@@ -34,6 +34,18 @@
  * DDL form, `SETTINGS` in any position, role changes, reserved schemas, output
  * redirection, and every table function — is refused.
  *
+ * ## Functions are allowlisted by name, in a third list
+ *
+ * Kinds and fields are not enough on their own. Every function call *and every
+ * operator* arrives as one `Function` node, so a walk that stops at the kind
+ * admits `getSetting()`, `currentUser()`, `hostName()` and `version()` — none
+ * of which reaches another tenant, and all of which publish more of the server
+ * than this API means to. `./functions.ts` is the name allowlist and carries
+ * the rule that governs it: a function is listed because a governed question
+ * needs it, never because it looks harmless. It is applied in two places,
+ * because a name reaches the walk in two shapes — a `Function` node, and the
+ * bare `func_name` string of an `APPLY` column transformer.
+ *
  * ## Table functions
  *
  * Refused **positionally**: a `TableExpression` carrying a `table_function` is
@@ -56,6 +68,10 @@
  * @see ../provisioning.ts — the database-layer isolation this backs up
  */
 
+import {
+  isAllowedGovernedFunction,
+  isGovernedAggregateFunction,
+} from "./functions";
 import {
   clickHouseSqlParser,
   type GovernedSqlParser,
@@ -82,6 +98,69 @@ export interface GovernedSqlParameter {
   readonly type: string;
 }
 
+/** A governed table as one query block named it. */
+export interface GovernedSqlTableReference {
+  /** Qualified and lowercased, the way {@link AcceptedGovernedSql.tables} is. */
+  readonly table: string;
+  /** The alias the block gave it, lowercased. Absent when it was named directly. */
+  readonly alias?: string;
+}
+
+/**
+ * One equality a `JOIN` was written on, with each side exactly as the caller
+ * wrote it — `t.TraceId`, not a resolved column.
+ *
+ * Resolving a side to a dataset is the reader's job, and
+ * {@link GovernedSqlQueryBlock.tables} is what it takes to do it: the qualifier
+ * is either an alias or a table name from that same list. The walk deliberately
+ * does not do it here, because doing so would mean deciding what an ambiguous
+ * or shadowed qualifier means — a judgement that belongs to whoever is asking,
+ * not to the gate.
+ */
+export interface GovernedSqlJoinEdge {
+  readonly left: string;
+  readonly right: string;
+}
+
+/**
+ * One `SELECT` block, and the structure the walk saw in it.
+ *
+ * Recorded because a diagnostic like `POSSIBLE_FANOUT` — aggregating at a
+ * parent's grain after a one-to-many join — is a question about the shape of
+ * the query, and the walk is the only pass that ever looks at the tree. Reading
+ * it back out later would mean parsing the statement a second time, and a
+ * second parse is a second answer waiting to disagree with the first.
+ */
+export interface GovernedSqlQueryBlock {
+  /**
+   * Governed tables this block reads, in first-seen order. CTE names are
+   * excluded for the same reason they are excluded from
+   * {@link AcceptedGovernedSql.tables}: a `WITH` name is its own block.
+   */
+  readonly tables: readonly GovernedSqlTableReference[];
+  /**
+   * The equalities this block's joins were written on.
+   *
+   * Only the conjunctive ones whose two sides are both plain column
+   * references: `ON a = b AND c = d` contributes two edges, while a side that
+   * is a function call, a literal, or one arm of an `OR` contributes none. The
+   * question these answer is which key columns were matched, and an equality
+   * that may or may not hold is not one of them.
+   */
+  readonly joins: readonly GovernedSqlJoinEdge[];
+  /** Whether the block carries `GROUP BY`, in any of its spellings. */
+  readonly groupBy: boolean;
+  /**
+   * Whether the block collapses rows with an aggregate.
+   *
+   * `false` for an aggregate used with `OVER`: a window function reads a frame
+   * and returns one value per row, which is the opposite of collapsing. A block
+   * with a join, no `groupBy` and no `aggregated` is the bare `SELECT` over a
+   * fanout that a diagnostic wants to warn about.
+   */
+  readonly aggregated: boolean;
+}
+
 /** A query that passed the gate, with the facts the walk established. */
 export interface AcceptedGovernedSql {
   readonly ok: true;
@@ -89,6 +168,11 @@ export interface AcceptedGovernedSql {
   readonly tables: readonly string[];
   /** Bound parameters the query declares, in first-seen order. */
   readonly parameters: readonly GovernedSqlParameter[];
+  /**
+   * One entry per `SELECT` block, in the order the walk met them — the
+   * outermost query first, then what it contains.
+   */
+  readonly blocks: readonly GovernedSqlQueryBlock[];
 }
 
 /** A query that was refused, and every reason found before the walk stopped. */
@@ -134,6 +218,20 @@ const UNRESOLVABLE_COLUMN_SETS: ReadonlySet<string> = new Set([
   "QualifiedColumnsRegexpMatcher",
 ]);
 
+/**
+ * A {@link GovernedSqlQueryBlock} while the walk is still filling it in.
+ *
+ * Mutable, and carried on the frame rather than looked up, so that whichever
+ * node learns a fact writes it to the block it is lexically inside — which is
+ * the only interpretation that stays right when blocks nest.
+ */
+interface BlockAccumulator {
+  readonly tables: GovernedSqlTableReference[];
+  readonly joins: GovernedSqlJoinEdge[];
+  groupBy: boolean;
+  aggregated: boolean;
+}
+
 /** Where the walk currently is, and what it has learned on the way down. */
 interface Frame {
   readonly clause: GovernedSqlClause;
@@ -143,6 +241,8 @@ interface Frame {
   readonly nodeDepth: number;
   /** CTE names visible here, lowercased. Not checked against the table policy. */
   readonly ctes: ReadonlySet<string>;
+  /** The `SELECT` block this node sits in. Absent above the outermost one. */
+  readonly block?: BlockAccumulator;
 }
 
 /** Everything the walk accumulates. */
@@ -151,6 +251,7 @@ interface WalkContext {
   readonly violations: GovernedSqlViolation[];
   readonly tables: Set<string>;
   readonly parameters: Map<string, string>;
+  readonly blocks: BlockAccumulator[];
 }
 
 interface NodeArgs {
@@ -511,12 +612,27 @@ function walkInterpolatedColumn({ value, node, frame, ctx }: FieldArgs): void {
 }
 
 // ---------------------------------------------------------------------------
-// `enter` hooks — the three places the frame changes
+// `enter` hooks — what a node decides before its fields are walked: the frame
+// its children see, whether it is refused outright, and what it contributes to
+// the block it sits in.
 // ---------------------------------------------------------------------------
 
-/** Brings this SELECT's CTE names into scope before anything else is walked. */
-function enterSelectQuery({ node, frame }: NodeArgs): Frame {
-  if (!Array.isArray(node.with)) return frame;
+/**
+ * Opens this SELECT's block and brings its CTE names into scope, before
+ * anything else is walked.
+ */
+function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
+  const block: BlockAccumulator = {
+    tables: [],
+    joins: [],
+    groupBy:
+      (Array.isArray(node.group_by) && node.group_by.length > 0) ||
+      node.group_by_all === true,
+    aggregated: false,
+  };
+  ctx.blocks.push(block);
+
+  if (!Array.isArray(node.with)) return { ...frame, block };
   const ctes = new Set(frame.ctes);
   for (const item of node.with) {
     if (
@@ -527,7 +643,7 @@ function enterSelectQuery({ node, frame }: NodeArgs): Frame {
       ctes.add(item.name.trim().toLowerCase());
     }
   }
-  return { ...frame, ctes };
+  return { ...frame, ctes, block };
 }
 
 /** Descends one query level, or refuses when that would pass the ceiling. */
@@ -551,6 +667,7 @@ function enterSubquery({ node, frame, ctx }: NodeArgs): Frame | null {
 interface LiteralTableReference {
   readonly name: string;
   readonly database?: string;
+  readonly alias?: string;
 }
 
 /**
@@ -566,7 +683,11 @@ function readTableReference(node: SqlAstNode): LiteralTableReference | null {
   if (typeof name !== "string") return null;
   if (database !== undefined && typeof database !== "string") return null;
   if (alias !== undefined && typeof alias !== "string") return null;
-  return database === undefined ? { name } : { name, database };
+  return {
+    name,
+    ...(database === undefined ? {} : { database }),
+    ...(alias === undefined ? {} : { alias }),
+  };
 }
 
 /** Checks a table reference against the reserved schemas, then the catalog. */
@@ -625,7 +746,143 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
     return null;
   }
   ctx.tables.add(qualified);
+  frame.block?.tables.push({
+    table: qualified,
+    ...(reference.alias ? { alias: reference.alias.trim().toLowerCase() } : {}),
+  });
   return frame;
+}
+
+/**
+ * How many nodes the join-key scan will look at before giving up.
+ *
+ * The scan runs inside {@link enterTableJoin}, which is *before* the walk's own
+ * depth ceiling has descended into the `ON` expression, so it cannot borrow
+ * that ceiling. A join condition big enough to reach this bound is one no
+ * diagnostic would say anything useful about anyway, and the query itself is
+ * still validated by the walk that follows.
+ */
+const MAX_JOIN_KEY_SCAN_NODES = 200;
+
+/** The name a side of a join equality was written with, or `null` if it is not a plain reference. */
+function joinSideName(value: unknown): string | null {
+  if (!isNode(value) || value.type !== "Identifier") return null;
+  return typeof value.name === "string" ? value.name : null;
+}
+
+/**
+ * The equality pairs a `JOIN` was written on.
+ *
+ * Descends `AND` only. An equality reached through an `OR`, a `NOT`, or any
+ * other function is not a key the join is guaranteed to have matched on, and
+ * recording it would tell a diagnostic that two datasets line up on a column
+ * when they may not.
+ */
+function collectJoinEdges({
+  node,
+  block,
+}: {
+  node: SqlAstNode;
+  block: BlockAccumulator;
+}): void {
+  if (Array.isArray(node.using)) {
+    // `USING (col)` matches the same name on both sides, which is exactly the
+    // pair an `ON` would have spelled out.
+    for (const element of node.using) {
+      const name = joinSideName(element);
+      if (name !== null) block.joins.push({ left: name, right: name });
+    }
+  }
+
+  const pending: unknown[] = [node.on];
+  let visited = 0;
+  while (pending.length > 0 && visited < MAX_JOIN_KEY_SCAN_NODES) {
+    visited += 1;
+    const current = pending.pop();
+    if (!isNode(current) || current.type !== "Function") continue;
+    if (!Array.isArray(current.arguments)) continue;
+    if (current.name === "and") {
+      pending.push(...current.arguments);
+      continue;
+    }
+    if (current.name !== "equals" || current.arguments.length !== 2) continue;
+    const left = joinSideName(current.arguments[0]);
+    const right = joinSideName(current.arguments[1]);
+    if (left !== null && right !== null) block.joins.push({ left, right });
+  }
+}
+
+/** Records the join's key pairs, then lets the walk validate the condition itself. */
+function enterTableJoin({ node, frame }: NodeArgs): Frame {
+  if (frame.block) collectJoinEdges({ node, block: frame.block });
+  return frame;
+}
+
+/**
+ * Applies the function allowlist, and notes an aggregate for the block.
+ *
+ * Reports and keeps descending rather than cutting the subtree off, so that a
+ * caller who used a refused function *and* a restricted field hears about both
+ * in one round trip.
+ */
+function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
+  const { name } = node;
+  if (typeof name !== "string") {
+    refuseUnrecognised({ node, frame, ctx });
+    return null;
+  }
+  if (!isAllowedGovernedFunction(name)) {
+    reportRefusedFunction({ name, node, frame, ctx });
+    return frame;
+  }
+  if (frame.block && isGovernedAggregateFunction(name) && !isWindowCall(node)) {
+    frame.block.aggregated = true;
+  }
+  return frame;
+}
+
+/** Whether this call is a window function rather than a row-collapsing aggregate. */
+function isWindowCall(node: SqlAstNode): boolean {
+  return (
+    node.kind === "WINDOW_FUNCTION" ||
+    node.is_window_function === true ||
+    node.window_definition !== undefined ||
+    node.window_name !== undefined
+  );
+}
+
+function reportRefusedFunction({
+  name,
+  node,
+  frame,
+  ctx,
+}: {
+  name: string;
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  report({
+    ctx,
+    frame,
+    code: "FUNCTION_NOT_ALLOWED",
+    message: `The function "${echoIdentifier(name)}" cannot be used here. Rewrite the expression using the functions this API supports.`,
+    node,
+  });
+}
+
+/**
+ * `APPLY(f)` on a column set names its function as a bare string rather than as
+ * a call, so the allowlist has to be applied here too — the one place a
+ * function reaches the walk without a `Function` node around it.
+ */
+function walkApplyFunctionName({ value, node, frame, ctx }: FieldArgs): void {
+  if (typeof value !== "string") {
+    refuseUnrecognised({ node, frame, ctx });
+    return;
+  }
+  if (isAllowedGovernedFunction(value)) return;
+  reportRefusedFunction({ name: value, node, frame, ctx });
 }
 
 /** Applies the content gate to a column reference. */
@@ -782,6 +1039,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     fields: { name: SCALAR, database: SCALAR, alias: SCALAR },
   },
   TableJoin: {
+    enter: enterTableJoin,
     fields: {
       // PASTE is absent deliberately: it joins by row position rather than by
       // key, which is not a shape the governed schema's joins are defined for.
@@ -859,6 +1117,10 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   Function: {
+    // On `enter` rather than as a rule for the `name` field, because a field
+    // rule only fires when the field is present: a `Function` node that
+    // arrived without a name would walk straight past a name check hung there.
+    enter: enterFunction,
     fields: {
       name: SCALAR,
       arguments: { kind: "nodes" },
@@ -926,7 +1188,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
   ColumnsTransformerList: { fields: { children: { kind: "nodes" } } },
   ColumnsApplyTransformer: {
     fields: {
-      func_name: SCALAR,
+      func_name: { kind: "custom", walk: walkApplyFunctionName },
       parameters: { kind: "node" },
       lambda: { kind: "node" },
       lambda_arg: SCALAR,
@@ -1019,6 +1281,12 @@ export function validateGovernedSql({
     ok: true,
     tables: [...ctx.tables],
     parameters: [...ctx.parameters].map(([name, type]) => ({ name, type })),
+    blocks: ctx.blocks.map((block) => ({
+      tables: [...block.tables],
+      joins: [...block.joins],
+      groupBy: block.groupBy,
+      aggregated: block.aggregated,
+    })),
   };
 }
 
@@ -1109,5 +1377,6 @@ function createWalkContext(policy: ResolvedGovernedSqlPolicy): WalkContext {
     violations: [],
     tables: new Set<string>(),
     parameters: new Map<string, string>(),
+    blocks: [],
   };
 }

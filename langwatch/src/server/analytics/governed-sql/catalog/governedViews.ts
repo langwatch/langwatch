@@ -49,6 +49,7 @@ const TRACES: GovernedViewDefinition = {
   sourceTable: "trace_summaries",
   description:
     "One row per trace, with its timing, token, cost and error rollups.",
+  gates: [],
   grain: "one row per (TenantId, TraceId), latest version only",
   joinKeys: ["TenantId", "TraceId"],
   timeColumn: "OccurredAt",
@@ -94,6 +95,7 @@ const TRACES: GovernedViewDefinition = {
     {
       name: "TotalDurationMs",
       type: "Int64",
+      unit: "ms",
       description: "Wall-clock duration of the whole trace, in milliseconds.",
       gates: [],
       sourceColumns: ["TotalDurationMs"],
@@ -101,6 +103,7 @@ const TRACES: GovernedViewDefinition = {
     {
       name: "TimeToFirstTokenMs",
       type: "Nullable(UInt32)",
+      unit: "ms",
       description: "Milliseconds until the first generated token.",
       gates: [],
       sourceColumns: ["TimeToFirstTokenMs"],
@@ -108,6 +111,7 @@ const TRACES: GovernedViewDefinition = {
     {
       name: "TimeToLastTokenMs",
       type: "Nullable(UInt32)",
+      unit: "ms",
       description: "Milliseconds until the last generated token.",
       gates: [],
       sourceColumns: ["TimeToLastTokenMs"],
@@ -115,6 +119,7 @@ const TRACES: GovernedViewDefinition = {
     {
       name: "TokensPerSecond",
       type: "Nullable(UInt32)",
+      unit: "tokens/s",
       description: "Generation throughput over the trace.",
       gates: [],
       sourceColumns: ["TokensPerSecond"],
@@ -150,6 +155,7 @@ const TRACES: GovernedViewDefinition = {
     {
       name: "TotalCost",
       type: "Nullable(Float64)",
+      unit: "USD",
       description: "Billed cost of the trace, in USD.",
       gates: ["costs"],
       sourceColumns: ["TotalCost"],
@@ -165,6 +171,7 @@ const TRACES: GovernedViewDefinition = {
     {
       name: "TotalPromptTokenCount",
       type: "Nullable(UInt32)",
+      unit: "tokens",
       description: "Prompt tokens across the trace.",
       gates: [],
       sourceColumns: ["TotalPromptTokenCount"],
@@ -172,6 +179,7 @@ const TRACES: GovernedViewDefinition = {
     {
       name: "TotalCompletionTokenCount",
       type: "Nullable(UInt32)",
+      unit: "tokens",
       description: "Completion tokens across the trace.",
       gates: [],
       sourceColumns: ["TotalCompletionTokenCount"],
@@ -277,6 +285,7 @@ const SPANS: GovernedViewDefinition = {
   name: "spans",
   sourceTable: "stored_spans",
   description: "One row per span, with its timing, status and attributes.",
+  gates: [],
   grain: "one row per (TenantId, TraceId, SpanId), latest version only",
   joinKeys: ["TenantId", "TraceId", "SpanId"],
   timeColumn: "StartTime",
@@ -334,6 +343,7 @@ const SPANS: GovernedViewDefinition = {
     {
       name: "DurationMs",
       type: "UInt64",
+      unit: "ms",
       description: "Span duration in milliseconds.",
       gates: [],
       sourceColumns: ["DurationMs"],
@@ -383,6 +393,7 @@ const SPANS: GovernedViewDefinition = {
     {
       name: "Cost",
       type: "Nullable(Float64)",
+      unit: "USD",
       description: "Billed cost attributed to the span, in USD.",
       gates: ["costs"],
       sourceColumns: ["Cost"],
@@ -390,6 +401,7 @@ const SPANS: GovernedViewDefinition = {
     {
       name: "NonBilledCost",
       type: "Nullable(Float64)",
+      unit: "USD",
       description: "Cost attributed to the span that is not billed, in USD.",
       gates: ["costs"],
       sourceColumns: ["NonBilledCost"],
@@ -442,6 +454,7 @@ const EVALUATIONS: GovernedViewDefinition = {
   name: "evaluations",
   sourceTable: "evaluation_runs",
   description: "One row per evaluation run, with its score and outcome.",
+  gates: [],
   grain: "one row per (TenantId, EvaluationId), latest version only",
   joinKeys: ["TenantId", "TraceId"],
   timeColumn: "ScheduledAt",
@@ -586,6 +599,7 @@ const SIMULATIONS: GovernedViewDefinition = {
   name: "simulations",
   sourceTable: "simulation_runs",
   description: "One row per simulation run, with its verdict and criteria.",
+  gates: [],
   grain: "one row per (TenantId, ScenarioRunId), latest version only",
   joinKeys: ["TenantId", "ScenarioRunId"],
   timeColumn: "StartedAt",
@@ -675,6 +689,7 @@ const SIMULATIONS: GovernedViewDefinition = {
     {
       name: "DurationMs",
       type: "Nullable(UInt64)",
+      unit: "ms",
       description: "How long the run took, in milliseconds.",
       gates: [],
       sourceColumns: ["DurationMs"],

@@ -26,6 +26,15 @@
  * have, and reusing the derivation is what makes it impossible rather than
  * merely unlikely.
  *
+ * ## A dataset the caller can read nothing in is absent, not empty
+ *
+ * A column stays listed because naming its gate is what makes the refusal
+ * actionable. A *dataset* with nothing readable in it has no such half-answer
+ * to give — every column would carry the same refusal, and the list would be a
+ * page of them. {@link governedVisibleViews} decides, and the validator agrees
+ * without a second arrangement: every column of an absent dataset is withheld,
+ * so referencing one is refused.
+ *
  * @see ./catalog/types.ts — the derivations this projects
  * @see specs/analytics/governed-sql-api.feature
  */
@@ -34,8 +43,11 @@ import type { FieldProtection } from "../../traces/projection/catalog";
 import type { Protections } from "../../traces/protections";
 import { GOVERNED_VIEW_CATALOG } from "./catalog/governedViews";
 import {
+  type GovernedColumnUnit,
   type GovernedViewDefinition,
+  governedColumnGates,
   governedGatedColumns,
+  governedVisibleViews,
 } from "./catalog/types";
 
 /** How many columns an example query names. Enough to be a template, not a dump. */
@@ -53,6 +65,14 @@ export interface GovernedSchemaColumn {
   /** ClickHouse type, exactly what a query gets back. */
   readonly type: string;
   readonly description: string;
+  /**
+   * What the values are measured in, or `null` when they are not measured in
+   * anything — an identifier, a name, a flag, a count or a score.
+   *
+   * Explicitly `null` rather than absent, so a consumer can tell "this column
+   * has no unit" from "this API is older than units".
+   */
+  readonly unit: GovernedColumnUnit | null;
   /**
    * Permissions that must *all* be held to reference this column. Empty for an
    * unrestricted column.
@@ -104,7 +124,7 @@ export function governedExampleSql({
   view: GovernedViewDefinition;
 }): string {
   const projection = view.columns
-    .filter((column) => column.gates.length === 0)
+    .filter((column) => governedColumnGates({ view, column }).length === 0)
     .slice(0, EXAMPLE_COLUMN_COUNT)
     .map((column) => column.name);
   return (
@@ -135,7 +155,7 @@ export function describeGovernedSchema({
   const withheld = new Set(governedGatedColumns({ protections, views }));
   return {
     database,
-    datasets: views.map((view) => ({
+    datasets: governedVisibleViews({ protections, views }).map((view) => ({
       name: `${database}.${view.name}`,
       description: view.description,
       grain: view.grain,
@@ -146,7 +166,8 @@ export function describeGovernedSchema({
         name: column.name,
         type: column.type,
         description: column.description,
-        gates: column.gates,
+        unit: column.unit ?? null,
+        gates: governedColumnGates({ view, column }),
         available: !withheld.has(column.name),
       })),
       exampleSql: governedExampleSql({ database, view }),

@@ -441,4 +441,157 @@ describe("validateGovernedSql", () => {
       );
     });
   });
+
+  /**
+   * The structural facts a diagnostic reads back off an accepted query. They
+   * are recorded by the same walk that validated it, so a case here is also a
+   * check that the walk saw the query the way a reader will assume it did.
+   */
+  describe("given an accepted query whose shape a diagnostic will read", () => {
+    const blocksOf = (sql: string) => {
+      const result = validate(sql, UNGATED_POLICY);
+      if (!result.ok) {
+        throw new Error(
+          `fixture SQL was refused: ${result.violations.map((v) => v.code).join(", ")}`,
+        );
+      }
+      return result.blocks;
+    };
+
+    it("records the datasets a block reads, with the aliases it gave them", () => {
+      expect(
+        blocksOf(
+          "SELECT t.TraceId FROM traces AS t JOIN analytics.spans AS s ON t.TraceId = s.TraceId",
+        )[0]?.tables,
+      ).toEqual([
+        { table: "analytics.traces", alias: "t" },
+        { table: "analytics.spans", alias: "s" },
+      ]);
+    });
+
+    it("omits an alias a block did not give", () => {
+      expect(blocksOf("SELECT TraceId FROM traces")[0]?.tables).toEqual([
+        { table: "analytics.traces" },
+      ]);
+    });
+
+    it("records every key pair an ON condition conjoins", () => {
+      expect(
+        blocksOf(
+          "SELECT t.TraceId FROM traces AS t JOIN spans AS s " +
+            "ON t.TenantId = s.TenantId AND t.TraceId = s.TraceId",
+        )[0]?.joins,
+      ).toEqual(
+        expect.arrayContaining([
+          { left: "t.TenantId", right: "s.TenantId" },
+          { left: "t.TraceId", right: "s.TraceId" },
+        ]),
+      );
+    });
+
+    it("records a USING join as the same column on both sides", () => {
+      expect(
+        blocksOf("SELECT TraceId FROM traces JOIN spans USING (TraceId)")[0]
+          ?.joins,
+      ).toEqual([{ left: "TraceId", right: "TraceId" }]);
+    });
+
+    /**
+     * An equality that only holds on one arm of an `OR` is not a key the join
+     * matched on, and neither is one over a computed value. Recording either
+     * would tell a fanout rule two datasets line up when they may not.
+     */
+    it.each([
+      [
+        "one arm of an OR",
+        "SELECT t.TraceId FROM traces AS t JOIN spans AS s ON t.TraceId = s.TraceId OR t.TenantId = s.TenantId",
+      ],
+      [
+        "a comparison of computed values",
+        "SELECT t.TraceId FROM traces AS t JOIN spans AS s ON lower(t.TraceId) = lower(s.TraceId)",
+      ],
+    ])("records no key pair for %s", (_case, sql) => {
+      expect(blocksOf(sql)[0]?.joins).toEqual([]);
+    });
+
+    it.each<[string, string, { groupBy: boolean; aggregated: boolean }]>([
+      [
+        "a plain projection",
+        "SELECT TraceId FROM traces",
+        { groupBy: false, aggregated: false },
+      ],
+      [
+        "an explicit grouping",
+        "SELECT Model, count() FROM traces GROUP BY Model",
+        { groupBy: true, aggregated: true },
+      ],
+      [
+        "GROUP BY ALL",
+        "SELECT Model, count() FROM traces GROUP BY ALL",
+        { groupBy: true, aggregated: true },
+      ],
+      [
+        "an aggregate with no grouping",
+        "SELECT count() FROM traces",
+        { groupBy: false, aggregated: true },
+      ],
+      [
+        "a conditional aggregate",
+        "SELECT countIf(Cost > 1) FROM traces",
+        { groupBy: false, aggregated: true },
+      ],
+      // A window function reads a frame and returns a value per row, so it
+      // collapses nothing — the distinction a fanout rule turns on.
+      [
+        "an aggregate used as a window function",
+        "SELECT sum(Cost) OVER (PARTITION BY Model) FROM traces",
+        { groupBy: false, aggregated: false },
+      ],
+      [
+        "a named window over an aggregate",
+        "SELECT sum(Cost) OVER w FROM traces WINDOW w AS (PARTITION BY Model)",
+        { groupBy: false, aggregated: false },
+      ],
+    ])("reports the shape of %s", (_case, sql, expected) => {
+      expect(blocksOf(sql)[0]).toMatchObject(expected);
+    });
+
+    it("gives every SELECT its own block, outermost first", () => {
+      const blocks = blocksOf(
+        "SELECT TraceId FROM (SELECT TraceId FROM traces GROUP BY TraceId)",
+      );
+
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0]).toMatchObject({ tables: [], groupBy: false });
+      expect(blocks[1]).toMatchObject({
+        tables: [{ table: "analytics.traces" }],
+        groupBy: true,
+      });
+    });
+
+    it("keeps a common table expression's aggregation out of the block that reads it", () => {
+      const blocks = blocksOf(
+        "WITH totals AS (SELECT TraceId, sum(Cost) AS spend FROM traces GROUP BY TraceId) " +
+          "SELECT TraceId, spend FROM totals",
+      );
+
+      expect(blocks.some((block) => block.groupBy && block.aggregated)).toBe(
+        true,
+      );
+      const outermost = blocks[0];
+      expect(outermost).toMatchObject({
+        tables: [],
+        groupBy: false,
+        aggregated: false,
+      });
+    });
+
+    it("gives each branch of a UNION its own block", () => {
+      const blocks = blocksOf(
+        "SELECT TraceId FROM traces UNION ALL SELECT count() FROM spans",
+      );
+
+      expect(blocks.map((block) => block.aggregated)).toEqual([false, true]);
+    });
+  });
 });

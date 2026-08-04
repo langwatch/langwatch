@@ -16,7 +16,11 @@ import { describe, expect, it } from "vitest";
 
 import type { Protections } from "../../../traces/protections";
 import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
-import { governedAllowedTables, governedGatedColumns } from "../catalog/types";
+import {
+  type GovernedViewDefinition,
+  governedAllowedTables,
+  governedGatedColumns,
+} from "../catalog/types";
 import { describeGovernedSchema } from "../schema";
 import { validateGovernedSql } from "../validation/validate";
 
@@ -86,6 +90,41 @@ describe("given the governed schema catalog", () => {
           `${column.dataset}.${column.name}`,
         ).not.toBe("");
       }
+    });
+
+    /**
+     * `null` rather than an absent key, because a consumer has to be able to
+     * tell "this column has no unit" from "this response predates units".
+     */
+    it("answers the unit question for every column, including with no", () => {
+      const columns = columnsOf(FULLY_PERMITTED);
+      for (const column of columns) {
+        expect(
+          Object.hasOwn(column, "unit"),
+          `${column.dataset}.${column.name} does not answer the unit question`,
+        ).toBe(true);
+      }
+      expect(
+        columns.filter((column) => column.unit === null).length,
+        "every column carries a unit — the null case is untested",
+      ).toBeGreaterThan(0);
+    });
+
+    it("publishes the unit of a measured column", () => {
+      const byName = new Map(
+        columnsOf(FULLY_PERMITTED).map((column) => [
+          `${column.dataset}.${column.name}`,
+          column,
+        ]),
+      );
+      expect(byName.get("analytics.traces.TotalDurationMs")!.unit).toBe("ms");
+      expect(byName.get("analytics.traces.TotalCost")!.unit).toBe("USD");
+      expect(byName.get("analytics.traces.TotalPromptTokenCount")!.unit).toBe(
+        "tokens",
+      );
+      expect(byName.get("analytics.spans.Cost")!.unit).toBe("USD");
+      // An identifier measures nothing, and says so.
+      expect(byName.get("analytics.traces.TraceId")!.unit).toBeNull();
     });
   });
 
@@ -218,6 +257,100 @@ describe("given the governed schema catalog", () => {
       for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
         expect(dataset.exampleSql, dataset.name).toContain(
           `WHERE ${dataset.timeColumn} >=`,
+        );
+      }
+    });
+  });
+
+  /**
+   * A dataset a caller may read nothing in. Exercised on a fixture, because no
+   * shipped dataset is gated as a whole — the catalog suite pins that — and a
+   * case written against the shipped catalog would be asserting that nothing
+   * happens. The code under test is the endpoint's, and it is the same code.
+   */
+  describe("when a dataset is outside the caller's permissions", () => {
+    const TRANSCRIPTS: GovernedViewDefinition = {
+      name: "transcripts",
+      sourceTable: "raw_transcripts",
+      description: "Everything said in a conversation, verbatim.",
+      gates: ["input"],
+      grain: "one row per (TenantId, TranscriptId)",
+      joinKeys: ["TenantId"],
+      timeColumn: "OccurredAt",
+      freshness: "seconds behind ingestion",
+      dedup: { keyColumns: ["TenantId"], versionColumn: "UpdatedAt" },
+      columns: [
+        {
+          name: "TranscriptId",
+          type: "String",
+          description: "Transcript identifier.",
+          gates: [],
+          sourceColumns: ["TranscriptId"],
+        },
+        {
+          name: "Spoken",
+          type: "String",
+          description: "What was said.",
+          gates: ["output"],
+          sourceColumns: ["Spoken"],
+        },
+      ],
+    };
+    const views = [...GOVERNED_VIEW_CATALOG, TRANSCRIPTS];
+    const schemaWith = (protections: Protections) =>
+      describeGovernedSchema({ database: DATABASE, protections, views });
+
+    it("leaves it out of the published schema entirely", () => {
+      expect(
+        schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name),
+      ).not.toContain("analytics.transcripts");
+    });
+
+    it("publishes it to a caller who holds the permission, so absence is about the permission", () => {
+      expect(
+        schemaWith(FULLY_PERMITTED).datasets.map((dataset) => dataset.name),
+      ).toContain("analytics.transcripts");
+    });
+
+    it("keeps every other dataset, rather than hiding the schema", () => {
+      expect(
+        schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name),
+      ).toEqual(
+        GOVERNED_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`),
+      );
+    });
+
+    it("names the dataset's permission on each of its columns", () => {
+      const dataset = schemaWith(FULLY_PERMITTED).datasets.find(
+        (candidate) => candidate.name === "analytics.transcripts",
+      )!;
+      expect(dataset.columns.map((column) => column.gates)).toEqual([
+        ["input"],
+        ["input", "output"],
+      ]);
+    });
+
+    /**
+     * The half that keeps the endpoint and the gate agreeing. A dataset the
+     * endpoint hides must not be quietly readable, and every column of it being
+     * withheld is what makes that true without a second mechanism.
+     */
+    it("refuses every column of the hidden dataset at the gate", () => {
+      const policy = {
+        allowedTables: governedAllowedTables({ database: DATABASE, views }),
+        gatedColumns: governedGatedColumns({
+          protections: WITHOUT_CONTENT,
+          views,
+        }),
+        defaultDatabase: DATABASE,
+      };
+      for (const column of TRANSCRIPTS.columns) {
+        const result = validateGovernedSql({
+          sql: `SELECT ${column.name} FROM analytics.transcripts`,
+          ...policy,
+        });
+        expect(result.ok, `${column.name} was readable in a hidden dataset`).toBe(
+          false,
         );
       }
     });

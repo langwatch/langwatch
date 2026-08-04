@@ -28,11 +28,15 @@ import {
 } from "../contentGating";
 import { GOVERNED_VIEW_CATALOG, governedViewByName } from "../governedViews";
 import {
+  GOVERNED_COLUMN_UNITS,
+  type GovernedViewDefinition,
   columnExpression,
   governedAllowedTables,
+  governedColumnGates,
   governedContentGatedColumns,
   governedGatedColumns,
   governedViewSourceColumns,
+  governedVisibleViews,
   isContentGated,
 } from "../types";
 
@@ -156,6 +160,61 @@ describe("given the governed view catalog", () => {
               `${view.name}.${column.name} names ${source} without qualifying it`,
             ).toBe(false);
           }
+        }
+      }
+    });
+
+    /**
+     * The expectation is derived from what the column *is* — its name and the
+     * sentence the endpoint publishes about it — rather than read back off the
+     * `unit` field, so a millisecond column added without a unit turns this red
+     * instead of agreeing with itself.
+     */
+    it("declares a unit on every column that measures something", () => {
+      let checked = 0;
+      for (const view of GOVERNED_VIEW_CATALOG) {
+        for (const column of view.columns) {
+          const where = `${view.name}.${column.name}`;
+          const expected =
+            column.name.endsWith("Ms")
+              ? "ms"
+              : /\bin USD\b/.test(column.description)
+                ? "USD"
+                : column.name.endsWith("TokenCount")
+                  ? "tokens"
+                  : null;
+          if (expected === null) continue;
+          checked += 1;
+          expect(column.unit, `${where} measures ${expected}`).toBe(expected);
+        }
+      }
+      expect(
+        checked,
+        "no column looks like it measures anything — this guard is inspecting nothing",
+      ).toBeGreaterThan(0);
+    });
+
+    it("declares no unit on a column that measures nothing", () => {
+      const unitless = GOVERNED_VIEW_CATALOG.flatMap((view) =>
+        view.columns.filter((column) => column.unit === undefined),
+      );
+      expect(unitless.length).toBeGreaterThan(0);
+      for (const column of unitless) {
+        expect(
+          /millisecond|in USD|tokens per/i.test(column.description),
+          `${column.name} describes a measurement but declares no unit`,
+        ).toBe(false);
+      }
+    });
+
+    it("uses only units from the published vocabulary", () => {
+      for (const view of GOVERNED_VIEW_CATALOG) {
+        for (const column of view.columns) {
+          if (column.unit === undefined) continue;
+          expect(
+            [...GOVERNED_COLUMN_UNITS],
+            `${view.name}.${column.name}`,
+          ).toContain(column.unit);
         }
       }
     });
@@ -357,6 +416,17 @@ describe("given the governed view catalog", () => {
     });
 
     /**
+     * A dataset can be gated as a whole, and the shipped catalog gates none —
+     * pinned here so that gating one is a decision someone made rather than a
+     * line that arrived with a copy-pasted entry.
+     */
+    it("gates no shipped dataset in its entirety", () => {
+      for (const view of GOVERNED_VIEW_CATALOG) {
+        expect(view.gates, `${view.name} is gated as a whole`).toEqual([]);
+      }
+    });
+
+    /**
      * A column requiring two permissions is withheld unless both are held.
      * Written as its own case because "some gate is missing" and "every gate is
      * missing" are easy to swap, and the swap only shows up on a column with
@@ -384,6 +454,120 @@ describe("given the governed view catalog", () => {
       for (const column of bothGates) {
         expect(outputOnly).toContain(column.name);
       }
+    });
+  });
+
+  /**
+   * Dataset-level gating, exercised on a fixture rather than on the shipped
+   * catalog — which gates no dataset, so a case written against it would assert
+   * that nothing happens. The mechanism is the same code either way, and the
+   * case above pins the shipped catalog's own answer.
+   */
+  describe("when a dataset is gated as a whole", () => {
+    const TRANSCRIPTS: GovernedViewDefinition = {
+      name: "transcripts",
+      sourceTable: "raw_transcripts",
+      description: "Everything said in a conversation, verbatim.",
+      gates: ["input"],
+      grain: "one row per (TenantId, TranscriptId)",
+      joinKeys: ["TenantId"],
+      timeColumn: "OccurredAt",
+      freshness: "seconds behind ingestion",
+      dedup: { keyColumns: ["TenantId"], versionColumn: "UpdatedAt" },
+      columns: [
+        {
+          name: "TenantId",
+          type: "String",
+          description: "Project the transcript belongs to.",
+          gates: [],
+          sourceColumns: ["TenantId"],
+        },
+        {
+          name: "Spoken",
+          type: "String",
+          description: "What was said.",
+          gates: ["output"],
+          sourceColumns: ["Spoken"],
+        },
+      ],
+    };
+    const views = [...GOVERNED_VIEW_CATALOG, TRANSCRIPTS];
+    const holding = (input: boolean, output: boolean) => ({
+      canSeeCapturedInput: input,
+      canSeeCapturedOutput: output,
+      canSeeCosts: true,
+    });
+
+    it("adds the dataset's permissions to every column's own", () => {
+      expect(
+        governedColumnGates({
+          view: TRANSCRIPTS,
+          column: TRANSCRIPTS.columns[0]!,
+        }),
+      ).toEqual(["input"]);
+      expect(
+        governedColumnGates({
+          view: TRANSCRIPTS,
+          column: TRANSCRIPTS.columns[1]!,
+        }),
+      ).toEqual(["input", "output"]);
+    });
+
+    it("leaves a column's gates alone when its dataset is ungated", () => {
+      const traces = governedViewByName("traces")!;
+      for (const column of traces.columns) {
+        expect(governedColumnGates({ view: traces, column })).toBe(
+          column.gates,
+        );
+      }
+    });
+
+    it("hides the dataset from a caller who lacks its permission", () => {
+      expect(
+        governedVisibleViews({
+          protections: holding(false, true),
+          views,
+        }).map((view) => view.name),
+      ).not.toContain("transcripts");
+    });
+
+    it("shows it to a caller who holds it, so the case above is about the permission", () => {
+      expect(
+        governedVisibleViews({ protections: holding(true, true), views }).map(
+          (view) => view.name,
+        ),
+      ).toContain("transcripts");
+    });
+
+    it("leaves every other dataset visible", () => {
+      expect(
+        governedVisibleViews({ protections: holding(false, false), views }).map(
+          (view) => view.name,
+        ),
+      ).toEqual(GOVERNED_VIEW_CATALOG.map((view) => view.name));
+    });
+
+    /**
+     * The half that keeps the schema endpoint and the validator agreeing: a
+     * dataset the endpoint hides has every column in the withheld set, so
+     * naming one is refused rather than silently answered.
+     */
+    it("withholds every column of the hidden dataset", () => {
+      const withheld = governedGatedColumns({
+        protections: holding(false, true),
+        views,
+      });
+      for (const column of TRANSCRIPTS.columns) {
+        expect(withheld, `${column.name} is readable in a hidden dataset`).toContain(
+          column.name,
+        );
+      }
+    });
+
+    it("withholds none of them from a caller holding the dataset's permission", () => {
+      expect(
+        governedGatedColumns({ protections: holding(true, true), views }),
+      ).toEqual([]);
     });
   });
 });

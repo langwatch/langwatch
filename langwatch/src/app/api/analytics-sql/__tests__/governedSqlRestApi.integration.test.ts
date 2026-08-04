@@ -44,8 +44,10 @@ import { GOVERNED_VIEW_CATALOG } from "~/server/analytics/governed-sql/catalog/g
 import {
   type GovernedClickHouseHarness,
   selectRows,
+  selectScalar,
   startGovernedClickHouse,
 } from "~/server/analytics/governed-sql/__tests__/governedClickHouseHarness";
+import type { GovernedViewDefinition } from "~/server/analytics/governed-sql/catalog/types";
 import {
   SHIPPED_GOVERNED_DEDUP,
   governedViewSetupStatements,
@@ -56,6 +58,8 @@ import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
+import { getProtectionsForProject } from "~/server/api/utils";
+import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "~/server/db";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -317,6 +321,35 @@ describe("given the governed analytics SQL REST endpoints", () => {
       `expected a refusal, got ${response.status}: ${JSON.stringify(body)}`,
     ).toBeGreaterThanOrEqual(400);
     return body;
+  };
+
+  /** Reads the schema endpoint as one project, asserting it answered. */
+  const readSchema = async (project: Project) => {
+    const response = await app.request(schemaPath(project), {
+      headers: { "X-Auth-Token": project.apiKey },
+    });
+    expect(response.status).toBe(200);
+    return (await response.json()) as Record<string, any>;
+  };
+
+  /**
+   * Puts the process-wide service back to what a deployment would build.
+   *
+   * Two cases swap it for one with a different ceiling or a different catalog,
+   * and a swap left in place would silently become the configuration every
+   * later case ran against.
+   */
+  const restoreShippedService = () => {
+    setGovernedSqlService(
+      new GovernedSqlService({
+        executor: createGovernedSqlExecutor({
+          ...harness.restrictedConnection(),
+          database,
+          tenantSetting: harness.names.tenantSetting,
+        }),
+        database,
+      }),
+    );
   };
 
   /** Administrator-side row count per tenant: the control behind every zero-rows claim. */
@@ -776,14 +809,6 @@ describe("given the governed analytics SQL REST endpoints", () => {
   describe("when the schema endpoint is called", () => {
     /** @scenario "The schema endpoint names which permission unlocks each gated column" */
     it("names the permission that unlocks each withheld column, per caller", async () => {
-      const readSchema = async (project: Project) => {
-        const response = await app.request(schemaPath(project), {
-          headers: { "X-Auth-Token": project.apiKey },
-        });
-        expect(response.status).toBe(200);
-        return (await response.json()) as any;
-      };
-
       const permitted = await readSchema(openProject);
       const gated = await readSchema(gatedProject);
 
@@ -839,6 +864,180 @@ describe("given the governed analytics SQL REST endpoints", () => {
         headers: { "X-Auth-Token": openProject.apiKey },
       });
       expect(response.status).toBe(404);
+    });
+
+    /** @scenario "Authenticated client discovers its governed schema scoped to its own permissions" */
+    it("describes every dataset it publishes, down to what its numbers are measured in", async () => {
+      for (const project of [openProject, gatedProject]) {
+        const schema = await readSchema(project);
+
+        expect(schema.datasets.length).toBeGreaterThan(0);
+        for (const dataset of schema.datasets) {
+          const where = `${project.slug}: ${dataset.name}`;
+          expect(dataset.description, where).not.toBe("");
+          expect(dataset.grain, where).not.toBe("");
+          expect(dataset.freshness, where).not.toBe("");
+          expect(dataset.timeColumn, where).not.toBe("");
+          expect(dataset.joinKeys.length, where).toBeGreaterThan(0);
+          expect(dataset.exampleSql, where).toContain(dataset.name);
+
+          for (const column of dataset.columns) {
+            const at = `${where}.${column.name}`;
+            expect(column.type, at).not.toBe("");
+            expect(column.description, at).not.toBe("");
+            // The content restrictions, per column: which permissions it needs
+            // and whether this caller holds them.
+            expect(Array.isArray(column.gates), at).toBe(true);
+            expect(typeof column.available, at).toBe("boolean");
+            // Units are answered for every column, `null` where there is none.
+            expect(Object.hasOwn(column, "unit"), at).toBe(true);
+          }
+        }
+
+        const units = schema.datasets.flatMap((dataset: any) =>
+          dataset.columns
+            .filter((column: any) => column.unit !== null)
+            .map((column: any) => column.unit),
+        );
+        expect(
+          new Set(units),
+          "no column published a unit — the assertion above passes on all-null",
+        ).toContain("ms");
+        expect(new Set(units)).toContain("USD");
+      }
+    });
+
+    /**
+     * A dataset the caller may read nothing in. Driven with a catalog that has
+     * one, because the shipped catalog gates no dataset as a whole — a case
+     * written against it would be asserting that nothing happens, which is not
+     * what the scenario claims. The endpoint, the auth path and the permission
+     * derivation under test are the shipped ones.
+     */
+    /** @scenario "Authenticated client discovers its governed schema scoped to its own permissions" */
+    it("leaves out a dataset the caller's permissions do not reach", async () => {
+      const transcripts: GovernedViewDefinition = {
+        name: "transcripts",
+        sourceTable: "raw_transcripts",
+        description: "Everything said in a conversation, verbatim.",
+        gates: ["input"],
+        grain: "one row per (TenantId, TranscriptId)",
+        joinKeys: ["TenantId"],
+        timeColumn: "OccurredAt",
+        freshness: "seconds behind ingestion",
+        dedup: { keyColumns: ["TenantId"], versionColumn: "UpdatedAt" },
+        columns: [
+          {
+            name: "TranscriptId",
+            type: "String",
+            description: "Transcript identifier.",
+            gates: [],
+            sourceColumns: ["TranscriptId"],
+          },
+        ],
+      };
+
+      setGovernedSqlService(
+        new GovernedSqlService({
+          executor: createGovernedSqlExecutor({
+            ...harness.restrictedConnection(),
+            database,
+            tenantSetting: harness.names.tenantSetting,
+          }),
+          database,
+          views: [...GOVERNED_VIEW_CATALOG, transcripts],
+        }),
+      );
+      try {
+        const names = async (project: Project) =>
+          (await readSchema(project)).datasets.map(
+            (dataset: any) => dataset.name,
+          );
+
+        // The gated project's data-privacy rule withholds captured input, so
+        // the dataset that needs it is not there at all.
+        expect(await names(gatedProject)).not.toContain(
+          `${database}.transcripts`,
+        );
+        // The same catalog, a caller who holds the permission: present. Absence
+        // is about the permission and not about the fixture.
+        expect(await names(openProject)).toContain(`${database}.transcripts`);
+      } finally {
+        restoreShippedService();
+      }
+    });
+
+    /**
+     * Whether the fail-closed derivation in `governedGatedColumns` — which
+     * withholds unless a permission is explicitly `true` — can be exercised end
+     * to end, settled here rather than re-argued.
+     *
+     * It cannot be reached with *unresolved* permissions:
+     * `getUserProtectionsForProject` assigns an explicit boolean to
+     * `canSeeCapturedInput` and `canSeeCapturedOutput` on every one of its
+     * return paths, including the `catch` that runs when the policy resolver is
+     * down (which returns explicit `false`), and `getProtectionsForProject`
+     * pins `canSeeCosts: true` for every API key. So on this path
+     * `=== true` and `!== false` are the same test, which is why inverting the
+     * check survives this suite. The `=== true` form is still the correct one,
+     * because the fields are optional and the service takes `Protections` from
+     * callers that are not this route — and that is where the unit suite pins
+     * it (`catalog/__tests__/governedViewCatalog.unit.test.ts`).
+     *
+     * The two cases below are the guard on that reasoning: the shape claim, and
+     * the resolver outage the claim leans on.
+     */
+    it("resolves an explicit answer for every permission, never an unresolved one", async () => {
+      for (const project of [openProject, gatedProject]) {
+        const protections = await getProtectionsForProject(prisma, {
+          projectId: project.id,
+        });
+        expect(
+          typeof protections.canSeeCapturedInput,
+          `${project.slug} resolved an unresolved input permission`,
+        ).toBe("boolean");
+        expect(
+          typeof protections.canSeeCapturedOutput,
+          `${project.slug} resolved an unresolved output permission`,
+        ).toBe("boolean");
+        expect(protections.canSeeCosts).toBe(true);
+      }
+    });
+
+    it("withholds content end to end when the policy resolver is down", async () => {
+      const service = getDataPrivacyPolicyService();
+      const outage = vi
+        .spyOn(service, "getResolvedForProject")
+        .mockRejectedValue(new Error("policy store unreachable"));
+      try {
+        const schema = await readSchema(openProject);
+        const contentColumns = schema.datasets.flatMap((dataset: any) =>
+          dataset.columns.filter(
+            (column: any) =>
+              column.gates.includes("input") || column.gates.includes("output"),
+          ),
+        );
+        expect(
+          contentColumns.length,
+          "no column is content-gated — this case is inspecting nothing",
+        ).toBeGreaterThan(0);
+        for (const column of contentColumns) {
+          expect(
+            column.available,
+            `${column.name} stayed readable through a resolver outage`,
+          ).toBe(false);
+        }
+
+        const refused = await refuse(
+          openProject,
+          `SELECT CapturedInput FROM ${database}.traces`,
+        );
+        expect(
+          refused.violations.map((violation: any) => violation.code),
+        ).toContain("GATED_COLUMN");
+      } finally {
+        outage.mockRestore();
+      }
     });
   });
 
@@ -926,104 +1125,225 @@ describe("given the governed analytics SQL REST endpoints", () => {
           "RESULT_TRUNCATED",
         ]);
       } finally {
-        setGovernedSqlService(
-          new GovernedSqlService({
-            executor: createGovernedSqlExecutor({
-              ...harness.restrictedConnection(),
-              database,
-              tenantSetting: harness.names.tenantSetting,
-            }),
-            database,
-          }),
-        );
+        restoreShippedService();
       }
     });
   });
 
   describe("when the caller asks the server about its own session", () => {
     /**
-     * Characterization, not an endorsement — and the reason the feature file's
-     * "Query database credentials never reach the caller" scenario is
-     * deliberately left unbound by this suite.
+     * The inversion of what this suite used to record.
      *
-     * The validator allowlists node *kinds*, not function names, so
-     * `currentUser()` and `getSetting()` parse, pass the gate, and answer. What
-     * they answer is this caller's own session: the shared restricted identity
-     * the gateway runs as, and the capability derived from the caller's own
-     * project key — nothing of another tenant's, and no credential. So it is
-     * not a leak, and it *is* the most direct evidence there is that the
-     * gateway executes as the restricted identity with the right capability
-     * rather than borrowing the application's own connection.
+     * Until the validator allowlisted function *names*, `currentUser()` and
+     * `getSetting()` parsed, passed the gate, and answered. What they answered
+     * was this caller's own session — the shared restricted identity and a
+     * capability derived from the caller's own project key — so nothing of
+     * another tenant's and no credential. It was still more of the server than
+     * this API publishes, and while it was reachable the feature file's
+     * "Query database credentials never reach the caller" scenario could not
+     * honestly be bound. It is refused now, and the scenario is bound below.
      *
-     * It is still more of the server than this API means to publish. Closing it
-     * needs a function allowlist in the validator, which this slice does not
-     * own; when one lands, this test is where the change is noticed.
+     * The evidence the old test carried — that the gateway really does execute
+     * as the restricted identity with this caller's capability — has not been
+     * dropped. It moved one layer down, to the positive control in that
+     * scenario, which puts the same two questions to the database directly.
      */
-    it("answers as the restricted identity, carrying this caller's own capability", async () => {
+    const SESSION_PROBES: readonly [string, (setting: string) => string][] = [
+      ["the identity queries run as", () => "currentUser()"],
+      [
+        "the tenant capability the gateway sends",
+        (setting) => `getSetting('${setting}')`,
+      ],
+      ["the machine the server runs on", () => "hostName()"],
+      ["the server build", () => "version()"],
+      ["the database the connection is bound to", () => "currentDatabase()"],
+    ];
+
+    it.each(SESSION_PROBES)(
+      "refuses a query asking for %s",
+      async (_case, call) => {
+        const body = await refuse(
+          openProject,
+          `SELECT ${call(harness.names.tenantSetting)} AS value FROM ${database}.traces`,
+        );
+
+        expect(body.error).toBe("governed_sql_not_permitted");
+        expect(
+          body.violations.map((violation: any) => violation.code),
+        ).toEqual(["FUNCTION_NOT_ALLOWED"]);
+      },
+    );
+
+    it("still answers the same query shape with a function it does support", async () => {
       const body = await run(
         openProject,
-        `SELECT currentUser() AS identity, ` +
-          `getSetting('${harness.names.tenantSetting}') AS capability`,
+        `SELECT now() AS value FROM ${database}.traces LIMIT 1`,
       );
-
-      expect(
-        body.rows[0].identity,
-        "the gateway did not execute as the restricted identity",
-      ).toBe(harness.names.restrictedUser);
-      expect(
-        body.rows[0].capability,
-        "the gateway sent a capability that is not this caller's",
-      ).toBe(governedTenantCapability({ apiKey: openProject.apiKey }));
+      expect(body.rows).toHaveLength(1);
     });
   });
 
   describe("when a response or an error is inspected for internals", () => {
     /**
-     * Deliberately unbound: this proves responses and errors never *volunteer*
-     * an internal, which is narrower than the feature file's scenario, and the
-     * gap is named in the characterization above.
+     * The two directions the scenario names, and a control for each.
+     *
+     * *Volunteered*: a mix of answers and refusals, none of which mentions an
+     * internal in the SQL that produced it, checked against every internal this
+     * deployment has. *Asked for*: the same internals requested outright —
+     * through a function, through the system schema, through the physical
+     * table — and refused.
+     *
+     * Absence assertions pass against a server that never held the value, so
+     * each direction opens with a control that produces it. The session
+     * internals are read back as the restricted identity, which is the identity
+     * the gateway itself runs as; the database's own error text is captured by
+     * running the failing statement there directly. Both are then asserted
+     * absent from everything the gateway returned.
      */
-    it("never volunteers a credential, a server setting, a physical table name, or another tenant", async () => {
+    /** @scenario "Query database credentials never reach the caller" */
+    it("never carries a credential, a server setting, a physical table name, or another tenant — volunteered or asked for", async () => {
       const connection = harness.restrictedConnection();
       // Every request below is made as the gated project, so the *open*
       // project is the other tenant, and its very existence is one of the
       // things an error must not disclose.
+      const capability = governedTenantCapability({
+        apiKey: gatedProject.apiKey,
+      });
+
+      // Control, one layer down: the session facts asserted absent below are
+      // exactly what the database answers when the same two questions are put
+      // to it directly, as the identity the gateway runs as.
+      const restricted = await harness.restrictedClient({
+        keyHash: capability,
+      });
+      expect(
+        await selectScalar<string>(restricted, "SELECT currentUser() AS value"),
+        "the gateway does not run as the identity these assertions name",
+      ).toBe(harness.names.restrictedUser);
+      expect(
+        await selectScalar<string>(
+          restricted,
+          `SELECT getSetting('${harness.names.tenantSetting}') AS value`,
+        ),
+        "the capability these assertions name is not the one the database sees",
+      ).toBe(capability);
+
+      // Control for the database's own voice: a statement the gate accepts and
+      // ClickHouse then refuses. Its message is what an unfiltered error path
+      // would relay, so it is captured here and asserted absent below.
+      const failing = `SELECT CAST(TraceName AS UInt64) AS value FROM ${database}.traces`;
+      const databaseError = await selectScalar<string>(restricted, failing).then(
+        () => "",
+        (error: unknown) => String((error as Error)?.message ?? ""),
+      );
+      expect(
+        databaseError,
+        "the statement meant to fail inside the database succeeded — the control below is vacuous",
+      ).not.toBe("");
+      // Fragments of the database's own diagnostic, taken from the message it
+      // just produced rather than guessed at. `__table1` is the alias
+      // ClickHouse gives the view internally, and appears nowhere a caller
+      // could have written — so finding either of these in a response could
+      // only mean the database's words were relayed verbatim.
+      const relayed = ["__table1", "while executing"].filter((fragment) =>
+        databaseError.includes(fragment),
+      );
+      expect(
+        relayed,
+        `the database error carries none of the fragments asserted absent: ${databaseError}`,
+      ).not.toEqual([]);
+
       const secrets = [
         connection.password,
         connection.username,
         connection.url,
         harness.names.tenantSetting,
-        governedTenantCapability({ apiKey: gatedProject.apiKey }),
+        harness.names.settingsProfile,
+        capability,
         harness.names.keyMapTable,
         openProject.id,
         openProject.apiKey,
         ...GOVERNED_VIEW_CATALOG.map((view) => view.sourceTable),
         facts,
+        ...relayed,
       ];
 
-      // A mix of answers and refusals: the leak surface is both.
-      const responses = await Promise.all(
-        [
-          `SELECT count() AS value FROM ${database}.traces`,
-          `SELECT * FROM ${database}.nowhere`,
-          `SELECT CapturedInput FROM ${database}.traces`,
-          "SELECT FROM WHERE )(",
-          `SELECT count() FROM ${database}.traces SETTINGS max_threads = 1`,
-          `DROP TABLE ${database}.traces`,
-        ].map((sql) => post(gatedProject, { sql })),
-      );
+      const probes: readonly {
+        sql: string;
+        answered: boolean;
+        parameters?: Record<string, unknown>;
+      }[] = [
+        // Volunteered: ordinary answers and ordinary refusals.
+        { sql: `SELECT count() AS value FROM ${database}.traces`, answered: true },
+        { sql: `SELECT * FROM ${database}.nowhere`, answered: false },
+        { sql: `SELECT CapturedInput FROM ${database}.traces`, answered: false },
+        { sql: "SELECT FROM WHERE )(", answered: false },
+        {
+          sql: `SELECT count() FROM ${database}.traces SETTINGS max_threads = 1`,
+          answered: false,
+        },
+        { sql: `DROP TABLE ${database}.traces`, answered: false },
+        // A statement the gate accepts and the database refuses: the one path
+        // where the error the caller sees originates below the gateway.
+        { sql: failing, answered: false },
+        // Asked for outright.
+        {
+          sql: `SELECT currentUser() AS value FROM ${database}.traces`,
+          answered: false,
+        },
+        {
+          sql: `SELECT hostName() AS value FROM ${database}.traces`,
+          answered: false,
+        },
+        { sql: "SELECT name, value FROM system.settings", answered: false },
+        {
+          sql: `SELECT name FROM system.tables WHERE database = '${database}'`,
+          answered: false,
+        },
+        // Another tenant's existence, asked for by id. It runs — and the row
+        // policy is what makes the answer empty rather than the gate.
+        {
+          sql: `SELECT count() AS value FROM ${database}.traces WHERE TenantId = {tenant:String}`,
+          answered: true,
+          parameters: { tenant: openProject.id },
+        },
+      ];
+
       const bodies = await Promise.all(
-        responses.map((response) => response.text()),
+        probes.map(async (probe) => {
+          const response = await post(gatedProject, {
+            sql: probe.sql,
+            ...(probe.parameters ? { parameters: probe.parameters } : {}),
+          });
+          expect(
+            response.status === 200,
+            `${probe.sql} — expected ${probe.answered ? "an answer" : "a refusal"}, got ${response.status}`,
+          ).toBe(probe.answered);
+          return { sql: probe.sql, text: await response.text() };
+        }),
       );
 
-      for (const body of bodies) {
+      for (const { sql, text } of bodies) {
         for (const secret of secrets) {
           expect(
-            body.includes(secret),
-            `a response leaked "${secret}": ${body}`,
+            text.includes(secret),
+            `"${secret}" reached the caller through: ${sql}\n${text}`,
           ).toBe(false);
         }
       }
+    });
+
+    it("answers nothing about the other tenant, so the probe above is not empty for the wrong reason", async () => {
+      expect(
+        await adminRowCount("trace_summaries", openProject.id),
+        "the other tenant has no rows — its absence from the answer proves nothing",
+      ).toBeGreaterThan(0);
+      const body = await run(
+        gatedProject,
+        `SELECT count() AS value FROM ${database}.traces WHERE TenantId = {tenant:String}`,
+        { tenant: openProject.id },
+      );
+      expect(Number(body.rows[0].value)).toBe(0);
     });
   });
 

@@ -355,13 +355,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   # Public API (later PR of this issue — #6480)
   # ---------------------------------------------------------------------------
 
-  # @unimplemented: the endpoint ships, and publishes descriptions, types, grain,
-  # freshness, join keys, per-column content restrictions and example SQL — but
-  # two of this scenario's claims are not delivered. The catalog declares no unit
-  # per column, and permissions gate COLUMNS rather than datasets, so no dataset
-  # is ever absent. Both need a catalog change, which is a slice of its own; the
-  # part that does ship is bound by the scenario below.
-  @integration @unimplemented
+  @integration
   Scenario: Authenticated client discovers its governed schema scoped to its own permissions
     Given an authenticated API client
     When it calls the schema discovery endpoint
@@ -521,8 +515,14 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When it submits SQL using postgresql, url, s3, remote, or any table function
     Then the gateway rejects the query by AST policy
 
-  # @unimplemented: gateway error envelope lands with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @unit
+  Scenario: Only the functions a governed question needs can be called
+    Given the governed analytics SQL policy
+    When a query calls a function outside the set the governed questions need
+    Then the query is refused before it reaches the database
+    And the functions those questions are written in are accepted
+
+  @integration
   Scenario: Query database credentials never reach the caller
     Given an authenticated API client
     When any governed query succeeds or fails
@@ -691,10 +691,10 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 # Product:
 # AC "schema discovery scoped to own permissions"
 #   → Scenario: Authenticated client discovers its governed schema scoped to its own permissions
-#     (still @unimplemented: no per-column unit, and permissions gate columns rather
-#      than datasets — both need a catalog change)
+#     (the catalog carries a per-column unit and a dataset-level gate; a dataset
+#      the caller can read nothing in is absent rather than listed-and-refused)
 #   → Scenario: The schema endpoint names which permission unlocks each gated column
-#     (the shipped half: per-column gate kinds, not a collapsed boolean)
+#     (per-column gate kinds, not a collapsed boolean)
 # AC "execute native ClickHouse SQL via REST" → Scenario: Client executes native ClickHouse SQL through the documented REST endpoint
 # AC "typed columns, rows, stats, truncation, diagnostics" → Scenario: Results carry typed columns, rows, execution statistics, truncation state, and diagnostics
 # AC "parameterized queries re-run deterministically"
@@ -744,9 +744,14 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 # AC "table functions blocked by AST policy and grants"
 #   → Scenario: Table functions are rejected for the restricted identity by grants
 #   → Scenario: External and table-function access is blocked by AST policy before reaching the database
+#   → Scenario: Only the functions a governed question needs can be called
+#     (the name allowlist beside the positional table-function rule: a function
+#      is listed because a governed question needs it, never because it looks harmless)
 # AC "credentials never reach the caller"
 #   → Scenario: PG connection credentials are not exposed to the restricted identity
 #   → Scenario: Query database credentials never reach the caller
+#     (both directions — never volunteered, and refused when asked for outright,
+#      which is what the function allowlist made true)
 # AC "missing parser/identity/policy fails closed" → Scenario: Missing parser, restricted identity, or row policy fails closed
 #
 # Resource safety:

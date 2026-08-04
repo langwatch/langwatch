@@ -25,6 +25,25 @@ import type { FieldProtection } from "../../../traces/projection/catalog";
 import type { Protections } from "../../../traces/protections";
 
 /**
+ * What a column's numbers are measured in.
+ *
+ * A closed vocabulary, and deliberately short: a unit is here because a column
+ * genuinely has one, not so that every column can carry a label. A count has no
+ * unit beyond the thing counted, which its name already says, and a score is
+ * whatever the evaluator decided — publishing "score" as a unit would be
+ * inventing a fact. Written with the standard symbol where one exists, because
+ * `ms` and `USD` are the notation, not an abbreviation of the word.
+ */
+export const GOVERNED_COLUMN_UNITS = [
+  "ms",
+  "USD",
+  "tokens",
+  "tokens/s",
+] as const;
+
+export type GovernedColumnUnit = (typeof GOVERNED_COLUMN_UNITS)[number];
+
+/**
  * One exposed column.
  *
  * `gates` is a set rather than a single value because a column can require more
@@ -39,6 +58,14 @@ export interface GovernedViewColumn {
   readonly type: string;
   /** One line, for the schema endpoint. Says what the value means, not how it is stored. */
   readonly description: string;
+  /**
+   * What the values are measured in, when they are measured in anything.
+   *
+   * Absent is the honest answer for an identifier, a flag, a name, a count or a
+   * score — and it is a different answer from a unit nobody got round to
+   * filling in, which is why there is no placeholder value.
+   */
+  readonly unit?: GovernedColumnUnit;
   /**
    * Permissions a caller must hold to reference this column, all of them.
    *
@@ -96,6 +123,21 @@ export interface GovernedViewDefinition {
   readonly sourceTable: string;
   /** One line for the schema endpoint. */
   readonly description: string;
+  /**
+   * Permissions a caller must hold to reach the dataset at all.
+   *
+   * Every column inherits them ({@link governedColumnGates}), which is what
+   * makes a dataset the caller may not reach *absent* from the published
+   * schema and refused by the validator, rather than merely awkward to use.
+   * Declared explicitly rather than defaulted, so that adding a dataset means
+   * answering the question.
+   *
+   * Empty for every dataset shipped today: none of them is content in its
+   * entirety — a caller with no content permission can still count runs, read
+   * verdicts and group by model. A dataset that *is* content end to end — a raw
+   * conversation store — is what this exists for.
+   */
+  readonly gates: readonly FieldProtection[];
   /** What one row of the view is, after deduplication. */
   readonly grain: string;
   /** Columns another governed view can be joined to this one on. */
@@ -114,9 +156,35 @@ export interface GovernedViewDefinition {
   readonly columns: readonly GovernedViewColumn[];
 }
 
-/** Whether a column carries captured customer content. */
+/**
+ * Whether a column carries captured customer content.
+ *
+ * Reads the column's own gates only. The view generator uses this to decide
+ * what a view's SQL must filter out, and a dataset-level gate says who may read
+ * the dataset rather than what the values are — a distinction that matters,
+ * because a view has no viewer and cannot filter by permission.
+ */
 export function isContentGated(column: GovernedViewColumn): boolean {
   return column.gates.includes("input") || column.gates.includes("output");
+}
+
+/**
+ * Every permission a caller needs to reference one column: the dataset's, then
+ * the column's own.
+ *
+ * The union rather than either half, because both are real. A column of a
+ * gated dataset is unreadable for two independent reasons and the schema
+ * endpoint publishes both, so a caller told what to ask for is told all of it.
+ */
+export function governedColumnGates({
+  view,
+  column,
+}: {
+  view: GovernedViewDefinition;
+  column: GovernedViewColumn;
+}): readonly FieldProtection[] {
+  if (view.gates.length === 0) return column.gates;
+  return [...new Set([...view.gates, ...column.gates])];
 }
 
 /**
@@ -194,17 +262,58 @@ export function governedGatedColumns({
   protections: Protections;
   views: readonly GovernedViewDefinition[];
 }): readonly string[] {
+  const held = heldPermissions(protections);
+  const withheld = views.flatMap((view) =>
+    view.columns
+      .filter((column) =>
+        governedColumnGates({ view, column }).some((gate) => !held.has(gate)),
+      )
+      .map((column) => column.name),
+  );
+  return [...new Set(withheld)].sort();
+}
+
+/**
+ * The permissions a caller holds.
+ *
+ * Fail-closed: only an explicit `true` counts, so the shape
+ * `getUserProtectionsForProject` returns when the policy resolver is down
+ * grants nothing.
+ */
+function heldPermissions(protections: Protections): ReadonlySet<FieldProtection> {
   const held = new Set<FieldProtection>();
   if (protections.canSeeCapturedInput === true) held.add("input");
   if (protections.canSeeCapturedOutput === true) held.add("output");
   if (protections.canSeeCosts === true) held.add("costs");
+  return held;
+}
 
-  const withheld = views.flatMap((view) =>
-    view.columns
-      .filter((column) => column.gates.some((gate) => !held.has(gate)))
-      .map((column) => column.name),
+/**
+ * The datasets a caller can reach, in catalog order.
+ *
+ * A dataset drops out when the caller may read nothing in it — either because
+ * the dataset itself is gated on a permission they lack, or because every one
+ * of its columns is. Those are the same fact from two directions, so they are
+ * one rule rather than two: what makes a dataset absent is that there is
+ * nothing in it for this caller, however that came about.
+ *
+ * The schema endpoint publishes exactly these. The validator needs no separate
+ * arrangement — every column of an absent dataset is in
+ * {@link governedGatedColumns}, so referencing one is refused.
+ */
+export function governedVisibleViews({
+  protections,
+  views,
+}: {
+  protections: Protections;
+  views: readonly GovernedViewDefinition[];
+}): readonly GovernedViewDefinition[] {
+  const held = heldPermissions(protections);
+  return views.filter((view) =>
+    view.columns.some((column) =>
+      governedColumnGates({ view, column }).every((gate) => held.has(gate)),
+    ),
   );
-  return [...new Set(withheld)].sort();
 }
 
 /** Every column of every view that carries captured content, sorted. */

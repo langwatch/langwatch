@@ -41,6 +41,14 @@ export const GOVERNED_SQL_VIOLATION_CODES = [
   "TABLE_NOT_ALLOWED",
   /** A table function was used as a source. */
   "TABLE_FUNCTION",
+  /**
+   * A function outside the allowlist was called.
+   *
+   * Its own code rather than `UNSUPPORTED_SYNTAX` because the remedy differs:
+   * the query's *shape* is fine and one expression has to be rewritten, which
+   * is a far shorter distance to travel than "this is not a read query".
+   */
+  "FUNCTION_NOT_ALLOWED",
   /** A restricted field was referenced. */
   "GATED_COLUMN",
   /** A wildcard column set was selected while restricted fields exist. */
