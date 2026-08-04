@@ -147,8 +147,18 @@ class Client(LangWatchClientProtocol):
                 ):
                     self.__shutdown_tracer_provider()
                     self.__setup_tracer_provider()
-            if endpoint_url is not None and endpoint_url != Client._endpoint_url:
-                Client._endpoint_url = endpoint_url
+            # Normalized before the comparison, so reconfiguring with the same
+            # endpoint written differently ("https://host/" for "https://host")
+            # is recognized as unchanged and does not restart the exporter.
+            # A value that normalizes to nothing is treated as not supplied
+            # rather than as the cloud default: this instance already has an
+            # endpoint, and silently moving a self-hosted client to the cloud
+            # is worse than ignoring a blank argument.
+            normalized_endpoint = (
+                normalize_endpoint(endpoint_url) if endpoint_url is not None else None
+            )
+            if normalized_endpoint and normalized_endpoint != Client._endpoint_url:
+                Client._endpoint_url = normalized_endpoint
                 if (
                     not Client._skip_open_telemetry_setup
                     and not Client._disable_sending

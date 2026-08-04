@@ -63,6 +63,33 @@ class TestClientSetup:
         finally:
             Client.reset_for_testing()
 
+    def test_normalizes_when_reconfiguring_an_existing_instance(self) -> None:
+        Client.reset_for_testing()
+        try:
+            Client(
+                api_key="test-key",
+                endpoint_url="https://first.example.com",
+                skip_open_telemetry_setup=True,
+            )
+            reconfigured = Client(endpoint_url="  https://second.example.com///  ")
+            assert reconfigured.endpoint_url == "https://second.example.com"
+        finally:
+            Client.reset_for_testing()
+
+    def test_keeps_the_endpoint_when_reconfigured_with_a_blank_value(self) -> None:
+        """A blank argument must not move a self-hosted client to the cloud."""
+        Client.reset_for_testing()
+        try:
+            Client(
+                api_key="test-key",
+                endpoint_url="https://self.hosted.example.com",
+                skip_open_telemetry_setup=True,
+            )
+            reconfigured = Client(endpoint_url="   ")
+            assert reconfigured.endpoint_url == "https://self.hosted.example.com"
+        finally:
+            Client.reset_for_testing()
+
     def test_stores_the_endpoint_without_its_trailing_slash(self) -> None:
         Client.reset_for_testing()
         try:
