@@ -33,7 +33,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
 import { governedPostgresViews } from "../catalog/types";
-import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../provisioning";
+import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../postgresMapping";
 import {
   governedPostgresReaderConnectionLimit,
   governedViewSetupStatements,

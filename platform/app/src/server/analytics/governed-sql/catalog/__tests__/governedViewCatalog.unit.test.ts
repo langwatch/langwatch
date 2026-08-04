@@ -20,6 +20,7 @@ import {
   type ContentCategory,
 } from "../../../../data-privacy/dataPrivacy.types";
 import { CONTENT_KEY_CATALOG } from "../../../../data-privacy/dropKeyCatalog";
+import { GATED_DATASET } from "../../__tests__/gatedDatasetFixture";
 import {
   CONTENT_ATTRIBUTE_KEYS,
   contentKeyExclusionSql,
@@ -30,7 +31,6 @@ import { GOVERNED_VIEW_CATALOG, governedViewByName } from "../governedViews";
 import {
   columnExpression,
   GOVERNED_COLUMN_UNITS,
-  type GovernedViewDefinition,
   governedAllowedTables,
   governedColumnGates,
   governedContentGatedColumns,
@@ -119,13 +119,22 @@ describe("given the governed view catalog", () => {
           continue;
         }
 
+        // Asserted before the grant loop, not inside it: `versionColumn` is
+        // optional, and an entry that forgot it would otherwise fail as
+        // "deduplicates on undefined without granting it" — which reads as a
+        // broken guard rather than as the missing declaration it is.
+        expect(
+          view.dedup.versionColumn,
+          `${view.name} is ClickHouse-resident and declares no version column, so its view would silently double-count`,
+        ).toBeDefined();
+
         // A ClickHouse-resident view builds its own dedup subquery, so the same
         // columns must additionally be granted on the source table — even when
         // nothing exposes them — or that subquery cannot be evaluated.
         const sourceColumns = governedViewSourceColumns(view);
         for (const column of [
           ...view.dedup.keyColumns,
-          view.dedup.versionColumn,
+          view.dedup.versionColumn!,
         ]) {
           expect(
             sourceColumns,
@@ -486,34 +495,7 @@ describe("given the governed view catalog", () => {
    * case above pins the shipped catalog's own answer.
    */
   describe("when a dataset is gated as a whole", () => {
-    const TRANSCRIPTS: GovernedViewDefinition = {
-      name: "transcripts",
-      sourceTable: "raw_transcripts",
-      description: "Everything said in a conversation, verbatim.",
-      gates: ["input"],
-      grain: "one row per (TenantId, TranscriptId)",
-      joinKeys: ["TenantId"],
-      timeColumn: "OccurredAt",
-      freshness: "seconds behind ingestion",
-      dedup: { keyColumns: ["TenantId"], versionColumn: "UpdatedAt" },
-      columns: [
-        {
-          name: "TenantId",
-          type: "String",
-          description: "Project the transcript belongs to.",
-          gates: [],
-          sourceColumns: ["TenantId"],
-        },
-        {
-          name: "Spoken",
-          type: "String",
-          description: "What was said.",
-          gates: ["output"],
-          sourceColumns: ["Spoken"],
-        },
-      ],
-    };
-    const views = [...GOVERNED_VIEW_CATALOG, TRANSCRIPTS];
+    const views = [...GOVERNED_VIEW_CATALOG, GATED_DATASET];
     const holding = (input: boolean, output: boolean) => ({
       canSeeCapturedInput: input,
       canSeeCapturedOutput: output,
@@ -523,14 +505,14 @@ describe("given the governed view catalog", () => {
     it("adds the dataset's permissions to every column's own", () => {
       expect(
         governedColumnGates({
-          view: TRANSCRIPTS,
-          column: TRANSCRIPTS.columns[0]!,
+          view: GATED_DATASET,
+          column: GATED_DATASET.columns[0]!,
         }),
       ).toEqual(["input"]);
       expect(
         governedColumnGates({
-          view: TRANSCRIPTS,
-          column: TRANSCRIPTS.columns[1]!,
+          view: GATED_DATASET,
+          column: GATED_DATASET.columns[1]!,
         }),
       ).toEqual(["input", "output"]);
     });
@@ -550,7 +532,7 @@ describe("given the governed view catalog", () => {
           protections: holding(false, true),
           views,
         }).map((view) => view.name),
-      ).not.toContain("transcripts");
+      ).not.toContain(GATED_DATASET.name);
     });
 
     it("shows it to a caller who holds it, so the case above is about the permission", () => {
@@ -558,7 +540,7 @@ describe("given the governed view catalog", () => {
         governedVisibleViews({ protections: holding(true, true), views }).map(
           (view) => view.name,
         ),
-      ).toContain("transcripts");
+      ).toContain(GATED_DATASET.name);
     });
 
     it("leaves every other dataset visible", () => {
@@ -579,7 +561,7 @@ describe("given the governed view catalog", () => {
         protections: holding(false, true),
         views,
       });
-      for (const column of TRANSCRIPTS.columns) {
+      for (const column of GATED_DATASET.columns) {
         expect(
           withheld,
           `${column.name} is readable in a hidden dataset`,

@@ -75,11 +75,15 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When it executes a query whose SQL text overrides the tenant setting with a guessed value
     Then no tenant-b row is returned
 
+  # No LangWatch error code applies here: the restricted identity executes below
+  # the API boundary, so the stable code is ClickHouse's own. The same attempt
+  # made through the gateway is refused earlier, as governed_sql_not_permitted
+  # with a SETTINGS_CLAUSE violation.
   @integration
   Scenario: Overriding a pinned setting in query text is rejected by profile constraints
     Given the restricted identity carries tenant-a's valid key-hash context
     When it executes a query whose SQL text attempts to change a pinned setting
-    Then the query is rejected with a settings-constraint error
+    Then the query is rejected by the database with ClickHouse error READONLY (164)
 
   @integration
   Scenario: Row policy holds inside a CTE
@@ -437,7 +441,9 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: A parameterized query missing a bound value is refused before execution
     Given an authenticated API client
     When it submits a parameterized query without a value for one of its parameters
-    Then the query is refused with a coded error naming the missing parameter
+    Then the query is refused with error code governed_sql_parameter_missing at HTTP 400
+    And the response names every parameter the SQL declares that the request left unset
+    And the fault is the caller's, and the remediation tells them to send a value for each declared parameter
     And the query never reaches the database
 
   # ---------------------------------------------------------------------------
@@ -545,7 +551,9 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: Content-gated fields are refused in every expression position
     Given an authenticated API client without content permissions
     When it references a content-gated field in projection, filter, group, order, having, join, window, or subquery position
-    Then the query is rejected
+    Then the query is rejected with error code governed_sql_not_permitted at HTTP 400
+    And every refusal names the GATED_COLUMN rule, so the caller learns which field to drop
+    And the fault is the caller's, and the remediation points them at the fields the schema endpoint lists for their key
     And the gated-field set matches the canonical visibility policy
 
   @integration
@@ -564,13 +572,17 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   Scenario: External and table-function access is blocked by AST policy before reaching the database
     Given an authenticated API client
     When it submits SQL using postgresql, url, s3, remote, or any table function
-    Then the gateway rejects the query by AST policy
+    Then the gateway rejects the query by AST policy with error code governed_sql_not_permitted at HTTP 400
+    And every refusal names the TABLE_FUNCTION rule, which a rejection by the database could not produce
+    And the fault is the caller's, and the remediation tells them to read only the datasets the schema endpoint lists
 
   @unit
   Scenario: Only the functions a governed question needs can be called
     Given the governed analytics SQL policy
     When a query calls a function outside the set the governed questions need
     Then the query is refused before it reaches the database
+    And the refusal names the FUNCTION_NOT_ALLOWED rule and the function it refused, so the caller knows what to change
+    And the boundary carries it as error code governed_sql_not_permitted, a caller fault
     And the functions those questions are written in are accepted
 
   @integration

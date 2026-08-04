@@ -13,10 +13,10 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-/** `…/validation/__tests__` → `langwatch/` */
+/** `…/validation/__tests__` → `platform/app/` */
 const APP_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
-/** `langwatch/` → repository root */
-const REPO_ROOT = join(APP_ROOT, "..");
+/** `platform/app/` → repository root */
+const REPO_ROOT = join(APP_ROOT, "..", "..");
 const ADR_ROOT = join(REPO_ROOT, "dev", "docs", "adr");
 const GOVERNED_SQL_ROOT = join(
   APP_ROOT,
@@ -50,6 +50,23 @@ const GRAMMAR_EXTENSIONS = [
 /** Module names that would mean we had built a front end of our own. */
 const OWN_FRONT_END_PATTERN =
   /(grammar|lexer|tokeni[sz]|compiler|codegen|\bir\b)/i;
+
+/**
+ * The ADR that owns the table-function and SSRF policy.
+ *
+ * Named rather than discovered by text search: ownership is a decision, and a
+ * search finds whichever ADR happens to mention both terms. Anchoring it here
+ * means an ADR-081 that stopped documenting the policy fails as exactly that,
+ * rather than as a corpus-wide count nobody can read.
+ */
+const POLICY_ADR = "081-governed-sql-table-function-and-ssrf-policy.md";
+
+/**
+ * Both spellings, because the ADR uses both: hyphenated in its filename and in
+ * compound adjectives, spaced in ordinary prose. A pattern that accepted only
+ * one made ownership depend on which sentence the author happened to write.
+ */
+const TABLE_FUNCTION_PATTERN = /table[\s-]function/i;
 
 function readManifest(): {
   dependencies: Record<string, string>;
@@ -142,22 +159,47 @@ describe("what the governed SQL API ships", () => {
           text: readFileSync(join(ADR_ROOT, name), "utf8"),
         }));
 
-      const matching = adrs.filter(
-        ({ text }) => /table function/i.test(text) && /SSRF/i.test(text),
-      );
+      // Ownership first, keyed on the filename, so a policy that stopped being
+      // documented fails as "ADR-081 no longer covers it" rather than as a
+      // count over every ADR in the repository.
+      const policy = adrs.find(({ name }) => name === POLICY_ADR);
+      expect(
+        policy,
+        `${POLICY_ADR} owns the table-function and SSRF policy and is not in ${ADR_ROOT}`,
+      ).toBeDefined();
+      if (!policy) throw new Error("unreachable: presence asserted above");
 
       expect(
-        matching.map(({ name }) => name),
-        "exactly one ADR owns the table-function and SSRF policy",
-      ).toHaveLength(1);
-
-      const policy = matching[0];
-      if (!policy) throw new Error("unreachable: length asserted above");
+        policy.text,
+        `${POLICY_ADR} no longer documents the table-function policy`,
+      ).toMatch(TABLE_FUNCTION_PATTERN);
+      expect(
+        policy.text,
+        `${POLICY_ADR} no longer documents the SSRF policy`,
+      ).toMatch(/SSRF/i);
 
       // Both mechanisms, because the ADR's job is to stop either one being
       // mistaken for the whole boundary.
       expect(policy.text, "names the AST half").toMatch(/AST/);
       expect(policy.text, "names the grants half").toMatch(/grant/i);
+
+      // Uniqueness second, and it means something different: a reader who
+      // follows the index must land on one answer, not two that could diverge.
+      //
+      // Read off the *filename*, not the body. A body search cannot tell an ADR
+      // that owns the policy from one that cites it, and the sibling governed-SQL
+      // ADRs legitimately cite it — 082 and 084 both name table functions and
+      // SSRF while deciding something else entirely. An ADR *titled* for the
+      // policy is the ambiguity worth failing on.
+      expect(
+        adrs
+          .filter(
+            ({ name }) =>
+              TABLE_FUNCTION_PATTERN.test(name) && /ssrf/i.test(name),
+          )
+          .map(({ name }) => name),
+        "a second ADR is named for the table-function and SSRF policy, so which one governs is ambiguous",
+      ).toEqual([POLICY_ADR]);
 
       expect(
         readFileSync(join(ADR_ROOT, "README.md"), "utf8"),

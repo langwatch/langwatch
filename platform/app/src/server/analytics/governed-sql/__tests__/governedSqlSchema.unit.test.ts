@@ -16,13 +16,13 @@ import { describe, expect, it } from "vitest";
 
 import type { Protections } from "../../../traces/protections";
 import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
-import {
-  type GovernedViewDefinition,
-  governedAllowedTables,
-  governedGatedColumns,
-} from "../catalog/types";
+import { governedAllowedTables, governedGatedColumns } from "../catalog/types";
 import { describeGovernedSchema } from "../schema";
 import { validateGovernedSql } from "../validation/validate";
+import {
+  GATED_DATASET,
+  GATED_DATASET_QUALIFIED_NAME,
+} from "./gatedDatasetFixture";
 
 const DATABASE = "analytics";
 
@@ -262,53 +262,27 @@ describe("given the governed schema catalog", () => {
   });
 
   /**
-   * A dataset a caller may read nothing in. Exercised on a fixture, because no
-   * shipped dataset is gated as a whole — the catalog suite pins that — and a
-   * case written against the shipped catalog would be asserting that nothing
-   * happens. The code under test is the endpoint's, and it is the same code.
+   * A dataset a caller may read nothing in. Exercised on the shared fixture
+   * (`./gatedDatasetFixture`), because no shipped dataset is gated as a whole —
+   * the catalog suite pins that — and a case written against the shipped
+   * catalog would be asserting that nothing happens. The code under test is the
+   * endpoint's, and it is the same code.
    */
   describe("when a dataset is outside the caller's permissions", () => {
-    const TRANSCRIPTS: GovernedViewDefinition = {
-      name: "transcripts",
-      sourceTable: "raw_transcripts",
-      description: "Everything said in a conversation, verbatim.",
-      gates: ["input"],
-      grain: "one row per (TenantId, TranscriptId)",
-      joinKeys: ["TenantId"],
-      timeColumn: "OccurredAt",
-      freshness: "seconds behind ingestion",
-      dedup: { keyColumns: ["TenantId"], versionColumn: "UpdatedAt" },
-      columns: [
-        {
-          name: "TranscriptId",
-          type: "String",
-          description: "Transcript identifier.",
-          gates: [],
-          sourceColumns: ["TranscriptId"],
-        },
-        {
-          name: "Spoken",
-          type: "String",
-          description: "What was said.",
-          gates: ["output"],
-          sourceColumns: ["Spoken"],
-        },
-      ],
-    };
-    const views = [...GOVERNED_VIEW_CATALOG, TRANSCRIPTS];
+    const views = [...GOVERNED_VIEW_CATALOG, GATED_DATASET];
     const schemaWith = (protections: Protections) =>
       describeGovernedSchema({ database: DATABASE, protections, views });
 
     it("leaves it out of the published schema entirely", () => {
       expect(
         schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name),
-      ).not.toContain("analytics.transcripts");
+      ).not.toContain(GATED_DATASET_QUALIFIED_NAME);
     });
 
     it("publishes it to a caller who holds the permission, so absence is about the permission", () => {
       expect(
         schemaWith(FULLY_PERMITTED).datasets.map((dataset) => dataset.name),
-      ).toContain("analytics.transcripts");
+      ).toContain(GATED_DATASET_QUALIFIED_NAME);
     });
 
     it("keeps every other dataset, rather than hiding the schema", () => {
@@ -321,7 +295,7 @@ describe("given the governed schema catalog", () => {
 
     it("names the dataset's permission on each of its columns", () => {
       const dataset = schemaWith(FULLY_PERMITTED).datasets.find(
-        (candidate) => candidate.name === "analytics.transcripts",
+        (candidate) => candidate.name === GATED_DATASET_QUALIFIED_NAME,
       )!;
       expect(dataset.columns.map((column) => column.gates)).toEqual([
         ["input"],
@@ -343,9 +317,9 @@ describe("given the governed schema catalog", () => {
         }),
         defaultDatabase: DATABASE,
       };
-      for (const column of TRANSCRIPTS.columns) {
+      for (const column of GATED_DATASET.columns) {
         const result = validateGovernedSql({
-          sql: `SELECT ${column.name} FROM analytics.transcripts`,
+          sql: `SELECT ${column.name} FROM ${GATED_DATASET_QUALIFIED_NAME}`,
           ...policy,
         });
         expect(

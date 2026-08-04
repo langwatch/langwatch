@@ -57,13 +57,15 @@ import {
 } from "./catalog/types";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
+  postgresApprovedViewStatement,
+  postgresEngineTableStatement,
+} from "./postgresMapping";
+import {
   type GovernedSqlNames,
   type GovernedTable,
   governedGrantStatement,
   governedRowPolicyStatement,
   KEY_MAP_COLUMNS,
-  postgresApprovedViewStatement,
-  postgresEngineTableStatement,
 } from "./provisioning";
 
 /**

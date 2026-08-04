@@ -296,6 +296,31 @@ export function createGovernedSqlService(
   });
 }
 
+/**
+ * ## Why this is not on the application container — do not copy the pattern
+ *
+ * The house rule is that a server-side caller obtains a service from
+ * `getApp()`, and a module-level cache with an exported setter is a second
+ * dependency-injection mechanism. This slice keeps the local one anyway, and
+ * the reason is the container's lifecycle rather than a preference:
+ *
+ *  - `App`'s fields are `readonly` and it is built once by `initializeApp`.
+ *    There is no per-field override, so a suite swapping the executor means
+ *    `resetApp()` plus a full re-initialisation with different dependencies.
+ *  - The endpoint suites swap the executor *between describe blocks* — a
+ *    Testcontainers-backed one, a throwing one, a lowered-ceilings one — half a
+ *    dozen times per file. On the container that is half a dozen full app
+ *    teardowns, each closing the event-sourcing and Redis handles the rest of
+ *    the file still needs.
+ *
+ * Migrating is therefore a change to `dependencies.ts`, `presets.ts`, `app.ts`,
+ * the barrel, the route and both endpoint suites, and it changes their
+ * lifecycle rather than only their wiring. That is a slice of its own, not a
+ * late edit to this one.
+ *
+ * The setter is reachable from anything importing the barrel, and that is a
+ * real cost: nothing but a test should ever call it.
+ */
 let cached: GovernedSqlService | null = null;
 
 /** The process-wide service, built from the environment on first use. */
@@ -308,8 +333,10 @@ export function getGovernedSqlService(): GovernedSqlService {
  * Replaces the process-wide service, or clears it so the next read rebuilds
  * from the environment.
  *
- * The seam the endpoint suite wires a Testcontainers-provisioned executor
- * through, and the seam a deployment slice will wire the real one through.
+ * **Tests only.** The seam the endpoint suites wire a Testcontainers-provisioned
+ * executor through. Production code builds its service from the environment and
+ * never calls this — see the note above for why the container is not the seam
+ * in this slice.
  */
 export function setGovernedSqlService(
   service: GovernedSqlService | null,

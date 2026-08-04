@@ -264,7 +264,7 @@ interface BlockAccumulator {
 interface Frame {
   readonly clause: GovernedSqlClause;
   /** Sticky: once inside a nested query, every violation reports `subquery`. */
-  readonly inSubquery: boolean;
+  readonly isInSubquery: boolean;
   readonly subqueryDepth: number;
   readonly nodeDepth: number;
   /** CTE names visible here, lowercased. Not checked against the table policy. */
@@ -363,7 +363,7 @@ function report({
   const at = node ? positionOf(node) : undefined;
   ctx.violations.push({
     code,
-    clause: frame.inSubquery ? "subquery" : frame.clause,
+    clause: frame.isInSubquery ? "subquery" : frame.clause,
     message,
     ...(at ? { at } : {}),
   });
@@ -690,7 +690,7 @@ function enterSubquery({ node, frame, ctx }: NodeArgs): Frame | null {
     });
     return null;
   }
-  return { ...frame, subqueryDepth, inSubquery: true, clause: "subquery" };
+  return { ...frame, subqueryDepth, isInSubquery: true, clause: "subquery" };
 }
 
 /** A table reference written out in literal names, which is the only kind allowed. */
@@ -1403,7 +1403,7 @@ const NO_CTES: ReadonlySet<string> = new Set<string>();
 
 const ROOT_FRAME: Frame = {
   clause: "statement",
-  inSubquery: false,
+  isInSubquery: false,
   subqueryDepth: 0,
   nodeDepth: 0,
   ctes: NO_CTES,

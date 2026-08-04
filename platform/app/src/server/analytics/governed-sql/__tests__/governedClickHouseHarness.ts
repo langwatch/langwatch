@@ -81,17 +81,19 @@ import {
   governedPostgresViews,
 } from "../catalog/types";
 import {
+  DEFAULT_POSTGRES_READER_LIMITS,
+  postgresNamedCollectionStatements,
+  postgresReaderRoleStatements,
+} from "../postgresMapping";
+import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML,
   clickHouseAccessManagementConfigXml,
-  DEFAULT_POSTGRES_READER_LIMITS,
   type GovernedSqlNames,
   type GovernedTable,
   governedClickHouseSetupStatements,
   governedRowPolicyStatement,
-  postgresNamedCollectionStatements,
-  postgresReaderRoleStatements,
 } from "../provisioning";
 import {
   governedApprovedPostgresViewNames,

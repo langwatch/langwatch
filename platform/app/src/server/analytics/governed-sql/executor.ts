@@ -31,8 +31,12 @@
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/observability";
 
 import { translateClickHouseQueryError } from "~/server/app-layer/clients/clickhouse/translate-query-error";
+import { DEFAULT_GOVERNED_RESOURCE_LIMITS } from "./provisioning";
+
+const logger = createLogger("langwatch:analytics:governed-sql:executor");
 
 /** One column of a result, as the server typed it. */
 export interface GovernedSqlColumn {
@@ -161,6 +165,33 @@ function elapsedMs(elapsedSeconds: number | undefined): number {
 }
 
 /**
+ * How long the driver waits on a governed query, in milliseconds.
+ *
+ * Deliberately *above* the shipped profile's `max_execution_time`, and derived
+ * from it rather than written twice: the server's ceiling is the one a caller
+ * can act on, because it arrives as a coded `query_timeout`. A socket the
+ * driver abandoned first arrives as an unknown transport failure for the same
+ * underlying event, which tells the caller nothing and pages us instead of
+ * them. The margin covers the round trip and the server's own cancellation.
+ *
+ * A deployment that provisions the profile with a *higher* execution ceiling
+ * has to raise this with it, or it gets the transport failure back.
+ */
+const GOVERNED_REQUEST_TIMEOUT_MS =
+  (DEFAULT_GOVERNED_RESOURCE_LIMITS.maxExecutionTimeSeconds + 5) * 1000;
+
+/**
+ * Sockets this process may hold open against the governed endpoint at once.
+ *
+ * Stated rather than defaulted so the governed pool is a decision: it is a
+ * second pool beside the application's own ClickHouse client, and the two
+ * compete for the same server's connection budget. Pinned at the driver's own
+ * default — there is no measurement saying otherwise yet — so that raising it
+ * is a change someone makes on purpose.
+ */
+const GOVERNED_MAX_OPEN_CONNECTIONS = 10;
+
+/**
  * An executor that runs governed SQL as the restricted identity.
  *
  * The client is built here rather than taken as an argument so that the two
@@ -176,6 +207,8 @@ export function createGovernedSqlExecutor(
     username: connection.username,
     password: connection.password,
     database: connection.database,
+    request_timeout: GOVERNED_REQUEST_TIMEOUT_MS,
+    max_open_connections: GOVERNED_MAX_OPEN_CONNECTIONS,
   });
 
   return {
@@ -227,6 +260,13 @@ export function createGovernedSqlExecutor(
  * application's own ClickHouse: an unconfigured deployment must refuse governed
  * queries, and a partially-configured one must refuse them too. Every field is
  * required for exactly that reason.
+ *
+ * The two cases are indistinguishable to a caller and must not be to an
+ * operator, so a partial configuration is logged with the names it is missing.
+ * They are not read through the validated env module: the variables are
+ * optional by design — most deployments provision no governed identity — and an
+ * optional entry there would not reject a misspelling either, while making them
+ * required would refuse to boot every deployment that does not run this API.
  */
 export function governedSqlConnectionFromEnv(): GovernedSqlConnection | null {
   const url = process.env.GOVERNED_SQL_CLICKHOUSE_URL;
@@ -234,7 +274,34 @@ export function governedSqlConnectionFromEnv(): GovernedSqlConnection | null {
   const password = process.env.GOVERNED_SQL_CLICKHOUSE_PASSWORD;
   const database = process.env.GOVERNED_SQL_DATABASE;
   const tenantSetting = process.env.GOVERNED_SQL_TENANT_SETTING;
+
+  const required = [
+    ["GOVERNED_SQL_CLICKHOUSE_URL", url],
+    ["GOVERNED_SQL_CLICKHOUSE_USER", username],
+    ["GOVERNED_SQL_CLICKHOUSE_PASSWORD", password],
+    ["GOVERNED_SQL_DATABASE", database],
+    ["GOVERNED_SQL_TENANT_SETTING", tenantSetting],
+  ] as const;
+  const absent = required.filter(([, value]) => !value).map(([name]) => name);
+
+  if (absent.length > 0) {
+    // A deployment that set *some* of these meant to enable the API and got a
+    // silent refusal on every query instead, so name what is missing. One that
+    // set none is simply not running the API and says nothing. Variable names
+    // only, never their values — one of these is a password.
+    if (absent.length < required.length) {
+      logger.warn(
+        { absent },
+        "governed SQL is partially configured, so every query will be refused",
+      );
+    }
+    return null;
+  }
+  // Re-checked rather than asserted: `absent` is computed by a callback, which
+  // TypeScript cannot use to narrow these five, and reaching for `!` here would
+  // silently outlive someone editing the list above.
   if (!url || !username || !password || !database || !tenantSetting)
     return null;
+
   return { url, username, password, database, tenantSetting };
 }

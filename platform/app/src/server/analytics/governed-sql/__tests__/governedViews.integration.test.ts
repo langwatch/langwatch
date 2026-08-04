@@ -201,7 +201,8 @@ describe("given the governed views provisioned over the shipped fact tables", ()
         );
         expect(
           actual.length,
-          `${view.name} exposes no columns — the view was not created`,
+          `${view.name} exposes ${actual.length} columns, the catalog declares ${view.columns.length}` +
+            (actual.length === 0 ? " — the view was not created" : ""),
         ).toBe(view.columns.length);
 
         const wrong = view.columns
@@ -323,13 +324,22 @@ describe("given the governed views provisioned over the shipped fact tables", ()
           (view) => view.name === "simulations",
         ),
       });
+      // Before the try, because the `finally` reattaches the policy using this
+      // same entry: a catalog rename would otherwise throw inside the try and
+      // then throw again while restoring, masking the first failure and leaving
+      // the source table unpoliced for every case after this one.
+      if (!sourceTable) {
+        throw new Error(
+          `governed-sql views suite: "simulations" is not in the shipped catalog, so there is no source table to detach a policy from`,
+        );
+      }
 
       let tenantsWithoutPolicy: string[] = [];
       try {
         await harness.applyAsAdmin([
           dropGovernedRowPolicyStatement({
             names: harness.names,
-            table: sourceTable!.table,
+            table: sourceTable.table,
             database: facts,
           }),
         ]);
@@ -343,7 +353,7 @@ describe("given the governed views provisioned over the shipped fact tables", ()
         await harness.applyAsAdmin([
           governedRowPolicyStatement({
             names: harness.names,
-            governedTable: sourceTable!,
+            governedTable: sourceTable,
           }),
         ]);
       }
@@ -781,17 +791,25 @@ describe("given the governed views provisioned over the shipped fact tables", ()
         `WHERE OccurredAt >= toDateTime64('${SEED_RECENT_WEEK.from}', 3) ` +
         `AND OccurredAt < toDateTime64('${SEED_RECENT_WEEK.to}', 3)`;
 
-      const measured: Record<
-        GovernedDedupStrategy,
-        { unfilteredRows: number; filteredRows: number; rows: number }
-      > = {} as never;
+      const strategies = [
+        "none",
+        "in-tuple",
+        "final",
+      ] satisfies GovernedDedupStrategy[];
+
+      // `Partial`, because that is what it is until the loop finishes. Declared
+      // as fully-populated it would have typed every read below as present
+      // while a loop that threw part-way left them `undefined`, and the
+      // assertions would then have compared `undefined` to `undefined`.
+      const measured: Partial<
+        Record<
+          GovernedDedupStrategy,
+          { unfilteredRows: number; filteredRows: number; rows: number }
+        >
+      > = {};
 
       try {
-        for (const strategy of [
-          "none",
-          "in-tuple",
-          "final",
-        ] satisfies GovernedDedupStrategy[]) {
+        for (const strategy of strategies) {
           await harness.applyAsAdmin([
             governedViewStatement({
               names: harness.names,
@@ -824,6 +842,16 @@ describe("given the governed views provisioned over the shipped fact tables", ()
       // default reporter swallows a passing test's stdout, and a measurement
       // nobody can read is not a measurement.
       const report = JSON.stringify(measured);
+
+      // The comparisons below are only a comparison if all three ran. Proven
+      // here rather than assumed by the type, so a strategy the loop never
+      // reached fails as itself instead of as an unreadable `undefined`.
+      for (const strategy of strategies) {
+        expect(
+          measured[strategy],
+          `${strategy} was never measured, so the comparisons below compare nothing. ${report}`,
+        ).toBeDefined();
+      }
 
       expect(
         measured.none!.rows,
