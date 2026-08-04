@@ -1516,10 +1516,28 @@ function validateExemptionList({
   return errors;
 }
 
-function main(): void {
-  const args = process.argv.slice(2);
-  const asJson = args.includes("--json");
+/**
+ * Everything the check has worked out, before any of it is printed or judged.
+ * The report, the verdict and the JSON payload are three views of this one
+ * value, so none of them can disagree with the others about what was found.
+ */
+interface ParityAnalysis {
+  enforced: Report[];
+  legacy: LegacyReport[];
+  /** Inert files, whether excused or not — a count worth printing on its own. */
+  inert: InertReport[];
+  /** Inert files LEGACY_INERT excuses, and so still tolerated. */
+  exemptInert: InertReport[];
+  /** Inert files nobody has excused. Fatal. */
+  newInert: InertReport[];
+  /** Entries that no longer belong on their list, and must leave it. Fatal. */
+  staleLegacy: LegacyReport[];
+  staleInert: string[];
+  unknownAnnotations: UnknownAnnotation[];
+  listErrors: string[];
+}
 
+function analyzeParity(): ParityAnalysis {
   const allFeatures = discoverFeatureFiles();
   const listErrors = [
     ...validateExemptionList({
@@ -1567,99 +1585,139 @@ function main(): void {
     }
   }
 
-  // Legacy-list hygiene: every entry must still have at least one unbound
-  // scenario. If a file is fully bound, it must be removed from the list.
-  const staleLegacy = legacy.filter((r) => r.unbound === 0);
-
   // Inert floor. A file that declares scenarios and enforces none of them is a
   // failure unless it was already in that state when the floor was introduced.
   const inertSet = new Set(LEGACY_INERT);
   const inert = enforced.filter(isInert).map(toInertReport);
-  const newInert = inert.filter((r) => !inertSet.has(r.feature));
-  const exemptInert = inert.filter((r) => inertSet.has(r.feature));
-
-  // Ratchet hygiene: an entry that is no longer inert has been fixed, and must
-  // leave the list so it can never silently regress.
   const inertFeatures = new Set(inert.map((r) => r.feature));
-  const staleInert = LEGACY_INERT.filter(
-    (f) => allFeatures.includes(f) && !inertFeatures.has(f),
+
+  return {
+    enforced,
+    legacy,
+    inert,
+    exemptInert: inert.filter((r) => inertSet.has(r.feature)),
+    newInert: inert.filter((r) => !inertSet.has(r.feature)),
+    // Legacy-list hygiene: every entry must still have at least one unbound
+    // scenario. If a file is fully bound, it must be removed from the list.
+    staleLegacy: legacy.filter((r) => r.unbound === 0),
+    // Ratchet hygiene: an entry that is no longer inert has been fixed, and
+    // must leave the list so it can never silently regress.
+    staleInert: LEGACY_INERT.filter(
+      (f) => allFeatures.includes(f) && !inertFeatures.has(f),
+    ),
+    unknownAnnotations,
+    listErrors,
+  };
+}
+
+function printParityReport(a: ParityAnalysis): void {
+  console.log("Feature-file parity check");
+  console.log("=========================");
+  console.log(
+    `Enforced: ${a.enforced.length} file(s) · Legacy: ${a.legacy.length} file(s) · Inert: ${a.inert.length} file(s)`,
   );
+
+  for (const r of a.enforced) printEnforcedReport(r);
+  printLegacySummary(a.legacy);
+  printInertSummary(a.exemptInert);
+  printNewInert(a.newInert);
+  printUnknownAnnotations(a.unknownAnnotations);
+}
+
+/**
+ * Why the check fails, in the words the failure is reported with. Empty means
+ * it passes: the verdict and the message come from the same list, so the check
+ * cannot exit non-zero without saying what for.
+ */
+function fatalReasons(a: ParityAnalysis): string[] {
+  const reasons: string[] = [];
+  const enforcedUnbound = a.enforced.reduce((s, r) => s + r.unbound.length, 0);
+
+  if (enforcedUnbound > 0) {
+    reasons.push(`${enforcedUnbound} unbound scenario(s) in enforced files`);
+  }
+  if (a.unknownAnnotations.length > 0) {
+    reasons.push(`${a.unknownAnnotations.length} unknown annotation(s)`);
+  }
+  if (a.staleLegacy.length > 0) {
+    reasons.push(
+      `${a.staleLegacy.length} fully-bound file(s) still in LEGACY_UNBOUND — remove them from the list: ${a.staleLegacy
+        .map((r) => r.feature)
+        .join(", ")}`,
+    );
+  }
+  if (a.newInert.length > 0) {
+    reasons.push(
+      `${a.newInert.length} file(s) enforce no scenario at all (nothing in them is tagged @unit/@integration/@e2e/@regression)`,
+    );
+  }
+  if (a.staleInert.length > 0) {
+    reasons.push(
+      `${a.staleInert.length} file(s) in LEGACY_INERT now enforce scenarios — remove them from the list: ${a.staleInert.join(
+        ", ",
+      )}`,
+    );
+  }
+  if (a.listErrors.length > 0) {
+    reasons.push(`${a.listErrors.length} exemption-list error(s)`);
+  }
+
+  return reasons;
+}
+
+function printOkSummary(a: ParityAnalysis): void {
+  const enforcedTotal = a.enforced.reduce((s, r) => s + r.scenarios.length, 0);
+  const legacyUnbound = a.legacy.reduce((s, r) => s + r.unbound, 0);
+  console.log(
+    `\nOK: ${enforcedTotal} enforced scenario(s) bound across ${a.enforced.length} file(s).`,
+  );
+  if (a.legacy.length > 0) {
+    console.log(
+      `    ${legacyUnbound} unbound scenario(s) tolerated in ${a.legacy.length} legacy file(s).`,
+    );
+  }
+  if (a.exemptInert.length > 0) {
+    const invisible = a.exemptInert.reduce((s, r) => s + r.totalScenarios, 0);
+    console.log(
+      `    ${a.exemptInert.length} file(s) exempted via LEGACY_INERT enforce nothing at all — ${invisible} scenario(s) are invisible to this check.`,
+    );
+  }
+}
+
+function main(): void {
+  const asJson = process.argv.slice(2).includes("--json");
+  const analysis = analyzeParity();
 
   if (asJson) {
     console.log(
       JSON.stringify(
         {
-          enforced,
-          legacy,
-          unknownAnnotations,
-          listErrors,
-          staleLegacy: staleLegacy.map((r) => r.feature),
-          inert: exemptInert,
-          newInert,
-          staleInert,
+          enforced: analysis.enforced,
+          legacy: analysis.legacy,
+          unknownAnnotations: analysis.unknownAnnotations,
+          listErrors: analysis.listErrors,
+          staleLegacy: analysis.staleLegacy.map((r) => r.feature),
+          inert: analysis.exemptInert,
+          newInert: analysis.newInert,
+          staleInert: analysis.staleInert,
         },
         null,
         2,
       ),
     );
   } else {
-    console.log("Feature-file parity check");
-    console.log("=========================");
-    console.log(
-      `Enforced: ${enforced.length} file(s) · Legacy: ${legacy.length} file(s) · Inert: ${inert.length} file(s)`,
-    );
-
-    for (const r of enforced) printEnforcedReport(r);
-    printLegacySummary(legacy);
-    printInertSummary(exemptInert);
-    printNewInert(newInert);
-    printUnknownAnnotations(unknownAnnotations);
+    printParityReport(analysis);
   }
 
-  const enforcedUnbound = enforced.reduce((s, r) => s + r.unbound.length, 0);
-  const hasFatal =
-    enforcedUnbound > 0 ||
-    unknownAnnotations.length > 0 ||
-    listErrors.length > 0 ||
-    staleLegacy.length > 0 ||
-    newInert.length > 0 ||
-    staleInert.length > 0;
-
-  if (hasFatal) {
+  const reasons = fatalReasons(analysis);
+  if (reasons.length > 0) {
     if (!asJson) {
-      const parts: string[] = [];
-      if (enforcedUnbound > 0) {
-        parts.push(`${enforcedUnbound} unbound scenario(s) in enforced files`);
-      }
-      if (unknownAnnotations.length > 0) {
-        parts.push(`${unknownAnnotations.length} unknown annotation(s)`);
-      }
-      if (staleLegacy.length > 0) {
-        parts.push(
-          `${staleLegacy.length} fully-bound file(s) still in LEGACY_UNBOUND — remove them from the list: ${staleLegacy
-            .map((r) => r.feature)
-            .join(", ")}`,
-        );
-      }
-      if (newInert.length > 0) {
-        parts.push(
-          `${newInert.length} file(s) enforce no scenario at all (nothing in them is tagged @unit/@integration/@e2e/@regression)`,
-        );
-      }
-      if (staleInert.length > 0) {
-        parts.push(
-          `${staleInert.length} file(s) in LEGACY_INERT now enforce scenarios — remove them from the list: ${staleInert.join(
-            ", ",
-          )}`,
-        );
-      }
-      if (listErrors.length > 0) {
-        parts.push(`${listErrors.length} exemption-list error(s)`);
-      }
       // The list name is already inside each message.
-      for (const err of listErrors) console.error(`Exemption list: ${err}`);
+      for (const err of analysis.listErrors) {
+        console.error(`Exemption list: ${err}`);
+      }
       console.error(
-        `FAIL: ${parts.join(
+        `FAIL: ${reasons.join(
           ", ",
         )}. See spec-binding convention in dev/docs/TESTING_PHILOSOPHY.md.`,
       );
@@ -1667,24 +1725,7 @@ function main(): void {
     process.exit(1);
   }
 
-  if (!asJson) {
-    const enforcedTotal = enforced.reduce((s, r) => s + r.scenarios.length, 0);
-    const legacyUnbound = legacy.reduce((s, r) => s + r.unbound, 0);
-    console.log(
-      `\nOK: ${enforcedTotal} enforced scenario(s) bound across ${enforced.length} file(s).`,
-    );
-    if (legacy.length > 0) {
-      console.log(
-        `    ${legacyUnbound} unbound scenario(s) tolerated in ${legacy.length} legacy file(s).`,
-      );
-    }
-    if (exemptInert.length > 0) {
-      const invisible = exemptInert.reduce((s, r) => s + r.totalScenarios, 0);
-      console.log(
-        `    ${exemptInert.length} file(s) exempted via LEGACY_INERT enforce nothing at all — ${invisible} scenario(s) are invisible to this check.`,
-      );
-    }
-  }
+  if (!asJson) printOkSummary(analysis);
 }
 
 /**
