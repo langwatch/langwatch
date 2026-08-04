@@ -46,18 +46,18 @@ Feature: Editing a trace in the drawer
 
   Rule: Entering edit mode is a deliberate, permitted action
 
-    @planned
+    @integration
     Scenario: The overflow menu offers to edit the trace
       When I open the trace actions menu
       Then I see an action to edit the trace
 
-    @planned
+    @integration
     Scenario: A reviewer without permission to update annotations cannot edit
       Given I do not have permission to update annotations
       When I open the trace actions menu
       Then I do not see an action to edit the trace
 
-    @planned
+    @integration
     Scenario: A shared trace is never editable
       Given I am reading the trace on its public share page
       Then I do not see an action to edit the trace
