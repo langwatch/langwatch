@@ -9,6 +9,7 @@ import type {
   WebhookDeliveryOutcome,
   WebhookEndpoint,
 } from "@prisma/client";
+import { pruneWebhookDeliveries } from "~/server/webhooks/deliveryLog";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
 import {
   allowsInsecureLocalUrls,
@@ -22,8 +23,6 @@ const logger = createLogger("langwatch:webhooks:endpoint-service");
 
 /** 72 hours of unbroken failures auto-disables an endpoint. */
 export const WEBHOOK_AUTO_DISABLE_AFTER_MS = 72 * 60 * 60 * 1000;
-/** Delivery-log retention, mirroring the automations webhook log. */
-export const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const WEBHOOK_DISABLED_REASON_AUTO = "auto_failures_72h";
 export const WEBHOOK_DISABLED_REASON_MANUAL = "manual";
@@ -478,6 +477,7 @@ export class WebhookEndpointService {
     sampleLimit: number;
   }): Promise<{ attempted: number; delivered: number; latencies: number[] }> {
     const where = {
+      channel: "platform" as const,
       organizationId: params.organizationId,
       endpointId: params.endpointId,
       firedAt: { gt: params.since },
@@ -573,6 +573,7 @@ export class WebhookEndpointService {
 
     await this.deps.prisma.webhookEndpointDelivery.create({
       data: {
+        channel: "platform",
         organizationId: params.organizationId,
         endpointId: params.endpointId,
         dispatchId: params.dispatchId,
@@ -731,6 +732,11 @@ export class WebhookEndpointService {
     const limit = Math.min(params.limit ?? 25, 200);
     const rows = await this.deps.prisma.webhookEndpointDelivery.findMany({
       where: {
+        // The log is shared with the automations channel now. Those rows carry
+        // no organizationId or endpointId so they could not match anyway, but
+        // saying so keeps this reader's scope in the query rather than in a
+        // reader's head.
+        channel: "platform",
         organizationId: params.organizationId,
         endpointId: params.endpointId,
         // Strictly after the cursor row in (firedAt desc, id desc) order,
@@ -756,8 +762,12 @@ export class WebhookEndpointService {
       deliveries: page.map((r) => ({
         id: r.id,
         dispatchId: r.dispatchId,
-        attempt: r.attempt,
-        eventCount: r.eventCount,
+        // Nullable in the shared table because the automations channel records
+        // neither; every platform row carries both, and the query above only
+        // returns platform rows, so the fallbacks describe an unreachable row
+        // rather than a value this reader invents.
+        attempt: r.attempt ?? 1,
+        eventCount: r.eventCount ?? 0,
         outcome: r.outcome,
         responseStatus: r.responseStatus,
         latencyMs: r.latencyMs,
@@ -792,15 +802,10 @@ export class WebhookEndpointService {
     };
   }
 
-  /** 30-day delivery-log prune; returns the deleted count. */
+  /** 30-day delivery-log prune; returns the deleted count. Runs the shared
+   *  sweep, so it clears both channels' rows from the one table. */
   async pruneDeliveries(now: Date = new Date()): Promise<number> {
-    const before = new Date(now.getTime() - WEBHOOK_DELIVERY_RETENTION_MS);
-    const deleted = await this.deps.prisma.$executeRaw`
-      DELETE FROM "WebhookEndpointDelivery"
-      WHERE "firedAt" < ${before}
-      -- @tenancy: webhook delivery-log retention sweep (system-owned maintenance)
-    `;
-    return deleted;
+    return await pruneWebhookDeliveries({ prisma: this.deps.prisma, now });
   }
 
   private async requireEndpoint(params: {

@@ -2,6 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
@@ -26,6 +27,7 @@ import type {
 } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
+import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
 import {
   assertWebhookDelivered,
   sendWebhook,
@@ -229,6 +231,10 @@ export type FlushEndpointPayload = z.infer<typeof flushEndpointSchema>;
 export interface WebhookDeliveryProcessDeps {
   processStore: ProcessStore;
   endpoints: WebhookEndpointService;
+  /** Install-wide maintenance runs off this PM's hourly sweep and reaches
+   *  past the endpoint tables (the idempotency receipt expiry), so it needs a
+   *  handle rather than going through the endpoint service. */
+  prisma: PrismaClient;
   /** Resolves the org's active plan for the enterprise gate. */
   getPlan: (organizationId: string) => Promise<PlanInfo>;
   now?: () => number;
@@ -674,6 +680,13 @@ async function runMaintenanceIfDue(
       before: now - OUTBOX_ROW_RETENTION_MS,
     });
     await deps.endpoints.pruneDeliveries(new Date(now));
+    // Receipts expire lazily, when their key is next presented, so a key that
+    // is never retried is never revisited and its row never leaves. The
+    // expiresAt index was built for a bulk sweep; this is it.
+    await pruneExpiredIdempotencyReceipts({
+      prisma: deps.prisma,
+      now: new Date(now),
+    });
   } catch (error) {
     logger.warn({ error }, "webhook delivery maintenance sweep failed");
   }

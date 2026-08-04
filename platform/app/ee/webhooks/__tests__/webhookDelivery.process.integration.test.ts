@@ -314,6 +314,7 @@ beforeEach(() => {
   deps = {
     processStore: store,
     endpoints,
+    prisma,
     getPlan: async () =>
       ({ webhookEndpointsEnabled: true }) as Awaited<
         ReturnType<WebhookDeliveryProcessDeps["getPlan"]>

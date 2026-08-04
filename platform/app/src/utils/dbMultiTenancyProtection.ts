@@ -604,10 +604,14 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // One table, two channels, two tenancy anchors: a platform row belongs to an
+  // organization and an endpoint, an automations row to a project and a
+  // trigger. A query is scoped if it names either pair's anchor; a create must
+  // carry one complete pair, so a row can never land without a tenant.
   WebhookEndpointDelivery: {
     validateWhere: (where) => {
       const reason =
-        "requires a row id, organizationId, or endpointId in the where clause";
+        "requires a row id, organizationId, endpointId, or projectId in the where clause";
       if (!where) return reason;
       const ok = validateRecursive(
         where,
@@ -615,7 +619,9 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           hasIdOrInPredicate(c) ||
           typeof c.organizationId === "string" ||
           (c.organizationId && Array.isArray(c.organizationId.in)) ||
-          typeof c.endpointId === "string",
+          typeof c.endpointId === "string" ||
+          typeof c.projectId === "string" ||
+          (c.projectId && Array.isArray(c.projectId.in)),
       );
       return ok ? null : reason;
     },
@@ -623,11 +629,13 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       const records = Array.isArray(data) ? data : [data];
       for (const d of records) {
         if (!d) return "create requires a data payload";
-        if (
-          typeof d.organizationId !== "string" ||
-          typeof d.endpointId !== "string"
-        ) {
-          return "create requires organizationId and endpointId in the data payload";
+        const platformScoped =
+          typeof d.organizationId === "string" &&
+          typeof d.endpointId === "string";
+        const automationsScoped =
+          typeof d.projectId === "string" && typeof d.triggerId === "string";
+        if (!platformScoped && !automationsScoped) {
+          return "create requires organizationId and endpointId, or projectId and triggerId, in the data payload";
         }
       }
       return null;

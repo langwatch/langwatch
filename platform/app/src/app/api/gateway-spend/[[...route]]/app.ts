@@ -673,6 +673,7 @@ secured.access(requires("gatewaySpend:manage")).post(
     const deliveryDeps: WebhookDeliveryProcessDeps = {
       processStore: new PrismaProcessStore(prisma),
       endpoints,
+      prisma,
       getPlan: (organizationId) =>
         getApp().planProvider.getActivePlan({ organizationId }),
     };
