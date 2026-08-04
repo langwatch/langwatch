@@ -41,6 +41,43 @@ Feature: Datasets list page
     Then I am taken into the upload flow to add files
 
   # ============================================================================
+  # The list stays fast as the platform grows
+  # ============================================================================
+  #
+  # Entry counts come from three places depending on where a dataset's content
+  # lives: the records table for the original layout, and a stored count column
+  # for datasets kept in object storage (ADR-032). Counting must never depend on
+  # how much data other projects hold - a customer's list should load at the
+  # same speed whether the platform serves one project or ten thousand.
+
+  @integration
+  Scenario: Listing never counts another project's entries
+    Given another project holds far more dataset entries than mine
+    When I open my datasets page
+    Then the entry counts I see cover only my own project's datasets
+    And no other project's entries are read to produce them
+
+  @integration
+  Scenario: Datasets kept in object storage report their count without reading entries
+    Given every dataset in my project is stored in object storage
+    When I open my datasets page
+    Then each row shows the stored entry count
+    And the entries table is not queried at all
+
+  @integration
+  Scenario: Entry counts are right whichever storage a dataset uses
+    Given my project mixes datasets stored in the entries table with datasets stored in object storage
+    When I open my datasets page
+    Then every row shows that dataset's own entry count
+
+  @integration
+  Scenario: The list loads while I wait, and tells me it is loading
+    Given my datasets are still being fetched
+    When I open my datasets page
+    Then I see that the list is loading
+    And I am not shown an empty-project message
+
+  # ============================================================================
   # Creating
   # ============================================================================
 

@@ -1,4 +1,9 @@
-import { Button, createListCollection, Field } from "@chakra-ui/react";
+import {
+  Button,
+  createListCollection,
+  Field,
+  Skeleton,
+} from "@chakra-ui/react";
 import type { Dataset } from "@prisma/client";
 import { type ReactNode, useEffect, useState } from "react";
 import type {
@@ -16,6 +21,7 @@ interface DatasetSelectorProps<T extends { datasetId: string }> {
   errors: FieldErrors<T>;
   setValue: UseFormSetValue<T>;
   onCreateNew: () => void;
+  isLoading?: boolean;
   register?: never;
 }
 
@@ -25,6 +31,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
   errors,
   setValue,
   onCreateNew,
+  isLoading = false,
 }: DatasetSelectorProps<T>) {
   const datasetCollection = createListCollection({
     items:
@@ -42,32 +49,48 @@ export function DatasetSelector<T extends { datasetId: string }>({
     setSelectedValue(localStorageDatasetId ? [localStorageDatasetId] : []);
   }, [localStorageDatasetId]);
 
+  // An empty dropdown looks exactly like a project with no datasets, so while
+  // the list is in flight the trigger is replaced by a skeleton rather than
+  // inviting a click that would open nothing.
+  const isEmpty = !isLoading && datasetCollection.items.length === 0;
+
   return (
     <HorizontalFormControl
       label="Dataset"
       helper="Add to an existing dataset or create a new one"
       invalid={!!errors.datasetId}
     >
-      <Select.Root
-        collection={datasetCollection}
-        value={selectedValue}
-        onValueChange={(e) => {
-          const value = e.value[0] ?? "";
-          setSelectedValue(e.value);
-          setValue("datasetId" as Path<T>, value as PathValue<T, Path<T>>);
-        }}
-      >
-        <Select.Trigger>
-          <Select.ValueText placeholder="Select Dataset" />
-        </Select.Trigger>
-        <Select.Content portalled={false}>
-          {datasetCollection.items.map((dataset) => (
-            <Select.Item key={dataset.value} item={dataset}>
-              {dataset.label}
-            </Select.Item>
-          ))}
-        </Select.Content>
-      </Select.Root>
+      {isLoading ? (
+        <Skeleton
+          height="40px"
+          borderRadius="md"
+          aria-label="Loading datasets"
+        />
+      ) : (
+        <Select.Root
+          collection={datasetCollection}
+          value={selectedValue}
+          disabled={isEmpty}
+          onValueChange={(e) => {
+            const value = e.value[0] ?? "";
+            setSelectedValue(e.value);
+            setValue("datasetId" as Path<T>, value as PathValue<T, Path<T>>);
+          }}
+        >
+          <Select.Trigger>
+            <Select.ValueText
+              placeholder={isEmpty ? "No datasets yet" : "Select Dataset"}
+            />
+          </Select.Trigger>
+          <Select.Content portalled={false}>
+            {datasetCollection.items.map((dataset) => (
+              <Select.Item key={dataset.value} item={dataset}>
+                {dataset.label}
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Root>
+      )}
       {errors.datasetId && (
         <Field.ErrorText>
           {errors.datasetId.message as ReactNode}
