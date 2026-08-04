@@ -22,3 +22,6 @@
 -- pause is acceptable. `CREATE INDEX CONCURRENTLY` would avoid it entirely but
 -- cannot run inside a transaction, which the Prisma migration setup requires.
 CREATE INDEX "DatasetRecord_projectId_datasetId_idx" ON "DatasetRecord"("projectId", "datasetId");
+
+-- Down (manual rollback):
+-- DROP INDEX "DatasetRecord_projectId_datasetId_idx";

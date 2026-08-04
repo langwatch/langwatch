@@ -45,10 +45,11 @@ Feature: Datasets list page
   # ============================================================================
   #
   # Entry counts come from three places depending on where a dataset's content
-  # lives: the records table for the original layout, and a stored count column
-  # for datasets kept in object storage (ADR-032). Counting must never depend on
-  # how much data other projects hold - a customer's list should load at the
-  # same speed whether the platform serves one project or ten thousand.
+  # lives: the records table for the original layout, a stored row count for
+  # datasets kept as chunks in object storage (ADR-032), and a separate stored
+  # count for the older single-file object-storage layout. Counting must never
+  # depend on how much data other projects hold - a customer's list should load
+  # at the same speed whether the platform serves one project or ten thousand.
 
   @integration
   Scenario: Listing never counts another project's entries

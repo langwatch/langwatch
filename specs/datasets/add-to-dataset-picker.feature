@@ -39,3 +39,21 @@ Feature: Picking the target dataset when adding traces to a dataset
     And the datasets finish loading
     Then "offline evals" is offered in the dataset dropdown
     And the dropdown no longer says it is loading
+
+  # ============================================================================
+  # When the list cannot be fetched
+  # ============================================================================
+
+  @integration
+  Scenario: A failed request is not reported as an empty project
+    Given the request for my project's datasets fails
+    When I open the "Add to Dataset" drawer
+    Then the dataset dropdown tells me the datasets could not be loaded
+    And it does not tell me I have no datasets
+
+  @integration
+  Scenario: I can still create a dataset from the drawer
+    Given my project has no datasets
+    When I open the "Add to Dataset" drawer
+    And I choose to create a new dataset
+    Then the dataset creation form opens
