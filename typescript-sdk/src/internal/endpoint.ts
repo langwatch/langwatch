@@ -14,9 +14,21 @@ import { DEFAULT_ENDPOINT } from "./constants";
 const isSet = (value: string | null | undefined): value is string =>
   typeof value === "string" && value.trim() !== "";
 
-/** Trim surrounding whitespace and drop any trailing slashes. */
-export const normalizeEndpoint = (endpoint: string): string =>
-  endpoint.trim().replace(/\/+$/, "");
+/**
+ * Trim surrounding whitespace and drop any trailing slashes.
+ *
+ * Scanned rather than matched with `/\/+$/`: a repeated character class bound
+ * to an anchor backtracks from every start index, which is quadratic on a
+ * string of many slashes. The endpoint is configuration rather than attacker
+ * input, but a linear scan costs nothing and leaves no such edge to reason
+ * about.
+ */
+export const normalizeEndpoint = (endpoint: string): string => {
+  const trimmed = endpoint.trim();
+  let end = trimmed.length;
+  while (end > 0 && trimmed[end - 1] === "/") end--;
+  return trimmed.slice(0, end);
+};
 
 /**
  * Resolve the endpoint from an explicit value, then `LANGWATCH_ENDPOINT`, then

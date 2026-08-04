@@ -7,7 +7,7 @@ from typing import List, Optional, Sequence, ClassVar
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
 from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
-from langwatch.state import get_instance
+from langwatch.state import DEFAULT_ENDPOINT, get_instance, normalize_endpoint
 from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
@@ -232,7 +232,7 @@ class Client(LangWatchClientProtocol):
             Client._project_id = os.getenv("LANGWATCH_PROJECT_ID")
 
         if endpoint_url is not None:
-            Client._endpoint_url = endpoint_url
+            Client._endpoint_url = normalize_endpoint(endpoint_url)
         else:
             # Always re-read LANGWATCH_ENDPOINT from env on every setup()
             # call. The previous "pin once on first init" behavior caused
@@ -243,11 +243,11 @@ class Client(LangWatchClientProtocol):
             # callback 401 against the cloud API. Re-reading per-call costs
             # one os.getenv lookup; the explicit endpoint_url path above
             # still wins.
-            env_endpoint = os.getenv("LANGWATCH_ENDPOINT")
+            env_endpoint = normalize_endpoint(os.getenv("LANGWATCH_ENDPOINT") or "")
             if env_endpoint:
                 Client._endpoint_url = env_endpoint
             elif not Client._endpoint_url:
-                Client._endpoint_url = "https://app.langwatch.ai"
+                Client._endpoint_url = DEFAULT_ENDPOINT
 
         if debug is not None:
             Client._debug = debug

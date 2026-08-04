@@ -138,6 +138,35 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
+  describe("when a source holds only whitespace", () => {
+    it("skips a blank flag and falls through to the environment", () => {
+      process.env.LANGWATCH_ENDPOINT = "https://env.example.com";
+      const result = resolveControlPlaneEndpoint({ flag: "   " });
+      expect(result.url).toBe("https://env.example.com");
+      expect(result.source).toBe("env");
+    });
+
+    it("skips a blank persisted url and falls through to the default", () => {
+      delete process.env.LANGWATCH_ENDPOINT;
+      const result = resolveControlPlaneEndpoint({
+        cfg: cfgFixture({ control_plane_url: "   " }),
+      });
+      expect(result.url).toBe("https://app.langwatch.ai");
+      expect(result.source).toBe("default");
+    });
+  });
+
+  describe("when a source carries a trailing slash", () => {
+    it("strips it", () => {
+      delete process.env.LANGWATCH_ENDPOINT;
+      const result = resolveControlPlaneEndpoint({
+        flag: "https://self.hosted.example.com///",
+      });
+      expect(result.url).toBe("https://self.hosted.example.com");
+      expect(result.source).toBe("flag");
+    });
+  });
+
   describe("resolveControlPlaneUrl convenience", () => {
     /** @scenario every CLI command resolves the endpoint via the same single function */
     it("returns just the URL string", () => {

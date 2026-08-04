@@ -4,6 +4,8 @@ import os
 from typing import Optional
 from .types import LangWatchClientProtocol
 
+DEFAULT_ENDPOINT = "https://app.langwatch.ai"
+
 # Singleton instance of the client
 __instance: Optional[LangWatchClientProtocol] = None
 
@@ -16,11 +18,23 @@ def set_instance(client: LangWatchClientProtocol) -> None:
     global __instance
     __instance = client
 
+def normalize_endpoint(endpoint: str) -> str:
+    """Trim surrounding whitespace and drop any trailing slashes.
+
+    Request URLs are built by appending paths that already carry a leading
+    slash, so an endpoint written as ``https://app.langwatch.ai/`` would
+    produce ``https://app.langwatch.ai//api/experiment/init``. The router does
+    not match that, and the caller gets an opaque 404 with nothing pointing at
+    the endpoint as the cause.
+    """
+    return endpoint.strip().rstrip("/")
+
+
 def get_endpoint() -> str:
     """Get the current endpoint URL of the LangWatch client."""
     if __instance is None:
-        return os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
-    return __instance.endpoint_url
+        return normalize_endpoint(os.getenv("LANGWATCH_ENDPOINT") or "") or DEFAULT_ENDPOINT
+    return normalize_endpoint(__instance.endpoint_url) or DEFAULT_ENDPOINT
 
 def get_api_key() -> str:
     """Get the current API key of the LangWatch client."""

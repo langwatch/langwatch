@@ -42,11 +42,14 @@ export interface ResolvedEndpoint {
 export function resolveControlPlaneEndpoint(
   opts: ResolveEndpointOptions = {},
 ): ResolvedEndpoint {
-  if (opts.flag) {
+  // Every source is checked for content, not truthiness: a whitespace-only
+  // value normalizes to the empty string, and returning that as the resolved
+  // URL is worse than falling through to the next source.
+  if (opts.flag?.trim()) {
     return { url: normalizeEndpoint(opts.flag), source: "flag" };
   }
   const env = process.env.LANGWATCH_ENDPOINT;
-  if (env && env.trim() !== "") {
+  if (env?.trim()) {
     return { url: normalizeEndpoint(env), source: "env" };
   }
   // Reading the config involves disk I/O; only do it if we need to.
@@ -64,7 +67,7 @@ export function resolveControlPlaneEndpoint(
   // explicit `langwatch config set endpoint <url>`. If it differs from
   // the hardcoded default, treat it as a user choice.
   const persisted = cfg?.control_plane_url;
-  if (persisted && persisted !== DEFAULT_ENDPOINT) {
+  if (persisted?.trim() && persisted !== DEFAULT_ENDPOINT) {
     return { url: normalizeEndpoint(persisted), source: "config" };
   }
   return { url: normalizeEndpoint(DEFAULT_ENDPOINT), source: "default" };

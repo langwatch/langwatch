@@ -70,8 +70,13 @@ export class WorkflowsApiService {
   constructor(
     config?: Pick<InternalConfig, "langwatchApiClient"> & { endpoint?: string },
   ) {
-    this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
+    // The run URLs this service rebases and the requests it issues have to
+    // name the same host, so a caller that supplies only an endpoint gets a
+    // client built on that endpoint rather than on the environment.
     this.endpoint = resolveEndpoint(config?.endpoint);
+    this.apiClient =
+      config?.langwatchApiClient ??
+      createLangWatchApiClient(undefined, this.endpoint);
     this.experimentsApiService = new ExperimentsApiService({
       langwatchApiClient: this.apiClient,
     });
