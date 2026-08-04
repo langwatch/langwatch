@@ -132,3 +132,36 @@ Feature: Email gateway providers
     Given the email provider is set to a gateway that is missing its credentials
     When the interface asks whether email is available
     Then it reports email as unavailable rather than failing to render
+
+  # The chart is where an operator actually configures all of this, so these
+  # scenarios describe what the rendered deployment must contain. They are
+  # bound to charts/langwatch/tests/email-gateway.sh, which renders the chart
+  # and asserts, rather than to the application's unit tests.
+
+  @unit
+  Scenario: Background jobs can send email as well as the web application
+    Given email is enabled and a gateway is configured
+    When the deployment is rendered
+    Then the background job workers receive the same gateway configuration as the web application
+
+  @unit
+  Scenario: A gateway named but never configured is caught before install
+    Given email is enabled
+    And the named gateway has no settings and none are supplied out of band
+    When the deployment is rendered
+    Then rendering fails naming the gateway and the setting to fill in
+
+  @unit
+  Scenario: Settings supplied out of band are accepted
+    Given email is enabled
+    And the named gateway has no settings in the chart
+    But additional environment variables are supplied to the containers
+    When the deployment is rendered
+    Then rendering succeeds, because the chart cannot see what those variables carry
+
+  @unit
+  Scenario: Forcing an unencrypted starting connection is not silently dropped
+    Given email is enabled and an SMTP relay is configured
+    And the operator turns the implicit encryption setting off
+    When the deployment is rendered
+    Then the containers receive that setting rather than falling back to the port default
