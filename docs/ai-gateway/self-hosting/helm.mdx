@@ -426,7 +426,7 @@ gateway:
 
 Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
 - `security`, edge, fails fast with 413, operator bumps when large base64 images are legitimate;
-- `budget`, accounting, reconciles asynchronously via the span-to-ledger path, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
+- `budget`, accounting, reconciles asynchronously from the spend commands the gateway emits, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
 - `upstream`, per-provider, fails mid-flight with circuit-breaker trips.
 
 The chart's ConfigMap renders the int as `%d` (the chart's test render catches a YAML scientific-notation gotcha, Go's `ParseInt` rejects `1.048576e+07`). If you override this value in a custom `values.yaml`, write integer literals, not floats.

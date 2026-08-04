@@ -348,7 +348,6 @@ The two URLs are split for **auth + routing convenience**, not for architectural
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
   - `langwatch.ingestion_source.{id, organization_id, source_type}`, source identity
-  - `langwatch.governance.retention_class`, derived governance context (driving CH TTL)
 - **Same trace viewer**: open a span in `/messages`, the rendering is identical regardless of which URL it came from. The origin attributes appear as read-only system metadata.
 - **Same compliance + RBAC + multitenancy machinery**: all the controls that have been hardened over years of running OTel ingest at scale apply equally to governance data.
 
@@ -376,7 +375,7 @@ The internal-architecture decision behind this is captured in [ADR-018](https://
 - [Governance → Ingestion sources](/ai-governance/ingestion-sources/index): set up `/api/ingest/otel/:sourceId` for an external platform.
 - [Generic OTel ingestion source](/ai-governance/ingestion-sources/otel-generic): copy-paste curl that pushes a canonical 5-attribute body to the governance endpoint.
 - [Compliance architecture](/ai-gateway/governance/compliance-architecture): how the unified substrate underwrites SOC 2, ISO 27001, EU AI Act, GDPR, HIPAA-most-uses out of the box.
-- [Per-origin retention](/ai-gateway/governance/retention): `thirty_days`, `one_year`, `seven_years` retention classes; how the CH TTL policy keys off the origin attribute.
+- [Governance data retention](/ai-gateway/governance/retention): how long governance data is kept, and the scoped policies that decide it.
 - [Governance CLI debug](/ai-gateway/governance/cli-debug): `langwatch ingest tail <id>` consumes the governance data; `langwatch ingest health <id>` shows per-source 24h/7d/30d volume.
 
 ---
@@ -1669,7 +1668,7 @@ OpenAI-shaped. Additional LangWatch headers:
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3M...
+X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
 X-LangWatch-Provider: openai
 X-LangWatch-Model: gpt-5-mini
 X-LangWatch-Cache: miss
@@ -1699,7 +1698,7 @@ data: {"id":"chatcmpl-…","object":"chat.completion.chunk","choices":[{"index":
 data: [DONE]
 ```
 
-A response header `X-LangWatch-Request-Id` is emitted on the first frame. Mid-stream failures close the connection with a terminal `event: error` frame (see [Errors](/ai-gateway/api/errors#streaming-errors)).
+A response header `X-LangWatch-Gateway-Request-Id` is emitted on the first frame. Mid-stream failures close the connection with a terminal `event: error` frame (see [Errors](/ai-gateway/api/errors#streaming-errors)).
 
 ## Error handling
 
@@ -1711,7 +1710,7 @@ All errors use the OpenAI-compatible envelope documented at [Errors](/ai-gateway
 - `429 rate_limit_exceeded`, VK, project, org rate limit.
 - `502 provider_error`, `504 upstream_timeout`, upstream provider exhausted (possibly after fallback).
 
-Every error carries `X-LangWatch-Request-Id`, use it for support tickets and to jump straight to the trace in the LangWatch UI.
+Errors from an authenticated request carry `X-LangWatch-Gateway-Request-Id`. Use it for support tickets and to jump straight to the trace in the LangWatch UI.
 
 ## Example (Python)
 
@@ -1730,7 +1729,7 @@ resp = client.chat.completions.create(
 )
 
 print(resp.choices[0].message.content)
-print("Request id:", resp.response.headers["X-LangWatch-Request-Id"])
+print("Request id:", resp.response.headers["X-LangWatch-Gateway-Request-Id"])
 ```
 
 ## Example (curl)
@@ -1798,7 +1797,7 @@ Content-Type: application/json
 OpenAI-shape. Additional LangWatch headers:
 
 ```http
-X-LangWatch-Request-Id: grq_01HZX9K3M...
+X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
 X-LangWatch-Provider: openai
 X-LangWatch-Model: text-embedding-3-small
 
@@ -1932,7 +1931,7 @@ Errors (like successes) always carry:
 | `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
 | `unsupported_parameter` | `400` | The parameter policy refused a request parameter for the target lane: either the request depends on it functionally and the lane cannot honor it, or `drop_tuning_params` is `false` and the lane has no mapping for it. The message names the parameter, the lane, and why. See [Parameter mapping](/ai-gateway/parameter-mapping). |
 | `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
-| `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Request-Id` is how we trace it. |
+| `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Gateway-Request-Id` is how we trace it. |
 
 ## Budget-warning headers (not errors)
 
@@ -1953,7 +1952,7 @@ When a virtual key carries an active [attributed-user budget template](/ai-gatew
 ```http
 HTTP/1.1 401 Unauthorized
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNM...
+X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
 
 {
   "error": {
@@ -1969,7 +1968,7 @@ X-LangWatch-Request-Id: grq_01HZX9K3MNM...
 ```http
 HTTP/1.1 402 Payment Required
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNN...
+X-LangWatch-Gateway-Request-Id: req_1f0a7c3d5e8b2946af10c7d3e5b829
 
 {
   "error": {
@@ -1993,7 +1992,7 @@ X-LangWatch-Request-Id: grq_01HZX9K3MNN...
 ```http
 HTTP/1.1 403 Forbidden
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNO...
+X-LangWatch-Gateway-Request-Id: req_9d24b8e07f1a3c65d8b2e40f7a1c93
 
 {
   "error": {
@@ -2010,7 +2009,7 @@ X-LangWatch-Request-Id: grq_01HZX9K3MNO...
 ```http
 HTTP/1.1 504 Gateway Timeout
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNP...
+X-LangWatch-Gateway-Request-Id: req_4e71a9c2b60d85f3179ec4b208da6f
 X-LangWatch-Provider: anthropic
 X-LangWatch-Fallback-Count: 2
 
@@ -2033,7 +2032,7 @@ data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","me
 
 ```
 
-Clients that receive chunks and then an `error` frame should treat the response as incomplete (partial) and `X-LangWatch-Request-Id` still identifies the session in traces.
+Clients that receive chunks and then an `error` frame should treat the response as incomplete (partial) and `X-LangWatch-Gateway-Request-Id` still identifies the session in traces.
 
 ### Mid-stream `code` values
 
@@ -2502,7 +2501,13 @@ Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `ga
 
 ## OpenAPI
 
-All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas, which generate into the repository-wide OpenAPI 3.1 document (`docs/api-reference/openapiLangWatch.json`) rendered by the API-reference docs. The CLI's `VirtualKeysApiService` and `GatewayBudgetsApiService` DTOs are hand-authored against the same schemas; a future improvement is to regenerate them from the OpenAPI output so drift fails at build time.
+Every route on this API is described in LangWatch's OpenAPI 3.1 document, served unauthenticated at:
+
+```
+GET https://app.langwatch.ai/api/gateway/v1/openapi.json
+```
+
+It carries the whole public REST surface, not only the gateway routes, so one fetch feeds a client generator, a Postman import, or an agent that needs the schemas. Self-hosted: same path on your control plane's DNS.
 
 ## See also
 
@@ -2588,7 +2593,7 @@ Anthropic-shaped. Response headers:
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3M...
+X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
 X-LangWatch-Provider: anthropic
 X-LangWatch-Model: claude-haiku-4-5-20251001
 X-LangWatch-Cache: hit
@@ -2902,7 +2907,7 @@ Spend events ride the standard envelope (`{id, type, created, schema_version, da
 
 Field notes:
 
-- **`event_id`** is the envelope `id`: the gateway request id with a type suffix. Dedup on it. **`gateway_request_id`** is the plain join key across the settled and completed pair, and it is the same ULID your client received in the `X-LangWatch-Gateway-Request-Id` response header, so you can join request-side logs to billing events.
+- **`event_id`** is the envelope `id`: the gateway request id with a type suffix. Dedup on it. **`gateway_request_id`** is the plain join key across the settled and completed pair, and it is the same id your client received in the `X-LangWatch-Gateway-Request-Id` response header, so you can join request-side logs to billing events.
 - **`occurred_at`** is request time, never ingest or delivery time. Late events land in the right invoice period.
 - **`status`** is `success` or `error` on completed events. Failed provider calls are events too; `error` carries `{class, http_status}` so your billing decides whether to charge for them.
 - **`end_user_id`** is the attributed end user (see [attribution](#attribution-what-the-request-carries)). **`metadata`** is your caller echo, returned verbatim: this is how billing joins events to your own tenant and user records.
@@ -2946,7 +2951,7 @@ Attribution is captured on the request path; nothing is provisioned per end user
 
 - **End-user id** resolution precedence: the `x-langwatch-end-user-id` header, then `x-litellm-end-user-id` (a migration alias, accepted so LiteLLM-shaped clients need no change), then the OpenAI `user` body field. Headers win over the body.
 - **Metadata echo**: send `x-langwatch-metadata` (a JSON object, 4 KB cap). It returns verbatim as `metadata` on every spend event for that request.
-- **Request id**: every gateway response carries `X-LangWatch-Gateway-Request-Id`, the same ULID that keys the spend event.
+- **Request id**: an authenticated gateway response carries `X-LangWatch-Gateway-Request-Id`, the same id that keys the spend event.
 
 One resolver feeds both metering and [per-end-user budget enforcement](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates), so billing and capping can never disagree about who a request was.
 
@@ -3215,7 +3220,7 @@ The UI surfaces this as "Warning thresholds" on a single budget row; each thresh
 
 ## Debit model
 
-Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` (ULID) and is **idempotent** by that id, so a gateway retry or a redelivered batch never double-bills.
+Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` and is **idempotent** by that id, so a gateway retry or a redelivered batch never double-bills.
 
 Debit flow:
 
@@ -3769,7 +3774,7 @@ After one `claude` session:
 
 If traffic doesn't appear:
 
-- Run `claude --print "say hi"` and look at the exit status + the `X-LangWatch-Request-Id` header. If the request fails, the gateway emits a diagnostic error envelope (not a provider-opaque one).
+- Run `claude --print "say hi"` and look at the exit status + the `X-LangWatch-Gateway-Request-Id` header. If the request fails, the gateway emits a diagnostic error envelope (not a provider-opaque one).
 - Check the VK's allowed providers includes `anthropic`.
 - Check that the project's Anthropic model provider credential is configured (**Settings → Model Providers**).
 
@@ -4324,7 +4329,7 @@ VK `policy_rules.tools: ["bash", "shell", "exec"]`. opencode requests a tool wit
 
 - **Model picker shows only stock providers**: ensure `opencode.json` is in `~/.config/opencode/` or `$PWD`. opencode logs the loaded config path on startup.
 - **`401 invalid_api_key`**, `{env:LANGWATCH_VK}` didn't expand. Export the env var before launching opencode.
-- **Streaming hangs mid-response**: check `X-LangWatch-Request-Id` against the LangWatch trace; gateway emits a terminal `event: error` on mid-stream failures (it won't silently switch providers). See [Streaming](/ai-gateway/streaming).
+- **Streaming hangs mid-response**: check `X-LangWatch-Gateway-Request-Id` against the LangWatch trace; gateway emits a terminal `event: error` on mid-stream failures (it won't silently switch providers). See [Streaming](/ai-gateway/streaming).
 - **`opencode run` hangs indefinitely on custom provider (1.14.x)**, confirmed regression in opencode 1.14.22: `opencode models` correctly lists the custom provider's models, but `opencode run -m custom-provider/model` only emits the proxy-startup log line then hangs (no instance creation, no HTTP call to the gateway, exit 124 at any timeout). Reproduces across cwd `opencode.json` and global `~/.config/opencode/opencode.json`, with and without `npm: "@ai-sdk/openai-compatible"`, with and without the package pre-installed at `~/.config/opencode/node_modules/@ai-sdk/openai-compatible/`. Workarounds: pin opencode `1.13.x` (pre-bug); or run via `opencode --attach <server-url>` against a long-running `opencode serve` instance instead of `opencode run`. Track upstream `opencode-ai/opencode#5674` for fix.
 
 ## Working configuration verified end-to-end
@@ -4551,8 +4556,10 @@ A spending limit attached to a scope. Scopes:
 - `project` (all traffic in a project)
 - `virtual_key` (this specific VK)
 - `principal` (one user or service account)
+- `group` (each member of a group, individually)
+- `attributed_user` (each end user seen on a key or project, individually)
 
-Windows: `minute`, `hour`, `day`, `week`, `month`, `total`.
+Windows: `minute`, `hour`, `day`, `week`, `month`, `total`, `manual`. The cycling windows align to the calendar unless you anchor them to your own start instant. See [Budgets](/ai-gateway/budgets#windows).
 
 `on_breach`:
 
@@ -4651,7 +4658,7 @@ Per-VK regex allow/deny lists for:
 - **MCP servers**: matched against declared `mcp_servers[].name` and `.url`. Denied servers → 403 `tool_not_allowed`.
 - **Outbound URLs**: heuristically matched against every `http(s)://` URL in the request body. Denied URLs → 403 `url_not_allowed`.
 
-Each block emits an `AuditLog` row (gateway shape) + the `X-LangWatch-Request-Id` response header → trace correlation.
+Each block emits an `AuditLog` row (gateway shape) + the `X-LangWatch-Gateway-Request-Id` response header → trace correlation.
 
 ## Traces (per-tenant observability)
 
@@ -4666,11 +4673,11 @@ Attributes always present (source of truth: `services/aigateway/adapters/gateway
 
 When a bundle-baked cache rule matches: `langwatch.cache.rule_id`, `.rule_priority`, `.mode_applied`.
 
-<Info>Previously-documented per-feature attrs (`langwatch.fallback.attempt`, `.reason`, `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `langwatch.guardrail.post_flag`, `.verdict`) are **not emitted in v1**. For per-feature signals today, use the Prometheus counters + correlate via `X-LangWatch-Request-Id`. See [Observability → Per-feature attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the v1 ↔ v1.1 breakdown.</Info>
+<Info>Previously-documented per-feature attrs (`langwatch.fallback.attempt`, `.reason`, `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `langwatch.guardrail.post_flag`, `.verdict`) are **not emitted in v1**. For per-feature signals today, use the Prometheus counters + correlate via `X-LangWatch-Gateway-Request-Id`. See [Observability → Per-feature attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the v1 ↔ v1.1 breakdown.</Info>
 
 ## Request id
 
-Every response carries `X-LangWatch-Request-Id: grq_<ULID>`. Use it to:
+Once a request is authenticated, its response carries `X-LangWatch-Gateway-Request-Id: req_<30 hex characters>`. Use it to:
 
 - Deep-link into the LangWatch trace from logs.
 - File a support ticket, the first thing we ask for.
@@ -4901,7 +4908,7 @@ Goal: catch misconfigurations in the gateway BEFORE they surface during an on-ca
 - A ModelProvider scoped at ORG/TEAM/PROJECT is healthy (reaches actual upstream) via its Advanced (Gateway) tab settings.
 - VK creation + secret reveal flow works at the requested scope.
 - VK resolves end-to-end against the gateway data plane.
-- Response carries `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`, `X-LangWatch-Request-Id`, and `traceparent`.
+- Response carries `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`, `X-LangWatch-Gateway-Request-Id`, and `traceparent`.
 - VK revocation propagates (best-effort, cache TTL applies).
 
 ## Prerequisites
@@ -4964,7 +4971,7 @@ RESP_TRACE_ID=$(grep -i '^x-langwatch-trace-id:' "$HEADERS_FILE" | awk '{print $
 RESP_SPAN_ID=$(grep -i '^x-langwatch-span-id:' "$HEADERS_FILE" | awk '{print $2}' | tr -d '\r')
 RESP_TRACEPARENT=$(grep -i '^traceparent:' "$HEADERS_FILE" | awk '{print $2}' | tr -d '\r')
 
-[ -z "$REQUEST_ID" ] && { echo "FAIL: missing X-LangWatch-Request-Id"; exit 1; }
+[ -z "$REQUEST_ID" ] && { echo "FAIL: missing X-LangWatch-Gateway-Request-Id"; exit 1; }
 [ ${#RESP_TRACE_ID} -ne 32 ] && { echo "FAIL: trace-id not 32 hex ($RESP_TRACE_ID)"; exit 1; }
 [ ${#RESP_SPAN_ID} -ne 16 ] && { echo "FAIL: span-id not 16 hex ($RESP_SPAN_ID)"; exit 1; }
 
@@ -5097,7 +5104,8 @@ If you know the secret, look up the VK by its prefix:
 PREFIX="vk-lw-01HZX9..."
 
 # Find the VK via CLI
-langwatch virtual-keys list --prefix "$PREFIX"
+langwatch virtual-keys list --format json \
+  | jq --arg p "$PREFIX" '.data[] | select(.display_prefix | startswith($p))'
 ```
 
 Or from the UI: **AI Gateway → Virtual Keys** and filter by prefix. Clicking the row opens the [VK detail page](/ai-gateway/virtual-keys#vk-detail-page).
@@ -5132,7 +5140,7 @@ Before you rotate, capture the current state. Rotation creates an audit row, but
 # Mints a new secret + returns it; old continues working for 24h
 langwatch virtual-keys rotate "$VK_ID"
 # Pipe directly into your secret store if you want to avoid clipboard/terminal exposure:
-langwatch virtual-keys rotate "$VK_ID" --format raw | \
+langwatch virtual-keys rotate "$VK_ID" --format json | jq -r .secret | \
   vault kv put -mount=secret/gateway "$VK_ID" secret=-
 ```
 
@@ -5166,7 +5174,10 @@ If the secret has leaked publicly, don't rotate, revoke immediately.
 ```bash
 # UI: VK detail → Revoke. Confirmation dialog. No grace window.
 # CLI:
-langwatch virtual-keys revoke "$VK_ID" --reason "secret leaked in commit SHA $LEAK_SHA"
+langwatch virtual-keys revoke "$VK_ID"
+# Revocation is audit-logged with the actor. To record why, disable the key
+# with a reason first, then revoke:
+langwatch virtual-keys disable "$VK_ID" --reason "secret leaked in commit SHA $LEAK_SHA"
 ```
 
 The `--reason` field is stored in the audit row's metadata so post-incident reviews have context. Use it liberally.
@@ -5933,7 +5944,7 @@ curl -sD- -o/dev/null \
   grep -i x-langwatch-
 ```
 
-You should see `X-LangWatch-Request-Id`, `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`. Paste the request id into the LangWatch search bar, the full trace is already there.
+You should see `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`. Paste the request id into the LangWatch search bar, the full trace is already there.
 
 ## Step 4: Add your first policy
 
@@ -6736,7 +6747,7 @@ The gateway is a cache of the control plane, so a surprising amount continues to
 
 | Component down | Customer impact | How long gateway stays up | Notes |
 |---|---|---|---|
-| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default 6 h) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the OTel span and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default 6 h) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite, circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
 | Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite, L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
 | Gateway pod (crash, eviction) | None, HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |
@@ -6750,7 +6761,7 @@ When you find something worth filing:
 1. Grab the `.pb.gz` with `go tool pprof -symbolize=remote -proto http://localhost:6060/debug/pprof/heap > /tmp/heap.pb.gz`.
 2. Attach it to the issue along with:
    - Pod name + image digest (`kubectl get pod -n langwatch -o yaml | grep image`).
-   - `X-LangWatch-Request-Id` from one exemplar bad request.
+   - `X-LangWatch-Gateway-Request-Id` from one exemplar bad request.
    - `kubectl top pod` output around the spike.
 3. For urgent escalation, post in `#ai-gateway-support` with the request id.
 
@@ -7646,7 +7657,7 @@ Replace the `splunk_hec_send` shim with your SIEM's appropriate HTTP-pull or ing
 ## Cross-references
 
 - [Compliance architecture](/ai-gateway/governance/compliance-architecture) — how the unified substrate underwrites SOC 2 / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
-- [Per-origin retention](/ai-gateway/governance/retention) — `thirty_days` / `one_year` / `seven_years` retention classes; OCSF events are subject to the same retention as their source spans
+- [Governance data retention](/ai-gateway/governance/retention): OCSF events are kept as long as the spans they were derived from
 - [Anomaly rules](/ai-gateway/governance/anomaly-rules) — how AnomalyAlerts propagate into OCSF events with elevated severity
 - [Trace vs governance ingestion](/observability/trace-vs-activity-ingestion) — picking the right OTel URL for your scenario
 
@@ -8058,7 +8069,7 @@ re-running `langwatch login`).
 If you're curious about the platform side:
 
 - [Compliance architecture](/ai-gateway/governance/compliance-architecture) — how the unified observability substrate underwrites SOC 2 / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
-- [Per-origin retention](/ai-gateway/governance/retention) — `thirty_days` / `one_year` / `seven_years` retention classes; your IT admin picks the class for each ingest source
+- [Governance data retention](/ai-gateway/governance/retention): how long the activity recorded from your key is kept
 - [OCSF / SIEM export](/ai-gateway/governance/ocsf-export) — your security team's SIEM (Splunk, Datadog, Sentinel) pulls these events on a cron via the OCSF v1.1 read API
 - [Ingestion sources](/ai-governance/ingestion-sources/index) — the broader picture of what other AI platforms feed into the same governance dashboard
 
@@ -8088,7 +8099,7 @@ Retention is configured per scope under **Settings > Data Retention**: an organi
 The full mechanics, including how deletion works and the self-hosted notes, live on [Platform → Data Retention](/platform/data-retention). Everything there applies to governance-origin data unchanged: a project holding gateway traffic follows its project policy, or its team's, or the organization default.
 
 <Note>
-An earlier design attached a per-source retention class to each governance ingestion source. That mechanism was dropped before it shipped anywhere it could be relied on: retention is per organization, team, and project scope, not per source. If your compliance notes reference `retentionClass`, map them to scoped retention policies.
+Retention is scoped per organization, team, and project, never per ingestion source. Compliance notes that describe a per-source retention class map onto these scoped policies instead.
 </Note>
 
 ## What is deliberately exempt: billing records
@@ -8737,7 +8748,7 @@ Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gatew
 | `langwatch.organization_id` | Owning organisation. |
 | `langwatch.principal_id` | User or service account that made the call. |
 | `langwatch.vk_display_prefix` | First 16 chars of the VK's display form (for correlation with 401 traces where the full VK isn't known). |
-| `langwatch.gateway_request_id` | The value of the `X-LangWatch-Request-Id` response header. |
+| `langwatch.gateway_request_id` | The value of the `X-LangWatch-Gateway-Request-Id` response header. |
 | `langwatch.model` | Final resolved model name dispatched to the provider. |
 | `langwatch.provider` | Provider name (`openai`, `anthropic`, `gemini`, etc.). |
 | `langwatch.model_source` | How the model was resolved: `alias`, `explicit_slash`, `implicit`. |
@@ -8758,7 +8769,7 @@ Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gatew
 - `langwatch.fallback.winning_credential`, credential ID of the winning provider slot.
 - `langwatch.thread_id`, thread/conversation ID when provided via `X-LangWatch-Thread-Id` header.
 
-<Info>The following attributes are **not yet emitted** (tracked for v1.1): `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `.warnings`, `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome`, `.forced_injected`. Operators looking for these signals should use the Prometheus counters documented below. Request-id correlation via the `X-LangWatch-Request-Id` header lets operators join metric spikes back to individual traces.</Info>
+<Info>The following attributes are **not yet emitted** (tracked for v1.1): `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `.warnings`, `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome`, `.forced_injected`. Operators looking for these signals should use the Prometheus counters documented below. Request-id correlation via the `X-LangWatch-Gateway-Request-Id` header lets operators join metric spikes back to individual traces.</Info>
 
 ## Filtering in the LangWatch UI
 
@@ -8862,7 +8873,7 @@ The gateway itself exports all spans, sampling is applied downstream at the coll
 
 ## Debugging a single request
 
-From a log line or an error at the client, grab the `X-LangWatch-Request-Id` (`grq_01HZX9K3M…`). Paste into the LangWatch search bar and you land on the full trace: every attempt span, upstream latency, guardrail decisions, cache outcome, budget deltas. No digging through provider-side logs.
+From a log line or an error at the client, grab the `X-LangWatch-Gateway-Request-Id` (`req_c2bf5df0b8449f1d1838c4b98dd850`). Paste into the LangWatch search bar and you land on the full trace: every attempt span, upstream latency, guardrail decisions, cache outcome, budget deltas. No digging through provider-side logs.
 
 ## Trace-id propagation: concrete handshake
 
@@ -8873,7 +8884,7 @@ Every gateway response carries the following headers for W3C traceparent propaga
 | `X-LangWatch-Trace-Id` | 32 hex chars | Equals the incoming `traceparent` trace id when the caller supplied one; otherwise a freshly-minted trace id |
 | `X-LangWatch-Span-Id` | 16 hex chars | The gateway's own span id for this request |
 | `traceparent` | `00-<trace-id>-<span-id>-01` | W3C traceparent re-injected for downstream stitching, forward to any further hop you call |
-| `X-LangWatch-Request-Id` | `grq_<ULID>` | Gateway-scoped id; use this in support tickets |
+| `X-LangWatch-Gateway-Request-Id` | `req_<30 hex characters>` | Gateway-scoped id; use this in support tickets |
 | `X-LangWatch-Gateway-Version` | semver or git-sha | Version of the gateway pod that handled this request. Present on every response, success and error, so "which deploy returned this 500?" is answerable without access-log correlation. SDKs can also version-gate on header presence |
 
 ### Client already has a trace
@@ -8984,7 +8995,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
 - **OpenAI-compatible endpoint** at `/v1/chat/completions`, `/v1/embeddings`, `/v1/models`, etc. Drop in `OPENAI_BASE_URL=https://gateway.langwatch.ai/v1` and `OPENAI_API_KEY=vk-lw-…` and every existing OpenAI-SDK codebase works unchanged.
 - **Anthropic-compatible endpoint** at `/v1/messages` so Claude Code and native Anthropic SDKs work by setting `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` to your gateway URL and a LangWatch virtual key.
 - **Virtual keys**: LangWatch-issued credentials (`vk-lw-<ulid>`) with project/team/org scope. Show-once secrets, peppered-HMAC-SHA256 hashed, rotatable, revokable within 60 seconds.
-- **Hierarchical budgets**: enforce spend limits at organisation, team, project, virtual-key, or principal scope with windowed periods (minute → total) and soft-warn or hard-block semantics.
+- **Hierarchical budgets**: enforce spend limits at organisation, team, project, virtual-key, principal, group, or per-end-user scope, with periods from a minute to a whole grant, calendar-aligned or anchored to your own billing date, and soft-warn or hard-block semantics.
 - **Per-request guardrails**: invoke your LangWatch evaluators inline on the request, response, or each streaming chunk. Decisions: `allow`, `block`, `modify` (redact).
 - **Tool, MCP, URL policy**: block or allowlist tool calls, MCP server references, or outbound URLs by regex before the request ever leaves your gateway.
 - **Caching passthrough**: Anthropic `cache_control` markers are forwarded byte-for-byte by default (protecting your 90% cache discount). Override per-request with `X-LangWatch-Cache: respect|force|disable`.
@@ -9205,7 +9216,7 @@ Each has a `deny` list and an optional `allow` list.
 OpenAI Chat Completions: matched against `tools[].function.name`.
 Anthropic Messages: matched against `tools[].name`.
 
-Blocked → `403 tool_not_allowed` with the offending name in `error.message`. (In v1, block attribution flows via the `X-LangWatch-Request-Id` response header → trace correlation; a dedicated `langwatch.policy.violation` span attribute is a v1.1 observability follow-up.)
+Blocked → `403 tool_not_allowed` with the offending name in `error.message`. (In v1, block attribution flows via the `X-LangWatch-Gateway-Request-Id` response header → trace correlation; a dedicated `langwatch.policy.violation` span attribute is a v1.1 observability follow-up.)
 
 ### MCP servers
 
@@ -9313,7 +9324,7 @@ Fix the policy via `langwatch virtual-keys update <id>` (or the UI) and subseque
 ```http
 HTTP/1.1 403 Forbidden
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNO...
+X-LangWatch-Gateway-Request-Id: req_9d24b8e07f1a3c65d8b2e40f7a1c93
 
 {
   "error": {
@@ -9338,7 +9349,7 @@ Use patterns for deterministic rules (tool names, URL allowlists) and guardrails
 Every block emits:
 
 - `AuditLog` row (gateway shape) with actor (user or service principal, service-account VKs use `actor=svc_<projectId>`), VK id, policy kind, matched pattern, offending value (truncated to 64 chars), request id.
-- `X-LangWatch-Request-Id` response header for joining the 403 back to the trace stream.
+- `X-LangWatch-Gateway-Request-Id` response header for joining the 403 back to the trace stream.
 
 (A dedicated `langwatch.policy.violation=<kind>:<pattern>` span attribute is tracked as a v1.1 observability follow-up. In v1, use the audit log + request-id correlation to identify repeat offenders and tune patterns.)
 
@@ -9796,7 +9807,7 @@ Fallback attribution today:
 
 - Prometheus counter `gateway_provider_attempts_total{credential_id, outcome}` increments once per attempt, with `outcome` in `success | fallback_success | retryable_5xx | not_found | rate_limit | timeout | network | circuit_open | non_retryable | chain_exhausted | context_done`.
 - Response header `X-LangWatch-Fallback-Count: N`, how many fallbacks were attempted before success.
-- Request-id correlation via `X-LangWatch-Request-Id`, join the metric + log line back to the specific trace.
+- Request-id correlation via `X-LangWatch-Gateway-Request-Id`, join the metric + log line back to the specific trace.
 
 <Info>Per-attempt nested spans (`langwatch.fallback.attempt`, `.reason` attrs) are a v1.1 observability follow-up. In v1, the counter + header give you the aggregate picture; per-attempt reasoning lives in the gateway log line for that request-id.</Info>
 
@@ -10163,7 +10174,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 The response is OpenAI-shaped. Response headers tell you what happened inside the gateway:
 
 ```
-X-LangWatch-Request-Id: grq_01HZX9K3M…
+X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
 X-LangWatch-Provider: openai
 X-LangWatch-Model: gpt-5-mini
 X-LangWatch-Cache: miss
@@ -10620,7 +10631,7 @@ Every gateway response carries these headers so clients can stitch the span back
 | `X-LangWatch-Trace-Id` | 32-hex trace id. Matches the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted trace id |
 | `X-LangWatch-Span-Id` | 16-hex gateway span id |
 | `traceparent` | W3C traceparent re-injected for downstream stitching, pass it to any further hop you call |
-| `X-LangWatch-Request-Id` | ULID, gateway-scoped. Use this in support tickets |
+| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, gateway-scoped. Use this in support tickets |
 
 ```python
 resp = client.chat.completions.with_raw_response.create(
@@ -10675,14 +10686,14 @@ These layer on top of `default_headers` without replacing them.
 
 ### Response inspection
 
-Grab the `X-LangWatch-Request-Id` for support tickets or log correlation:
+Grab the `X-LangWatch-Gateway-Request-Id` for support tickets or log correlation:
 
 ```python
 resp = client.chat.completions.with_raw_response.create(
     model="gpt-5-mini",
     messages=[{"role": "user", "content": "Hi"}],
 )
-request_id = resp.http_response.headers["X-LangWatch-Request-Id"]
+request_id = resp.http_response.headers["X-LangWatch-Gateway-Request-Id"]
 print(f"LangWatch request id: {request_id}")
 ```
 
@@ -10830,7 +10841,7 @@ Every gateway response carries these headers so clients can stitch the gateway s
 | `X-LangWatch-Trace-Id` | 32-hex trace id. Equals the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted id |
 | `X-LangWatch-Span-Id` | 16-hex gateway span id |
 | `traceparent` | W3C traceparent re-injected for downstream stitching, forward to any further hop |
-| `X-LangWatch-Request-Id` | ULID, use in support tickets |
+| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, use in support tickets |
 
 ```ts
 const raw = await openai.chat.completions.withResponse().create({
@@ -10889,7 +10900,7 @@ const resp = await openai.chat.completions.withResponse().create({
   model: "gpt-5-mini",
   messages: [{ role: "user", content: "Hi" }],
 });
-const requestId = resp.response.headers.get("X-LangWatch-Request-Id");
+const requestId = resp.response.headers.get("X-LangWatch-Gateway-Request-Id");
 ```
 
 ## Anthropic TypeScript SDK
@@ -11744,7 +11755,7 @@ curl --fail --max-time 5 \
 
 On alert:
 
-1. Capture the `X-LangWatch-Request-Id` header from the response.
+1. Capture the `X-LangWatch-Gateway-Request-Id` header from the response.
 2. Look up the request's trace in the LangWatch UI under Origin = `gateway`.
 3. If the gateway returned 5xx, pull the gateway pod logs filtered by pod name (`GATEWAY_NODE_ID` is unused; the gateway derives `node_id` from `os.Hostname()` which inside a Kubernetes pod is the pod name).
 4. If the gateway returned the upstream provider's error verbatim, the gateway is healthy, the provider is degraded.
@@ -12191,7 +12202,7 @@ gateway:
 
 Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
 - `security`, edge, fails fast with 413, operator bumps when large base64 images are legitimate;
-- `budget`, accounting, reconciles asynchronously via the span-to-ledger path, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
+- `budget`, accounting, reconciles asynchronously from the spend commands the gateway emits, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
 - `upstream`, per-provider, fails mid-flight with circuit-breaker trips.
 
 The chart's ConfigMap renders the int as `%d` (the chart's test render catches a YAML scientific-notation gotcha, Go's `ParseInt` rejects `1.048576e+07`). If you override this value in a custom `values.yaml`, write integer literals, not floats.
@@ -12574,7 +12585,7 @@ LLM streaming over Server-Sent Events is a surprisingly load-bearing surface: co
 
 ### Before the first chunk: mutations allowed
 
-- Gateway may inject response headers (`X-LangWatch-Request-Id`, `X-LangWatch-Provider`, `X-LangWatch-Model`).
+- Gateway may inject response headers (`X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Provider`, `X-LangWatch-Model`).
 - Pre-call guardrails may rewrite the request payload before dispatch.
 - Fallback chain may transparently switch providers if the primary fails before any chunk arrives.
 
@@ -12697,7 +12708,7 @@ Same passthrough discipline.
 
 ## Observability
 
-- `X-LangWatch-Request-Id` on the first frame.
+- `X-LangWatch-Gateway-Request-Id` on the first frame.
 - Trace span per chunk would be too expensive, the gateway records a single span per streaming request with `langwatch.streaming=true` and the normal per-request attrs (`langwatch.model`, `langwatch.usage.*`, `langwatch.duration_ms`, `langwatch.cost_usd`).
 - Mid-stream failures are visible via `gateway_http_requests_total{status="500"}` + the single span's error state + request-id correlation to the gateway log line.
 
@@ -12771,7 +12782,7 @@ sidebarTitle: Troubleshooting
 
 When the gateway misbehaves, this page is the first stop. Each symptom below points to the diagnostic you'd run first and, where possible, the single log line or metric that nails the root cause.
 
-Every gateway response carries `X-LangWatch-Request-Id`. Grab it from your client's error output and paste into the LangWatch search bar, the full trace gives you attempts, upstream latency, cache outcome, and guardrail decisions in one view. **Do this before anything else** for a specific broken request.
+Gateway responses carry `X-LangWatch-Gateway-Request-Id` once the request is authenticated. Grab it from your client's error output and paste into the LangWatch search bar, the full trace gives you attempts, upstream latency, cache outcome, and guardrail decisions in one view. **Do this before anything else** for a specific broken request.
 
 ## `401 invalid_api_key`
 
@@ -12940,7 +12951,7 @@ Also check your client is actually sending `cache_control: {type: "ephemeral"}` 
 
 **Symptoms:**
 - `/v1/chat/completions` returned `200` with a real model response.
-- Response carried `X-LangWatch-Request-Id`.
+- Response carried `X-LangWatch-Gateway-Request-Id`.
 - But the LangWatch **Traces** screen in your project is empty (or doesn't show this request).
 
 **Diagnose:**
@@ -12978,7 +12989,7 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 
 6. **Trace landed but under a different project filter.** Check that the **Traces** screen is scoped to the same project as the auth token's project and that the `Origin = Gateway` quick-filter is either off or explicitly selected (the default view excludes non-Gateway origins when "Gateway" is active, and vice-versa).
 
-**Quick sanity check:** filter **Traces** for the last 5 minutes with **Origin = Gateway** and search for your `X-LangWatch-Request-Id`. If the row is there, you were looking at the wrong filter/project. If not, the export path dropped the span, diagnose via the log grep above.
+**Quick sanity check:** filter **Traces** for the last 5 minutes with **Origin = Gateway** and search for your `X-LangWatch-Gateway-Request-Id`. If the row is there, you were looking at the wrong filter/project. If not, the export path dropped the span, diagnose via the log grep above.
 
 ## `auth_cache_refresh_transport_failure` WARN spew in logs
 
@@ -13128,10 +13139,10 @@ kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial faile
 
 When you don't know where to start:
 
-1. Take the `X-LangWatch-Request-Id` from the failing request → LangWatch search.
+1. Take the `X-LangWatch-Gateway-Request-Id` from the failing request → LangWatch search.
 2. Compare `X-LangWatch-Provider` to the VK's configured primary, if different, fallback fired.
 3. Check `X-LangWatch-Cache` response header: `hit`, `miss`, `bypass`, `force` (the last is v1.1, deferred in v1).
-4. Gateway pod logs filtered on `request_id=grq_...` for structured entries.
+4. Gateway pod logs filtered on `request_id=req_...` for structured entries.
 5. Control-plane logs filtered on `vk_id` for authorization decisions.
 
 If none of the above narrows it: post in `#ai-gateway-support` with the request id and the full response headers. LangWatch oncall will trace it within an hour.
@@ -13700,7 +13711,7 @@ The Zod schemas backing each request and response body are the same schemas the 
 Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI spec lives at `platform/app/src/app/api/openapiLangWatch.json`, and both SDKs regenerate from it on the standard build target.
 
 ```bash
-# from langwatch/
+# from platform/app/
 pnpm run task generateOpenAPISpec   # regenerate openapiLangWatch.json from the Hono routes
 
 # from sdks/typescript/
@@ -13844,13 +13855,9 @@ The four filters compose with AND. Pagination is below the table; **Items per pa
 
 ## Retention
 
-Audit log retention follows the [governance retention class](/ai-gateway/governance/retention) configured for the organization:
+Audit log retention follows your organization's [retention policy](/platform/data-retention), scoped per organization, team, and project. Configuring it requires an Enterprise plan; other plans use the platform default window. Organizations under SOC 2, ISO 27001, or HIPAA obligations usually set a multi-year period here.
 
-- `thirty_days`, Apache 2.0 floor; rows older than 30d are dropped.
-- `one_year`, Enterprise.
-- `seven_years`, Enterprise. Recommended for SOC 2, ISO 27001, and HIPAA orgs that need a multi-year audit trail.
-
-Retention applies to the underlying ClickHouse partition; the Postgres `AuditLog` mirror table retains forever for fast UI lookups against the most recent ~year. The full retention model is described in [Compliance architecture](/ai-governance/compliance-architecture).
+Retention applies to the underlying ClickHouse partition; the Postgres `AuditLog` mirror table is kept for fast UI lookups against the most recent year. The full model is described in [Compliance architecture](/ai-governance/compliance-architecture).
 
 ## Common admin questions
 
@@ -14281,7 +14288,7 @@ sidebarTitle: Compliance architecture
 
 <Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance reactors fold them into OCSF-mapped events for SIEM export.</Info>
 
-<Note>**Available on Enterprise plans.** The OCSF/SIEM export, multi-class retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store with `thirty_days` retention and append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
 LangWatch AI Gateway governance is built on a **unified observability substrate**: every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
 
@@ -14350,19 +14357,11 @@ Every receiver writes a `*Received` event to `event_log` **before** any projecti
 
 This is the foundation that SOC 2 Type II, ISO 27001, EU AI Act general-purpose, GDPR, HIPAA-most-uses non-repudiation requirements rest on. An auditor asking "show me the audit trail before AND after this row was deleted" gets both.
 
-### 2. Per-origin retention class
+### 2. Retention
 
-Configured at the IngestionSource via `retentionClass`:
+Governance data is kept for as long as your retention policy says. Policies are set per organization, team, and project under **Settings > Data Retention**, the most specific scope winning, with periods from weeks to years. Deletion is enforced by the storage layer, not by an application worker that could be skipped. Configuring retention is an Enterprise capability; other plans use the platform default window.
 
-| `retentionClass` | Window | Use case |
-|---|---|---|
-| `thirty_days` (default) | 30 days | Day-to-day debugging, dashboards, SOC 2, ISO 27001 baseline |
-| `one_year` | 1 year | SOC 2 audit window, GDPR right-to-be-forgotten window, EU AI Act |
-| `seven_years` | 7 years | HIPAA-most-uses, financial audit windows |
-
-ClickHouse TTL policy honours the class. The retention class is **system-derived per source**, never user-supplied at OTLP ingest. Org plan ceiling is enforced at the composer, API layer, a free-tier org can't request `seven_years`.
-
-See [Per-origin retention](/ai-gateway/governance/retention) for the full retention contract.
+See [Governance data retention](/ai-gateway/governance/retention) for the full contract, including the fixed 13-month lifetime billing records keep regardless of policy.
 
 ### 3. RBAC: permission-driven, not role-driven
 
@@ -14427,14 +14426,14 @@ The baseline ships in this PR, fully tested, fully spec'd. Tamper-evidence is th
 If a SOC 2, ISO 27001, GDPR, HIPAA-most-uses auditor asks LangWatch about your governance data, the answers fit on one page:
 
 - **Where does it live?** In our standard trace store (`recorded_spans` + `log_records`), tagged with `langwatch.origin.kind = 'ingestion_source'`. Same indexes, same backups, same encryption-at-rest as everything else.
-- **How long is it kept?** Per the IngestionSource's `retentionClass`, 30 days, 1 year, 7 years. Set system-side per source, never user-supplied per event.
+- **How long is it kept?** For the period your organization's retention policy sets, scoped per organization, team, and project. Never chosen per event by whatever sent it.
 - **Who can read it?** Org admins + auditor read-only role. Customer-visible project members cannot.
 - **Is it tamper-evident?** The append-only `event_log` underwrites non-repudiation for SOC 2, ISO 27001, EU AI Act general-purpose, GDPR, HIPAA-most-uses. Cryptographic Merkle-root publication is a named follow-up for the strict tier (EU AI Act high-risk, HIPAA covered-entity strict, SEC 17a-4).
 - **Can the data leave the platform?** Via the OCSF v1.1 read API, cursor-paginated, org-tenant-isolated, auth-scoped to org admin or auditor. Six SIEM platforms (Splunk ES, Datadog Security, AWS Security Hub, Microsoft Sentinel, Elastic Security, Sumo Logic CSE) supported as cron-pull targets. See [OCSF, SIEM export](/ai-gateway/governance/ocsf-export).
 
 ## Cross-references
 
-- [Per-origin retention](/ai-gateway/governance/retention): `thirty_days`, `one_year`, `seven_years` retention classes; how the CH TTL policy keys off the origin attribute
+- [Governance data retention](/ai-gateway/governance/retention): how long governance data is kept, and the scoped policies that decide it
 - [OCSF, SIEM export](/ai-gateway/governance/ocsf-export): how governance feeds your SIEM (Splunk, Datadog, Sentinel, etc.)
 - [Trace vs governance ingestion](/observability/trace-vs-activity-ingestion): picking the right OTel URL for your scenario
 - [ADR-018: governance unified observability substrate](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/018-governance-unified-observability-substrate.md): the architecture decision record (for engineering reviewers)
@@ -15428,7 +15427,7 @@ The same chain controls cost, latency, fallback, and prompt caching across every
 For a brand-new org, the cheapest first source is `otel_generic`, it's available on the **Apache 2.0** open-core floor (no Enterprise license required) and accepts any OTLP/HTTP push:
 
 1. Navigate to **Settings → AI Governance → Ingestion Sources** (`/settings/governance/ingestion-sources`).
-2. Click **+ New source**, pick **Generic OTLP (`otel_generic`)**, fill the form, choose `thirty_days` retention.
+2. Click **+ New source**, pick **Generic OTLP (`otel_generic`)**, and fill the form.
 3. The backend mints a `lw_is_<base64url>` ingest secret and shows it **once** in a one-time-reveal modal, copy it now. The list endpoint never returns it again.
 4. Paste the secret into the upstream platform's OTLP exporter as `Authorization: Bearer lw_is_<secret>`. The receiver endpoint is on the same host as the rest of LangWatch.
 
@@ -15872,7 +15871,7 @@ Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli per the shared parser).
 - **OTLP shape:** Spans (lands in `recorded_spans` with origin metadata stamped). Same handoff path as `otel_generic`.
-- **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` + `langwatch.governance.retention_class` on every span, hands off to the existing trace pipeline. Cowork tool-call spans land as the OCSF "Action = tool_call"; model-call spans land as "Action = chat" via the governance fold's heuristic.
+- **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` on every span, hands off to the existing trace pipeline. Cowork tool-call spans land as the OCSF "Action = tool_call"; model-call spans land as "Action = chat" via the governance fold's heuristic.
 - **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
 
 ## What the admin configures upstream
@@ -15989,7 +15988,7 @@ sidebarTitle: Ingestion sources
 
 <Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Copilot Studio, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
 
-<Note>**`otel_generic` + `thirty_days` retention are Apache 2.0 floor; multi-source + extended retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the default 30-day retention; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and the `one_year`, `seven_years` retention classes ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/settings/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
+<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/settings/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
 
 LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch, distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
 
@@ -16031,7 +16030,7 @@ Independent of source type, the lifecycle is:
 1. Admin opens `/settings/governance/ingestion-sources`, picks a source type, fills the per-type config form (including the [retention class](/ai-gateway/governance/retention)), clicks Create.
 2. Backend mints a `lw_is_<base64url>` ingest secret, hashes it, persists the source with status `awaiting_first_event`. The secret is shown **once** in a one-time-reveal modal, it's never returned by the list/get endpoints again.
 3. Admin pastes the secret + per-source endpoint into the upstream platform (OTLP exporter URL, webhook destination, Azure app secret, S3 bucket policy, etc.).
-4. First event arrives at the receiver → receiver lazy-ensures the hidden Governance Project for the org (if not already), stamps `langwatch.origin.*` + `langwatch.governance.retention_class` attributes, hands off to the existing trace pipeline. Source status flips to `active` + `lastEventAt` updates.
+4. First event arrives at the receiver → receiver lazy-ensures the hidden Governance Project for the org (if not already), stamps the `langwatch.origin.*` attributes, hands off to the existing trace pipeline. Source status flips to `active` + `lastEventAt` updates.
 5. Web detail page polls every 10s, CLI tail polls every 3s in `--follow` mode, both see the flip + the new event simultaneously.
 
 For source types where the puller worker is not yet wired (the three "setup-contract-only" rows above), step 4 won't fire; the source stays at `awaiting_first_event` until the adapter ships.
@@ -16067,7 +16066,6 @@ Every governance-ingested span, log_record is stamped at the receiver edge with 
 | `langwatch.ingestion_source.id` | Source identity (matches the `lw_is_*` Bearer's resolved IngestionSource) |
 | `langwatch.ingestion_source.organization_id` | Org tenancy for cross-source roll-ups |
 | `langwatch.ingestion_source.source_type` | Source type (`otel_generic`, `workato`, etc.) for filtering |
-| `langwatch.governance.retention_class` | `thirty_days`, `one_year`, `seven_years`, drives ClickHouse TTL |
 
 These appear as read-only system metadata in the trace viewer, log detail pane; users cannot supply or edit them.
 
@@ -16087,7 +16085,7 @@ If you need an unwired adapter, file an issue tagged `governance/ingestion/adapt
 
 - [Trace vs governance ingestion](/observability/trace-vs-activity-ingestion): picking the right OTel URL
 - [Compliance architecture](/ai-gateway/governance/compliance-architecture): how the unified substrate underwrites SOC 2, ISO 27001, EU AI Act, GDPR, HIPAA-most-uses
-- [Per-origin retention](/ai-gateway/governance/retention): `thirty_days`, `one_year`, `seven_years` classes
+- [Governance data retention](/ai-gateway/governance/retention): how long governance data is kept
 - [OCSF, SIEM export](/ai-gateway/governance/ocsf-export): pulling governance events into Splunk, Datadog Security, etc.
 - [Governance CLI debug](/ai-gateway/governance/cli-debug): `langwatch ingest list/health/tail` commands
 
@@ -16174,7 +16172,7 @@ sidebarTitle: Generic OTel
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (`resource_spans`, `scope_spans`, `spans`). `snake_case` and `camelCase` both accepted.
 - **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
-- **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` + `langwatch.governance.retention_class` on every span, hands off to the existing trace pipeline (same `traces.collection.handleOtlpTraceRequest` that powers `/api/otel/v1/traces`). No parallel write path.
+- **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` on every span, hands off to the existing trace pipeline (same `traces.collection.handleOtlpTraceRequest` that powers `/api/otel/v1/traces`). No parallel write path.
 - **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
 
 ## What the admin configures upstream
@@ -17316,12 +17314,12 @@ LangWatch is open-core. Some governance surfaces work for every self-hosted depl
 | [AI Tools Portal at `/me`](/ai-governance/personal-portal/overview) | Apache 2.0 | Always available. Catalog editor at `/settings/governance/tool-catalog`, three tile classes, admin-curated. |
 | [Routing Policies](/ai-gateway/governance/routing-policies) | Apache 2.0 | Always available. The gateway-side policy chain is core. |
 | [CLI debugging](/ai-governance/cli-debug) | Apache 2.0 | Always available. CLI 409, 401, 403 catalog. |
-| [Ingestion Sources](/ai-governance/ingestion-sources/index) | Enterprise | `otel_generic` source type + `thirty_days` retention are available on the Apache 2.0 floor; multi-source + extended retention require Enterprise. |
+| [Ingestion Sources](/ai-governance/ingestion-sources/index) | Enterprise | The `otel_generic` source type at the platform default retention window is available on the Apache 2.0 floor; multiple sources and configurable retention require Enterprise. |
 | [Anomaly Rules](/ai-governance/anomaly-rules) | Enterprise | Admin-curated detection rules + dispatch (Slack, PagerDuty, SIEM). |
 | [Compliance architecture](/ai-governance/compliance-architecture) | Enterprise | OCSF, SIEM export, multi-class retention, tamper-evidence (post-GA follow-up). |
 | Gateway webhooks | Enterprise | Signed delivery of AI Gateway spend and budget events to your own systems, with retries, replay and a delivery log. This is the surface platforms meter and rebill their own customers on. |
 
-In the LangWatch UI, Enterprise-only surfaces show an **"Available on Enterprise plans"** card with an upgrade CTA when the org isn't on an Enterprise plan; the same surfaces gray out source-type dropdowns to `otel_generic` and retention to `thirty_days` for non-enterprise users.
+In the LangWatch UI, Enterprise-only surfaces show an **"Available on Enterprise plans"** card with an upgrade CTA when the org isn't on an Enterprise plan; the same surfaces gray out the source-type dropdown to `otel_generic` for non-enterprise users.
 
 ## Per-file license headers
 

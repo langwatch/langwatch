@@ -440,7 +440,7 @@ export function BudgetCreateDrawer({
                 <Field.Label>
                   Limit (USD)
                   <FieldInfoTooltip
-                    description="Spend ceiling per window in USD. Tracked against provider-computed token costs (summed post-response). Near-limit requests (≥90% of cap) trigger a live reconciliation on the gateway with a 200ms fail-open."
+                    description="Spend ceiling per window in USD, tracked against the cost each provider reports for the request. Responses carry a warning from 80% of the cap, and past it the on-breach action applies."
                     docHref="/ai-gateway/budgets#creating-a-budget"
                   />
                 </Field.Label>

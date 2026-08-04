@@ -120,7 +120,7 @@ The UI surfaces this as "Warning thresholds" on a single budget row; each thresh
 
 ## Debit model
 
-Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` (ULID) and is **idempotent** by that id, so a gateway retry or a redelivered batch never double-bills.
+Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` and is **idempotent** by that id, so a gateway retry or a redelivered batch never double-bills.
 
 Debit flow:
 

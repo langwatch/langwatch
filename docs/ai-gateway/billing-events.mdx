@@ -60,7 +60,7 @@ Spend events ride the standard envelope (`{id, type, created, schema_version, da
 
 Field notes:
 
-- **`event_id`** is the envelope `id`: the gateway request id with a type suffix. Dedup on it. **`gateway_request_id`** is the plain join key across the settled and completed pair, and it is the same ULID your client received in the `X-LangWatch-Gateway-Request-Id` response header, so you can join request-side logs to billing events.
+- **`event_id`** is the envelope `id`: the gateway request id with a type suffix. Dedup on it. **`gateway_request_id`** is the plain join key across the settled and completed pair, and it is the same id your client received in the `X-LangWatch-Gateway-Request-Id` response header, so you can join request-side logs to billing events.
 - **`occurred_at`** is request time, never ingest or delivery time. Late events land in the right invoice period.
 - **`status`** is `success` or `error` on completed events. Failed provider calls are events too; `error` carries `{class, http_status}` so your billing decides whether to charge for them.
 - **`end_user_id`** is the attributed end user (see [attribution](#attribution-what-the-request-carries)). **`metadata`** is your caller echo, returned verbatim: this is how billing joins events to your own tenant and user records.
@@ -104,7 +104,7 @@ Attribution is captured on the request path; nothing is provisioned per end user
 
 - **End-user id** resolution precedence: the `x-langwatch-end-user-id` header, then `x-litellm-end-user-id` (a migration alias, accepted so LiteLLM-shaped clients need no change), then the OpenAI `user` body field. Headers win over the body.
 - **Metadata echo**: send `x-langwatch-metadata` (a JSON object, 4 KB cap). It returns verbatim as `metadata` on every spend event for that request.
-- **Request id**: every gateway response carries `X-LangWatch-Gateway-Request-Id`, the same ULID that keys the spend event.
+- **Request id**: an authenticated gateway response carries `X-LangWatch-Gateway-Request-Id`, the same id that keys the spend event.
 
 One resolver feeds both metering and [per-end-user budget enforcement](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates), so billing and capping can never disagree about who a request was.
 

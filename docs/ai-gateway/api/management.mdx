@@ -449,7 +449,13 @@ Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `ga
 
 ## OpenAPI
 
-All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas, which generate into the repository-wide OpenAPI 3.1 document (`docs/api-reference/openapiLangWatch.json`) rendered by the API-reference docs. The CLI's `VirtualKeysApiService` and `GatewayBudgetsApiService` DTOs are hand-authored against the same schemas; a future improvement is to regenerate them from the OpenAPI output so drift fails at build time.
+Every route on this API is described in LangWatch's OpenAPI 3.1 document, served unauthenticated at:
+
+```
+GET https://app.langwatch.ai/api/gateway/v1/openapi.json
+```
+
+It carries the whole public REST surface, not only the gateway routes, so one fetch feeds a client generator, a Postman import, or an agent that needs the schemas. Self-hosted: same path on your control plane's DNS.
 
 ## See also
 

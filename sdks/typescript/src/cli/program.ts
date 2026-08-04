@@ -1739,7 +1739,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     virtualKeysCmd
       .command("rotate <id>")
-      .description("Rotate a virtual key's secret (old secret stops working immediately)")
+      .description("Rotate a virtual key's secret (the old one keeps working for 24 hours)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string) => {
       const { rotateVirtualKeyCommand: impl } = await import("./commands/virtual-keys/rotate.js");
