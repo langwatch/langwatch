@@ -193,6 +193,11 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+      # Throwaway 32-byte hex key. Anything encrypted at rest (webhook header
+      # values, signing secrets, stored idempotency responses) needs a real key
+      # to round-trip, and a test asserting that ciphertext is not readable text
+      # cannot mock the cipher it is asserting about.
+      CREDENTIALS_SECRET: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
       REDIS_URL: "redis://localhost:6379"
       BUILD_TIME: "true"
 
@@ -308,6 +313,11 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+      # Throwaway 32-byte hex key. Anything encrypted at rest (webhook header
+      # values, signing secrets, stored idempotency responses) needs a real key
+      # to round-trip, and a test asserting that ciphertext is not readable text
+      # cannot mock the cipher it is asserting about.
+      CREDENTIALS_SECRET: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"

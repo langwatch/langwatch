@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaWebhookDeliveryRepository } from "~/server/app-layer/automations/repositories/webhook-delivery.prisma.repository";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   pruneExpiredIdempotencyReceipts,
   pruneWebhookDeliveries,
@@ -72,17 +73,17 @@ beforeAll(async () => {
   endpointId = endpoint.id;
 });
 
-afterAll(async () => {
-  await prisma.webhookEndpointDelivery.deleteMany({ where: { projectId } });
-  await prisma.webhookEndpointDelivery.deleteMany({
-    where: { organizationId },
-  });
-  await prisma.webhookEndpoint.deleteMany({ where: { organizationId } });
-  await prisma.trigger.deleteMany({ where: { projectId } });
-  await prisma.project.delete({ where: { id: projectId } });
-  await prisma.team.delete({ where: { id: teamId } });
-  await prisma.organization.delete({ where: { id: organizationId } });
-});
+afterAll(() =>
+  cleanupTestRows(prisma, [
+    ["webhookEndpointDelivery", { projectId }],
+    ["webhookEndpointDelivery", { organizationId }],
+    ["webhookEndpoint", { organizationId }],
+    ["trigger", { projectId }],
+    ["project", { id: projectId }],
+    ["team", { id: teamId }],
+    ["organization", { id: organizationId }],
+  ]),
+);
 
 const writeAutomationsRow = (firedAt: Date, dispatchId: string) =>
   prisma.webhookEndpointDelivery.create({
