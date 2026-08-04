@@ -142,9 +142,19 @@ export async function replayGooseMigrationUp({
  * every replay goes through.
  */
 const LOCK_POLL_MS = 50;
-const LOCK_WAIT_TIMEOUT_MS = 120_000;
-/** Longer than the hook timeout, so a live holder is never mistaken for a corpse. */
-const LOCK_STALE_MS = 180_000;
+/**
+ * Below the 120s hook timeout of the suites that replay, so a lock nobody ever
+ * releases fails with a message naming the file to delete rather than as a
+ * generic hook timeout.
+ */
+const LOCK_WAIT_TIMEOUT_MS = 90_000;
+/**
+ * A holder that has had it this long is a corpse, and breaking the lock beats
+ * failing the run. Two orders of magnitude above a real hold: replaying the
+ * rollup rebuild takes about 200ms. Has to stay well under the wait timeout
+ * too, or the waiter gives up before it is ever allowed to break anything.
+ */
+const LOCK_STALE_MS = 30_000;
 
 async function withReplayLock<T>(
   database: string,
