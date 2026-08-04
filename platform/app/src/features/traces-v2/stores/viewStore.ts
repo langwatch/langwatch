@@ -191,7 +191,8 @@ function persistActiveLensId(id: string): void {
   }
 }
 
-const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
+/** Newest first: the order the flat trace list falls back to. */
+export const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
 
 function isGroupingMode(value: unknown): value is GroupingMode {
   return (

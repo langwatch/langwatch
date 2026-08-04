@@ -4,7 +4,7 @@ import { api } from "~/utils/api";
 import { useSamplePreview } from "../onboarding";
 import type { TraceListCursor } from "../stores/filterStore";
 import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { DEFAULT_SORT, useViewStore } from "../stores/viewStore";
 import type { TraceListItem } from "../types/trace";
 import { mapTraceListPayload } from "../utils/mapTraceListPayload";
 
@@ -76,6 +76,12 @@ export function useTraceListQuery(): TraceListQueryResult {
   // alone, otherwise the two hooks would fight over `page`, each resetting
   // the other's cursor space.
   const ownsPagination = grouping !== "by-conversation";
+  // The sessions lens sorts by dimensions only a session has (`lastTurn`,
+  // `turns`), and forwarding one of those here would ask the flat list to
+  // order by a column it does not have. It still runs while that lens is
+  // active because FindBar reads its rows, so it asks for its own default
+  // order rather than the session's.
+  const listSort = ownsPagination ? sort : DEFAULT_SORT;
   const traceCursor =
     pageCursor && typeof pageCursor === "object" ? pageCursor : undefined;
   const effectivePage = ownsPagination ? page : 1;
@@ -95,7 +101,7 @@ export function useTraceListQuery(): TraceListQueryResult {
     traceListQueryInput({
       projectId: project?.id ?? "",
       timeRange,
-      sort,
+      sort: listSort,
       page: effectivePage,
       pageSize,
       traceCursor,
