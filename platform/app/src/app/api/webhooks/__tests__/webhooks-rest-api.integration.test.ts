@@ -10,6 +10,10 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import {
+  verifyWebhookSignature,
+  WEBHOOK_SIGNATURE_HEADER,
+} from "~/server/webhooks/signature";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
@@ -357,13 +361,22 @@ describe("Feature: Webhook endpoints REST API", () => {
     let receiver: Server;
     let receiverUrl: string;
     let hits: string[] = [];
+    let captured: Array<{ headers: Record<string, string>; body: string }> = [];
     const originalHatch = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
 
     beforeAll(async () => {
       receiver = createServer((req, res) => {
         hits.push(req.url ?? "");
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end("{}");
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", () => {
+          captured.push({
+            headers: req.headers as Record<string, string>,
+            body: Buffer.concat(chunks).toString("utf8"),
+          });
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end("{}");
+        });
       });
       await new Promise<void>((resolve) =>
         receiver.listen(0, "127.0.0.1", resolve),
@@ -390,6 +403,7 @@ describe("Feature: Webhook endpoints REST API", () => {
       planHasWebhookEndpoints = true;
       process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
       hits = [];
+      captured = [];
 
       const createRes = await app.request("/api/webhooks/v1/endpoints", {
         method: "POST",
@@ -400,7 +414,9 @@ describe("Feature: Webhook endpoints REST API", () => {
         }),
       });
       expect(createRes.status).toBe(201);
-      const { data } = (await createRes.json()) as { data: { id: string } };
+      const { data } = (await createRes.json()) as {
+        data: { id: string; secret: string };
+      };
 
       const testRes = await app.request(
         `/api/webhooks/v1/endpoints/${data.id}/test`,
@@ -413,6 +429,25 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(testBody.data.delivered).toBe(true);
       expect(testBody.data.response_status).toBe(200);
       expect(hits).toEqual(["/hook"]);
+
+      // The route ran through the REAL shared sender, so this is also the
+      // only place the signature is checked against bytes that actually
+      // crossed a socket rather than a mock's arguments.
+      const received = captured[0]!;
+      const signature = received.headers[
+        WEBHOOK_SIGNATURE_HEADER.toLowerCase()
+      ] as string;
+      expect(signature).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
+      expect(
+        verifyWebhookSignature({
+          secret: data.secret,
+          body: received.body,
+          header: signature,
+          nowSeconds: Math.floor(Date.now() / 1000),
+        }),
+      ).toBe(true);
+      expect(received.headers["x-langwatch-delivery-id"]).toMatch(/^test:/);
+      expect(received.headers["x-langwatch-test-fire"]).toBe("true");
     });
   });
 

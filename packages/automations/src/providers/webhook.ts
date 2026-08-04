@@ -5,11 +5,12 @@ import type { PreviewEnvelope, SharedDef } from "./types";
 export const WEBHOOK_METHODS = ["POST", "PUT", "PATCH"] as const;
 
 /**
- * Sentinel a header VALUE carries on the wire to mean "keep the saved value".
- * Header values are secrets (Authorization, API keys): they are encrypted at
- * rest and never returned to the client (ADR-040 §3, same discipline as
- * `SLACK_BOT_TOKEN_KEPT`). Reads echo names with this sentinel as the value;
- * saves and test fires resolve it against the stored ciphertext server-side.
+ * Sentinel a stored SECRET carries on the wire to mean "keep the saved value".
+ * Header values (Authorization, API keys) and the signing secret are all
+ * secrets: they are encrypted at rest and never returned to the client
+ * (ADR-040 §3, same discipline as `SLACK_BOT_TOKEN_KEPT`). Reads echo this
+ * sentinel in place of every stored value; saves and test fires resolve it
+ * against the stored ciphertext server-side.
  */
 export const WEBHOOK_HEADER_VALUE_KEPT = "__kept__";
 export const webhookMethodSchema = z.enum(WEBHOOK_METHODS);
@@ -151,6 +152,20 @@ export const webhookActionParamsSchema = z.object({
 	/** Liquid JSON body source. NULL = the framework default envelope. Stored
 	 *  inside `actionParams` (not a Trigger template column) — ADR-040 §1. */
 	bodyTemplate: z.string().nullable().default(null),
+	/**
+	 * Optional HMAC signing secret (ADR-040 §3). NULL means unsigned, which is
+	 * what every webhook automation was until this existed: one signing scheme
+	 * shipped with the endpoints platform and this channel never passed a
+	 * secret to it, so a receiver had no way to tell a LangWatch delivery from
+	 * anyone who learned the URL.
+	 *
+	 * Set it and deliveries carry `X-LangWatch-Signature: t=<unix>,v1=<hmac>`,
+	 * signed by the same implementation the endpoints platform uses. This is
+	 * the WIRE shape: a value may be `WEBHOOK_HEADER_VALUE_KEPT`, resolved
+	 * server-side against the stored ciphertext. At rest it is encrypted, like
+	 * the header values, and never returns to the client.
+	 */
+	signingSecret: z.string().trim().nullable().optional(),
 });
 
 export type WebhookActionParams = z.infer<typeof webhookActionParamsSchema>;

@@ -17,6 +17,7 @@ import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/de
 import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
   decryptWebhookHeaders,
+  decryptWebhookSigningSecrets,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
@@ -601,6 +602,7 @@ export async function dispatchGraphAlertAction({
       url: params.url,
       method: params.method,
       headers: decryptWebhookHeaders(params),
+      signingSecrets: decryptWebhookSigningSecrets(params),
       body: rendered.body,
       triggerName: trigger.name,
     });

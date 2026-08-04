@@ -41,6 +41,7 @@ import {
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import {
   decryptWebhookHeaders,
+  decryptWebhookSigningSecrets,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
 import {
@@ -51,6 +52,7 @@ import {
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import {
   type DraftProject,
+  type TestFireWebhookDestination,
   validateTemplateDraft,
 } from "~/server/app-layer/automations/trigger-template.service";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
@@ -827,7 +829,11 @@ export const automationRouter = createTRPCRouter({
         // against the stored ciphertext, exactly like the Slack bot token
         // above. Unresolvable kept values (fresh draft, renamed header) are
         // dropped rather than sent as the literal sentinel.
-        let webhookDestination = input.webhookDestination;
+        // Widened past the input schema on purpose: signingSecrets is
+        // resolved server-side from the saved trigger and is deliberately not
+        // accepted from the browser.
+        let webhookDestination: TestFireWebhookDestination | null | undefined =
+          input.webhookDestination;
         if (
           webhookDestination &&
           Object.values(webhookDestination.headers).includes(
@@ -862,6 +868,23 @@ export const automationRouter = createTRPCRouter({
             headers[name] = value;
           }
           webhookDestination = { ...webhookDestination, headers };
+        }
+
+        // The signing secret is a stored secret too, so the browser never has
+        // it and cannot send it. Resolve it from the saved trigger so a test
+        // fire signs exactly as a real one does, which is the only way an
+        // author can point the button at their receiver's verification.
+        if (webhookDestination && input.automationId) {
+          const row = await getApp().triggers.getById({
+            triggerId: input.automationId,
+            projectId: input.projectId,
+          });
+          const signingSecrets = decryptWebhookSigningSecrets(
+            (row?.actionParams ?? {}) as WebhookStoredActionParams,
+          );
+          if (signingSecrets.length > 0) {
+            webhookDestination = { ...webhookDestination, signingSecrets };
+          }
         }
 
         const project = await resolveProjectIdentity(input.projectId);
