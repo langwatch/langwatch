@@ -136,7 +136,7 @@
     "@react-email/components": "^0.0.42",
     "@react-email/render": "^2.0.9",
     "@sendgrid/mail": "^8.1.6",
-    "@slack/webhook": "^7.1.0",
+    "@slack/webhook": "^8.0.0",
     "@t3-oss/env-core": "^0.13.11",
     "@tanstack/react-query": "^4.44.0",
     "@tanstack/react-table": "^8.21.3",
