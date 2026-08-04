@@ -129,6 +129,11 @@ export class ApiKeyRepository {
   }): Promise<ApiKeyWithBindings | null> {
     // Reject personal API keys whose owning user has been deactivated.
     // Service keys (userId = null) are always eligible.
+    //
+    // Deliberately NOT filtered on `unclaimedAt`: an unclaimed agent-onboarding
+    // account ingesting traces is the entire product, and its ingestion key is
+    // a service key anyway. Adding the filter here would kill ingestion for
+    // every temporary account the moment it was provisioned.
     // We use findFirst rather than findUnique because Prisma's findUnique
     // does not accept related filters; lookupId is @unique so the result
     // is still unique.

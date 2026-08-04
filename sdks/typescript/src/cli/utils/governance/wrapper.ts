@@ -258,10 +258,22 @@ function shouldAutoLogin(): boolean {
  */
 export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	let cfg = loadConfig();
+
+	// Deliberately NOT auto-provisioning here. `langwatch onboard` can get a
+	// temporary workspace with no account, and the message below names it —
+	// but creating an account as a side effect of running a coding assistant
+	// is not something to do behind someone's back, least of all in CI or
+	// under an agent, where nobody is watching and the non-TTY contract is to
+	// exit rather than act.
 	if (!isLoggedIn(cfg)) {
 		if (!shouldAutoLogin()) {
+			// Two ways forward, and they are genuinely different: the gateway
+			// path needs an org, a virtual key and configured providers, while
+			// `onboard` needs nothing at all and gets traces flowing now.
 			process.stderr.write(
-				"Not logged in. Run `langwatch login --device` first.\n",
+				"Not logged in.\n" +
+					"  langwatch onboard        start with a temporary workspace, no signup\n" +
+					"  langwatch login --device sign in to an existing account\n",
 			);
 			process.exit(1);
 		}

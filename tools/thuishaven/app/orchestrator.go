@@ -108,6 +108,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
 		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
+		// "" outside a portless stack, which is what keeps NODE_EXTRA_CA_CERTS out
+		// of the overlay when there is no local CA to trust.
+		PortlessCACertPath: o.proxy.CACertPath(),
 		// Mirror planChildren: a separate `workers` lane exists only when workers
 		// are requested AND not hosted in-process. Persist it so restart targets
 		// the workers' own group rather than the API's when they share a process.

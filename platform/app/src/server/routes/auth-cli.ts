@@ -235,7 +235,7 @@ interface RefreshTokenRecord {
   client_info?: ClientInfo;
 }
 
-interface AccessTokenRecord {
+export interface AccessTokenRecord {
   user_id: string;
   organization_id: string;
   issued_at: number;
@@ -313,7 +313,7 @@ function userTokensIndexKey(userId: string): string {
  * Auth contract: Authorization: Bearer lw_at_<base64url>. Anything else,
  * including session cookies, is rejected — these endpoints are CLI-only.
  */
-async function validateAccessToken(
+export async function validateAccessToken(
   authHeader: string | null | undefined,
 ): Promise<AccessTokenRecord | null> {
   const token = bearerAccessToken(authHeader);

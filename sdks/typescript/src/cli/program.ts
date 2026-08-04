@@ -103,7 +103,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       showGlobalOptions: true,
     })
     .showHelpAfterError()
-    .showSuggestionAfterError();
+    .showSuggestionAfterError()
+    .option(
+      "--profile <name>",
+      "credential profile to use (like the AWS CLI); defaults to LANGWATCH_PROFILE, then `default`",
+    )
+    .option(
+      "--solo",
+      "ignore any signed-in identity and use a throwaway profile scoped to this directory — two agents in two directories are two accounts",
+    );
 
   // Record the output context of the command about to run, so that when it
   // FAILS it fails in the shape the caller asked for — a structured document
@@ -133,6 +141,42 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const requested = resolveActionOutputOptions(actionCommand);
     const effective = await assertFormatIsSupported(actionCommand, requested);
     await applyOutputContext(effective);
+  });
+
+  // Profile selection lands in the environment rather than being threaded
+  // through every command signature: `configPath()` is the single place that
+  // decides where credentials live, and it reads the environment. One hook
+  // therefore gives every existing command profiles without touching it.
+  //
+  // `--solo` is not a second mechanism — it resolves to an ordinary profile
+  // named after the working directory, so it inherits the same storage,
+  // permissions and cleanup rules as any other.
+  program.hook("preAction", async (_thisCommand, actionCommand) => {
+    // Read the leaf's options as well as the root's. `--solo` is declared
+    // globally, but `enablePositionalOptions` means a global only parses
+    // BEFORE the subcommand — and `langwatch onboard --solo` is what anyone
+    // would actually type, so commands that take it declare it too and both
+    // spellings land here.
+    const leaf = actionCommand.opts<{ profile?: string; solo?: boolean }>();
+    const root = program.opts<{ profile?: string; solo?: boolean }>();
+    const opts = {
+      profile: leaf.profile ?? root.profile,
+      solo: leaf.solo ?? root.solo,
+    };
+    if (opts.solo) {
+      const { soloProfileName } = await import(
+        "./utils/governance/profile.js"
+      );
+      process.env.LANGWATCH_PROFILE = soloProfileName(process.cwd());
+      return;
+    }
+    if (opts.profile) {
+      const { assertValidProfileName } = await import(
+        "./utils/governance/profile.js"
+      );
+      assertValidProfileName(opts.profile);
+      process.env.LANGWATCH_PROFILE = opts.profile;
+    }
   });
 
   // Top-level commands
@@ -262,6 +306,33 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // Marked `hidden:true` so they don't pollute the top-level command list
   // in `langwatch --help`; rendered together under a "Coding assistants:"
   // section via addHelpText below. `langwatch <tool> --help` still works.
+  emitsResult(
+    program
+    .command("onboard")
+    .description(
+      "Start sending traces with no account: provisions a temporary workspace, wires this project's Claude Code telemetry to it, and prints a QR to keep it.",
+    )
+    .option("--tool <name>", "assistant to wire up (default: claude)")
+    .option("--endpoint <url>", "control-plane URL (self-hosted instances)")
+    .option(
+      "--force",
+      "rewire even if this project already exports OTLP somewhere else",
+    )
+    // Declared here as well as globally so `langwatch onboard --solo` works,
+    // not only `langwatch --solo onboard`. The pre-action hook reads either.
+    .option("--profile <name>", "credential profile to use")
+    .option(
+      "--solo",
+      "ignore any signed-in identity and use a throwaway profile scoped to this directory",
+    )
+    ,
+    async (opts: { tool?: string; endpoint?: string; force?: boolean }) => {
+      const { onboardCommand } = await import("./commands/onboard.js");
+      const { isAgentModeEnv } = await import("./utils/output.js");
+      return onboardCommand({ ...opts, isAgent: isAgentModeEnv(process.env) });
+    },
+  );
+
   program
     .command("claude", { hidden: true })
     .description("Run `claude` (Claude Code) routed through the LangWatch gateway.")

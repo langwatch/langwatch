@@ -72,6 +72,18 @@ model User {
   updatedAt                     DateTime                 @default(now()) @updatedAt
   lastLoginAt                   DateTime?
   deactivatedAt                 DateTime?
+  /// Set while this user is a placeholder created by anonymous agent
+  /// onboarding (`npx langwatch <agent>`) that nobody has claimed yet. It owns
+  /// a real organization and project so every downstream table has an ordinary
+  /// owner from day 0, but it is NOT a person: `email` is null, it has no
+  /// credentials, and it must never reach a session.
+  ///
+  /// The twin of `deactivatedAt` — both mean "this row exists but is not a
+  /// live actor" — and it is filtered in the same places: the sign-in gate,
+  /// member listings and seat counts. Cleared when the account is claimed.
+  ///
+  /// Spec: specs/ai-governance/agent-onboarding/
+  unclaimedAt                   DateTime?
   // User-level pin for the persona-resolver redirect target. NULL = use
   // auto-detection. When set, wins over auto-detected persona destination.
   // Spec: specs/ai-gateway/governance/persona-home-content.feature
@@ -98,6 +110,9 @@ model User {
   promptTagsCreated             PromptTag[]              @relation("promptTagCreatedBy")
   promptTagsUpdated             PromptTag[]              @relation("promptTagUpdatedBy")
   groupMemberships              GroupMembership[]
+  /// Present while this user is an unclaimed agent-onboarding placeholder.
+  ephemeralAccount              EphemeralAccount?
+  passkeys                      Passkey[]
   roleBindings                  RoleBinding[]
   apiKeys                       ApiKey[]
   gatewayBudgetsCreated         GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
@@ -274,6 +289,9 @@ model Organization {
   /// outside onboarding) — the home resolver keeps legacy behavior.
   /// ADR-038.
   primaryIntent          OrganizationIntent?
+
+  /// Present while this org is an unclaimed, agent-provisioned workspace.
+  ephemeralAccount         EphemeralAccount?
 
   promoCode                String?
   stripeCustomerId         String?                   @unique
@@ -3636,4 +3654,81 @@ model BugReport {
   metadata         Json?
 
   @@index([createdAt])
+}
+
+/// An account provisioned with no identity behind it, by `npx langwatch
+/// <agent>`. Holds the two deadlines that govern it until someone claims it.
+///
+/// Every stored identifier is a keyed hash, never the raw value: the claim
+/// token so a database dump cannot be replayed into somebody else's
+/// workspace, and the fingerprint / address so a dump cannot be reversed into
+/// "which machines and networks tried LangWatch". Equality still works, which
+/// is all the abuse checks need.
+///
+/// `ingestionStopsAt` and `deleteAfter` are nulled on claim rather than
+/// shadowed by a status column, so the reaper's work list is exactly
+/// `deleteAfter <= now` and a claimed row can never match it.
+///
+/// Spec: specs/ai-governance/agent-onboarding/
+model EphemeralAccount {
+  id               String   @id @default(nanoid())
+  /// The placeholder that owns the organization until someone claims it.
+  /// Cascades: reaping the user reaps the account record with it.
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId   String   @unique
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectId        String   @unique
+  projectSlug      String
+  projectName      String
+  /// Which coding agent provisioned it — also the ingestion key's source type.
+  agent            String
+  claimTokenHash   String   @unique
+  fingerprintHash  String?
+  ipHash           String?
+  provisionedAt    DateTime @default(now())
+  /// Null once claimed.
+  ingestionStopsAt DateTime?
+  /// Null once claimed. The reaper's work list is a query over this column.
+  deleteAfter      DateTime?
+  claimedAt        DateTime?
+  /// No FK: a claim is a historical fact that should outlive the account of
+  /// whoever made it.
+  claimedByUserId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  @@index([deleteAfter])
+  @@index([ingestionStopsAt])
+}
+
+/// A WebAuthn credential, enrolled from a phone by scanning the QR the CLI
+/// prints. The ceremony always happens in a real browser: the phone's browser
+/// is a genuine WebAuthn client, so the origin binding in `clientDataJSON` is
+/// trustworthy. A CLI acting as its own client would have to assert its own
+/// origin, which is exactly the phishing resistance a passkey exists to
+/// provide — see specs/ai-governance/agent-onboarding/passkey-claim.feature.
+///
+/// Shaped to match what @simplewebauthn/server returns so a future migration
+/// onto a better-auth passkey plugin is a rename, not a re-derivation.
+model Passkey {
+  id           String    @id @default(nanoid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Human label, e.g. "iPhone". Null until the owner renames it.
+  name         String?
+  /// Base64url credential id from the authenticator. Globally unique.
+  credentialId String    @unique
+  publicKey    Bytes
+  /// Signature counter, for cloned-authenticator detection.
+  counter      Int       @default(0)
+  /// "singleDevice" | "multiDevice" — whether the credential syncs.
+  deviceType   String?
+  backedUp     Boolean   @default(false)
+  /// Comma-separated AuthenticatorTransport list, as returned by the browser.
+  transports   String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
 }

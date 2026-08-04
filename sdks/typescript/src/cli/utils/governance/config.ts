@@ -6,10 +6,10 @@
  */
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
+import { profileConfigPath, resolveProfileName } from "./profile";
 
 export interface GovernanceConfig {
   /** AI Gateway base URL (e.g. https://gateway.langwatch.ai). */
@@ -72,6 +72,32 @@ export interface GovernanceConfig {
     string,
     { id?: string; secret?: string; prefix?: string }
   >;
+
+  /**
+   * A temporary workspace provisioned by `langwatch onboard` for this profile.
+   *
+   * Persisted so a re-run in the same directory picks the account back up
+   * instead of provisioning another one — which would burn the server's
+   * per-fingerprint rate limit within minutes and leave a trail of abandoned
+   * workspaces. This is what makes `--solo` per-directory rather than
+   * per-invocation.
+   *
+   * Holds the ingestion key and the claim token, so the file's 0600 mode is
+   * load-bearing.
+   */
+  ephemeral_account?: {
+    control_plane_url: string;
+    project_id: string;
+    project_slug: string;
+    project_name: string;
+    organization_id: string;
+    ingestion_key: string;
+    otlp_endpoint: string;
+    claim_token: string;
+    claim_url: string;
+    /** ISO 8601. Null once claimed. */
+    delete_after?: string | null;
+  };
 
   /**
    * Persistent answer to the post-login "save export block to your
@@ -183,9 +209,12 @@ export function isCanonicalVkSecret(secret: string | undefined): boolean {
  * LANGWATCH_CLI_CONFIG for tests / non-default homes.
  */
 export function configPath(): string {
+  // An explicit file wins over everything, including a profile: tests and
+  // non-default homes set it, and a profile silently redirecting them
+  // elsewhere would be a baffling failure.
   const env = process.env.LANGWATCH_CLI_CONFIG;
   if (env) return env;
-  return path.join(os.homedir(), ".langwatch", "config.json");
+  return profileConfigPath(resolveProfileName());
 }
 
 /**

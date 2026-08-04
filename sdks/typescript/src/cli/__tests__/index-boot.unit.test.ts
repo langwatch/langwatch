@@ -182,6 +182,12 @@ describe("the CLI boot module graph", () => {
         "cli/daemon/spawn.ts",
         "cli/index.ts",
         "cli/utils/governance/config.ts",
+        // Deliberate: `configPath()` resolves the active profile on every
+        // command, so this is on the credential path by construction. It
+        // imports only node builtins config.ts already loads — and uses an
+        // inline FNV-1a rather than `node:crypto` precisely to keep it that
+        // cheap.
+        "cli/utils/governance/profile.ts",
         "cli/utils/governance/resolveEndpoint.ts",
         "internal/constants.ts",
         // dispatch wraps the in-process command in a credential holder scope

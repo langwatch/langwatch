@@ -150,6 +150,15 @@ export function createEnvConfig() {
           return "local";
         }),
       BASE_HOST: optionalIfBuildTime(z.string().min(1)),
+      /**
+       * Set to "true" to refuse anonymous, agent-provisioned temporary
+       * accounts (`npx langwatch <agent>`). Off by default — a self-hosted
+       * install that does not want unauthenticated account creation flips
+       * this rather than patching the route.
+       */
+      LANGWATCH_DISABLE_ANONYMOUS_ONBOARDING: z
+        .enum(["true", "false"])
+        .optional(),
       NEXTAUTH_PROVIDER: z.string().optional(),
       NEXTAUTH_SECRET: optionalIfBuildTime(z.string().min(1)),
       NEXTAUTH_URL: optionalIfBuildTime(
@@ -459,6 +468,8 @@ export function createEnvConfig() {
       NODE_ENV: process.env.NODE_ENV,
       ENVIRONMENT: process.env.ENVIRONMENT,
       BASE_HOST: process.env.BASE_HOST,
+      LANGWATCH_DISABLE_ANONYMOUS_ONBOARDING:
+        process.env.LANGWATCH_DISABLE_ANONYMOUS_ONBOARDING,
       NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
       NEXTAUTH_URL: process.env.NEXTAUTH_URL,

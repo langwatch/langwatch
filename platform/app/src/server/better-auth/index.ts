@@ -174,6 +174,7 @@ export const auth = betterAuth({
     additionalFields: {
       pendingSsoSetup: { type: "boolean", defaultValue: false, input: false },
       deactivatedAt: { type: "date", required: false, input: false },
+      unclaimedAt: { type: "date", required: false, input: false },
       lastLoginAt: { type: "date", required: false, input: false },
     },
   },

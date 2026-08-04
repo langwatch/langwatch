@@ -507,12 +507,24 @@ export const beforeSessionCreate = async ({
 }): Promise<boolean | void> => {
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { deactivatedAt: true },
+    select: { deactivatedAt: true, unclaimedAt: true },
   });
   if (user?.deactivatedAt) {
     logger.warn(
       { userId: session.userId },
       "Blocked session create: user deactivated",
+    );
+    return false;
+  }
+  if (user?.unclaimedAt) {
+    // An unclaimed agent-onboarding placeholder owns a real organization but
+    // is not a person: no email, no credentials, nobody has proved they own
+    // it. Every sign-in path funnels through here, so this single check is
+    // what stops one being taken over — including by a later signup that
+    // somehow resolved to the same row.
+    logger.warn(
+      { userId: session.userId },
+      "Blocked session create: account has not been claimed",
     );
     return false;
   }

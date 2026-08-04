@@ -1,0 +1,41 @@
+{
+	"name": "@langwatch/ai-onboarding",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Anonymous agent onboarding — ephemeral account provisioning, the unclaimed lifecycle, and the PKCE claim handoff",
+	"type": "module",
+	"packageManager": "pnpm@10.24.0",
+	"main": "src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./adapters": "./src/adapters/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "vitest",
+		"test:unit": "vitest run"
+	},
+	"keywords": [
+		"langwatch",
+		"onboarding",
+		"provisioning",
+		"claim"
+	],
+	"license": "MIT",
+	"dependencies": {
+		"@langwatch/contracts": "workspace:*",
+		"@langwatch/handled-error": "workspace:*",
+		"@langwatch/observability": "workspace:*"
+	},
+	"peerDependencies": {
+		"@opentelemetry/api": "^1.9.0",
+		"zod": "^3.23.0"
+	},
+	"devDependencies": {
+		"@opentelemetry/api": "^1.9.1",
+		"@types/node": "^26.0.1",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.9",
+		"zod": "^3.25.76"
+	}
+}

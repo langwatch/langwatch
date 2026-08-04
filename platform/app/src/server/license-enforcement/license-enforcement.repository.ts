@@ -91,7 +91,11 @@ export class LicenseEnforcementRepository
     // no access, so billing for them would be charging for a locked door.
     // See seat-reconciliation.feature.
     const users = await this.prisma.organizationUser.findMany({
-      where: { organizationId, disabledAt: null },
+      // An unclaimed agent-onboarding placeholder holds an ADMIN membership so
+      // the organization has an owner from day 0, but nobody is sitting in that
+      // seat — counting it would bill a temporary account for a person who does
+      // not exist, and could push a real org over its member limit.
+      where: { organizationId, disabledAt: null, user: { unclaimedAt: null } },
       select: { userId: true, role: true },
     });
 

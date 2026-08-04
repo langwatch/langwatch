@@ -53,6 +53,7 @@ function buildMockUser(overrides: Partial<User> = {}): User {
     updatedAt: new Date("2024-01-02T00:00:00Z"),
     lastLoginAt: null,
     deactivatedAt: null,
+    unclaimedAt: null,
     lastHomePath: null,
     tracesExplorerTourDismissedAt: null,
     ...overrides,

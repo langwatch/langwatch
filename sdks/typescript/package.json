@@ -83,6 +83,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.1.0",
     "@types/prompts": "^2.4.9",
+    "@types/qrcode": "^1.5.6",
     "@typescript/native-preview": "7.0.0-dev.20260705.1",
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "^4.1.0",
@@ -125,6 +126,7 @@
     "openapi-fetch": "^0.17.0",
     "ora": "^9.3.0",
     "prompts": "^2.4.2",
+    "qrcode": "^1.5.4",
     "xksuid": "^0.0.4",
     "zod": "^4.0.14"
   },

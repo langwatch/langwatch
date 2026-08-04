@@ -16,6 +16,7 @@ import { z } from "zod";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { submitBugReport } from "~/server/app-layer/bug-reports/bug-report.service";
+import { nearestHopIp } from "~/server/http/client-ip";
 
 const secured = createServiceApp({ basePath: "/api/bug-reports" });
 
@@ -48,16 +49,8 @@ const bugReportBodySchema = z
     { message: "either summary or sessionData is required" },
   );
 
-/**
- * Rate-limit bucket for the caller. `x-forwarded-for` is only trustworthy
- * from the hop nearest us, which is why this reads the LAST entry: earlier
- * ones are client-supplied.
- */
-const callerKey = (c: Context): string => {
-  const hops = c.req.header("x-forwarded-for")?.split(",") ?? [];
-  const nearest = hops[hops.length - 1]?.trim();
-  return `ip:${nearest ?? "unknown"}`;
-};
+/** Rate-limit bucket for the caller. */
+const callerKey = (c: Context): string => `ip:${nearestHopIp(c) ?? "unknown"}`;
 
 secured
   .access(

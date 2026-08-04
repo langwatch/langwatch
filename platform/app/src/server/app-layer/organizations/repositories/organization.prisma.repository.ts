@@ -381,9 +381,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       },
       include: {
         members: {
+          // Unclaimed agent-onboarding placeholders are filtered unconditionally:
+          // `includeDeactivated` is an admin affordance for real people who were
+          // switched off, and a placeholder is not a person at all.
           ...(!includeDeactivated
-            ? { where: { user: { deactivatedAt: null } } }
-            : {}),
+            ? { where: { user: { deactivatedAt: null, unclaimedAt: null } } }
+            : { where: { user: { unclaimedAt: null } } }),
           orderBy: [
             { user: { name: "asc" } },
             { user: { email: "asc" } },
@@ -451,6 +454,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return this.prisma.user.findMany({
       where: {
         deactivatedAt: null,
+        // Never surface an unclaimed placeholder as a member — it has no
+        // email or name to render, and it is not somebody you can invite,
+        // remove or bill for.
+        unclaimedAt: null,
         orgMemberships: {
           some: {
             organizationId,
