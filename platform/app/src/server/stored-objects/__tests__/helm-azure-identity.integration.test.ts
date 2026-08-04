@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const CHART_DIR = path.resolve(__dirname, "../../../../../charts/langwatch");
+const CHART_DIR = path.resolve(__dirname, "../../../../../../charts/langwatch");
 const BASE_VALUES = path.join(CHART_DIR, "tests", "values-e2e.yaml");
 
 function hasHelm(): boolean {
