@@ -3,8 +3,10 @@ import { Bug, TextCursorInput } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Edit } from "react-feather";
+import { AnnotationPopover } from "~/features/traces-v2/components/TraceDrawer/conversationView/AnnotationPopover";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -53,6 +55,8 @@ const ActionButton = ({
       positioning={{ placement: "top" }}
     >
       <Box
+        role="button"
+        aria-label={tooltipContent}
         width="38px"
         height="38px"
         display="flex"
@@ -130,6 +134,7 @@ export const MessageHoverActions = ({
   };
 
   const { setCommentState } = useAnnotationCommentStore();
+  const [suggestingCorrection, setSuggestingCorrection] = useState(false);
 
   const { drawerOpen } = useDrawer();
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
@@ -194,18 +199,32 @@ export const MessageHoverActions = ({
 
       <ActionButton
         tooltipContent="Suggest"
-        onClick={() => {
-          setCommentState?.({
-            traceId: trace.trace_id,
-            action: "new",
-            annotationId: undefined,
-            expectedOutput: trace.output?.value,
-            expectedOutputAction: "new",
-          });
-        }}
+        onClick={() => setSuggestingCorrection(true)}
       >
         <TextCursorInput size={"20px"} />
       </ActionButton>
+
+      {/* Mounted only while it is open, and anchored to a hidden span beside
+          the action column, the same way the trace drawer anchors its own
+          correction popover. */}
+      {suggestingCorrection && (
+        <AnnotationPopover
+          traceId={trace.trace_id}
+          output={stringifyIfObject(trace.output?.value)}
+          mode="suggest"
+          open={suggestingCorrection}
+          onOpenChange={setSuggestingCorrection}
+          trigger={
+            <Box
+              as="span"
+              aria-hidden="true"
+              display="inline-block"
+              width="0"
+              height="0"
+            />
+          }
+        />
+      )}
     </VStack>
   );
 };

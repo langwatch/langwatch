@@ -1,52 +1,80 @@
-import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { AnnotationQueueItem } from "@prisma/client";
-import { useEffect, useMemo, useState } from "react";
+import {
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "react-feather";
+import { LuPencil } from "react-icons/lu";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
+import { Checkbox } from "~/components/ui/checkbox";
+import { toaster } from "~/components/ui/toaster";
+import { useDrawerStore } from "~/features/traces-v2/stores/drawerStore";
+import { enterTraceEditMode } from "~/features/traces-v2/utils/traceEditMode";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { TasksDone } from "../../../components/icons/TasksDone";
 import { Conversation } from "../../../components/messages/Conversation";
 
+type AssignedQueueItem =
+  RouterOutputs["annotation"]["getOptimizedAnnotationQueues"]["assignedQueueItems"][number];
+
+/** A trace timestamp is only useful to the drawer when it is a real number. */
+const partitionHint = (startedAt: unknown): number | null =>
+  typeof startedAt === "number" && Number.isFinite(startedAt)
+    ? startedAt
+    : null;
+
 export default function TraceAnnotations() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
+  // Every status, not only what is still pending: an item marked for the
+  // end-of-queue dataset hand-off keeps its mark after it is done, and the
+  // hand-off has to find those items once the queue is empty.
   const { assignedQueueItems, queuesLoading } = useAnnotationQueues({
+    selectedAnnotations: "all",
     showQueueAndUser: true,
     allQueueItems: true,
   });
   const { project } = useOrganizationTeamProject();
   const queryClient = api.useContext();
+  const { openDrawer, setFlowCallbacks } = useDrawer();
 
-  const allQueueItems = useMemo(() => {
-    const items = [...(assignedQueueItems ?? [])];
-
-    // Filter out done items
-    return items.filter((item) => !item.doneAt);
-  }, [assignedQueueItems]);
+  const pendingQueueItems = useMemo(
+    () => (assignedQueueItems ?? []).filter((item) => !item.doneAt),
+    [assignedQueueItems],
+  );
 
   // Force re-render when items change by creating a key
   const queueItemsKey = useMemo(() => {
-    return allQueueItems.map((item) => `${item.id}-${item.doneAt}`).join(",");
-  }, [allQueueItems]);
+    return pendingQueueItems
+      .map((item) => `${item.id}-${item.doneAt}`)
+      .join(",");
+  }, [pendingQueueItems]);
 
-  let currentQueueItem = allQueueItems.find((item) => item.id === queueItem);
+  let currentQueueItem = pendingQueueItems.find(
+    (item) => item.id === queueItem,
+  );
 
   if (!currentQueueItem) {
-    currentQueueItem = allQueueItems[0];
+    currentQueueItem = pendingQueueItems[0];
   }
 
-  const refetchQueueItems = async () => {
+  const refetchQueueItems = useCallback(async () => {
     await queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
     await queryClient.annotation.getPendingItemsCount.invalidate();
     await queryClient.annotation.getAssignedItemsCount.invalidate();
     await queryClient.annotation.getQueueItemsCounts.invalidate();
-  };
+  }, [queryClient]);
 
-  console.log("currentQueueItem", currentQueueItem);
   const traceDetails = api.traces.getById.useQuery(
     {
       projectId: project?.id ?? "",
@@ -68,11 +96,65 @@ export default function TraceAnnotations() {
     }
   }, [traceDetails.data?.metadata.thread_id, currentQueueItem?.id]);
 
+  // ── End-of-queue dataset hand-off ─────────────────────────────────────
+  // Marked items keep their mark after they are done, so the set below spans
+  // the whole queue walk and not only what is still waiting.
+  const markedItems = useMemo(
+    () => (assignedQueueItems ?? []).filter((item) => item.markedForDatasetAt),
+    [assignedQueueItems],
+  );
+  const markedTraceIds = useMemo(
+    () => Array.from(new Set(markedItems.map((item) => item.traceId))),
+    [markedItems],
+  );
+  const markedItemIds = useMemo(
+    () => markedItems.map((item) => item.id),
+    [markedItems],
+  );
+  // Dismissing the drawer is an answer. The hand-off is offered once per set of
+  // marks, and asking again waits for that set to change.
+  const markSignature = markedItemIds.join(",");
+  const offeredHandoffFor = useRef<string | null>(null);
+  const clearDatasetMarks = api.annotation.clearDatasetMarks.useMutation();
+  const clearMarks = clearDatasetMarks.mutate;
+
+  useEffect(() => {
+    if (queuesLoading) return;
+    if (pendingQueueItems.length > 0) return;
+    if (markedTraceIds.length === 0) return;
+    if (offeredHandoffFor.current === markSignature) return;
+    const projectId = project?.id;
+    if (!projectId) return;
+
+    offeredHandoffFor.current = markSignature;
+    const handedOverItemIds = [...markedItemIds];
+    setFlowCallbacks("addDatasetRecord", {
+      onSuccess: () => {
+        clearMarks(
+          { projectId, queueItemIds: handedOverItemIds },
+          { onSuccess: () => void refetchQueueItems() },
+        );
+      },
+    });
+    openDrawer("addDatasetRecord", { selectedTraceIds: markedTraceIds });
+  }, [
+    queuesLoading,
+    pendingQueueItems.length,
+    markSignature,
+    markedTraceIds,
+    markedItemIds,
+    project?.id,
+    openDrawer,
+    setFlowCallbacks,
+    clearMarks,
+    refetchQueueItems,
+  ]);
+
   if (queuesLoading) {
     return <AnnotationsLayout />;
   }
 
-  if (allQueueItems.length === 0 && !queuesLoading) {
+  if (pendingQueueItems.length === 0 && !queuesLoading) {
     return (
       <AnnotationsLayout>
         <VStack
@@ -129,7 +211,7 @@ export default function TraceAnnotations() {
           >
             <AnnotationQueuePicker
               key={queueItemsKey}
-              queueItems={allQueueItems}
+              queueItems={pendingQueueItems}
               currentQueueItem={currentQueueItem}
               refetchQueueItems={refetchQueueItems}
             />
@@ -145,13 +227,17 @@ const AnnotationQueuePicker = ({
   currentQueueItem,
   refetchQueueItems,
 }: {
-  queueItems: AnnotationQueueItem[];
-  currentQueueItem: AnnotationQueueItem;
+  queueItems: AssignedQueueItem[];
+  currentQueueItem: AssignedQueueItem;
   refetchQueueItems: () => Promise<void>;
 }) => {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
   const [isNavigating, setIsNavigating] = useState(false);
+  // Whichever way the reviewer last answered the checkbox, until the queue is
+  // read back. Keyed by item so moving on never carries an answer along.
+  const [markAnswers, setMarkAnswers] = useState<Record<string, boolean>>({});
 
   const currentQueueItemIndex = queueItems.findIndex(
     (item) => item.id === currentQueueItem.id,
@@ -169,6 +255,8 @@ const AnnotationQueuePicker = ({
   };
 
   const markQueueItemDone = api.annotation.markQueueItemDone.useMutation();
+  const markQueueItemForDataset =
+    api.annotation.markQueueItemForDataset.useMutation();
 
   const markQueueItemDoneMoveToNext = async () => {
     markQueueItemDone.mutate(
@@ -178,18 +266,74 @@ const AnnotationQueuePicker = ({
       },
       {
         onSuccess: async () => {
-          await refetchQueueItems();
           const nextItem = queueItems[currentQueueItemIndex + 1];
           if (nextItem) {
+            await refetchQueueItems();
             await navigateToQueue(nextItem.id);
           } else {
+            // Clear the queue item out of the URL before the refetch empties
+            // the queue, so the end-of-queue hand-off opens onto a bare URL
+            // instead of having its drawer params replaced away.
             setIsNavigating(true);
             await router.replace(`/${project?.slug}/annotations/my-queue`);
+            await refetchQueueItems();
             setTimeout(() => setIsNavigating(false), 100);
           }
         },
       },
     );
+  };
+
+  const isMarkedForDataset =
+    markAnswers[currentQueueItem.id] ??
+    currentQueueItem.markedForDatasetAt !== null;
+
+  const toggleDatasetMark = (marked: boolean) => {
+    setMarkAnswers((answers) => ({
+      ...answers,
+      [currentQueueItem.id]: marked,
+    }));
+    markQueueItemForDataset.mutate(
+      {
+        queueItemId: currentQueueItem.id,
+        projectId: project?.id ?? "",
+        marked,
+      },
+      {
+        onSuccess: () => void refetchQueueItems(),
+        onError: () => {
+          setMarkAnswers((answers) => ({
+            ...answers,
+            [currentQueueItem.id]: !marked,
+          }));
+          toaster.create({
+            title: marked
+              ? "Could not mark this item for the dataset"
+              : "Could not remove the mark from this item",
+            description: "Please try again.",
+            type: "error",
+            meta: { closable: true },
+          });
+        },
+      },
+    );
+  };
+
+  const editTrace = () => {
+    const traceId =
+      currentQueueItem.trace?.trace_id ?? currentQueueItem.traceId;
+    const occurredAtMs = partitionHint(
+      currentQueueItem.trace?.timestamps?.started_at,
+    );
+    // The drawer store carries the trace before the URL does, so the drawer
+    // renders on the right trace from the first frame. Opening a trace leaves
+    // edit mode, so editing is entered after it.
+    useDrawerStore.getState().openTrace(traceId, occurredAtMs);
+    enterTraceEditMode(traceId);
+    openDrawer("traceV2Details", {
+      traceId,
+      ...(occurredAtMs === null ? {} : { t: String(occurredAtMs) }),
+    });
   };
 
   return (
@@ -210,54 +354,60 @@ const AnnotationQueuePicker = ({
           <Spinner />
         </Box>
       )}
-      <VStack>
-        <HStack gap={8}>
-          <HStack gap={2}>
-            <Button
-              variant="outline"
-              disabled={currentQueueItemIndex === 0 || isNavigating}
-              onClick={() => {
-                const previousItem = queueItems[currentQueueItemIndex - 1];
-                if (previousItem) {
-                  void navigateToQueue(previousItem.id);
-                }
-              }}
-            >
-              <ChevronLeft />
-            </Button>
-            <Button
-              variant="outline"
-              disabled={
-                currentQueueItemIndex === queueItems.length - 1 || isNavigating
-              }
-              onClick={() => {
-                const nextItem = queueItems[currentQueueItemIndex + 1];
-                if (nextItem) {
-                  void navigateToQueue(nextItem.id);
-                }
-              }}
-            >
-              <ChevronRight />
-            </Button>
-          </HStack>
-          <Text>
-            {currentQueueItemIndex + 1} of {queueItems.length}
-          </Text>
-          <Button
-            colorPalette="blue"
-            disabled={
-              currentQueueItem.doneAt !== null ||
-              markQueueItemDone.isLoading ||
-              isNavigating
+      <HStack gap={4} width="full">
+        <Button
+          variant="outline"
+          disabled={currentQueueItemIndex === 0 || isNavigating}
+          onClick={() => {
+            const previousItem = queueItems[currentQueueItemIndex - 1];
+            if (previousItem) {
+              void navigateToQueue(previousItem.id);
             }
-            onClick={() => {
-              void markQueueItemDoneMoveToNext();
-            }}
-          >
-            <Check /> Done
-          </Button>
-        </HStack>
-      </VStack>
+          }}
+        >
+          <ChevronLeft /> Previous
+        </Button>
+        <Button
+          variant="outline"
+          disabled={
+            currentQueueItemIndex === queueItems.length - 1 || isNavigating
+          }
+          onClick={() => {
+            const nextItem = queueItems[currentQueueItemIndex + 1];
+            if (nextItem) {
+              void navigateToQueue(nextItem.id);
+            }
+          }}
+        >
+          Next <ChevronRight />
+        </Button>
+        <Text whiteSpace="nowrap">
+          {currentQueueItemIndex + 1} of {queueItems.length}
+        </Text>
+        <Spacer />
+        <Checkbox
+          checked={isMarkedForDataset}
+          onCheckedChange={(event) => toggleDatasetMark(!!event.checked)}
+        >
+          Add to dataset at the end
+        </Checkbox>
+        <Button variant="outline" disabled={isNavigating} onClick={editTrace}>
+          <LuPencil /> Edit trace
+        </Button>
+        <Button
+          colorPalette="blue"
+          disabled={
+            currentQueueItem.doneAt !== null ||
+            markQueueItemDone.isLoading ||
+            isNavigating
+          }
+          onClick={() => {
+            void markQueueItemDoneMoveToNext();
+          }}
+        >
+          <Check /> Done
+        </Button>
+      </HStack>
     </Box>
   );
 };

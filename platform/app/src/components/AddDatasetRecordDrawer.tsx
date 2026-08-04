@@ -181,6 +181,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         onSuccess: () => {
           trpc.dataset.getAll.invalidate();
           trpc.datasetRecord.getAll.invalidate();
+          // Whoever opened the drawer gets told the records landed, so a flow
+          // that led here can finish itself off (the annotation queue clears
+          // the marks it handed over).
+          props.onSuccess?.();
           closeDrawer();
           toaster.create({
             title: "Succesfully added to dataset",

@@ -103,6 +103,24 @@ Feature: Per-turn actions in ConversationView
     Then an annotation is created on the third turn's trace with the new expectedOutput
     And the turn's `TurnAnnotationBadges` chip renders a yellow Lightbulb "correction" indicator
 
+  # ─── A suggestion is also the trace's correction ───────────────────────
+  #
+  # Suggesting is the reviewer-facing half of a trace correction. The
+  # annotation stays the record of who suggested what, and the same text is
+  # also stored as the trace's corrected output, so the add-to-dataset read
+  # returns the corrected trace. That second write happens inside the two
+  # annotation mutations this popover saves through, so every surface that
+  # suggests gets it: the per-turn action row here, the legacy conversation on
+  # the annotation queue, and the saved-suggestion list under a message. The
+  # storage half is specified in specs/traces-v2/trace-edit-overlay.feature.
+
+  @integration
+  Scenario: The legacy conversation suggests through the same correction popover
+    Given the reviewer is reading a message in the legacy conversation
+    When the reviewer uses the suggest action on it
+    Then the same correction popover opens in suggest mode for that message's trace
+    And it is pre-filled with the message's current output, so the reviewer edits in place
+
   # ─── Add to dataset (turn) ─────────────────────────────────────────────
 
   Scenario: "Dataset" on a turn opens the AddDatasetRecord drawer scoped to that turn
@@ -122,14 +140,11 @@ Feature: Per-turn actions in ConversationView
 
   # ─── Add to dataset (whole conversation) ───────────────────────────────
 
-  @planned
   Scenario: Drawer header surfaces a conversation-level add-to-dataset entry
-    # Not yet implemented as of 2026-05-01 — DrawerHeader does not expose an
-    # "Add conversation to dataset" entry. Conversation-level add-to-dataset
-    # would need to be wired in TraceOverflowMenu or the conversation header.
+    # Lives in TraceOverflowMenu, shown when the trace belongs to a
+    # conversation, with the turn count beside it.
     Then the drawer header shows "Add conversation to dataset"
 
-  @planned
   Scenario: Whole-conversation add opens the dataset drawer with all turns
     When the user clicks "Add conversation to dataset"
     Then the AddDatasetRecordDrawer opens preloaded with one record per turn
