@@ -50,6 +50,7 @@ import {
   GOVERNED_TEST_POSTGRES_CONNECTION_LIMIT,
   type GovernedClickHouseHarness,
   type GovernedPostgresHarness,
+  governedTestNamedCollection,
   mapPostgresIntoClickHouse,
   PG_EXCLUDED_COLUMN,
   PG_MAPPED_TABLE,
@@ -447,7 +448,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         () =>
           selectRows(
             tenantA,
-            `SELECT * FROM postgresql(pg_analytics, table='${postgres.baseTable}')`,
+            `SELECT * FROM postgresql(${governedTestNamedCollection(harness.names)}, table='${postgres.baseTable}')`,
           ),
         CLICKHOUSE_ERROR_CODE.ACCESS_DENIED,
         "using the named collection through a table function",

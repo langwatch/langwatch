@@ -1194,7 +1194,21 @@ const PG_ADMIN_USER = "test";
 const PG_ADMIN_PASSWORD = "test";
 const PG_DATABASE = "lwtest";
 const PG_SCHEMA = "public";
-const PG_NAMED_COLLECTION = "pg_analytics";
+
+/**
+ * The named collection this suite's engine tables read through.
+ *
+ * Per-suite for the same reason `governedNamesForSuite` exists: named
+ * collections are server-global, and CI runs integration files two at a time
+ * against one ClickHouse server. Under a shared name, each suite's
+ * DROP + CREATE repoints the collection at its own PostgreSQL container —
+ * the neighbour's engine tables silently read the wrong database, or lose
+ * the collection entirely mid-run. (Shipped provisioning keeps one fixed
+ * name; a deployment has one PostgreSQL, not one per suite.)
+ */
+export function governedTestNamedCollection(names: GovernedSqlNames): string {
+  return `pg_${names.database}`;
+}
 
 /**
  * The dataset the PostgreSQL isolation proof is written against.
@@ -1673,10 +1687,11 @@ export async function mapPostgresIntoClickHouse({
       tenantColumn: PG_MAPPED_TENANT_COLUMN,
     }),
   );
+  const collection = governedTestNamedCollection(harness.names);
   await harness.applyAsAdmin([
     ...postgresNamedCollectionStatements({
       connection: {
-        collection: PG_NAMED_COLLECTION,
+        collection,
         // The docker host as seen from inside the ClickHouse container; see the
         // module comment for why this is not a shared docker network.
         host: "host.docker.internal",
@@ -1692,7 +1707,7 @@ export async function mapPostgresIntoClickHouse({
     ),
     ...governedPostgresEngineTableStatements({
       names: harness.names,
-      collection: PG_NAMED_COLLECTION,
+      collection,
     }),
     // No grant here on purpose. `governedViewSetupStatements` issues the
     // column-scoped one for every source it reads, and ClickHouse grants are
