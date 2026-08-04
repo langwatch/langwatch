@@ -384,13 +384,13 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
     });
   });
 
-  describe("given an evaluator row stored before normalisation existed", () => {
+  describe("given an evaluator row already stored in the unreadable shape", () => {
     describe("when the online pipeline executes it for a trace", () => {
       /** @scenario An evaluator already stored in the unreadable shape still resolves its prompt */
       it("resolves its prompt at read time, without needing a migration", async () => {
-        // Write-time normalisation cannot help this row: it was written before the
-        // normaliser existed. Read-time recovery is what covers the customer's
-        // actual evaluator.
+        // Write-side normalisation was tried and reverted (it broke code
+        // evaluators), so nothing converts this row. Read-time recovery is the
+        // only thing that covers the customer's actual evaluator.
         const call = await executeWith(
           buildMonitor({
             parameters: null,

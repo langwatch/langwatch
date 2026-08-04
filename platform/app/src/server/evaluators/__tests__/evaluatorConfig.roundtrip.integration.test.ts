@@ -9,11 +9,11 @@
  * write path stores and what the read path expects, and an in-memory object
  * round-trips perfectly whether or not the real column does.
  *
- * The load-bearing case is the FIRST one: a row inserted with raw SQL, bypassing
- * the normaliser entirely. That is the shape the reporting customer's evaluator
- * is already in — write-time normalisation cannot reach it, so if read-time
- * recovery does not work against a real row, the fix does not help the person who
- * filed the issue.
+ * The load-bearing case is the FIRST one: a row inserted with raw SQL, in the
+ * shape the reporting customer's evaluator is already in. Write-side
+ * normalisation was tried and reverted (it broke code evaluators), so NOTHING
+ * converts that row — if read-time recovery does not work against it, the fix
+ * does not help the person who filed the issue.
  *
  * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the suite
  * stays runnable on a box with no database.
@@ -45,7 +45,7 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
     await prisma.$disconnect();
   });
 
-  describe("given a row written before the normaliser existed", () => {
+  describe("given a row nothing on the write side will ever convert", () => {
     it("recovers the user's prompt at read time, with no migration", async () => {
       // Raw SQL on purpose: this bypasses the repository, so the row lands in
       // exactly the broken shape the customer's evaluator is already in.
@@ -70,9 +70,10 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
       const { settings } = resolveEvaluatorSettingsWithSource({
         config: row.config as Record<string, unknown>,
         parameters: null,
-        // Read back from Postgres, not restated: recovery is gated on this
-        // column, so a literal here would assert the gate against a value the
-        // database never had to agree with.
+        // Read back from Postgres rather than restated: recovery is gated on
+        // this column, and reading it proves the value survives the write
+        // path. (The column is an unconstrained `String`, so this is not the
+        // database agreeing to anything — just the row answering for itself.)
         evaluatorRecordType: row.type,
       });
 

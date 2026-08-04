@@ -131,24 +131,6 @@ const SCHEMA = defineCommandSchema(
 const CONFIG_METADATA_KEYS = new Set(["evaluatorType", "settings"]);
 
 /**
- * The one `Evaluator.type` whose `config` holds judge settings.
- *
- * `evaluatorTypeSchema` in the evaluators router enumerates three: "evaluator"
- * (built-in), "code" and "workflow". Only the built-in kind stores settings in
- * `config`, and only its writers can lose them — the router validates `config`
- * as a bare `z.record`, so nothing stops a prompt landing at the top level.
- * The other two own their `config` shape outright: a code evaluator's is a
- * VALID top-level `{ code, inputs, outputs }` per `codeEvaluatorConfigSchema`,
- * and a workflow evaluator's is empty. Recovering from those would rewrite a
- * correct config into judge settings and count healthy rows as affected.
- *
- * Deliberately an allowlist, not a `!== "code"` denylist: a type added later
- * gets the previous, safe behaviour by default rather than silently inheriting
- * a recovery rule written before it existed.
- */
-const SETTINGS_BEARING_EVALUATOR_TYPE = "evaluator";
-
-/**
  * Where the settings handed to the judge came from.
  *
  * `top-level-recovery` is the langwatch#6397 case: the prompt the previous rule
@@ -231,10 +213,23 @@ export function resolveEvaluatorSettingsWithSource({
     return { settings: parameters, source: "monitor-parameters" };
   }
 
-  // Only the settings-bearing type can have LOST settings. Everything else
-  // keeps the pre-langwatch#6397 rule verbatim, so this change cannot alter
-  // what a code or workflow evaluator sends to the engine.
-  if (evaluatorRecordType !== SETTINGS_BEARING_EVALUATOR_TYPE) {
+  // Only "evaluator" (built-in) can have LOST settings. `evaluatorTypeSchema`
+  // in the evaluators router enumerates three, and the other two own their
+  // `config` shape outright: a code evaluator's is a VALID top-level
+  // `{ code, inputs, outputs }` per `codeEvaluatorConfigSchema`, and a workflow
+  // evaluator's is empty. Recovering from those hands a correct config to the
+  // judge as settings and counts healthy rows as affected.
+  //
+  // An allowlist, not a `!== "code"` denylist: a type added later gets the
+  // previous, safe behaviour rather than silently inheriting a recovery rule
+  // written before it existed. Compared inline, matching how this same file
+  // reads `type === "workflow"` at the call site below.
+  //
+  // Scope of the change, precisely: recovery is what this gates. The empty-
+  // `settings` rule above sits UPSTREAM of it and still applies to every type,
+  // so a non-built-in evaluator carrying `settings: {}` now falls back to
+  // `monitor.parameters` where the old rule returned the empty object.
+  if (evaluatorRecordType !== "evaluator") {
     return { settings: parameters, source: "monitor-parameters" };
   }
 
