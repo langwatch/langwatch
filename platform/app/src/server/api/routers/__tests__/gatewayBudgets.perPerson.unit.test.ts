@@ -10,6 +10,10 @@
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  nanoUsdToDecimalString,
+  usdToNanoUsd,
+} from "~/server/gateway/wireMoney";
 import { createInnerTRPCContext } from "../../trpc";
 import { gatewayBudgetsRouter } from "../gatewayBudgets";
 
@@ -113,11 +117,17 @@ function callerFor(budgets: Array<Record<string, unknown>>) {
   } as any);
 }
 
+/** A bucket's spend, as both wire units, derived from one USD amount. */
+function bucketSpend(usd: string) {
+  const spentNanoUsd = Number(usdToNanoUsd(usd));
+  return { spentNanoUsd, spentUsd: nanoUsdToDecimalString(spentNanoUsd) };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   breakdown.mockResolvedValue([
-    { scopeId: `${ANCHOR_VK_ID}:a`, spentUsd: "1.500000" },
-    { scopeId: `${ANCHOR_VK_ID}:b`, spentUsd: "0.200000" },
+    { scopeId: `${ANCHOR_VK_ID}:a`, ...bucketSpend("1.500000") },
+    { scopeId: `${ANCHOR_VK_ID}:b`, ...bucketSpend("0.200000") },
   ]);
 });
 

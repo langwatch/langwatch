@@ -48,6 +48,7 @@ import {
   VirtualKeyNotFoundError,
 } from "./errors";
 import { identityPatchData, type ResourceMetadata } from "./resourceMetadata";
+import { usdToNanoUsd } from "./wireMoney";
 import { keysetAfter } from "./wirePagination";
 
 const logger = createLogger("langwatch:gateway:budget-service");
@@ -60,6 +61,14 @@ const logger = createLogger("langwatch:gateway:budget-service");
  * scope leaves both fields absent.
  */
 export type GatewayBudgetWithSeats = GatewayBudget & {
+  /**
+   * Current-period spend as the nano-USD integer the ledger holds, present
+   * whenever it was read from the ledger at all. `spentUsd` on the same row
+   * is this number rendered, so the two always agree; a consumer publishing
+   * an integer takes it from here rather than re-deriving it from decimals,
+   * which cannot recover digits the decimal never had.
+   */
+  spentNanoUsd?: number;
   /** Distinct end users with spend against this template this period. */
   endUsersSeen?: number;
   /** How many of those are at or over the per-person limit. */
@@ -382,7 +391,7 @@ export class GatewayBudgetService {
       return { budgets, spendAvailable: false };
     }
 
-    const spendByBudget = new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
+    const spendByBudget = new Map(spends.map((s) => [s.budgetId, s]));
     return {
       spendAvailable: true,
       budgets: budgets.map((b) => {
@@ -392,7 +401,11 @@ export class GatewayBudgetService {
           ? { ...b, endUsersSeen: seat.seen, endUsersOver: seat.over }
           : b;
         if (ch === undefined) return withSeats;
-        return { ...withSeats, spentUsd: new Prisma.Decimal(ch) };
+        return {
+          ...withSeats,
+          spentNanoUsd: ch.spentNanoUsd,
+          spentUsd: new Prisma.Decimal(ch.spentUsd),
+        };
       }),
     };
   }
@@ -449,10 +462,13 @@ export class GatewayBudgetService {
         boundaries: args.boundariesByBudget.get(budget.id) ?? [],
         now: args.now,
       });
-      const limitUsd = Number.parseFloat(budget.limitUsd.toString());
+      // Compared as integers, in the unit both sides are exact in. A seat
+      // one nano-USD under its cap is under it, and a float comparison at
+      // these magnitudes is what decides that wrongly.
+      const limitNanoUsd = usdToNanoUsd(budget.limitUsd);
       out.set(budget.id, {
         seen: buckets.length,
-        over: buckets.filter((b) => Number.parseFloat(b.spentUsd) >= limitUsd)
+        over: buckets.filter((b) => BigInt(b.spentNanoUsd) >= limitNanoUsd)
           .length,
       });
     }

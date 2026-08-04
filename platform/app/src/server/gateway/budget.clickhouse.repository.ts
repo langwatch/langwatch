@@ -29,8 +29,15 @@
  * what it actually spent. Every read here names its budget for the same
  * reason; see `bucketMatchSql`.
  *
+ * Money is the integer nano-USD the request was priced in, carried on
+ * `AmountNanoUSD` and summed there. `AmountUSD` is a `Decimal(18, 6)` that
+ * cannot hold a nano figure, so it renders a single debit for the audit read
+ * and is never summed: rounding each debit to a micro-USD and then adding
+ * them is not the amount anybody spent, and the gap grows with request count.
+ *
  * See: migration 00017_create_gateway_budget_ledger.sql
  * See: migration 00069_gateway_budget_scope_totals_budget_grain.sql
+ * See: migration 00070_gateway_budget_ledger_nano_usd.sql
  * See: specs/ai-gateway/_shared/contract.md §4.5
  */
 
@@ -51,6 +58,8 @@ import {
   isCyclicWindow,
   nextBoundaryFor,
 } from "./budgetWindow";
+import { parseSummedNanoUsd } from "./spendEvents.clickhouse.repository";
+import { nanoUsdToDecimalString } from "./wireMoney";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
@@ -68,7 +77,13 @@ export type BudgetDebitRow = {
   /** ModelProvider the request was dispatched to, when the gateway said. */
   providerKey?: string | null;
   gatewayRequestId: string;
-  amountUsd: string;
+  /**
+   * What the request cost, as the integer nano-USD it was priced in. The only
+   * amount a caller states: the `AmountUSD` column is written from this one,
+   * so the two cannot drift apart, and it is a `Decimal(18, 6)` that a nano
+   * figure does not fit in, which is why it is not the one that gets summed.
+   */
+  amountNanoUsd: number;
   tokensInput: number;
   tokensOutput: number;
   tokensCacheRead: number;
@@ -84,12 +99,18 @@ export type ScopeSpend = {
   budgetId: string;
   scope: GatewayBudgetScopeType;
   scopeId: string;
+  /** The exact total, in the nano-USD integer the debits were priced in. */
+  spentNanoUsd: number;
+  /** The same total as its display string, derived from `spentNanoUsd`. */
   spentUsd: string;
 };
 
 /** One bucket of a fanned-out budget and what it has spent this period. */
 export type BucketSpend = {
   scopeId: string;
+  /** The exact total, in the nano-USD integer the debits were priced in. */
+  spentNanoUsd: number;
+  /** The same total as its display string, derived from `spentNanoUsd`. */
   spentUsd: string;
 };
 
@@ -203,15 +224,20 @@ export type LedgerEventRow = {
   occurredAt: Date;
 };
 
-/** Raw shape of a per-bucket spend row, in the ledger's column casing. */
-type BucketSpendRow = { ScopeId: string; SpentUSD: string };
+/**
+ * Raw shape of a per-bucket spend row, in the ledger's column casing.
+ *
+ * ClickHouse serializes an `Int64` sum as a string, which is what keeps a
+ * money total past 2^53 from arriving already rounded.
+ */
+type BucketSpendRow = { ScopeId: string; SpentNanoUSD: string };
 
 /** Raw shape of a rollup total row, in the rollup's column casing. */
 type RollupScopeRow = {
   BudgetId: string;
   Scope: string;
   ScopeId: string;
-  SpentUSD: string;
+  SpentNanoUSD: string;
 };
 
 type ClickHouseClientFor = Awaited<ReturnType<ClickHouseClientResolver>>;
@@ -362,7 +388,7 @@ function flooredTargetSums(targets: BudgetSpendTarget[]): {
       `fscopeId${i}`,
       `fsuffix${i}`,
     );
-    return `toString(sumIf(AmountUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
+    return `toString(sumIf(AmountNanoUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
   });
   return { sql: sums.join(",\n              "), params };
 }
@@ -432,15 +458,31 @@ function rollupRowMatchesTarget(
  * What one target's buckets total in a rollup result. The query asks for
  * every target in the window at once, so the rows come back mixed and each
  * target picks out its own.
+ *
+ * The sum stays in integers. A group budget totals one row per member here,
+ * and adding those as floats would put drift back into a figure the ledger
+ * holds exactly.
  */
 function sumRollupRowsForTarget(
   rows: RollupScopeRow[],
   target: BudgetSpendTarget,
-): number {
+): bigint {
   const scope = scopeToClickHouse(target.scope);
   return rows
     .filter((r) => rollupRowMatchesTarget(r, target, scope))
-    .reduce((sum, r) => sum + (Number.parseFloat(r.SpentUSD) || 0), 0);
+    .reduce((sum, r) => sum + BigInt(r.SpentNanoUSD || "0"), 0n);
+}
+
+/** One exact total, in both units the surface publishes. */
+function spentFromNano(nano: bigint | string): {
+  spentNanoUsd: number;
+  spentUsd: string;
+} {
+  const exact = typeof nano === "bigint" ? nano : BigInt(nano || "0");
+  return {
+    spentNanoUsd: parseSummedNanoUsd(exact),
+    spentUsd: nanoUsdToDecimalString(exact),
+  };
 }
 
 export class GatewayBudgetClickHouseRepository {
@@ -532,7 +574,8 @@ export class GatewayBudgetClickHouseRepository {
       ProviderCredentialId: r.providerCredentialId ?? "",
       ProviderKey: r.providerKey ?? "",
       GatewayRequestId: r.gatewayRequestId,
-      AmountUSD: r.amountUsd,
+      AmountNanoUSD: r.amountNanoUsd,
+      AmountUSD: nanoUsdToDecimalString(BigInt(r.amountNanoUsd)),
       TokensInput: r.tokensInput,
       TokensOutput: r.tokensOutput,
       TokensCacheRead: r.tokensCacheRead,
@@ -710,7 +753,7 @@ export class GatewayBudgetClickHouseRepository {
           budgetId: t.budgetId,
           scope: t.scope,
           scopeId: t.scopeId,
-          spentUsd: "0",
+          ...spentFromNano(0n),
         },
     );
   }
@@ -750,7 +793,7 @@ export class GatewayBudgetClickHouseRepository {
         budgetId: t.budgetId,
         scope: t.scope,
         scopeId: t.scopeId,
-        spentUsd: (Number.parseFloat(row[`T${i}`] ?? "0") || 0).toFixed(6),
+        ...spentFromNano(row[`T${i}`] ?? "0"),
       }));
     } catch (error) {
       logger.error(
@@ -785,7 +828,7 @@ export class GatewayBudgetClickHouseRepository {
               BudgetId,
               Scope,
               ScopeId,
-              toString(sumMerge(SpendUSD)) AS SpentUSD
+              toString(sumMerge(SpendNanoUSD)) AS SpentNanoUSD
             FROM ${TOTALS_TABLE}
             WHERE TenantId IN (${tenantPlaceholders(tenantIds)})
               AND Window = {window:String}
@@ -806,7 +849,7 @@ export class GatewayBudgetClickHouseRepository {
         budgetId: t.budgetId,
         scope: t.scope,
         scopeId: t.scopeId,
-        spentUsd: sumRollupRowsForTarget(rows, t).toFixed(6),
+        ...spentFromNano(sumRollupRowsForTarget(rows, t)),
       }));
     } catch (error) {
       logger.error(
@@ -861,10 +904,7 @@ export class GatewayBudgetClickHouseRepository {
         : await this.flooredBucketSpend({ client, shape, budget });
 
     return [...spentByBucket.entries()]
-      .map(([scopeId, raw]) => ({
-        scopeId,
-        spentUsd: (Number.parseFloat(raw) || 0).toFixed(6),
-      }))
+      .map(([scopeId, raw]) => ({ scopeId, ...spentFromNano(raw) }))
       .sort((a, b) => (a.scopeId < b.scopeId ? -1 : 1));
   }
 
@@ -891,7 +931,7 @@ export class GatewayBudgetClickHouseRepository {
         query: `
           SELECT
             ScopeId,
-            toString(sumMerge(SpendUSD)) AS SpentUSD
+            toString(sumMerge(SpendNanoUSD)) AS SpentNanoUSD
           FROM ${TOTALS_TABLE}
           WHERE TenantId IN (${shape.tenantPlaceholders})
             AND Scope = {scope:String}
@@ -907,7 +947,7 @@ export class GatewayBudgetClickHouseRepository {
         format: "JSONEachRow",
       });
       for (const row of (await result.json()) as BucketSpendRow[]) {
-        spentByBucket.set(row.ScopeId, row.SpentUSD);
+        spentByBucket.set(row.ScopeId, row.SpentNanoUSD);
       }
     } catch (error) {
       logger.error(
@@ -928,7 +968,7 @@ export class GatewayBudgetClickHouseRepository {
       budgetId: budget.id,
       floorPredicate: `(${shape.movedBoundaryPredicates.join(" OR ")})`,
     })) {
-      spentByBucket.set(row.ScopeId, row.SpentUSD);
+      spentByBucket.set(row.ScopeId, row.SpentNanoUSD);
     }
     return spentByBucket;
   }
@@ -960,7 +1000,7 @@ export class GatewayBudgetClickHouseRepository {
       budgetId: budget.id,
       floorPredicate,
     })) {
-      spentByBucket.set(row.ScopeId, row.SpentUSD);
+      spentByBucket.set(row.ScopeId, row.SpentNanoUSD);
     }
     return spentByBucket;
   }
@@ -982,7 +1022,7 @@ export class GatewayBudgetClickHouseRepository {
         query: `
           SELECT
             ScopeId,
-            toString(sum(AmountUSD)) AS SpentUSD
+            toString(sum(AmountNanoUSD)) AS SpentNanoUSD
           FROM ${EVENTS_TABLE} FINAL
           WHERE TenantId IN (${shape.tenantPlaceholders})
             AND Scope = {scope:String}
@@ -1023,7 +1063,7 @@ export class GatewayBudgetClickHouseRepository {
           GatewayRequestId AS id,
           BudgetId AS budgetId,
           VirtualKeyId AS virtualKeyId,
-          toString(AmountUSD) AS amountUsd,
+          toString(AmountNanoUSD) AS amountNanoUsd,
           Model AS model,
           ProviderSlot AS providerSlot,
           TokensInput AS tokensInput,
@@ -1040,7 +1080,8 @@ export class GatewayBudgetClickHouseRepository {
       query_params: { tenantId, budgetId, limit },
       format: "JSONEachRow",
     });
-    type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {
+    type Row = Omit<LedgerEventRow, "occurredAt" | "status" | "amountUsd"> & {
+      amountNanoUsd: string;
       occurredAtMs: string;
       status: string;
     };
@@ -1053,7 +1094,7 @@ function toLedgerEventRow(r: {
   id: string;
   budgetId: string;
   virtualKeyId: string;
-  amountUsd: string;
+  amountNanoUsd: string;
   model: string;
   providerSlot: string | null;
   tokensInput: number;
@@ -1066,7 +1107,9 @@ function toLedgerEventRow(r: {
     id: r.id,
     budgetId: r.budgetId,
     virtualKeyId: r.virtualKeyId,
-    amountUsd: r.amountUsd,
+    // Rendered from the integer, so a single debit shown next to the request
+    // that caused it is the amount that request was actually priced at.
+    amountUsd: nanoUsdToDecimalString(BigInt(r.amountNanoUsd || "0")),
     model: r.model,
     providerSlot:
       r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
@@ -1136,18 +1179,6 @@ function windowToClickHouse(window: GatewayBudgetWindow): string {
   return window.toString();
 }
 
-/**
- * Start-of-period (UTC) for the current window.
- *
- * This is one half of a contract: the rollup only ever returns a row when
- * this lands on exactly the PeriodStart the materialised view bucketed the
- * debit into. The other half is the multiIf() in
- * 00069_gateway_budget_scope_totals_budget_grain.sql, and the two are pinned
- * together by budget.clickhouse.repository.periodStart.integration.test.ts.
- * Change one without the other and the affected window stops accruing
- * entirely: spend is written, every read returns 0, and budgets on that
- * window silently stop enforcing.
- */
 /**
  * The OccurredAt lower bound a spend read must honor for a budget whose
  * period boundary is not the calendar one, or undefined for the rollup
@@ -1269,6 +1300,19 @@ export function bucketPeriodFloorMs(
   return candidates.length > 0 ? Math.max(...candidates) : undefined;
 }
 
+/**
+ * Start-of-period (UTC) for the current window.
+ *
+ * This is one half of a contract: the rollup only ever returns a row when
+ * this lands on exactly the PeriodStart the materialised view bucketed the
+ * debit into. The other half is the multiIf() in
+ * 00070_gateway_budget_ledger_nano_usd.sql, which carries forward the
+ * bucketing 00069 established, and the two are pinned together by
+ * budget.clickhouse.repository.periodStart.integration.test.ts. Change one
+ * without the other and the affected window stops accruing entirely: spend
+ * is written, every read returns 0, and budgets on that window silently
+ * stop enforcing.
+ */
 export function currentPeriodStart(
   window: GatewayBudgetWindow,
   now: Date,

@@ -76,7 +76,7 @@ function debitRow(
     window: "MANUAL",
     virtualKeyId: VK_ID,
     providerKey: null,
-    amountUsd: "10.000000",
+    amountNanoUsd: 10_000_000_000,
     tokensInput: 100,
     tokensOutput: 50,
     tokensCacheRead: 0,
@@ -201,7 +201,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         window: "MONTH",
         scopeId: bucket,
         gatewayRequestId: requestId,
-        amountUsd: "999.000000",
+        amountNanoUsd: 999_000_000_000,
       }),
     ]);
 
@@ -305,7 +305,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         scope: "VIRTUAL_KEY",
         scopeId: VK_ID,
         gatewayRequestId: requestId,
-        amountUsd: "42.000000",
+        amountNanoUsd: 42_000_000_000,
         occurredAt: new Date(),
       }),
     ]);
@@ -379,7 +379,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         budgetId: template.id,
         scopeId: bucketA,
         gatewayRequestId: `req-${suffix}-alice`,
-        amountUsd: "20.000000",
+        amountNanoUsd: 20_000_000_000,
         occurredAt: new Date(),
       }),
     ]);
@@ -388,7 +388,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         budgetId: template.id,
         scopeId: bucketB,
         gatewayRequestId: `req-${suffix}-bob`,
-        amountUsd: "30.000000",
+        amountNanoUsd: 30_000_000_000,
         occurredAt: new Date(),
       }),
     ]);
@@ -490,7 +490,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         window: "MONTH",
         scopeId: VK_ID,
         gatewayRequestId: `req-${suffix}-anchored`,
-        amountUsd: "42.000000",
+        amountNanoUsd: 42_000_000_000,
         occurredAt: spentAt,
       }),
     ]);
@@ -551,7 +551,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         scopeId: bucket,
         window: "MONTH",
         gatewayRequestId: `req-${suffix}-seat-before`,
-        amountUsd: "7.000000",
+        amountNanoUsd: 7_000_000_000,
         occurredAt: new Date(periodStart.getTime() - 3_600_000),
       }),
     ]);
@@ -561,7 +561,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         scopeId: bucket,
         window: "MONTH",
         gatewayRequestId: `req-${suffix}-seat-inside`,
-        amountUsd: "5.000000",
+        amountNanoUsd: 5_000_000_000,
         occurredAt: new Date(periodStart.getTime() + 3_600_000),
       }),
     ]);

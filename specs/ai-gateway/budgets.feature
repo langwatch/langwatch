@@ -788,3 +788,50 @@ Feature: AI Gateway — Budgets
     When I open the AI Gateway section
     Then the "Budgets" nav item is hidden
     And direct URL access returns a 403 page with a "request access" link
+
+  # ============================================================================
+  # Money exactness
+  #
+  # A request is priced once, as an integer number of nano-USD, and the spend
+  # events publish that integer. A budget is the same money seen from the other
+  # side, so the two have to agree to the nano or a customer reconciling their
+  # spend against their cap finds a gap nobody can explain.
+  # ============================================================================
+
+  @integration
+  Scenario: A budget totals a cost that is not a whole number of microdollars
+    Given a virtual key with a monthly budget
+    And the key serves a request priced at 73950 nano-USD
+    When I read the budget
+    Then its spend reads 73950 nano-USD
+    And its spend reads "0.00007395" in dollars
+
+  @integration
+  Scenario: Per-request rounding does not accumulate across requests
+    Given a virtual key with a monthly budget
+    And the key serves three requests each priced at 24650 nano-USD
+    When I read the budget
+    Then its spend reads 73950 nano-USD
+    And not the 75000 that rounding each request first would have reported
+
+  @integration
+  Scenario: A budget reading from its own boundary stays exact
+    Given a virtual key with a manual-window budget
+    And the key serves three requests each priced at 24650 nano-USD
+    When I read the budget
+    Then its spend reads 73950 nano-USD
+
+  @integration
+  Scenario: A budget and its spend events report the same integer
+    Given a virtual key with a monthly budget
+    And the key serves requests priced at amounts below one microdollar
+    When I read the budget over the public API
+    Then spent_nano_usd equals the sum the spend events carry
+    And spent_usd is that integer rendered, not a figure rounded before it
+
+  @unit
+  Scenario: A per-person template reports no total of its own
+    Given a per-person template budget whose seats have spend
+    When I read the template row
+    Then spent_usd and spent_nano_usd are both null
+    And the seats it is watching are reported as end_users_seen and end_users_over
