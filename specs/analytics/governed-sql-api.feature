@@ -396,48 +396,52 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     And the query never reaches the database
 
   # ---------------------------------------------------------------------------
-  # Answerable-question coverage (later PR of this issue — #6480)
+  # Answerable-question coverage (bound in this PR — the shipped endpoint,
+  # Testcontainers ClickHouse carrying the shipped migrations and views)
   # Each case is fixture-backed with at least two tenants, only the
   # authenticated tenant contributing, asserted through the public gateway.
   # ---------------------------------------------------------------------------
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Latency percentiles by model in time buckets
     Given seeded traces for two tenants
     When the client asks for p50, p95, and p99 latency by model in time buckets
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Error rate versus the previous equivalent period
     Given seeded traces for two tenants spanning two periods
     When the client compares error rate against the previous equivalent period
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Rolling windows over trace metrics
     Given seeded traces for two tenants
     When the client computes a one-hour rolling error rate
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
+  @integration
+  Scenario: Cost by project, model, and prompt version
+    Given seeded traces carrying cost, model and prompt version for two tenants
+    When the client aggregates cost by project, model, and prompt version
+    Then typed results answer the question from the authenticated tenant's data only
+
+  # @unimplemented: resolving a project or a prompt version to its NAME means joining the
+  # PostgreSQL-resident dimension tables, which no governed dataset carries yet — they land
+  # with the PG-mapping PR of #6480. The identifier form of the same question is bound above.
   @integration @unimplemented
-  Scenario: Cost by project, model, and prompt version via dimension joins by name
+  Scenario: Cost attributed to dimension names rather than identifiers
     Given seeded generations and dimension data for two tenants
     When the client aggregates cost by project, model, and prompt-version names through dimension joins
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Token and cost outliers
-    Given seeded generations for two tenants
+    Given seeded traces with token and cost rollups for two tenants
     When the client asks for token and cost outliers
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Evaluation score distributions and pass rates by model and prompt version
     Given seeded evaluations for two tenants
     When the client asks for score distributions and pass rates by model and prompt version
@@ -452,36 +456,40 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When the client asks how often human thumbs agree with evaluator pass results
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Traces containing operation A then operation B
     Given seeded traces with ordered spans for two tenants
     When the client asks for traces where operation A precedes operation B
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Time between two events in a trace
     Given seeded traces with ordered spans for two tenants
     When the client asks for the elapsed time between two named events per trace
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: First failure and first retry per trace
     Given seeded traces with failures and retries for two tenants
     When the client asks for the first failure and first retry per trace
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
+  @integration
+  Scenario: Run comparisons across simulation batches
+    Given seeded simulation runs for two tenants across two batches
+    When the client compares verdict and duration metrics across those batches
+    Then typed results answer the question from the authenticated tenant's data only
+
+  # @unimplemented: the experiment and experiment-run entities are PostgreSQL-resident and no
+  # governed dataset carries them; they land with the PG-mapping PR of #6480. The simulation
+  # batch — the run grouping the governed catalog does expose — is bound above.
   @integration @unimplemented
   Scenario: Experiment run comparisons
     Given seeded experiment runs for two tenants
     When the client compares metrics across experiment runs
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Fanout warning on a trace-to-span join
     Given seeded traces and spans for two tenants
     When the client aggregates at trace grain after joining spans
@@ -503,6 +511,13 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When it references a content-gated field in projection, filter, group, order, having, join, window, or subquery position
     Then the query is rejected
     And the gated-field set matches the canonical visibility policy
+
+  @integration
+  Scenario: A dataset withheld from a caller cannot be named in a query
+    Given an authenticated API client whose permissions withhold a whole dataset
+    When it names that dataset in a query
+    Then the query is rejected before it reaches the database
+    And a caller holding the permission reads the same dataset normally
 
   # ---------------------------------------------------------------------------
   # Read-only, exfiltration, and fail-closed behavior at the gateway
@@ -563,7 +578,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     And no unmarked partial result is returned
 
   # ---------------------------------------------------------------------------
-  # Diagnostics (later PR of this issue — #6480)
+  # Diagnostics (bound in this PR — advisory, never a refusal)
   # ---------------------------------------------------------------------------
 
   @integration
@@ -572,22 +587,26 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When a query's results are truncated by the result-size limit
     Then the response marks truncation explicitly
 
-  # @unimplemented: diagnostics rules land with the diagnostics PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Incomplete or misaligned comparison period diagnostic fires
     Given an authenticated API client
     When a query compares periods of unequal or incomplete coverage
     Then the response carries the comparison-period diagnostic
 
-  # @unimplemented: diagnostics rules land with the diagnostics PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Missing time buckets diagnostic fires
     Given an authenticated API client
     When a time-bucketed query has empty buckets in range
     Then the response carries the missing-time-buckets diagnostic
 
-  # @unimplemented: documentation copy lands with the diagnostics PR of #6480.
-  @unit @unimplemented
+  @integration
+  Scenario: An unbounded read is reported as covering the whole history
+    Given an authenticated API client
+    When it queries a dataset with no condition on the column that prunes its partitions
+    Then the response carries the unbounded-time-range diagnostic naming that column
+    And the same question with that condition carries no diagnostic
+
+  @unit
   Scenario: Clean diagnostic status is documented as no known issue detected
     Given the diagnostics documentation
     When the clean status is described
@@ -702,18 +721,30 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #   → Scenario: A parameterized query missing a bound value is refused before execution
 #     (the failure path of the same feature, refused at the gateway)
 #
-# Answerable-question coverage (one scenario each, same titles in order):
+# Answerable-question coverage (one scenario each, same titles in order). Each
+# bound case asserts the value its seed implies — the percentile, the rate, the
+# sum — against a second tenant seeded in the same window, so "only the
+# authenticated tenant contributed" is proven by the number itself:
 # p50/p95/p99 → Latency percentiles by model in time buckets
 # error rate vs previous period → Error rate versus the previous equivalent period
 # rolling windows → Rolling windows over trace metrics
 # cost by project/model/prompt-version → Cost by project, model, and prompt version via dimension joins by name
+#   (project and prompt version answered by their identifiers, which is what the
+#    governed catalog carries; the by-NAME dimension join needs the
+#    PostgreSQL-resident project and prompt-config tables and lands with the
+#    PG-mapping PR)
 # token/cost outliers → Token and cost outliers
 # evaluation distributions/pass rates → Evaluation score distributions and pass rates by model and prompt version
 # annotation-vs-evaluation agreement → Annotation-versus-evaluation agreement
+#   (still @unimplemented, and the only question class that is: no governed
+#    dataset carries annotations, so it is blocked on the PG-mapping PR rather
+#    than on a fixture)
 # A then B → Traces containing operation A then operation B
 # time between events → Time between two events in a trace
 # first failure/retry → First failure and first retry per trace
 # experiment comparisons → Experiment run comparisons
+#   (compared across the simulation batches the catalog exposes; comparing by an
+#    experiment's NAME needs the PG-resident experiment dimension)
 # fanout warning → Fanout warning on a trace-to-span join
 #
 # Tenant isolation and authorization:
@@ -721,6 +752,10 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 # AC "row policies independently prevent cross-tenant reads, verified against the restricted identity"
 #   → the bound isolation-proof scenarios (baseline + CTE/UNION/JOIN/subquery above)
 # AC "content-gated fields refused in every expression position" → Scenario: Content-gated fields are refused in every expression position
+#   → Scenario: A dataset withheld from a caller cannot be named in a query
+#     (the dataset-level half of the same gate: absent from the published schema
+#      is not the same as out of reach, and the validator's allowed-table set is
+#      what makes it the second thing)
 # AC "row-policy + zero-rows-on-garbage-key on PG-engine mapped tables (PG container)"
 #   → Scenario: A PG-resident table is readable through ClickHouse only within the caller's tenant rows
 #   → Scenario: Garbage key context yields zero rows from a PG-engine mapped table
@@ -766,10 +801,14 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 # Diagnostics:
 # AC "four rules, each fixture-triggered"
 #   → Scenario: Fanout warning on a trace-to-span join (POSSIBLE_FANOUT)
-#   → Scenario: Truncation diagnostic fires when results are cut off
-#   → Scenario: Incomplete or misaligned comparison period diagnostic fires
-#   → Scenario: Missing time buckets diagnostic fires
+#   → Scenario: Truncation diagnostic fires when results are cut off (RESULT_TRUNCATED)
+#   → Scenario: Incomplete or misaligned comparison period diagnostic fires (INCOMPLETE_COMPARISON_PERIOD)
+#   → Scenario: Missing time buckets diagnostic fires (MISSING_TIME_BUCKETS)
 # AC "clean = no known issue detected" → Scenario: Clean diagnostic status is documented as no known issue detected
+# (a fifth rule beyond the four the issue scopes, because the partition-pruning
+#  measurement recorded in src/server/analytics/governed-sql/views.ts puts an
+#  eight-fold read cost on the shape it reports)
+#   → Scenario: An unbounded read is reported as covering the whole history (UNBOUNDED_TIME_RANGE)
 #
 # Non-goals:
 # AC "no PostgreSQL native-SQL endpoint" → Scenario: No PostgreSQL native-SQL execution endpoint exists

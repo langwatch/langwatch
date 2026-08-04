@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Protections } from "../../../traces/protections";
 import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
+import type { GovernedViewDefinition } from "../catalog/types";
 import {
   applyGovernedResultLimits,
   type GovernedSqlExecutionRequest,
@@ -47,6 +48,18 @@ const WITHOUT_CONTENT: Protections = {
   canSeeCapturedOutput: false,
   canSeeCosts: true,
 };
+
+/**
+ * A query that earns no diagnostic: one dataset, bounded on its time column.
+ *
+ * Spelled out rather than left as `SELECT count() FROM analytics.traces`,
+ * because that shape is *not* clean — reading a dataset with no predicate on
+ * its partitioning column is exactly what `UNBOUNDED_TIME_RANGE` reports, and a
+ * case asserting "no diagnostics" over it would be asserting the rule is off.
+ */
+const BOUNDED_COUNT =
+  "SELECT count() AS value FROM analytics.traces " +
+  "WHERE OccurredAt >= toDateTime64('2026-02-01 00:00:00', 3)";
 
 interface RecordingExecutor extends GovernedSqlExecutor {
   readonly calls: GovernedSqlExecutionRequest[];
@@ -143,7 +156,7 @@ describe("given the governed SQL service", () => {
       const result = await serviceWith(recordingExecutor()).execute({
         project: PROJECT,
         protections: FULLY_PERMITTED,
-        sql: "SELECT count() AS value FROM analytics.traces",
+        sql: BOUNDED_COUNT,
       });
 
       expect(result.columns).toEqual([{ name: "value", type: "UInt64" }]);
@@ -161,7 +174,9 @@ describe("given the governed SQL service", () => {
       ).execute({
         project: PROJECT,
         protections: FULLY_PERMITTED,
-        sql: "SELECT TraceId FROM analytics.traces",
+        sql:
+          "SELECT TraceId FROM analytics.traces " +
+          "WHERE OccurredAt >= toDateTime64('2026-02-01 00:00:00', 3)",
       });
 
       expect(result.truncated).toBe(true);
@@ -318,6 +333,91 @@ describe("given the governed SQL service", () => {
           sql,
         ).toBe("governed_sql_not_permitted");
       }
+    });
+  });
+
+  describe("when a dataset the caller's permissions withhold is named", () => {
+    /**
+     * A dataset that *is* captured content end to end, which is the case the
+     * dataset-level gate exists for. The shipped catalog has none — every one
+     * of its datasets is readable in part by a caller with no content
+     * permission — so a case written against it would assert that nothing
+     * happens, which is not the claim.
+     */
+    const transcripts: GovernedViewDefinition = {
+      name: "transcripts",
+      sourceTable: "raw_transcripts",
+      description: "Everything said in a conversation, verbatim.",
+      gates: ["input"],
+      grain: "one row per (TenantId, TranscriptId)",
+      joinKeys: ["TenantId"],
+      timeColumn: "OccurredAt",
+      freshness: "seconds behind ingestion",
+      dedup: { keyColumns: ["TenantId", "TranscriptId"], versionColumn: "UpdatedAt" },
+      columns: [
+        {
+          name: "TranscriptId",
+          type: "String",
+          description: "Transcript identifier.",
+          gates: [],
+          sourceColumns: ["TranscriptId"],
+        },
+      ],
+    };
+
+    const serviceWithTranscripts = (executor: GovernedSqlExecutor) =>
+      new GovernedSqlService({
+        executor,
+        database: DATABASE,
+        views: [...GOVERNED_VIEW_CATALOG, transcripts],
+      });
+
+    const sql = "SELECT count() FROM analytics.transcripts";
+
+    it("refuses the query, rather than returning the dataset's row-policed rows", async () => {
+      const executor = recordingExecutor();
+
+      expect(
+        await codeOf(() =>
+          serviceWithTranscripts(executor).execute({
+            project: PROJECT,
+            protections: WITHOUT_CONTENT,
+            sql,
+          }),
+        ),
+      ).toBe("governed_sql_not_permitted");
+      expect(
+        (
+          (
+            await metaOf(() =>
+              serviceWithTranscripts(executor).execute({
+                project: PROJECT,
+                protections: WITHOUT_CONTENT,
+                sql,
+              }),
+            )
+          ).violations as { code: string }[]
+        ).map((violation) => violation.code),
+      ).toContain("TABLE_NOT_ALLOWED");
+      expect(
+        executor.calls,
+        "a dataset the caller may not reach was queried anyway",
+      ).toHaveLength(0);
+    });
+
+    it("answers the same query for a caller who holds the permission", async () => {
+      const executor = recordingExecutor();
+
+      await expect(
+        serviceWithTranscripts(executor).execute({
+          project: PROJECT,
+          protections: FULLY_PERMITTED,
+          sql,
+        }),
+      ).resolves.toBeDefined();
+      // The refusal above is about the permission and not about the fixture:
+      // the same catalog, the same statement, a different caller.
+      expect(executor.calls).toHaveLength(1);
     });
   });
 

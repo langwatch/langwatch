@@ -15,7 +15,8 @@
  *     the query never reaches the database.
  *  4. Execute as the restricted identity, carrying the caller's tenant
  *     capability as the one setting the profile lets a query change.
- *  5. Shape the result, marking any ceiling that cut it short.
+ *  5. Shape the result, and run the advisory diagnostics (`./diagnostics.ts`)
+ *     over the facts step 3 recorded and the rows step 4 returned.
  *
  * ## Where the isolation actually lives
  *
@@ -46,8 +47,13 @@ import {
   type GovernedViewDefinition,
   governedAllowedTables,
   governedGatedColumns,
+  governedVisibleViews,
 } from "./catalog/types";
 import { governedTenantCapability } from "./capability";
+import {
+  type GovernedSqlDiagnostic,
+  governedSqlDiagnostics,
+} from "./diagnostics";
 import { GovernedSqlParameterMissingError, GovernedSqlUnavailableError } from "./errors";
 import {
   DEFAULT_GOVERNED_SQL_RESULT_LIMITS,
@@ -66,19 +72,6 @@ import type { Protections } from "../../traces/protections";
 
 const logger = createLogger("langwatch:analytics:governed-sql");
 
-/**
- * A structured note about a result that is correct but worth reading twice.
- *
- * Distinct from an error: the query ran and the answer is real. The union has
- * one member today; the diagnostics slice adds the rest
- * (`POSSIBLE_FANOUT`, comparison-period, missing-time-buckets).
- */
-export interface GovernedSqlDiagnostic {
-  readonly code: "RESULT_TRUNCATED";
-  readonly message: string;
-  readonly meta?: Readonly<Record<string, unknown>>;
-}
-
 /** What a caller gets back from the query endpoint. */
 export interface GovernedSqlQueryResult {
   readonly columns: readonly GovernedSqlColumn[];
@@ -87,8 +80,9 @@ export interface GovernedSqlQueryResult {
   /** Whether a result ceiling cut the answer short. */
   readonly truncated: boolean;
   /**
-   * Notes about the result. Empty means no known issue was detected, which is
-   * not the same as a guarantee the answer is what the caller meant.
+   * Notes about the result. An empty list means no known issue was detected,
+   * which is not a claim that the answer is the one the caller meant — see
+   * `GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING` in `./diagnostics.ts`.
    */
   readonly diagnostics: readonly GovernedSqlDiagnostic[];
 }
@@ -122,6 +116,15 @@ export interface GovernedSqlServiceDependencies {
   readonly database: string;
   readonly views?: readonly GovernedViewDefinition[];
   readonly limits?: GovernedSqlResultLimits;
+  /**
+   * The clock the diagnostics ask "has this period finished yet" against.
+   *
+   * A dependency rather than a call to `Date.now()` inside the rule, so that
+   * the diagnostics a result earns are a function of the result and the instant
+   * — which is what lets a suite pin the unfinished-period rule to a seeded
+   * fixture instead of to whenever it happens to run.
+   */
+  readonly now?: () => Date;
 }
 
 /**
@@ -133,10 +136,12 @@ export interface GovernedSqlServiceDependencies {
 export class GovernedSqlService {
   private readonly views: readonly GovernedViewDefinition[];
   private readonly limits: GovernedSqlResultLimits;
+  private readonly now: () => Date;
 
   constructor(private readonly deps: GovernedSqlServiceDependencies) {
     this.views = deps.views ?? GOVERNED_VIEW_CATALOG;
     this.limits = deps.limits ?? DEFAULT_GOVERNED_SQL_RESULT_LIMITS;
+    this.now = deps.now ?? (() => new Date());
   }
 
   /**
@@ -171,10 +176,19 @@ export class GovernedSqlService {
   }: GovernedSqlExecuteInput): Promise<GovernedSqlQueryResult> {
     const validation = validateGovernedSql({
       sql,
+      // The datasets this caller can reach, not every dataset the catalog has.
+      // A dataset gated as a whole is absent from the schema endpoint, and
+      // `allowedTables` is what makes it *unnameable* rather than merely
+      // unlisted: derived from the full catalog, a caller could name a hidden
+      // dataset and read its row-policed rows despite holding none of the
+      // permissions that dataset requires.
       allowedTables: governedAllowedTables({
         database: this.deps.database,
-        views: this.views,
+        views: governedVisibleViews({ protections, views: this.views }),
       }),
+      // Derived from the *full* catalog on purpose: a column of a hidden
+      // dataset must stay gated so that naming it unqualified — where no table
+      // reference reveals which dataset it came from — is refused too.
       gatedColumns: governedGatedColumns({ protections, views: this.views }),
       defaultDatabase: this.deps.database,
     });
@@ -216,6 +230,21 @@ export class GovernedSqlService {
       limits: this.limits,
     });
 
+    // The facts the walk recorded, plus what actually came back. Both halves
+    // are needed and neither is re-derived: a rule about the query's shape
+    // reads `validation`, a rule about the answer reads the rows.
+    const diagnostics = governedSqlDiagnostics({
+      validation,
+      database: this.deps.database,
+      views: this.views,
+      columns: execution.columns,
+      rows: execution.rows,
+      truncated: execution.truncated,
+      limits: this.limits,
+      rowsReturned: execution.statistics.rowsReturned,
+      now: this.now(),
+    });
+
     logger.info(
       {
         projectId: project.id,
@@ -224,6 +253,7 @@ export class GovernedSqlService {
         rowsRead: execution.statistics.rowsRead,
         elapsedMs: execution.statistics.elapsedMs,
         truncated: execution.truncated,
+        diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
       },
       "governed SQL executed",
     );
@@ -233,20 +263,7 @@ export class GovernedSqlService {
       rows: execution.rows,
       statistics: execution.statistics,
       truncated: execution.truncated,
-      diagnostics: execution.truncated
-        ? [
-            {
-              code: "RESULT_TRUNCATED",
-              message:
-                "The result was cut off at this API's response ceiling. Aggregate further, or narrow the query, to see the whole answer.",
-              meta: {
-                maxRows: this.limits.maxRows,
-                maxResultBytes: this.limits.maxResultBytes,
-                rowsReturned: execution.statistics.rowsReturned,
-              },
-            },
-          ]
-        : [],
+      diagnostics,
     };
   }
 }

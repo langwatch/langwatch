@@ -36,7 +36,12 @@ import { z } from "zod";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
-import { getGovernedSqlService } from "~/server/analytics/governed-sql";
+import {
+  GOVERNED_COLUMN_UNITS,
+  GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING,
+  GOVERNED_SQL_DIAGNOSTIC_CODES,
+  getGovernedSqlService,
+} from "~/server/analytics/governed-sql";
 import { prisma } from "~/server/db";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -88,7 +93,10 @@ const governedSqlResultSchema = z.object({
   truncated: z.boolean(),
   diagnostics: z.array(
     z.object({
-      code: z.string(),
+      // Enumerated rather than a bare string: a consumer branches on the code,
+      // and a published spec that would not tell it which codes exist makes it
+      // guess from prose.
+      code: z.enum(GOVERNED_SQL_DIAGNOSTIC_CODES),
       message: z.string(),
       meta: z.record(z.string(), z.any()).optional(),
     }),
@@ -110,6 +118,11 @@ const governedSchemaSchema = z.object({
           name: z.string(),
           type: z.string(),
           description: z.string(),
+          // Nullable rather than optional: the response answers the unit
+          // question for every column, and `null` is the answer for one that
+          // is not measured in anything. A consumer can tell that apart from
+          // an API too old to have units; `.optional()` could not.
+          unit: z.enum(GOVERNED_COLUMN_UNITS).nullable(),
           gates: z.array(z.enum(["input", "output", "costs"])),
           available: z.boolean(),
         }),
@@ -148,7 +161,8 @@ export function registerGovernedSqlRoutes(
     describeRoute({
       summary: "Run governed analytics SQL",
       description:
-        "Executes one read-only ClickHouse SELECT over the governed analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.",
+        "Executes one read-only ClickHouse SELECT over the governed analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. " +
+        `Diagnostics are advisory and never reject a query. ${GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING}`,
       tags: ["Analytics / Governed SQL"],
       responses: {
         ...baseResponses,

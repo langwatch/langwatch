@@ -148,8 +148,34 @@ export interface GovernedSqlQueryBlock {
    * that may or may not hold is not one of them.
    */
   readonly joins: readonly GovernedSqlJoinEdge[];
+  /**
+   * Column names this block filters on, lowercased and stripped of any
+   * qualifier — `WHERE t.OccurredAt >= …` contributes `occurredat`.
+   *
+   * Only `WHERE`, `PREWHERE` and `QUALIFY`, which are the positions that bound
+   * what a read touches. A join condition is deliberately absent: it says which
+   * rows line up, not which rows are read.
+   *
+   * Recorded because "this query has no predicate on the dataset's partitioning
+   * column" is a question about the query's shape, and the walk is the only
+   * pass that ever looks at the tree. It reads the name as written, so a filter
+   * written against a *projection alias* (`SELECT toStartOfHour(t) AS b … WHERE
+   * b > x`) contributes the alias rather than the column — a diagnostic reading
+   * this can therefore under-count real predicates, never invent one.
+   */
+  readonly filteredColumns: readonly string[];
   /** Whether the block carries `GROUP BY`, in any of its spellings. */
   readonly groupBy: boolean;
+  /**
+   * Names the block groups by, lowercased and stripped of any qualifier.
+   *
+   * Names, not expressions: `GROUP BY toStartOfHour(t)` groups by something the
+   * result has no name for, and is absent here, while the ordinary
+   * `SELECT toStartOfHour(t) AS bucket … GROUP BY bucket` contributes `bucket`
+   * — which is also the result column's name, and is what lets a reader tell a
+   * grouping key apart from an aggregate that happens to return a timestamp.
+   */
+  readonly groupByColumns: readonly string[];
   /**
    * Whether the block collapses rows with an aggregate.
    *
@@ -228,6 +254,8 @@ const UNRESOLVABLE_COLUMN_SETS: ReadonlySet<string> = new Set([
 interface BlockAccumulator {
   readonly tables: GovernedSqlTableReference[];
   readonly joins: GovernedSqlJoinEdge[];
+  readonly filteredColumns: Set<string>;
+  readonly groupByColumns: Set<string>;
   groupBy: boolean;
   aggregated: boolean;
 }
@@ -625,6 +653,8 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   const block: BlockAccumulator = {
     tables: [],
     joins: [],
+    filteredColumns: new Set<string>(),
+    groupByColumns: new Set<string>(),
     groupBy:
       (Array.isArray(node.group_by) && node.group_by.length > 0) ||
       node.group_by_all === true,
@@ -912,7 +942,32 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
     }
   }
   gateColumnReference({ name, ctx, frame, node });
+  noteColumnPosition({ name, frame });
   return frame;
+}
+
+/**
+ * Records a column named in a filter or grouping position on the block it sits
+ * in.
+ *
+ * The leaf segment only: what a diagnostic asks is "was this dataset's time
+ * column filtered", and `t.OccurredAt`, `OccurredAt` and
+ * `analytics.traces.OccurredAt` are all the same answer to it.
+ */
+function noteColumnPosition({
+  name,
+  frame,
+}: {
+  name: string;
+  frame: Frame;
+}): void {
+  const { block, clause } = frame;
+  if (!block) return;
+  if (clause !== "filter" && clause !== "group") return;
+  const leaf = name.split(".").at(-1)?.trim().toLowerCase();
+  if (!leaf) return;
+  if (clause === "filter") block.filteredColumns.add(leaf);
+  else block.groupByColumns.add(leaf);
 }
 
 /** Records a bound parameter. Parameters are values, and always permitted. */
@@ -1284,6 +1339,8 @@ export function validateGovernedSql({
     blocks: ctx.blocks.map((block) => ({
       tables: [...block.tables],
       joins: [...block.joins],
+      filteredColumns: [...block.filteredColumns],
+      groupByColumns: [...block.groupByColumns],
       groupBy: block.groupBy,
       aggregated: block.aggregated,
     })),

@@ -9,6 +9,17 @@
  */
 
 export { governedTenantCapability } from "./capability";
+export { GOVERNED_COLUMN_UNITS } from "./catalog/types";
+export type { GovernedColumnUnit } from "./catalog/types";
+export {
+  GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING,
+  GOVERNED_SQL_DIAGNOSTIC_CODES,
+  governedSqlDiagnostics,
+} from "./diagnostics";
+export type {
+  GovernedSqlDiagnostic,
+  GovernedSqlDiagnosticCode,
+} from "./diagnostics";
 export {
   GovernedSqlParameterMissingError,
   GovernedSqlUnavailableError,
@@ -33,10 +44,7 @@ export {
   getGovernedSqlService,
   setGovernedSqlService,
 } from "./governedSql.service";
-export type {
-  GovernedSqlDiagnostic,
-  GovernedSqlQueryResult,
-} from "./governedSql.service";
+export type { GovernedSqlQueryResult } from "./governedSql.service";
 export { describeGovernedSchema, governedExampleSql } from "./schema";
 export type {
   GovernedSchema,

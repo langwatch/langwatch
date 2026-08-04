@@ -525,7 +525,12 @@ describe("given the governed analytics SQL REST endpoints", () => {
     it("answers with typed columns, rows, execution statistics, truncation state and diagnostics", async () => {
       const body = await run(
         openProject,
-        `SELECT TraceId, TotalDurationMs FROM ${database}.traces ORDER BY TraceId LIMIT 3`,
+        `SELECT TraceId, TotalDurationMs FROM ${database}.traces ` +
+          // Bounded on the partition-pruning column, so the empty diagnostics
+          // list below is a clean answer rather than a rule that is switched
+          // off — an unbounded read of the same dataset earns a diagnostic.
+          `WHERE OccurredAt >= toDateTime64('${SEED_WINDOW.from}', 3) ` +
+          `ORDER BY TraceId LIMIT 3`,
       );
 
       expect(body.columns).toEqual([
@@ -968,6 +973,86 @@ describe("given the governed analytics SQL REST endpoints", () => {
     });
 
     /**
+     * Absent from the published schema is not the same as out of reach. The
+     * validator's `allowedTables` is what makes it the second thing, and it is
+     * the half a caller who reads no documentation would find.
+     */
+    /** @scenario "A dataset withheld from a caller cannot be named in a query" */
+    it("refuses a query naming a dataset the caller's permissions withhold, and answers it for one who holds them", async () => {
+      const transcripts: GovernedViewDefinition = {
+        name: "transcripts",
+        // Pointed at a table the migrations really created, so the permitted
+        // caller's query below reaches the database rather than failing on a
+        // missing relation — which would make the two halves fail for
+        // different reasons and prove neither.
+        sourceTable: "trace_summaries",
+        description: "Everything said in a conversation, verbatim.",
+        gates: ["input"],
+        grain: "one row per (TenantId, TraceId)",
+        joinKeys: ["TenantId"],
+        timeColumn: "OccurredAt",
+        freshness: "seconds behind ingestion",
+        dedup: { keyColumns: ["TenantId", "TraceId"], versionColumn: "UpdatedAt" },
+        columns: [
+          {
+            name: "TraceId",
+            type: "String",
+            description: "Trace identifier.",
+            gates: [],
+            sourceColumns: ["TraceId"],
+          },
+          {
+            name: "OccurredAt",
+            type: "DateTime64(3)",
+            description: "When the conversation started.",
+            gates: [],
+            sourceColumns: ["OccurredAt"],
+          },
+        ],
+      };
+      const views = [...GOVERNED_VIEW_CATALOG, transcripts];
+
+      await harness.applyAsAdmin(
+        governedViewSetupStatements({
+          names: harness.names,
+          sourceDatabase: facts,
+          views: [transcripts],
+          dedup: SHIPPED_GOVERNED_DEDUP,
+        }),
+      );
+      setGovernedSqlService(
+        new GovernedSqlService({
+          executor: createGovernedSqlExecutor({
+            ...harness.restrictedConnection(),
+            database,
+            tenantSetting: harness.names.tenantSetting,
+          }),
+          database,
+          views,
+        }),
+      );
+      try {
+        const sql = `SELECT count() AS value FROM ${database}.transcripts`;
+
+        const refused = await refuse(gatedProject, sql);
+        expect(refused.error).toBe("governed_sql_not_permitted");
+        expect(
+          refused.violations.map((violation: any) => violation.code),
+        ).toContain("TABLE_NOT_ALLOWED");
+
+        // The permitted caller reads it, which is what proves the refusal was
+        // the permission rather than a dataset that does not work.
+        const answered = await run(openProject, sql);
+        expect(Number(answered.rows[0].value)).toBeGreaterThan(0);
+      } finally {
+        restoreShippedService();
+        await harness.applyAsAdmin([
+          `DROP VIEW IF EXISTS ${database}.transcripts`,
+        ]);
+      }
+    });
+
+    /**
      * Whether the fail-closed derivation in `governedGatedColumns` — which
      * withholds unless a permission is explicitly `true` — can be exercised end
      * to end, settled here rather than re-argued.
@@ -1094,10 +1179,13 @@ describe("given the governed analytics SQL REST endpoints", () => {
      */
     /** @scenario "Truncation diagnostic fires when results are cut off" */
     it("cuts the result at the ceiling and says so, in the body and in a diagnostic", async () => {
-      const full = await run(
-        openProject,
-        `SELECT TraceId FROM ${database}.traces ORDER BY TraceId`,
-      );
+      // Bounded on the time column, so the only diagnostic either run can earn
+      // is the truncation one this case is about.
+      const traceIds =
+        `SELECT TraceId FROM ${database}.traces ` +
+        `WHERE OccurredAt >= toDateTime64('${SEED_WINDOW.from}', 3) ` +
+        `ORDER BY TraceId`;
+      const full = await run(openProject, traceIds);
       expect(full.rows.length).toBeGreaterThan(2);
       expect(full.truncated).toBe(false);
 
@@ -1113,10 +1201,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
         }),
       );
       try {
-        const capped = await run(
-          openProject,
-          `SELECT TraceId FROM ${database}.traces ORDER BY TraceId`,
-        );
+        const capped = await run(openProject, traceIds);
         expect(capped.rows).toHaveLength(2);
         expect(capped.rows).toEqual(full.rows.slice(0, 2));
         expect(capped.truncated).toBe(true);
