@@ -483,9 +483,9 @@ See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
 
 ```bash
 # Whichever the banner names as missing
-echo "LW_VIRTUAL_KEY_PEPPER=$(openssl rand -hex 32)" >> langwatch/.env
-echo "LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32)" >> langwatch/.env
-echo "LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)" >> langwatch/.env
+echo "LW_VIRTUAL_KEY_PEPPER=$(openssl rand -hex 32)" >> platform/app/.env
+echo "LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32)" >> platform/app/.env
+echo "LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)" >> platform/app/.env
 ```
 
 Restart the entry point (the validator runs at import time, so no incremental refresh).

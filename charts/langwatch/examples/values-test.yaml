@@ -29,9 +29,10 @@ langwatch_nlp:
 
 langevals:
   replicaCount: 1
+  # 256Mi/512Mi is below what the service needs just to import its evaluators.
   resources:
-    requests: { cpu: 50m, memory: 256Mi }
-    limits:   { cpu: 250m, memory: 512Mi }
+    requests: { cpu: 50m, memory: 768Mi }
+    limits:   { cpu: 250m, memory: 4Gi }
 
 clickhouse:
   chartManaged: true

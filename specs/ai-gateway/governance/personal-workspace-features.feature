@@ -26,12 +26,12 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
     - specs/ai-gateway/governance/ingestion-attribution.feature (security boundary)
 
   Implementation lives at:
-    - langwatch/prisma/schema.prisma `Project.personalFeatures` JSON
-    - langwatch/src/server/api/routers/personalWorkspaceFeatures.ts (tRPC)
-    - langwatch/src/components/me/PersonalSidebar.tsx (nav predicate)
-    - langwatch/src/pages/me/settings.tsx 'Workspace features' card
-    - langwatch/src/components/traces/EnableAdvancedFeaturesModal.tsx
-    - langwatch/src/server/governance/audit/personalWorkspaceFeatures.audit.ts
+    - platform/app/prisma/schema.prisma `Project.personalFeatures` JSON
+    - platform/app/src/server/api/routers/personalWorkspaceFeatures.ts (tRPC)
+    - platform/app/src/components/me/PersonalSidebar.tsx (nav predicate)
+    - platform/app/src/pages/me/settings.tsx 'Workspace features' card
+    - platform/app/src/components/traces/EnableAdvancedFeaturesModal.tsx
+    - platform/app/src/server/governance/audit/personalWorkspaceFeatures.audit.ts
 
   Background:
     Given a user "ariana@acme.com" who is a member of the personal-only

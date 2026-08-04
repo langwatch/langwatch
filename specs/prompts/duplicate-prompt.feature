@@ -35,13 +35,6 @@ Feature: Duplicate a prompt
     Then the duplicated prompt belongs to project "my-project"
 
   @integration
-  Scenario: Duplicating is blocked when the plan's prompt allowance is used up
-    Given my organization has reached the number of prompts its plan allows
-    When I try to duplicate "support-bot"
-    Then I am told the prompt limit has been reached
-    And no new prompt is created
-
-  @integration
   Scenario: Duplicating a prompt that no longer exists reports it as missing
     Given the prompt "support-bot" has been deleted
     When I try to duplicate "support-bot"

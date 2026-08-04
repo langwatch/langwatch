@@ -43,12 +43,13 @@ langwatch_nlp:
 
 langevals:
   replicaCount: 1
+  # One worker holding every local model needs ~2.6Gi. The limit is a ceiling,
+  # not a reservation, so it costs nothing until an evaluator loads a model.
   resources:
-    requests: { cpu: 100m, memory: 256Mi }
-    limits:   { cpu: 500m, memory: 512Mi }
+    requests: { cpu: 100m, memory: 768Mi }
+    limits:   { cpu: 500m, memory: 4Gi }
   extraEnvs:
     - { name: DISABLE_EVALUATORS_PRELOAD, value: "true" }
-    - { name: WEB_CONCURRENCY, value: "1" }
 
 clickhouse:
   chartManaged: true

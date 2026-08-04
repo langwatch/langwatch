@@ -154,9 +154,9 @@ See `dev/docs/best_practices/error-handling.md` and
 
 - #3785 — bug that triggered this ADR: provider-default silent no-op
 - `dev/docs/design/guidelines.md` §6 — implementation summary
-- `langwatch/src/hooks/useProviderFormSubmit.ts` — canonical implementation of cross-field submit-time validation
+- `platform/app/src/hooks/useProviderFormSubmit.ts` — canonical implementation of cross-field submit-time validation
 - [ADR-045](./045-domain-errors-handled-boundary.md) and
   `dev/docs/best_practices/error-handling.md` — the handled-error boundary and
   how a server rejection reaches the user
-- `langwatch/src/features/errors` — `showErrorToast`,
+- `platform/app/src/features/errors` — `showErrorToast`,
   `applyHandledErrorToForm`, `<FormServerError>`

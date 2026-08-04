@@ -1,8 +1,8 @@
 # Editable trace name — alignment while renaming
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/TraceDrawer/drawerHeader/EditableTraceName.tsx
-#   langwatch/src/features/traces-v2/components/TraceDrawer/drawerHeader/DrawerHeader.tsx  (status orb / StatusChip sibling)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/drawerHeader/EditableTraceName.tsx
+#   platform/app/src/features/traces-v2/components/TraceDrawer/drawerHeader/DrawerHeader.tsx  (status orb / StatusChip sibling)
 #
 # Motivation (round 5): clicking to rename the trace drops the inline
 # input AND, below it, a character counter (and any validation message).

@@ -62,6 +62,6 @@ The unconditional repository cap is deliberately coarser than the offload (it tr
 ## References
 
 - Feature spec: `specs/evaluations/evaluation-payload-offload.feature`
-- Offload module: `langwatch/src/server/app-layer/evaluations/evaluation-inputs-offload.ts`
-- Unconditional caps: `langwatch/src/server/app-layer/evaluations/evaluation-column-caps.ts`
+- Offload module: `platform/app/src/server/app-layer/evaluations/evaluation-inputs-offload.ts`
+- Unconditional caps: `platform/app/src/server/app-layer/evaluations/evaluation-column-caps.ts`
 - Related ADRs: ADR-022 (event_log source of truth / transient spool), ADR-007 (event sourcing).

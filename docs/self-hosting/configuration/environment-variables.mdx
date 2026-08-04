@@ -31,7 +31,7 @@ When using the Helm chart, you rarely need to set environment variables directly
 |----------|-------------|----------|
 | `API_TOKEN_JWT_SECRET` | JWT signing key for API tokens | Yes |
 | `CREDENTIALS_SECRET` | Encryption key for stored API keys and credentials | Yes |
-| `NEXTAUTH_SECRET` | Session encryption key for NextAuth.js | Yes |
+| `NEXTAUTH_SECRET` | Session encryption key | Yes |
 | `CRON_API_KEY` | API key for authenticating internal cron job HTTP calls | Yes |
 
 <Warning>
@@ -42,7 +42,7 @@ Never commit secrets to version control. In production, use a secrets manager (A
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azureAd`, `cognito`, `okta`, `auth0` | `email` |
+| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0`. Anything else, or a provider whose credentials are missing, starts in email mode. | `email` |
 
 ### SSO Provider Variables
 
@@ -63,14 +63,6 @@ Each SSO provider requires specific variables. See [SSO Configuration](/self-hos
 | `AZURE_AD_CLIENT_ID` | Azure AD application client ID |
 | `AZURE_AD_CLIENT_SECRET` | Azure AD application client secret |
 | `AZURE_AD_TENANT_ID` | Azure AD tenant ID |
-
-**AWS Cognito:**
-
-| Variable | Description |
-|----------|-------------|
-| `COGNITO_CLIENT_ID` | Cognito user pool client ID |
-| `COGNITO_CLIENT_SECRET` | Cognito user pool client secret |
-| `COGNITO_ISSUER` | Cognito issuer URL |
 
 **GitHub:**
 
