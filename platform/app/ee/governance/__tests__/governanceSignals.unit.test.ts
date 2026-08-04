@@ -117,6 +117,9 @@ describe("budget crossing detection", () => {
       [row("b_anchored", "vk_anchor:u1")],
     );
 
+    // Exactly one: a second dispatch for the same anchored period would be
+    // the same customer told twice, and reading only calls[0] would miss it.
+    expect(sendCrossing).toHaveBeenCalledTimes(1);
     const crossing = sendCrossing.mock.calls[0]![0];
     expect(crossing.kind).toBe("breached");
     // The stamp is the anchored period start, which is what makes the

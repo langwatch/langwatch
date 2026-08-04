@@ -462,7 +462,13 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
       }).toISOString(),
     );
 
-    const readAt = async (budget: typeof anchored, now: Date) => {
+    const readAt = async ({
+      budget,
+      now,
+    }: {
+      budget: typeof anchored;
+      now: Date;
+    }) => {
       const spends = await chRepo.getSpendForTargetsAcrossTenants(
         [PROJECT_ID],
         [
@@ -480,8 +486,15 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
       return Number.parseFloat(spends[0]!.spentUsd);
     };
 
-    // A debit inside the anchored period that was open at creation.
-    const spentAt = new Date(anchored.createdAt.getTime() - 60_000);
+    // A debit inside the anchored period that was open at creation. Taken
+    // from the period start rather than a minute before creation, which lands
+    // in the PREVIOUS period whenever creation happens inside the first
+    // minute of one.
+    const spentAt = anchoredPeriodStart({
+      window: "MONTH",
+      anchorAt: CYCLE_ANCHOR,
+      now: anchored.createdAt,
+    });
     await chRepo.insertDebit([
       debitRow({
         budgetId: anchored.id,
@@ -493,7 +506,9 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         occurredAt: spentAt,
       }),
     ]);
-    expect(await readAt(anchored, anchored.createdAt)).toBeCloseTo(42, 3);
+    expect(
+      await readAt({ budget: anchored, now: anchored.createdAt }),
+    ).toBeCloseTo(42, 3);
 
     const reset = await service.reset({
       id: anchored.id,
@@ -504,7 +519,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     expect(reset.lastResetAt).not.toBeNull();
 
     // The spend is forgiven immediately...
-    expect(await readAt(reset, reset.lastResetAt!)).toBe(0);
+    expect(await readAt({ budget: reset, now: reset.lastResetAt! })).toBe(0);
 
     // ...and the reported boundary is the anchor's next one, not one month
     // from the reset. A reset is a credit, not a re-phasing.

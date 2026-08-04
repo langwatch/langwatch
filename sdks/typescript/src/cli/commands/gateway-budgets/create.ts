@@ -28,7 +28,7 @@ export interface CreateGatewayBudgetOptions {
   cycleAnchorAt?: string;
 }
 
-const ALLOWED_WINDOWS: BudgetWindow[] = [
+const ALLOWED_WINDOWS = [
   "minute",
   "hour",
   "day",
@@ -36,7 +36,7 @@ const ALLOWED_WINDOWS: BudgetWindow[] = [
   "month",
   "total",
   "manual",
-];
+] as const satisfies readonly BudgetWindow[];
 
 function buildScope(options: CreateGatewayBudgetOptions): CreateGatewayBudgetScope {
   switch (options.scope) {
@@ -77,7 +77,7 @@ export const createGatewayBudgetCommand = async (
   // The flag stays case-insensitive for the human typing it; the wire value
   // is always lowercase.
   const window = options.window.toLowerCase() as BudgetWindow;
-  if (!ALLOWED_WINDOWS.includes(window)) {
+  if (!(ALLOWED_WINDOWS as readonly BudgetWindow[]).includes(window)) {
     console.error(
       chalk.red(`Error: --window must be one of ${ALLOWED_WINDOWS.join(", ")}`),
     );

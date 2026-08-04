@@ -1145,8 +1145,21 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         );
         expect(res.status).toBe(400);
         expect(await res.json()).toMatchObject({
-          error: { code: "gateway_budget_cycle_anchor_invalid" },
+          error: {
+            code: "gateway_budget_cycle_anchor_invalid",
+            message:
+              "That window does not cycle, so it cannot take a cycle anchor",
+            meta: { window },
+          },
         });
+        expect(
+          await prisma.gatewayBudget.findMany({
+            where: {
+              organizationId: ORG_ID,
+              name: `anchored-${window}-${suffix}`,
+            },
+          }),
+        ).toHaveLength(0);
       }
 
       // The same windows are fine without one.
@@ -1929,7 +1942,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
   // ── Idempotency-Key ───────────────────────────────────────────────────
 
-  describe("idempotency on creates", () => {
+  describe("when a create carries an Idempotency-Key", () => {
     /** A distinct budget body per test, so counting by name counts one test. */
     function budgetBody(label: string) {
       return {
@@ -2171,7 +2184,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const key = `idem-cache-key-${suffix}`;
       const body = {
         name: `idem-cache-${suffix}`,
-        matchers: { model: "gpt-4o-mini" },
+        matchers: { model: "gpt-5-mini" },
         action: { mode: "respect", ttl: 60 },
       };
 

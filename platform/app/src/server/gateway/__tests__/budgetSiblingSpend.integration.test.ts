@@ -151,7 +151,13 @@ async function createBudget(input: {
  * moves with it, and the whole point of one is which side of its own
  * boundary a debit falls on.
  */
-async function spentUsdFor(budgetIds: string[], now?: Date): Promise<string[]> {
+async function spentUsdFor({
+  budgetIds,
+  now,
+}: {
+  budgetIds: string[];
+  now?: Date;
+}): Promise<string[]> {
   const budgets = await prisma.gatewayBudget.findMany({
     where: { id: { in: budgetIds } },
   });
@@ -327,7 +333,10 @@ describe("given a hard cap and a soft cap on the same virtual key", () => {
   it("reports each budget's spend as one request, not two", async () => {
     await writeDebits(servedRequest({ virtualKeyId: PAIR_VK }));
 
-    expect(await spentUsdFor([hardId, softId])).toEqual(["0.001", "0.001"]);
+    expect(await spentUsdFor({ budgetIds: [hardId, softId] })).toEqual([
+      "0.001",
+      "0.001",
+    ]);
   });
 
   /** @scenario "The budget list shows a shared key's budgets undoubled" */
@@ -368,7 +377,11 @@ describe("given three budgets on the same virtual key", () => {
   it("reports one request's cost against each of the three", async () => {
     await writeDebits(servedRequest({ virtualKeyId: TRIO_VK }));
 
-    expect(await spentUsdFor(ids)).toEqual(["0.001", "0.001", "0.001"]);
+    expect(await spentUsdFor({ budgetIds: ids })).toEqual([
+      "0.001",
+      "0.001",
+      "0.001",
+    ]);
   });
 });
 
@@ -383,7 +396,10 @@ describe("given sibling budgets on the same key with different windows", () => {
 
     // Both windows contain both requests today, and each must see exactly
     // the two, not the four rows the pair of budgets wrote between them.
-    expect(await spentUsdFor([dayId, monthId])).toEqual(["0.002", "0.002"]);
+    expect(await spentUsdFor({ budgetIds: [dayId, monthId] })).toEqual([
+      "0.002",
+      "0.002",
+    ]);
   });
 });
 
@@ -395,7 +411,10 @@ describe("given two manual-window budgets on the same virtual key", () => {
   it("reports one request's cost against each, off the raw ledger", async () => {
     await writeDebits(servedRequest({ virtualKeyId: MANUAL_VK }));
 
-    expect(await spentUsdFor([hardId, softId])).toEqual(["0.001", "0.001"]);
+    expect(await spentUsdFor({ budgetIds: [hardId, softId] })).toEqual([
+      "0.001",
+      "0.001",
+    ]);
   });
 });
 
@@ -424,14 +443,20 @@ describe("given an anchored month and a calendar month on the same key", () => {
     // July one. This is the case the whole feature exists for: a customer
     // billed from the 17th gets a figure that spans the calendar boundary.
     expect(
-      await spentUsdFor([anchoredId, calendarId], INSIDE_ANCHORED_PERIOD),
+      await spentUsdFor({
+        budgetIds: [anchoredId, calendarId],
+        now: INSIDE_ANCHORED_PERIOD,
+      }),
     ).toEqual(["0.002", "0.001"]);
 
     // On 20 July the anchored period has rolled: its floor moved to 17
     // July, so both debits are behind it and the new period reads zero.
     // The calendar sibling is untouched, still inside July.
     expect(
-      await spentUsdFor([anchoredId, calendarId], AFTER_ANCHORED_ROLLOVER),
+      await spentUsdFor({
+        budgetIds: [anchoredId, calendarId],
+        now: AFTER_ANCHORED_ROLLOVER,
+      }),
     ).toEqual(["0", "0.001"]);
   });
 });

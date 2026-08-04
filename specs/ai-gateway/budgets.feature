@@ -611,6 +611,10 @@ Feature: AI Gateway — Budgets
   Scenario: A cycle anchor needs a cyclic window
     When I create a budget with window "total" or "manual" and a cycle anchor
     Then creation is rejected with "gateway_budget_cycle_anchor_invalid"
+    And the safe message is "That window does not cycle, so it cannot take a cycle anchor"
+    And the fault is the customer's, so the refusal is routine rather than an incident
+    And "meta.window" echoes the window that was sent, which is the caller's own value
+    And the customer reads that the window has no start date to set, and the two ways out: pick a window that rolls, or drop the start date
     Because neither window rolls, so there is no cycle for an anchor to phase
 
   @unit
@@ -664,6 +668,9 @@ Feature: AI Gateway — Budgets
   Scenario: A cycle anchor is rejected on windows that do not cycle
     When I create a budget over REST with window "manual" or "total" and "cycle_anchor_at" set
     Then the request is rejected with 400 and code "gateway_budget_cycle_anchor_invalid"
+    And the body carries the safe message "That window does not cycle, so it cannot take a cycle anchor"
+    And "meta.window" echoes the window that was sent
+    And nothing was created
     But the same windows are accepted without one
 
   # ============================================================================
