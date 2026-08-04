@@ -7,6 +7,12 @@
  * - Cloud metadata endpoints (see ssrfConstants.ts for full list)
  * - Cloud provider internal domains (configured for AWS, see ssrfConstants.ts to extend)
  *
+ * ## What's Blocked by default but allowlistable (ALLOWED_PROXY_HOSTS)
+ * - On-premise suffixes .local / .localhost. They name private infrastructure
+ *   rather than a cloud service handing out ambient credentials, so an operator
+ *   may re-enable one exact host. Everything above stays unconditional — a
+ *   cloud internal domain is never reachable by listing it.
+ *
  * ## What's Blocked (only when BLOCK_LOCAL_HTTP_CALLS is true)
  * Every non-globally-routable address, as classified by the shared
  * `@langwatch/ssrf` rule set (one table, shared byte-for-byte with the Go
@@ -89,7 +95,11 @@ import {
   fetch as undiciFetch,
 } from "undici";
 import { env } from "../env.mjs";
-import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrfConstants";
+import {
+  ALLOWLISTABLE_LOCAL_SUFFIXES,
+  BLOCKED_CLOUD_DOMAINS,
+  BLOCKED_METADATA_HOSTS,
+} from "./ssrfConstants";
 
 const logger = createLogger("langwatch:ssrfProtection");
 
@@ -212,6 +222,42 @@ export function isBlockedCloudDomain(hostname: string): boolean {
     (domain) =>
       lowerHostname === domain.slice(1) || lowerHostname.endsWith(domain),
   );
+}
+
+/**
+ * Whether a blocked hostname is blocked *only* because of an on-premise
+ * suffix (`.local`, `.localhost`) and may therefore be re-enabled for that
+ * exact host via ALLOWED_PROXY_HOSTS.
+ *
+ * A hostname that also matches a real cloud pattern is never allowlistable:
+ * `metadata.google.internal.local` hits `.internal` too, so it stays blocked.
+ */
+function isAllowlistableLocalDomain(hostname: string): boolean {
+  const lowerHostname = hostname.toLowerCase();
+
+  const matchesLocalSuffix = ALLOWLISTABLE_LOCAL_SUFFIXES.some((suffix) =>
+    lowerHostname.endsWith(suffix),
+  );
+  if (!matchesLocalSuffix) return false;
+
+  // Strip the on-premise suffix before testing the cloud patterns, so a
+  // hostname cannot smuggle a cloud label past the check by appending
+  // ".local" — "metadata.google.internal.local" still reads as ".internal".
+  const withoutLocalSuffix = ALLOWLISTABLE_LOCAL_SUFFIXES.reduce(
+    (name, suffix) =>
+      name.endsWith(suffix) ? name.slice(0, -suffix.length) : name,
+    lowerHostname,
+  );
+
+  const matchesCloudDomain = BLOCKED_CLOUD_DOMAINS.filter(
+    (domain) => !ALLOWLISTABLE_LOCAL_SUFFIXES.includes(domain),
+  ).some(
+    (domain) =>
+      withoutLocalSuffix === domain.slice(1) ||
+      withoutLocalSuffix.endsWith(domain),
+  );
+
+  return !matchesCloudDomain;
 }
 
 // ============================================================================
@@ -398,13 +444,22 @@ export function createSSRFValidator(config: SSRFConfig) {
       config,
     };
 
-    // Always validate metadata and cloud domains (critical security)
+    // Always validate metadata endpoints (critical security, never allowlistable)
     validateNotMetadataEndpoint(ctx);
-    validateNotBlockedCloudDomain(ctx);
+
+    // Cloud provider internal domains are rejected before the allowlist is even
+    // consulted, so they can never be allowlisted. The exception is the
+    // on-premise suffixes (.local / .localhost), which an operator may re-enable
+    // for a specific host below — they name private infrastructure, not a cloud
+    // service handing out ambient credentials.
+    if (!isAllowlistableLocalDomain(hostname)) {
+      validateNotBlockedCloudDomain(ctx);
+    }
 
     // Allowlist (literal hostname match, case-insensitive) — bypasses
-    // private-IP / localhost blocking. Cloud metadata was already rejected
-    // above, so it can never be allowlisted.
+    // private-IP / localhost blocking, and the .local/.localhost block for
+    // on-premise hosts. Cloud metadata and cloud internal domains were already
+    // rejected above, so neither can ever be allowlisted.
     if (config.allowedHosts.length > 0) {
       const normalizedAllowed = config.allowedHosts.map((h) =>
         h.trim().toLowerCase(),
@@ -421,6 +476,11 @@ export function createSSRFValidator(config: SSRFConfig) {
         );
       }
     }
+
+    // An on-premise host that was deferred past the cloud-domain check but did
+    // NOT match the allowlist is still blocked — deferring the check must not
+    // become a way to reach every .local host.
+    validateNotBlockedCloudDomain(ctx);
 
     // Handle IP literals
     const ipVersion = isIP(hostname);
