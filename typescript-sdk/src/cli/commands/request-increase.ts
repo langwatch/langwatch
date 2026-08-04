@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import { trimTrailingSlashes } from "@/internal/url";
+import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
  * `langwatch request-increase` — Screen-8 tail of the budget-exceeded
@@ -24,7 +24,7 @@ export const requestIncreaseCommand = async (
 
   const target =
     cfg.last_request_increase_url ??
-    `${trimTrailingSlashes(cfg.control_plane_url)}/me/budget/request`;
+    `${normalizeEndpoint(cfg.control_plane_url)}/me/budget/request`;
 
   console.log(`Opening ${target}`);
   await openInBrowser(target, options?.browser);

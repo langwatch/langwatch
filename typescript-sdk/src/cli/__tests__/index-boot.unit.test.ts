@@ -195,10 +195,6 @@ describe("the CLI boot module graph", () => {
         // boot; it adds no transitive dependency.
         "internal/endpoint.ts",
         "internal/runtime.ts",
-        // resolveEndpoint normalises every control-plane URL through the
-        // shared trailing-slash trim. The module is a dependency-free string
-        // helper, so its boot cost is negligible; it belongs here deliberately.
-        "internal/url.ts",
       ]);
     });
 

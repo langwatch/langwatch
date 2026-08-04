@@ -43,7 +43,7 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { trimTrailingSlashes } from "../../../internal/url";
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import {
 	codexHasGatewayBlock,
 	codexHasOtelBlock,
@@ -93,7 +93,7 @@ const LANGWATCH_OTLP_ENDPOINT_RE = /\/api\/otel\/?$/;
 
 /** The OTLP ingestion base endpoint a control plane serves. */
 export function otlpEndpointFor(controlPlaneUrl: string): string {
-	return `${trimTrailingSlashes(controlPlaneUrl)}/api/otel`;
+	return `${normalizeEndpoint(controlPlaneUrl)}/api/otel`;
 }
 
 /**

@@ -5,7 +5,7 @@ import {
   listIngestionSources,
   GovernanceCliError,
 } from "@/cli/utils/governance/cli-api";
-import { trimTrailingSlashes } from "@/internal/url";
+import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
  * `langwatch ingest list [--all] [--json]`
@@ -48,7 +48,7 @@ export async function ingestListCommand(options: {
     console.log(
       chalk.gray(
         "No ingestion sources yet. Open the admin UI at " +
-          `${trimTrailingSlashes(cfg.control_plane_url)}/settings/governance/ingestion-sources` +
+          `${normalizeEndpoint(cfg.control_plane_url)}/settings/governance/ingestion-sources` +
           " to connect your first source.",
       ),
     );

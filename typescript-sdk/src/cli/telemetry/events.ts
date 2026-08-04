@@ -33,7 +33,7 @@
 // schemas, which cost ~28ms an invocation to load and which nothing here needs.
 import { handledErrorFromThrown } from "@langwatch/langy/cards/handled-error";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
-import { trimTrailingSlashes } from "@/internal/url";
+import { normalizeEndpoint } from "@/internal/endpoint";
 import {
   LANGWATCH_EVENT_ATTRIBUTES as ATTR,
   LANGWATCH_EVENTS,
@@ -108,7 +108,7 @@ export const resolveLogsEndpoint = (
   if (signal) return signal;
 
   const generic = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
-  if (generic) return `${trimTrailingSlashes(generic)}/v1/logs`;
+  if (generic) return `${normalizeEndpoint(generic)}/v1/logs`;
 
   return null;
 };

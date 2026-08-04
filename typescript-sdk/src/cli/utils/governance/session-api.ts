@@ -22,7 +22,7 @@
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 
-import { trimTrailingSlashes } from "../../../internal/url";
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import {
   type GovernanceConfig,
   loadConfig,
@@ -130,7 +130,7 @@ async function sessionRequest(
     opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS,
   );
   const doFetch = () =>
-    f(trimTrailingSlashes(cfg.control_plane_url) + path, {
+    f(normalizeEndpoint(cfg.control_plane_url) + path, {
       method,
       headers: {
         Authorization: `Bearer ${cfg.access_token}`,

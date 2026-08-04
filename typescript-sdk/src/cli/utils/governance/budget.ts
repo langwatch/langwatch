@@ -9,7 +9,7 @@
  * spawning the tool.
  */
 
-import { trimTrailingSlashes } from "../../../internal/url";
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import { type GovernanceConfig } from "./config";
 
 export interface BudgetExceededPayload {
@@ -40,7 +40,7 @@ export async function checkBudget(
 ): Promise<BudgetExceededPayload | null> {
   if (!cfg.access_token) return null;
   const f = opts.fetchImpl ?? fetch;
-  const url = trimTrailingSlashes(cfg.control_plane_url) + "/api/auth/cli/budget/status";
+  const url = normalizeEndpoint(cfg.control_plane_url) + "/api/auth/cli/budget/status";
   let res: Response;
   try {
     res = await f(url, {

@@ -19,7 +19,7 @@ import {
 } from "@/cli/utils/governance/session-api";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
-import { trimTrailingSlashes } from "@/internal/url";
+import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
  * Always-on agent-hint banner shown above the interactive prompts on
@@ -211,7 +211,7 @@ export const loginCommand = async (
     const endpointFromEnv = process.env.LANGWATCH_ENDPOINT?.trim();
     const presetEndpoint = options?.endpoint ?? endpointFromEnv;
     if (presetEndpoint) {
-      const trimmed = trimTrailingSlashes(presetEndpoint);
+      const trimmed = normalizeEndpoint(presetEndpoint);
       const cfg = loadConfig();
       cfg.control_plane_url = trimmed;
       saveConfig(cfg);
@@ -404,7 +404,7 @@ export const loginCommand = async (
           console.log(chalk.yellow("Login cancelled"));
           process.exit(0);
         }
-        cfg.control_plane_url = trimTrailingSlashes(url.url as string);
+        cfg.control_plane_url = normalizeEndpoint(url.url as string);
         saveConfig(cfg);
       }
     }
