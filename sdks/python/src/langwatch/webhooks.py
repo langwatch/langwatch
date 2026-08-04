@@ -67,7 +67,6 @@ class WebhooksFacade:
         *,
         url: str,
         enabled_events: List[str],
-        description: Optional[str] = None,
         max_batch_size: Optional[int] = None,
         max_batch_delay_ms: Optional[int] = None,
         max_in_flight: Optional[int] = None,
@@ -88,8 +87,6 @@ class WebhooksFacade:
         ``on_idempotent_replay`` is called when the answer came from a receipt
         rather than a fresh write."""
         body: Dict[str, Any] = {"url": url, "enabled_events": enabled_events}
-        if description is not None:
-            body["description"] = description
         if max_batch_size is not None:
             body["max_batch_size"] = max_batch_size
         if max_batch_delay_ms is not None:
@@ -111,7 +108,6 @@ class WebhooksFacade:
         *,
         url: Optional[str] = None,
         enabled_events: Optional[List[str]] = None,
-        description: Optional[str] = None,
         status: Optional[str] = None,
         max_batch_size: Optional[int] = None,
         max_batch_delay_ms: Optional[int] = None,
@@ -126,8 +122,6 @@ class WebhooksFacade:
             body["url"] = url
         if enabled_events is not None:
             body["enabled_events"] = enabled_events
-        if description is not None:
-            body["description"] = description
         if status is not None:
             body["status"] = status
         if max_batch_size is not None:
@@ -229,14 +223,16 @@ class WebhooksFacade:
         self,
         *,
         type: Optional[str] = None,
-        created_from: Optional[int] = None,
-        created_to: Optional[int] = None,
+        from_ms: Optional[int] = None,
+        to_ms: Optional[int] = None,
         cursor: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> Dict[str, Any]:
         """One page of the organization's emitted-events log (Stripe
         /v1/events parity): filter by type and created range.
-        Returns {data, next_cursor}.
+        Returns {data, next_cursor}. ``from_ms`` and ``to_ms`` bound the
+        created range in epoch milliseconds, named as the spend facade names
+        the same wire params because ``from`` is a python keyword.
 
         ``type`` is a single event type, which is all the route filters on.
         An unknown type serves an empty page rather than an error, so a
@@ -244,10 +240,10 @@ class WebhooksFacade:
         params: Dict[str, Any] = {}
         if type is not None:
             params["type"] = type
-        if created_from is not None:
-            params["from"] = created_from
-        if created_to is not None:
-            params["to"] = created_to
+        if from_ms is not None:
+            params["from"] = from_ms
+        if to_ms is not None:
+            params["to"] = to_ms
         if cursor is not None:
             params["cursor"] = cursor
         if limit is not None:
@@ -260,8 +256,8 @@ class WebhooksFacade:
         self,
         *,
         type: Optional[str] = None,
-        created_from: Optional[int] = None,
-        created_to: Optional[int] = None,
+        from_ms: Optional[int] = None,
+        to_ms: Optional[int] = None,
         limit: Optional[int] = None,
     ) -> Iterator[Dict[str, Any]]:
         """Every emitted event matching the filters, one envelope at a time,
@@ -272,8 +268,8 @@ class WebhooksFacade:
         for page in walk_cursor_pages(
             lambda cursor: self.events_page(
                 type=type,
-                created_from=created_from,
-                created_to=created_to,
+                from_ms=from_ms,
+                to_ms=to_ms,
                 cursor=cursor,
                 limit=limit,
             )

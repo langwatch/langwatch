@@ -121,7 +121,6 @@ describe("WebhooksApiService", () => {
       const created = await new WebhooksApiService().create({
         url: "https://acme.example/hooks",
         enabled_events: ["gateway.request.completed"],
-        description: "billing feed",
         max_batch_size: 50,
         max_batch_delay_ms: 500,
         max_in_flight: 2,
@@ -133,12 +132,14 @@ describe("WebhooksApiService", () => {
       expect(body).toEqual({
         url: "https://acme.example/hooks",
         enabled_events: ["gateway.request.completed"],
-        description: "billing feed",
         max_batch_size: 50,
         max_batch_delay_ms: 500,
         max_in_flight: 2,
       });
       expect(body).not.toHaveProperty("enabledEvents");
+      // `description` is not in the route's body schema, so the server drops
+      // it. Offering it in the type promised a field that silently vanished.
+      expect(body).not.toHaveProperty("description");
     });
   });
 

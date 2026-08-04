@@ -225,6 +225,35 @@ signature per valid secret, and the delivery verifies against whichever one
 you hold. Freshness defaults to a five minute window, overridable with
 `tolerance_seconds`.
 
+`WEBHOOK_DELIVERY_ID_HEADER` names the header carrying the delivery attempt
+id, which is the natural key for making your handler idempotent: retries of
+the same batch repeat it. Automation deliveries use
+`WEBHOOK_EVENT_ID_HEADER` instead, so read whichever the delivery carries.
+
+## Handling API Errors
+
+Calls that the platform refuses raise a `LangWatchApiError` carrying the
+platform's own `code`. Branch on the code, never on the message: the message
+is written for a human reading a log and will change, the code will not.
+
+```python
+from langwatch import LangWatchApiError
+
+try:
+    langwatch.gateway_budgets.create(..., idempotency_key=key)
+except LangWatchApiError as error:
+    if error.code == "idempotency_error":
+        ...  # same key was used with a different body
+    print(error.status, error.operation, error.body)
+```
+
+Subclasses follow the status (`LangWatchApiValidationError`,
+`LangWatchApiNotFoundError`, `LangWatchApiConflictError`,
+`LangWatchApiPlanLimitError`, `LangWatchApiAuthenticationError`,
+`LangWatchApiServerError`) for when catching broadly is enough. Local misuse,
+a missing argument or an empty secret, still raises `TypeError` or
+`ValueError`: it never crossed the wire, so it carries no code.
+
 ## Python SDK Integrations
 
 Our Python SDK supports the following auto-instrumentors.

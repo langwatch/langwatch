@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 import pytest
 
+from langwatch.api_errors import LangWatchApiError, LangWatchApiPlanLimitError
+
 from langwatch.spend_events import SpendEventsFacade
 from langwatch.webhooks import WebhooksFacade
 
@@ -250,8 +252,48 @@ def test_errors_surface_operation_and_detail():
         return httpx.Response(402, json={"error": "plan_required"})
 
     facade = SpendEventsFacade(FakeRestClient(handler))
-    with pytest.raises(RuntimeError, match="list spend events"):
+    with pytest.raises(LangWatchApiPlanLimitError, match="list spend events"):
         facade.list_page(from_ms=1, to_ms=2)
+
+
+def test_refusals_carry_the_platform_code_rather_than_only_prose():
+    """A consumer branches on the code: the message is written for a human
+    reading a log and will change, the code is the contract."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            409,
+            json={
+                "error": {
+                    "code": "idempotency_error",
+                    "meta": {"reason": "body_mismatch"},
+                }
+            },
+        )
+
+    facade = SpendEventsFacade(FakeRestClient(handler))
+    with pytest.raises(LangWatchApiError) as raised:
+        facade.list_page(from_ms=1, to_ms=2)
+
+    error = raised.value
+    assert error.code == "idempotency_error"
+    assert error.status == 409
+    assert error.operation == "list spend events"
+    # The parsed payload survives for the fields the class does not promote.
+    assert error.body["error"]["meta"]["reason"] == "body_mismatch"
+
+
+def test_local_misuse_is_not_an_api_error():
+    """A malformed cursor chain never crossed the wire, so it carries no code
+    and must not look like a refusal from the platform."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": [], "next_cursor": "stuck"})
+
+    facade = SpendEventsFacade(FakeRestClient(handler))
+    with pytest.raises(RuntimeError) as raised:
+        list(facade.iterate(from_ms=1, to_ms=2))
+    assert not isinstance(raised.value, LangWatchApiError)
 
 
 def test_summaries_walk_follows_the_cursor_to_the_end():

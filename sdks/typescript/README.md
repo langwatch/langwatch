@@ -278,6 +278,11 @@ signature per valid secret, and the delivery verifies against whichever one
 you hold. Freshness defaults to a five minute window, overridable with
 `toleranceSeconds`.
 
+`WEBHOOK_DELIVERY_ID_HEADER` names the header carrying the delivery attempt
+id, which is the natural key for making your handler idempotent: retries of
+the same batch repeat it. Automation deliveries use `WEBHOOK_EVENT_ID_HEADER`
+instead, so read whichever the delivery carries.
+
 ## Testing
 
 ## Unit and Integration Testing

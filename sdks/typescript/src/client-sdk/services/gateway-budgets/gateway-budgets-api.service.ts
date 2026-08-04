@@ -93,16 +93,6 @@ export interface GatewayBudgetPage {
   next_cursor: string | null;
 }
 
-/** The complete budget listing, after a walk to exhaustion. */
-export interface GatewayBudgetListing {
-  data: GatewayBudget[];
-  /**
-   * False when ANY page of the walk could not total spend: one unreadable
-   * page makes the whole listing's spend unreal.
-   */
-  spend_available: boolean;
-}
-
 export type CreateGatewayBudgetScope =
   | { kind: "organization"; organization_id: string }
   | { kind: "team"; team_id: string }
@@ -279,6 +269,13 @@ export class GatewayBudgetsApiService {
    * `limit` sizes each request in the walk, it does NOT cap what comes back.
    * `cursor` resumes an interrupted walk. Take a single page with
    * `listPage()`, or stream the walk with `iterate()`.
+   *
+   * A plain array, like every other exhaustive `list()` in the SDK: a walk
+   * that ran to the end has no cursor left to report, and the page envelope's
+   * `spend_available` is readable off the rows, since a page that could not
+   * total spend serves `spent_usd` and `spent_nano_usd` as null rather than a
+   * stale figure. `budgets.some((b) => b.spent_usd === null)` is the same
+   * answer. Use `listPage()` when you want the flag stated outright.
    */
   async list(options?: {
     scopeTypes?: BudgetScopeKind[];
@@ -286,7 +283,7 @@ export class GatewayBudgetsApiService {
     limit?: number;
     /** Exact match on your own identifier, not a prefix or a search. */
     externalId?: string;
-  }): Promise<GatewayBudgetListing> {
+  }): Promise<GatewayBudget[]> {
     const pages = await collectCursorPages<GatewayBudgetPage>({
       startCursor: options?.cursor,
       nextCursorOf: (page) => page.next_cursor,
@@ -303,21 +300,15 @@ export class GatewayBudgetsApiService {
           externalId: options?.externalId,
         }),
     });
-    return {
-      data: pages.flatMap((page) => page.data),
-      // One page that could not total spend makes the whole listing's spend
-      // unreal, so the set's honest answer is the pessimistic one.
-      spend_available: pages.every((page) => page.spend_available),
-    };
+    return pages.flatMap((page) => page.data);
   }
 
   /**
    * Every non-archived budget, one row at a time, fetching each page only
    * when the consumer reaches it.
    *
-   * The rows come without the listing's `spend_available` flag, which is a
-   * property of the pages rather than of any single budget. Use `list()`
-   * when the answer depends on whether spend could be totalled at all.
+   * A null `spent_usd` means spend could not be totalled rather than that
+   * nothing was spent.
    */
   async *iterate(options?: {
     scopeTypes?: BudgetScopeKind[];

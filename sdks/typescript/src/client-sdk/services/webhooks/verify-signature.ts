@@ -28,6 +28,23 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export const WEBHOOK_SIGNATURE_HEADER = "X-LangWatch-Signature";
 
 /**
+ * Identifies one delivery ATTEMPT on the webhook platform's endpoints.
+ *
+ * The natural idempotency key for a receiver: retries of the same batch repeat
+ * it, so a receiver that has already processed this id can acknowledge and
+ * stop rather than applying the batch twice.
+ */
+export const WEBHOOK_DELIVERY_ID_HEADER = "X-LangWatch-Delivery-Id";
+
+/**
+ * The same role on automation deliveries (graph alerts and friends), which
+ * group their attempts by the logical fire rather than by the batch.
+ *
+ * Two names because they are two senders: read whichever the delivery carries.
+ */
+export const WEBHOOK_EVENT_ID_HEADER = "X-LangWatch-Event-Id";
+
+/**
  * How far a delivery's timestamp may sit from the receiver's clock, in
  * seconds. Matches the sender's documented window.
  */

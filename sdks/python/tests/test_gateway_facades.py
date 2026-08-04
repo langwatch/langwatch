@@ -198,38 +198,47 @@ def test_budgets_routes_and_envelopes():
     assert "end_user_id=user%2F9" in reset_call[1]
 
 
-def test_budgets_list_ands_spend_available_across_pages():
-    """spend_available is a correctness flag, not a per-page detail.
-
-    One page that could not total spend makes the whole answer say so,
-    because a null spent_usd anywhere in the walk cannot be told apart from
-    zero spend without it.
-    """
+def test_budgets_list_returns_a_plain_list_of_every_row():
+    """Every exhaustive list() answers the same shape across the SDK: a walk
+    that ran to the end has no cursor left to report."""
     handler, seen_cursors = paged(
         [
-            {"data": [{"id": "b_1"}], "spend_available": True, "next_cursor": "c1"},
-            {"data": [{"id": "b_2"}], "spend_available": False, "next_cursor": "c2"},
-            {"data": [{"id": "b_3"}], "spend_available": True, "next_cursor": None},
+            {"data": [{"id": "b_1", "spent_usd": "1"}], "spend_available": True, "next_cursor": "c1"},
+            {"data": [{"id": "b_2", "spent_usd": None}], "spend_available": False, "next_cursor": "c2"},
+            {"data": [{"id": "b_3", "spent_usd": "3"}], "spend_available": True, "next_cursor": None},
         ]
     )
     facade = GatewayBudgetsFacade(FakeRestClient(handler))
 
     listed = facade.list()
-    assert [b["id"] for b in listed["data"]] == ["b_1", "b_2", "b_3"]
-    assert listed["spend_available"] is False
+    assert [b["id"] for b in listed] == ["b_1", "b_2", "b_3"]
     assert seen_cursors == [None, "c1", "c2"]
 
 
-def test_budgets_list_keeps_spend_available_true_when_every_page_totalled():
+def test_a_page_that_could_not_total_spend_is_still_readable_off_the_rows():
+    """Dropping the envelope loses nothing: a page that could not total spend
+    serves spent_usd as null, so the rows carry the same signal the flag did.
+    Without that, a null could not be told apart from zero spend."""
     handler, _ = paged(
         [
-            {"data": [{"id": "b_1"}], "spend_available": True, "next_cursor": "c1"},
-            {"data": [{"id": "b_2"}], "spend_available": True, "next_cursor": None},
+            {"data": [{"id": "b_1", "spent_usd": "1"}], "spend_available": True, "next_cursor": "c1"},
+            {"data": [{"id": "b_2", "spent_usd": None}], "spend_available": False, "next_cursor": None},
         ]
     )
     facade = GatewayBudgetsFacade(FakeRestClient(handler))
 
-    assert facade.list()["spend_available"] is True
+    budgets = facade.list()
+    assert any(b["spent_usd"] is None for b in budgets) is True
+
+
+def test_list_page_still_states_spend_available_outright():
+    """The page envelope keeps the flag for callers who want it stated."""
+    handler, _ = paged(
+        [{"data": [{"id": "b_1"}], "spend_available": False, "next_cursor": None}]
+    )
+    facade = GatewayBudgetsFacade(FakeRestClient(handler))
+
+    assert facade.list_page()["spend_available"] is False
 
 
 def test_budgets_iterate_sends_the_scope_filter_and_walks_pages():

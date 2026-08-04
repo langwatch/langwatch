@@ -19,7 +19,10 @@ import { describe, expect, it } from "vitest";
 import {
   verifyWebhookSignature,
   WebhookSignatureVerificationError,
+  WEBHOOK_DELIVERY_ID_HEADER,
+  WEBHOOK_EVENT_ID_HEADER,
   WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS,
+  WEBHOOK_SIGNATURE_HEADER,
   type WebhookSignatureFailureCode,
 } from "../verify-signature";
 
@@ -51,6 +54,7 @@ interface SigningVector {
 
 const vectors = JSON.parse(readFileSync(VECTORS_PATH, "utf8")) as {
   default_tolerance_seconds: number;
+  headers: { signature: string; delivery_id: string; event_id: string };
   signing: SigningVector[];
   verification: VerificationVector[];
 };
@@ -88,6 +92,14 @@ describe("Feature: verifying a LangWatch webhook delivery", () => {
     expect(WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS).toBe(
       vectors.default_tolerance_seconds,
     );
+  });
+
+  it("names the headers the sender actually sets", () => {
+    // Hand-copied header names are how a receiver ends up keying idempotency
+    // off a header that no longer exists, processing every retry twice.
+    expect(WEBHOOK_SIGNATURE_HEADER).toBe(vectors.headers.signature);
+    expect(WEBHOOK_DELIVERY_ID_HEADER).toBe(vectors.headers.delivery_id);
+    expect(WEBHOOK_EVENT_ID_HEADER).toBe(vectors.headers.event_id);
   });
 
   it("reads a vector file that actually carries cases", () => {

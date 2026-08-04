@@ -48,7 +48,18 @@ const page = (
   ids: string[],
   next_cursor: string | null,
   spend_available = true,
-): unknown => ({ data: ids.map((id) => budget(id)), spend_available, next_cursor });
+): unknown => ({
+  data: ids.map((id) =>
+    budget(
+      id,
+      // Mirrors the server: a page it could not total serves both spend
+      // fields as null rather than a stale figure.
+      spend_available ? {} : { spent_usd: null, spent_nano_usd: null },
+    ),
+  ),
+  spend_available,
+  next_cursor,
+});
 
 /** The query string of the nth fetch, in call order. */
 const queryOf = (call: number): string => {
@@ -93,7 +104,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
 
       const result = await new GatewayBudgetsApiService().list();
 
-      expect(result.data.map((b) => b.id)).toEqual(["a", "b", "c", "d", "e"]);
+      expect(result.map((b) => b.id)).toEqual(["a", "b", "c", "d", "e"]);
       expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
@@ -126,15 +137,17 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       }
     });
 
-    it("reports spend as unavailable when any single page could not total it", async () => {
+    it("leaves the unreadable spend visible on the rows when a page could not total it", async () => {
       mockFetch
         .mockResolvedValueOnce(jsonResponse(page(["a"], "cursor-1", true)))
         .mockResolvedValueOnce(jsonResponse(page(["b"], null, false)));
 
       const result = await new GatewayBudgetsApiService().list();
 
-      expect(result.spend_available).toBe(false);
-      expect(result.data).toHaveLength(2);
+      // The envelope is gone, but nothing is lost: a page that could not
+      // total spend serves a null `spent_usd`, so the rows carry the signal.
+      expect(result).toHaveLength(2);
+      expect(result.some((b) => b.spent_usd === null)).toBe(true);
     });
 
     it("stops after one request against a server that sends no cursor at all", async () => {
@@ -144,7 +157,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
 
       const result = await new GatewayBudgetsApiService().list();
 
-      expect(result.data.map((b) => b.id)).toEqual(["a"]);
+      expect(result.map((b) => b.id)).toEqual(["a"]);
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -169,7 +182,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       });
 
       expect(new URLSearchParams(queryOf(0)).get("cursor")).toBe("cursor-2");
-      expect(result.data.map((b) => b.id)).toEqual(["c", "d"]);
+      expect(result.map((b) => b.id)).toEqual(["c", "d"]);
     });
   });
 

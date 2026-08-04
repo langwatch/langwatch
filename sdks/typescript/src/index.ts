@@ -175,6 +175,8 @@ export {
   WebhookSignatureVerificationError,
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS,
+  WEBHOOK_DELIVERY_ID_HEADER,
+  WEBHOOK_EVENT_ID_HEADER,
   type WebhookSignatureFailureCode,
   type VerifyWebhookSignatureOptions,
 } from "./client-sdk/services/webhooks/verify-signature";
@@ -195,7 +197,6 @@ export {
   GatewayBudgetsApiError,
   type GatewayBudget,
   type GatewayBudgetPage,
-  type GatewayBudgetListing,
   type BudgetScopeKind,
   type BudgetWindow,
   type BudgetOnBreach,

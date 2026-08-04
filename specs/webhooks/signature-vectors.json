@@ -2,6 +2,11 @@
   "$schema_note": "Generated file. Do not hand-edit: run `pnpm run task generateWebhookSignatureVectors` from platform/app.",
   "generated_by": "platform/app/src/tasks/generateWebhookSignatureVectors.ts",
   "generated_from": "platform/app/src/server/webhooks/signature.ts",
+  "headers": {
+    "signature": "X-LangWatch-Signature",
+    "delivery_id": "X-LangWatch-Delivery-Id",
+    "event_id": "X-LangWatch-Event-Id"
+  },
   "algorithm": {
     "header": "X-LangWatch-Signature: t=<unix seconds>,v1=<hex>[,v1=<hex>]",
     "signed_payload": "`${timestamp}.${raw body}`, using the timestamp as parsed from `t`",

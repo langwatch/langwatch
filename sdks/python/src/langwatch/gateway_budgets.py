@@ -86,27 +86,29 @@ class GatewayBudgetsFacade:
         raise_for_status(response, operation="list budgets")
         return response.json()
 
-    def list(self, *, external_id: Optional[str] = None) -> Dict[str, Any]:
+    def list(
+        self, *, external_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Every budget across scopes with live spend, following the cursor
-        to exhaustion, as {data, spend_available}.
+        to exhaustion.
 
         The route pages at a server default of 50, so reading a single page
         would silently truncate any organization holding more budgets than
-        that. The envelope survives rather than collapsing to a bare list
-        because ``spend_available`` is a correctness flag saying spend could
-        not be totalled, and a list has nowhere to carry it; a whole walk's
-        flag is the AND of every page's, so one page that could not total
-        spend makes the whole answer say so."""
+        that.
+
+        A plain list, like every other exhaustive ``list()``: a walk that ran
+        to the end has no cursor left to report, and the page envelope's
+        ``spend_available`` is readable off the rows themselves, since a page
+        that could not total spend serves ``spent_usd`` and ``spent_nano_usd``
+        as null rather than a stale figure. ``any(b["spent_usd"] is None for b
+        in budgets)`` is the same answer. Use ``list_page()`` when you want the
+        flag stated outright."""
         rows: List[Dict[str, Any]] = []
-        spend_available = True
         for page in walk_cursor_pages(
             lambda cursor: self.list_page(cursor=cursor, external_id=external_id)
         ):
             rows.extend(page["data"])
-            spend_available = spend_available and bool(
-                page.get("spend_available", True)
-            )
-        return {"data": rows, "spend_available": spend_available}
+        return rows
 
     def iterate(
         self,
@@ -118,8 +120,8 @@ class GatewayBudgetsFacade:
         """Every budget, one row at a time, fetching a page only when the
         previous one runs out.
 
-        Rows alone cannot carry ``spend_available``: use list() when a null
-        ``spent_usd`` has to be told apart from zero spend."""
+        A null ``spent_usd`` means spend could not be totalled rather than
+        that nothing was spent."""
         for page in walk_cursor_pages(
             lambda cursor: self.list_page(
                 scope_types=scope_types,

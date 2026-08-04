@@ -31,6 +31,8 @@ from typing import List, Optional, Sequence, Union
 
 __all__ = [
     "WEBHOOK_SIGNATURE_HEADER",
+    "WEBHOOK_DELIVERY_ID_HEADER",
+    "WEBHOOK_EVENT_ID_HEADER",
     "WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS",
     "WebhookSignatureVerificationError",
     "WebhookSignatureHeaderError",
@@ -41,6 +43,19 @@ __all__ = [
 
 WEBHOOK_SIGNATURE_HEADER = "X-LangWatch-Signature"
 """The header a delivery carries its signature in."""
+
+WEBHOOK_DELIVERY_ID_HEADER = "X-LangWatch-Delivery-Id"
+"""Identifies one delivery ATTEMPT on the webhook platform's endpoints.
+
+The natural idempotency key for a receiver: retries of the same batch repeat
+it, so a receiver that has already processed this id can acknowledge and stop
+rather than applying the batch twice."""
+
+WEBHOOK_EVENT_ID_HEADER = "X-LangWatch-Event-Id"
+"""The same role on automation deliveries (graph alerts and friends), which
+group their attempts by the logical fire rather than by the batch.
+
+Two names because they are two senders: read whichever the delivery carries."""
 
 WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS = 300
 """How far a delivery's timestamp may sit from the receiver's clock, in

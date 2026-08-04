@@ -2,7 +2,12 @@ import fs from "fs";
 import path from "path";
 
 import {
+  WEBHOOK_DELIVERY_ID_HEADER,
+  WEBHOOK_EVENT_ID_HEADER,
+} from "~/server/webhooks/sendWebhook";
+import {
   signWebhookPayload,
+  WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
 } from "~/server/webhooks/signature";
 
@@ -69,6 +74,17 @@ export interface SignatureVectorFile {
   $schema_note: string;
   generated_by: string;
   generated_from: string;
+  /**
+   * The header NAMES a receiver reads off a delivery, emitted here for the
+   * same reason the signatures are: an SDK that hand-copies a header name has
+   * no way to notice when the sender renames it, and a receiver keying
+   * idempotency off the wrong header silently processes every retry twice.
+   */
+  headers: {
+    signature: string;
+    delivery_id: string;
+    event_id: string;
+  };
   algorithm: {
     header: string;
     signed_payload: string;
@@ -355,6 +371,11 @@ export function buildVectors(): SignatureVectorFile {
       "Generated file. Do not hand-edit: run `pnpm run task generateWebhookSignatureVectors` from platform/app.",
     generated_by: "platform/app/src/tasks/generateWebhookSignatureVectors.ts",
     generated_from: "platform/app/src/server/webhooks/signature.ts",
+    headers: {
+      signature: WEBHOOK_SIGNATURE_HEADER,
+      delivery_id: WEBHOOK_DELIVERY_ID_HEADER,
+      event_id: WEBHOOK_EVENT_ID_HEADER,
+    },
     algorithm: {
       header: "X-LangWatch-Signature: t=<unix seconds>,v1=<hex>[,v1=<hex>]",
       signed_payload:

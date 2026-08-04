@@ -13,7 +13,18 @@ from .prompts.types import FetchPolicy
 # Imported eagerly rather than lazily like the facades: a webhook receiver
 # verifies a delivery inside a request handler and never calls setup(), and
 # the module costs nothing to import, being standard library only.
+from .api_errors import (
+    LangWatchApiAuthenticationError,
+    LangWatchApiConflictError,
+    LangWatchApiError,
+    LangWatchApiNotFoundError,
+    LangWatchApiPlanLimitError,
+    LangWatchApiServerError,
+    LangWatchApiValidationError,
+)
 from .webhook_signature import (
+    WEBHOOK_DELIVERY_ID_HEADER,
+    WEBHOOK_EVENT_ID_HEADER,
     WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS,
     WEBHOOK_SIGNATURE_HEADER,
     WebhookSignatureExpiredError,
@@ -261,4 +272,13 @@ __all__ = [
     "WebhookSignatureMismatchError",
     "WEBHOOK_SIGNATURE_HEADER",
     "WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS",
+    "WEBHOOK_DELIVERY_ID_HEADER",
+    "WEBHOOK_EVENT_ID_HEADER",
+    "LangWatchApiError",
+    "LangWatchApiValidationError",
+    "LangWatchApiAuthenticationError",
+    "LangWatchApiPlanLimitError",
+    "LangWatchApiNotFoundError",
+    "LangWatchApiConflictError",
+    "LangWatchApiServerError",
 ]

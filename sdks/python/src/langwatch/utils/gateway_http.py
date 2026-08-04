@@ -12,7 +12,11 @@ from typing import Any, Callable, Dict, Iterator, Optional, Set
 
 import httpx
 
-from langwatch.utils.exceptions import extract_api_error_detail
+from langwatch.api_errors import error_for_status
+from langwatch.utils.exceptions import (
+    extract_api_error_code,
+    extract_api_error_detail,
+)
 
 IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
 """The request header the control plane deduplicates creates on."""
@@ -28,33 +32,40 @@ cursor chain that never ends."""
 
 
 def raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
-    """Map a failed gateway or webhook response onto a builtin exception.
+    """Raise a typed :class:`LangWatchApiError` for a refused request.
 
-    404 and 400/422 are caller mistakes and raise ValueError; everything
-    else, including the 402 that says the plan does not carry the surface,
-    raises RuntimeError.
+    The class follows the status and the ``code`` follows the platform, so a
+    caller can catch broadly and branch narrowly. Matching on the message is
+    never necessary: the message is prose and will change, the code will not.
     """
     if response.is_success:
         return
     status = response.status_code
+    code = None
     detail = ""
     try:
         body = response.json()
+        code = extract_api_error_code(body)
         detail = extract_api_error_detail(body)
     except Exception:
-        detail = response.text or ""
+        body = response.text or ""
+        detail = body
     label = f"{operation}: " if operation else ""
-    if status == 404:
-        raise ValueError(f"{label}not found" + (f": {detail}" if detail else ""))
-    if status == 400 or status == 422:
-        raise ValueError(f"{label}bad request" + (f": {detail}" if detail else ""))
-    if status == 401 or status == 403:
-        raise RuntimeError(f"{label}authentication failed" + (f": {detail}" if detail else ""))
-    if status == 402:
-        raise RuntimeError(f"{label}plan does not include this surface" + (f": {detail}" if detail else ""))
-    if status >= 500:
-        raise RuntimeError(f"{label}server error ({status})" + (f": {detail}" if detail else ""))
-    raise RuntimeError(f"{label}unexpected status {status}" + (f": {detail}" if detail else ""))
+    summary = {
+        400: "bad request",
+        422: "bad request",
+        401: "authentication failed",
+        403: "authentication failed",
+        402: "plan does not include this surface",
+        404: "not found",
+        409: "conflicts with existing state",
+    }.get(status) or (
+        f"server error ({status})" if status >= 500 else f"unexpected status {status}"
+    )
+    message = f"{label}{summary}" + (f": {detail}" if detail else "")
+    raise error_for_status(
+        message, status=status, operation=operation, code=code, body=body
+    )
 
 
 def idempotency_headers(idempotency_key: Optional[str]) -> Dict[str, str]:

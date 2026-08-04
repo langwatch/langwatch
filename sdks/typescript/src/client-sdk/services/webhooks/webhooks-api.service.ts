@@ -40,7 +40,6 @@ export interface WebhookEndpointWithSecret extends WebhookEndpointSummary {
 export interface CreateWebhookEndpointInput {
   url: string;
   enabled_events: string[];
-  description?: string;
   /** Envelopes per delivery. The receiver always gets an array. */
   max_batch_size?: number;
   /** How long a partial batch waits for company before it is sent. */
@@ -53,7 +52,6 @@ export interface CreateWebhookEndpointInput {
 export interface UpdateWebhookEndpointInput {
   url?: string;
   enabled_events?: string[];
-  description?: string | null;
   status?: "active" | "disabled";
   max_batch_size?: number;
   max_batch_delay_ms?: number;

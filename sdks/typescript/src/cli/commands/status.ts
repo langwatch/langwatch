@@ -289,10 +289,14 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
    * must say so instead of ticking green.
    */
   async function fetchBudgetsAtRisk(): Promise<BudgetAtRisk[]> {
-    const { data: budgets, spend_available } = await new GatewayBudgetsApiService({
+    const budgets = await new GatewayBudgetsApiService({
       endpoint,
       apiKey,
     }).list();
+    // A budget whose spend could not be totalled serves a null `spent_usd`
+    // rather than a stale figure, so one null anywhere makes the whole
+    // listing's spend unreal.
+    const spend_available = budgets.every((b) => b.spent_usd !== null);
 
     const unreadable: string[] = [];
     const scored = budgets

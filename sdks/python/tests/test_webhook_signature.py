@@ -21,7 +21,10 @@ from typing import Any, Dict, List
 import pytest
 
 from langwatch import (
+    WEBHOOK_DELIVERY_ID_HEADER,
+    WEBHOOK_EVENT_ID_HEADER,
     WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS,
+    WEBHOOK_SIGNATURE_HEADER,
     WebhookSignatureExpiredError,
     WebhookSignatureVerificationError,
     verify_webhook_signature,
@@ -58,6 +61,14 @@ def test_vector_file_actually_carries_cases():
     # A path typo would otherwise make the parametrized suite read as green.
     assert len(VERIFICATION) > 15
     assert len(VECTORS["signing"]) > 3
+
+
+def test_header_names_match_the_sender():
+    """Hand-copied header names are how a receiver ends up keying idempotency
+    off a header that no longer exists, processing every retry twice."""
+    assert WEBHOOK_SIGNATURE_HEADER == VECTORS["headers"]["signature"]
+    assert WEBHOOK_DELIVERY_ID_HEADER == VECTORS["headers"]["delivery_id"]
+    assert WEBHOOK_EVENT_ID_HEADER == VECTORS["headers"]["event_id"]
 
 
 def test_default_tolerance_matches_the_sender():
