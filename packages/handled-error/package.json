@@ -20,11 +20,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "peerDependencies": {
-    "@opentelemetry/api": "^1.9.0"
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.1"
   },
   "devDependencies": {
-    "@opentelemetry/api": "^1.9.1",
     "typescript": "^5.9.2",
     "vitest": "^4.1.9"
   }
