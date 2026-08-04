@@ -51,13 +51,19 @@ import { GOVERNED_VIEW_CATALOG } from "./catalog/governedViews";
 import {
   columnExpression,
   type GovernedViewDefinition,
+  governedPostgresViews,
   governedViewSourceColumns,
+  isPostgresResident,
 } from "./catalog/types";
 import {
+  DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
+  KEY_MAP_COLUMNS,
   type GovernedSqlNames,
   type GovernedTable,
   governedGrantStatement,
   governedRowPolicyStatement,
+  postgresApprovedViewStatement,
+  postgresEngineTableStatement,
 } from "./provisioning";
 
 /**
@@ -164,20 +170,137 @@ function quotedColumn(value: string): string {
  */
 const SOURCE_ALIAS = "src";
 
+/**
+ * Alias the tenant-predicate subquery gives the key map.
+ *
+ * Needed because the key map and every mapped source name their tenant column
+ * identically; see {@link postgresTenantPredicate}.
+ */
+const KEY_MAP_ALIAS = "km";
+
 /** One of the source table's columns, qualified so no projection alias wins. */
 function sourceColumn(name: string): string {
   return `${SOURCE_ALIAS}.${quotedColumn(name)}`;
 }
 
-/** The physical table a view reads. */
+/**
+ * The column a dataset's source table names the owning project with.
+ *
+ * One name across both residences, and that is a design decision rather than a
+ * coincidence: the fact tables call it this, and the approved PostgreSQL views
+ * rename the application's `projectId` to match. Asserting it in one place is
+ * what would catch either side drifting.
+ */
+const TENANT_COLUMN = "TenantId";
+
+/**
+ * The columns the restricted identity is granted on a dataset's source table.
+ *
+ * The two residences answer this differently because their source tables are
+ * different objects. A fact table is the application's, carrying far more than
+ * the catalog exposes, so the grant is the catalog's *source* columns. A
+ * PostgreSQL-engine table was created from the catalog and carries exactly the
+ * exposed columns already, so the grant is those — the narrowing that matters
+ * happened one layer down, in the approved view.
+ */
+export function governedGrantedSourceColumns(
+  view: GovernedViewDefinition,
+): readonly string[] {
+  if (isPostgresResident(view)) {
+    return view.columns.map((column) => column.name);
+  }
+  return governedViewSourceColumns(view);
+}
+
+/**
+ * The physical table a view reads.
+ *
+ * A PostgreSQL-resident dataset's source is the engine table in the *governed*
+ * database rather than a fact table in the application's, so the database is
+ * chosen from the entry rather than always taken from the argument.
+ */
 function sourceRelation({
+  names,
   sourceDatabase,
   view,
 }: {
+  names: GovernedSqlNames;
   sourceDatabase: string;
   view: GovernedViewDefinition;
 }): string {
-  return `${assertIdentifier(sourceDatabase, "sourceDatabase")}.${assertIdentifier(view.sourceTable, "sourceTable")}`;
+  const database = isPostgresResident(view) ? names.database : sourceDatabase;
+  return `${assertIdentifier(database, "sourceDatabase")}.${assertIdentifier(view.sourceTable, "sourceTable")}`;
+}
+
+/**
+ * The predicate a PostgreSQL-resident view carries so the read that reaches the
+ * primary is the caller's tenant and not the whole table.
+ *
+ * ## Why this exists at all
+ *
+ * The row policy on the engine table is what makes the mapping *safe*, and it
+ * is not what makes it *cheap*: measured against 25.10.2.65, a row policy's
+ * predicate is never pushed down to PostgreSQL — not in the key-map form, and
+ * not even as a constant `TenantId = 'x'`. Every shape emits
+ * `COPY (SELECT … FROM "approved_view") TO STDOUT` and filters inside
+ * ClickHouse afterwards, so without this predicate any authenticated caller
+ * could make the primary OLTP database read every tenant's rows. Measured
+ * against the objects these generators provision, over a 10,016-row annotation
+ * table where the asking tenant owns two, from PostgreSQL's own
+ * `pg_stat_user_tables` accounting:
+ *
+ * | read                            | rows PostgreSQL read | statement it received |
+ * | ------------------------------- | -------------------- | --------------------- |
+ * | engine table, policy only       | 10,016               | no `WHERE` |
+ * | governed view, valid key        | 2                    | `WHERE "TenantId" = 'tenant-a'` |
+ * | governed view, unknown key      | 0                    | `WHERE "TenantId" = NULL` |
+ *
+ * The unknown-key row is the one worth noticing: the shape that returns nothing
+ * used to cost a full scan of the primary, and now costs nothing.
+ *
+ * ## Why a scalar subquery, and why over the key map
+ *
+ * A scalar subquery is the one shape that pushes down: ClickHouse folds it to a
+ * constant before it plans the PostgreSQL read, then sends that constant. The
+ * `IN (subquery)` form the row policy uses stays a set and is applied after the
+ * read, which is exactly why the policy does not contain load.
+ *
+ * It reads the key map with no `WHERE` of its own because the key map polices
+ * *itself* — the restricted identity sees exactly the row its own hash matches
+ * (`governedKeyMapRowPolicyStatement`). So the subquery yields this caller's
+ * tenant and nothing else, and an unknown or empty key yields no row at all,
+ * which ClickHouse folds to `NULL` and PostgreSQL matches nothing against. The
+ * dependency is load-bearing: without the key map's self-policy this subquery
+ * would see every row and fail as a multi-row scalar, which is a broken query
+ * rather than a leak — but it is why `governedPolicyCoverageQuery` auditing
+ * that policy matters here too.
+ *
+ * ## Why this is a performance control and not a security boundary
+ *
+ * The row policy still applies underneath it, so a wrong predicate costs a
+ * wrong read and never a wrong answer. Proven directly rather than argued: with
+ * the predicate hard-coded to a foreign tenant, PostgreSQL really does read and
+ * ship that tenant's rows, and the caller receives zero — see
+ * `__tests__/postgresEngineIsolation.integration.test.ts`.
+ */
+function postgresTenantPredicate({
+  names,
+}: {
+  names: GovernedSqlNames;
+}): string {
+  // The key map is aliased and the inner reference qualified because the two
+  // relations name their tenant column the same way: written bare, the
+  // identifier could bind to the outer scope and turn this into a correlated
+  // subquery, which ClickHouse does not support and would fail rather than
+  // silently widen — but failing at provisioning time is not a risk worth
+  // taking for two characters.
+  const keyMap = `${assertIdentifier(names.database, "database")}.${assertIdentifier(names.keyMapTable, "keyMapTable")}`;
+  return (
+    `WHERE ${sourceColumn(TENANT_COLUMN)} = (\n` +
+    `    SELECT ${KEY_MAP_ALIAS}.${quotedColumn(KEY_MAP_COLUMNS.tenantId)}\n` +
+    `    FROM ${keyMap} AS ${KEY_MAP_ALIAS}\n` +
+    `  )`
+  );
 }
 
 /**
@@ -194,11 +317,22 @@ function dedupPredicate(
   view: GovernedViewDefinition,
   relation: string,
 ): string {
+  const { versionColumn } = view.dedup;
+  if (!versionColumn) {
+    // Refuse at provisioning time rather than emit a view that collapses
+    // nothing: this strategy exists to keep one version per key, and a source
+    // with no version column has no survivor to pick. Reachable only if a
+    // dataset is given this strategy without declaring the column — the
+    // PostgreSQL-resident ones take the tenant-predicate branch instead.
+    throw new Error(
+      `governed view ${view.name} deduplicates on a version column it does not declare`,
+    );
+  }
   const outerKeys = view.dedup.keyColumns.map(sourceColumn);
   const innerKeys = view.dedup.keyColumns.map(quotedColumn);
-  const version = quotedColumn(view.dedup.versionColumn);
+  const version = quotedColumn(versionColumn);
   return (
-    `WHERE (${[...outerKeys, sourceColumn(view.dedup.versionColumn)].join(", ")}) IN (\n` +
+    `WHERE (${[...outerKeys, sourceColumn(versionColumn)].join(", ")}) IN (\n` +
     `    SELECT ${innerKeys.join(", ")}, max(${version})\n` +
     `    FROM ${relation}\n` +
     `    GROUP BY ${innerKeys.join(", ")}\n` +
@@ -225,17 +359,31 @@ export function governedViewStatement({
   view: GovernedViewDefinition;
   dedup: GovernedDedupStrategy;
 }): string {
-  const relation = sourceRelation({ sourceDatabase, view });
+  const relation = sourceRelation({ names, sourceDatabase, view });
+  // A PostgreSQL-resident source keeps one row per key, so there is no version
+  // to collapse and neither dedup shape applies; what it needs instead is the
+  // predicate that keeps the read off the primary from being a whole-table one.
+  const postgres = isPostgresResident(view);
   const projection = view.columns
-    .map(
-      (column) =>
-        `  ${columnExpression(column, sourceColumn)} AS ${quotedColumn(column.name)}`,
-    )
+    .map((column) => {
+      // The engine table already carries the catalog's names and types — the
+      // approved PostgreSQL view did the renaming, one layer further down — so
+      // here the projection is an identity. Reading `sourceColumns` instead
+      // would name the *application's* columns, which the engine table does not
+      // have.
+      const expression = postgres
+        ? sourceColumn(column.name)
+        : columnExpression(column, sourceColumn);
+      return `  ${expression} AS ${quotedColumn(column.name)}`;
+    })
     .join(",\n");
   const aliased = `${relation} AS ${SOURCE_ALIAS}`;
-  const from = dedup === "final" ? `${aliased} FINAL` : aliased;
-  const where =
-    dedup === "in-tuple" ? `\n${dedupPredicate(view, relation)}` : "";
+  const from = dedup === "final" && !postgres ? `${aliased} FINAL` : aliased;
+  const where = postgres
+    ? `\n${postgresTenantPredicate({ names })}`
+    : dedup === "in-tuple"
+      ? `\n${dedupPredicate(view, relation)}`
+      : "";
   return (
     `CREATE OR REPLACE VIEW ` +
     `${assertIdentifier(names.database, "database")}.${assertIdentifier(view.name, "view")}\n` +
@@ -262,9 +410,9 @@ export function governedSourceColumnGrantStatement({
   sourceDatabase: string;
   view: GovernedViewDefinition;
 }): string {
-  const columns = governedViewSourceColumns(view).map(quotedColumn).join(", ");
+  const columns = governedGrantedSourceColumns(view).map(quotedColumn).join(", ");
   return (
-    `GRANT SELECT(${columns}) ON ${sourceRelation({ sourceDatabase, view })} ` +
+    `GRANT SELECT(${columns}) ON ${sourceRelation({ names, sourceDatabase, view })} ` +
     `TO ${assertIdentifier(names.restrictedUser, "restrictedUser")}`
   );
 }
@@ -277,9 +425,11 @@ export function governedSourceColumnGrantStatement({
  * creating the same policy twice is not idempotent in a way worth relying on.
  */
 export function governedSourceTables({
+  names,
   sourceDatabase,
   views = GOVERNED_VIEW_CATALOG,
 }: {
+  names: GovernedSqlNames;
   sourceDatabase: string;
   views?: readonly GovernedViewDefinition[];
 }): GovernedTable[] {
@@ -287,14 +437,157 @@ export function governedSourceTables({
   for (const view of views) {
     byTable.set(view.sourceTable, {
       table: view.sourceTable,
-      // Every fact table names the owning project the same way. The catalog
-      // would have to grow a per-view tenant column if that ever stopped being
-      // true; today asserting it here is what would catch the change.
-      tenantColumn: "TenantId",
-      database: sourceDatabase,
+      // Every source names the owning project the same way — the fact tables
+      // because that is their column, the PostgreSQL-engine tables because the
+      // approved view renamed the application's `projectId` to match. The
+      // catalog would have to grow a per-view tenant column if that ever
+      // stopped being true; today asserting it here is what would catch it.
+      tenantColumn: TENANT_COLUMN,
+      // A PostgreSQL-engine table lives in the governed database, beside the
+      // view over it, rather than in the application's.
+      database: isPostgresResident(view) ? names.database : sourceDatabase,
     });
   }
   return [...byTable.values()];
+}
+
+/**
+ * The approved PostgreSQL views the catalog's PostgreSQL-resident datasets
+ * read, as statements to run *against PostgreSQL*.
+ *
+ * The only statements this module produces that are not ClickHouse SQL, and
+ * they are here rather than in a Prisma migration on purpose. These views are
+ * not part of the application's schema: their column lists are the governed
+ * catalog's, they change when the catalog changes, and nothing the application
+ * itself does reads them. Binding them to the migration history would tie a
+ * catalog edit to a schema migration and leave the two able to disagree.
+ *
+ * Run before {@link postgresReaderRoleStatements}, whose grants name them.
+ */
+export function governedPostgresApprovedViewStatements({
+  schema,
+  views = GOVERNED_VIEW_CATALOG,
+}: {
+  /** PostgreSQL schema the application's tables live in. */
+  schema: string;
+  views?: readonly GovernedViewDefinition[];
+}): string[] {
+  return governedPostgresViews(views).map((view) =>
+    postgresApprovedViewStatement({
+      schema,
+      view: view.postgres.approvedView,
+      baseRelation: view.postgres.baseRelation,
+      columns: view.columns.map((column) => ({
+        exposed: column.name,
+        // The tenant column is the one rename every mapping performs; the rest
+        // are the base relation's own names, taken from the catalog.
+        source:
+          column.name === TENANT_COLUMN
+            ? view.postgres.tenantSourceColumn
+            : singleSourceColumn(view, column.name),
+      })),
+    }),
+  );
+}
+
+/** The approved views the reader role must be granted, in catalog order. */
+export function governedApprovedPostgresViewNames(
+  views: readonly GovernedViewDefinition[] = GOVERNED_VIEW_CATALOG,
+): string[] {
+  return governedPostgresViews(views).map((view) => view.postgres.approvedView);
+}
+
+/**
+ * Connections to allow the reader role, derived from the catalog rather than
+ * chosen.
+ *
+ * The two numbers have to agree or the tighter one fails first, and they are
+ * set in different files — which is exactly how a `CONNECTION LIMIT` sized for
+ * one mapped table survived until a catalog of six exhausted it with idle
+ * pooled connections and then refused the role's next login. Deriving it is
+ * what stops that recurring when a dataset is added.
+ *
+ * Headroom on top of the pools' total demand, for the connection a
+ * re-provisioning run or an operator's `psql` needs while the pools are full.
+ */
+export function governedPostgresReaderConnectionLimit({
+  views = GOVERNED_VIEW_CATALOG,
+  connectionPoolSize = DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
+  concurrentCatalogs = 1,
+  headroom = 3,
+}: {
+  views?: readonly GovernedViewDefinition[];
+  connectionPoolSize?: number;
+  /**
+   * ClickHouse deployments mapping this PostgreSQL role at once.
+   *
+   * One in production — a governed database per deployment. More wherever
+   * several governed databases share a server and a role, which is the shape
+   * the test harness has and the reason this is a parameter: the cap is a
+   * property of how many pools point at the role, not of how many the catalog
+   * describes.
+   */
+  concurrentCatalogs?: number;
+  headroom?: number;
+} = {}): number {
+  return (
+    governedPostgresViews(views).length * connectionPoolSize * concurrentCatalogs +
+    headroom
+  );
+}
+
+/**
+ * The PostgreSQL-engine tables mapping each approved view into the governed
+ * database, as ClickHouse statements.
+ *
+ * Run before {@link governedViewSetupStatements}, which builds the governed
+ * views over them, and after the named collection exists.
+ */
+export function governedPostgresEngineTableStatements({
+  names,
+  collection,
+  views = GOVERNED_VIEW_CATALOG,
+}: {
+  names: GovernedSqlNames;
+  /** Named collection holding the PostgreSQL credentials. */
+  collection: string;
+  views?: readonly GovernedViewDefinition[];
+}): string[] {
+  return governedPostgresViews(views).map((view) =>
+    postgresEngineTableStatement({
+      names,
+      table: view.sourceTable,
+      columns: view.columns.map((column) => ({
+        name: column.name,
+        type: column.type,
+      })),
+      collection,
+      postgresRelation: view.postgres.approvedView,
+    }),
+  );
+}
+
+/**
+ * The one column a mapped dataset's exposed column reads.
+ *
+ * A PostgreSQL-resident column is a projection of exactly one base column: the
+ * approved view is a rename, never a computation, so that what the reader role
+ * is granted and what the catalog exposes are the same list rather than two
+ * lists that have to agree.
+ */
+function singleSourceColumn(
+  view: GovernedViewDefinition,
+  columnName: string,
+): string {
+  const column = view.columns.find((candidate) => candidate.name === columnName);
+  const [only] = column?.sourceColumns ?? [];
+  if (!only || column?.sourceColumns.length !== 1) {
+    throw new Error(
+      `governed-sql views: PostgreSQL-resident column "${view.name}.${columnName}" must read ` +
+        `exactly one source column; the approved view renames, it does not compute`,
+    );
+  }
+  return only;
 }
 
 /**
@@ -305,8 +598,10 @@ export function governedSourceTables({
  * entity, so the ordering between the two is load-bearing in exactly the way
  * the setup list documents.
  *
- * The source tables themselves are not created here — they come from the
- * ClickHouse migrations. This function only exposes them.
+ * The source tables themselves are not created here — the ClickHouse ones come
+ * from migrations, and the PostgreSQL-engine ones from
+ * {@link governedPostgresEngineTableStatements}, which must have run first.
+ * This function only exposes them.
  */
 export function governedViewSetupStatements({
   names,
@@ -323,12 +618,20 @@ export function governedViewSetupStatements({
     ...views.map((view) =>
       governedViewStatement({ names, sourceDatabase, view, dedup }),
     ),
+    // A fact table carries far more than the catalog exposes, so its grant is
+    // column-scoped. A PostgreSQL-engine table was *created from* the catalog
+    // and its whole column list is the exposed surface, so it takes the
+    // whole-object grant the key map and the views take — which is also what
+    // keeps `SHOW CREATE TABLE` answerable, the surface the credential-leak
+    // assertion inspects.
     ...views.map((view) =>
-      governedSourceColumnGrantStatement({ names, sourceDatabase, view }),
+      isPostgresResident(view)
+        ? governedGrantStatement({ names, table: view.sourceTable })
+        : governedSourceColumnGrantStatement({ names, sourceDatabase, view }),
     ),
     ...views.map((view) => governedGrantStatement({ names, table: view.name })),
-    ...governedSourceTables({ sourceDatabase, views }).map((governedTable) =>
-      governedRowPolicyStatement({ names, governedTable }),
+    ...governedSourceTables({ names, sourceDatabase, views }).map(
+      (governedTable) => governedRowPolicyStatement({ names, governedTable }),
     ),
   ];
 }

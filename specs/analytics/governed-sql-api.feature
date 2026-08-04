@@ -332,6 +332,43 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then no shape leaks a tenant-b row from the mapped table
 
   @integration
+  Scenario: Every PostgreSQL-resident dataset in the catalog is tenant-scoped
+    Given the PostgreSQL-resident half of the governed catalog is mapped into ClickHouse
+    And the restricted identity carries tenant-a's valid key-hash context
+    When it reads each mapped dataset in turn
+    Then every dataset returns the caller's tenant rows and no other tenant's
+
+  @integration
+  Scenario: The governed view sends a tenant predicate PostgreSQL can use
+    Given a PG-resident table is mapped into ClickHouse through the server-side named collection
+    And the restricted identity carries tenant-a's valid key-hash context
+    When it reads the governed view over the mapped table
+    Then the statement PostgreSQL received carries a predicate naming the caller's tenant
+    And it names no other tenant and carries no API key
+
+  @integration
+  Scenario: The governed view bounds what PostgreSQL reads to the caller's tenant
+    Given a PG-resident table is mapped into ClickHouse through the server-side named collection
+    When the same question is asked of the mapped table and of the governed view over it
+    Then PostgreSQL reads fewer rows for the governed view than for the mapped table
+    And a key-hash context matching no key-map entry makes PostgreSQL read nothing
+
+  @integration
+  Scenario: A wrong tenant predicate costs a wrong read and never a wrong answer
+    Given a governed view whose tenant predicate names a tenant other than the caller's
+    And the restricted identity carries tenant-a's valid key-hash context
+    When it reads that view
+    Then the statement PostgreSQL received carries the foreign tenant's predicate
+    And PostgreSQL read those foreign rows
+    And the caller receives zero rows, because the row policy decides the answer
+
+  @integration
+  Scenario: The dedicated PG role is bounded by a statement timeout and a connection cap
+    Given the dedicated PostgreSQL role the named collection connects as
+    When its statement timeout and connection limit are read back from the server
+    Then both are set, and a query that outruns the timeout is cancelled
+
+  @integration
   Scenario: The restricted identity cannot write through a PG-engine mapped table
     Given a PG-resident table is mapped into ClickHouse through the server-side named collection
     And the restricted identity carries tenant-a's valid key-hash context
@@ -426,10 +463,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When the client aggregates cost by project, model, and prompt version
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: resolving a project or a prompt version to its NAME means joining the
-  # PostgreSQL-resident dimension tables, which no governed dataset carries yet — they land
-  # with the PG-mapping PR of #6480. The identifier form of the same question is bound above.
-  @integration @unimplemented
+  @integration
   Scenario: Cost attributed to dimension names rather than identifiers
     Given seeded generations and dimension data for two tenants
     When the client aggregates cost by project, model, and prompt-version names through dimension joins
@@ -447,10 +481,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When the client asks for score distributions and pass rates by model and prompt version
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: fixture-backed acceptance cases land with the query endpoint PR of #6480;
-  # the annotations mechanism is whichever is in effect for that table (PG-engine join, or
-  # the projection fallback if it has been triggered).
-  @integration @unimplemented
+  @integration
   Scenario: Annotation-versus-evaluation agreement
     Given seeded annotations and evaluations for two tenants
     When the client asks how often human thumbs agree with evaluator pass results
@@ -480,10 +511,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When the client compares verdict and duration metrics across those batches
     Then typed results answer the question from the authenticated tenant's data only
 
-  # @unimplemented: the experiment and experiment-run entities are PostgreSQL-resident and no
-  # governed dataset carries them; they land with the PG-mapping PR of #6480. The simulation
-  # batch — the run grouping the governed catalog does expose — is bound above.
-  @integration @unimplemented
+  @integration
   Scenario: Experiment run comparisons
     Given seeded experiment runs for two tenants
     When the client compares metrics across experiment runs
@@ -616,9 +644,10 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   # Reaching PostgreSQL-resident data: decision end-state (later PR of this issue — #6480)
   # ---------------------------------------------------------------------------
 
-  # @unimplemented: the per-table measurement record and any projection fallback
-  # land with the PG-mapping PR of #6480; measurements are recorded in that PR
-  # before any projection is built.
+  # @unimplemented: no mapped table has failed the measured bar, so there is no
+  # projection fallback to exercise. The measurement itself is bound — see
+  # "The governed view bounds what PostgreSQL reads to the caller's tenant" —
+  # and this stays unbound until a table's numbers actually trigger a fallback.
   @integration @unimplemented
   Scenario: A PG-resident table that fails the measured bar is served via projection instead
     Given per-table p95 latency and load-on-primary measurements recorded for each PG-resident table
@@ -626,7 +655,11 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then that table is served from a ClickHouse projection
     And the fallback is documented per table
 
-  # @unimplemented: the annotations end-state lands with the PG-mapping PR of #6480.
+  # @unimplemented: annotations ship PG-direct, and the governed schema now has
+  # exactly one annotation source. The second half is not done: the
+  # `trace_summaries.AnnotationIds` column still backs the product's own
+  # has-annotation filter, so it is neither removed nor widened. Removing it is
+  # a product change beyond the governed schema and lands with its own slice.
   @integration @unimplemented
   Scenario: Annotation data has exactly one source at ship time
     Given the shipped annotations mechanism
@@ -729,22 +762,26 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 # error rate vs previous period → Error rate versus the previous equivalent period
 # rolling windows → Rolling windows over trace metrics
 # cost by project/model/prompt-version → Cost by project, model, and prompt version via dimension joins by name
-#   (project and prompt version answered by their identifiers, which is what the
-#    governed catalog carries; the by-NAME dimension join needs the
-#    PostgreSQL-resident project and prompt-config tables and lands with the
-#    PG-mapping PR)
+#   → Scenario: Cost by project, model, and prompt version (by identifier)
+#   → Scenario: Cost attributed to dimension names rather than identifiers
+#     (the by-NAME half joins the PostgreSQL-resident project and prompt
+#      dimensions; the model is already a name on the fact table, so nothing is
+#      mapped to resolve it)
 # token/cost outliers → Token and cost outliers
 # evaluation distributions/pass rates → Evaluation score distributions and pass rates by model and prompt version
 # annotation-vs-evaluation agreement → Annotation-versus-evaluation agreement
-#   (still @unimplemented, and the only question class that is: no governed
-#    dataset carries annotations, so it is blocked on the PG-mapping PR rather
-#    than on a fixture)
+#   (two cases: the agreement rate itself, and the isolation half stated
+#    separately because the aggregate would have the same shape if the other
+#    tenant's annotations had joined in)
 # A then B → Traces containing operation A then operation B
 # time between events → Time between two events in a trace
 # first failure/retry → First failure and first retry per trace
 # experiment comparisons → Experiment run comparisons
-#   (compared across the simulation batches the catalog exposes; comparing by an
-#    experiment's NAME needs the PG-resident experiment dimension)
+#   → Scenario: Run comparisons across simulation batches
+#     (the run grouping ClickHouse holds)
+#   → Scenario: Experiment run comparisons
+#     (the experiment-shaped comparison, over the PG-resident experiment and
+#      experiment-run entities)
 # fanout warning → Fanout warning on a trace-to-span join
 #
 # Tenant isolation and authorization:
@@ -760,15 +797,33 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #   → Scenario: A PG-resident table is readable through ClickHouse only within the caller's tenant rows
 #   → Scenario: Garbage key context yields zero rows from a PG-engine mapped table
 #   → Scenario: Row policy on a PG-engine mapped table holds under CTE, UNION, JOIN, and subquery shapes
-#   ("for every table still served via the named collection at ship time" is enforced when
-#    the shipped table list exists — the mapped-table proof harness is parameterized by table)
+#   → Scenario: Every PostgreSQL-resident dataset in the catalog is tenant-scoped
+#     ("for every table still served via the named collection at ship time":
+#      the case iterates the shipped catalog rather than naming one table, so a
+#      dataset added without a policy fails it with no test edit)
 #
 # Reaching PostgreSQL-resident data:
 # AC "per-table latency + load measurements recorded before projections" → recorded in the
-#    PG-mapping PR (process AC); gated behaviorally by:
+#    PG-mapping PR (process AC); the load half is measured on every run by:
+#   → Scenario: The row-policy predicate is not pushed down to PostgreSQL
+#     (the finding: a policy predicate never reaches the primary, in any form)
+#   → Scenario: The governed view sends a tenant predicate PostgreSQL can use
+#   → Scenario: The governed view bounds what PostgreSQL reads to the caller's tenant
+#     (rows off the primary, from PostgreSQL's own accounting — the number the
+#      projection-fallback decision turns on)
+#   → Scenario: A wrong tenant predicate costs a wrong read and never a wrong answer
+#     (what makes the predicate a performance control rather than a second
+#      security boundary: get it wrong and the row policy still decides)
+#   → Scenario: The dedicated PG role is bounded by a statement timeout and a connection cap
+# AC "failing tables fall back to projection, documented"
 #   → Scenario: A PG-resident table that fails the measured bar is served via projection instead
-# AC "failing tables fall back to projection, documented" → same scenario
+#     (still @unimplemented: no mapped table has failed the bar, so no fallback
+#      exists to exercise — see the note above the scenario)
 # AC "AnnotationIds partial projection resolved one way" → Scenario: Annotation data has exactly one source at ship time
+#   (still @unimplemented: the governed schema now has a single annotation
+#    source, but `trace_summaries.AnnotationIds` still backs the product's own
+#    has-annotation filter, so the projection itself is neither removed nor
+#    widened — see the note above the scenario)
 #
 # Read-only and exfiltration:
 # AC "single read query; writes/DDL/roles/settings/temp/system rejected by the identity"

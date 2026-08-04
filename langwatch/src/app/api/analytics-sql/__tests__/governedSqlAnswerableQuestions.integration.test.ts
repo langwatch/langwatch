@@ -48,7 +48,11 @@ import {
 } from "~/server/analytics/governed-sql";
 import {
   type GovernedClickHouseHarness,
+  type GovernedPostgresHarness,
+  mapPostgresIntoClickHouse,
+  postgresTenantSeedStatements,
   startGovernedClickHouse,
+  startGovernedPostgres,
 } from "~/server/analytics/governed-sql/__tests__/governedClickHouseHarness";
 import {
   SHIPPED_GOVERNED_DEDUP,
@@ -128,6 +132,38 @@ const LATENCY_TIERS = [
   { durationMs: 200, count: 17 },
   { durationMs: 5000, count: 2 },
 ] as const;
+
+/**
+ * The prompt id every seeded trace records, and therefore the id the asking
+ * tenant's PostgreSQL-resident prompt must carry for a by-name join to match.
+ */
+const SEEDED_PROMPT_ID = "prompt-checkout";
+
+/**
+ * The evaluated traces the seeded annotations are left on.
+ *
+ * Built from `evaluationSeeds()`' own ids through the same `${tenantId}-`
+ * prefix `seedTenant` applies, rather than restated: written out by hand the
+ * unprefixed form joins to nothing, and an annotation-to-evaluation join that
+ * matches no rows reports an agreement rate over zero comparisons rather than
+ * failing.
+ */
+const annotatedTraceIds = (tenantId: string): string[] =>
+  evaluationSeeds().map((seed) => `${tenantId}-${seed.traceId}`);
+/**
+ * The human verdict on each of those traces, in order.
+ *
+ * Chosen against `evaluationSeeds()` so agreement is a distinctive fraction
+ * rather than all-or-nothing: the evaluator passed the first two of the primary
+ * model's three and the last of the second's, and the human agrees on four of
+ * the six.
+ */
+const ANNOTATION_THUMBS = [true, false, false, false, true, true] as const;
+/** Agreements over {@link annotatedTraceIds}: evaluator pass matches thumbs. */
+const EXPECTED_AGREEMENTS = 4;
+
+/** Scores of the two seeded experiment runs. The comparison's whole point. */
+const EXPERIMENT_RUN_SCORES = [0.5, 0.9] as const;
 
 const PRIMARY_MODEL = "gpt-5-mini";
 const SECOND_MODEL = "claude-haiku";
@@ -632,6 +668,7 @@ async function seedTenant({
 
 describe("given the governed analytics SQL API and a seed with known answers", () => {
   let harness: GovernedClickHouseHarness;
+  let postgres: GovernedPostgresHarness;
   let organization: Organization;
   let team: Team;
   /** The authenticated tenant. Every asserted number is this project's. */
@@ -694,12 +731,17 @@ describe("given the governed analytics SQL API and a seed with known answers", (
   };
 
   beforeAll(async () => {
+    // Three of the questions below are answered from PostgreSQL-resident
+    // datasets, and every governed view over that half reads an engine table
+    // that has to exist before the view can be created.
+    postgres = await startGovernedPostgres();
     harness = await startGovernedClickHouse({
       suite: "questions",
       facts: "migrated",
     });
     database = harness.names.database;
     facts = harness.factDatabase;
+    await mapPostgresIntoClickHouse({ harness, postgres });
     await harness.applyAsAdmin(
       governedViewSetupStatements({
         names: harness.names,
@@ -768,6 +810,28 @@ describe("given the governed analytics SQL API and a seed with known answers", (
       factor: OTHER_TENANT_FACTOR,
     });
 
+    // The PostgreSQL-resident half, under the same two real project ids. Both
+    // tenants everywhere, so the isolation half of each answer below has
+    // something it could have got wrong.
+    for (const [project, promptId] of [
+      // The asking tenant's prompt carries the id its traces record, so the
+      // by-name join has both sides. A prompt id is a primary key, so the other
+      // tenant gets its own — which is what a second project would really have.
+      [asking, SEEDED_PROMPT_ID],
+      [other, `${other.id}-prompt`],
+    ] as const) {
+      for (const statement of postgresTenantSeedStatements({
+        tenantId: project.id,
+        traceIds: annotatedTraceIds(project.id),
+        thumbsUp: ANNOTATION_THUMBS,
+        scores: EXPERIMENT_RUN_SCORES,
+        promptId,
+      })) {
+        const result = await postgres.asAdmin(statement);
+        expect(result.exitCode, result.stderr).toBe(0);
+      }
+    }
+
     setGovernedSqlService(shippedService());
   }, 600_000);
 
@@ -779,6 +843,7 @@ describe("given the governed analytics SQL API and a seed with known answers", (
       await prisma.organization.delete({ where: { id: organization.id } });
     }
     await harness?.stop();
+    await postgres?.stop();
   });
 
   describe("when the second tenant's rows are counted", () => {
@@ -929,6 +994,57 @@ describe("given the governed analytics SQL API and a seed with known answers", (
         new Set(body.rows.map((row: any) => row.project)),
       ).toEqual(new Set([asking.id]));
       expect(codes(body)).toEqual([]);
+    });
+
+    /**
+     * The same question asked for names rather than identifiers, which is what
+     * needs the PostgreSQL-resident dimensions: the project's display name and
+     * the prompt's, joined through the mapping. The model is already a name on
+     * the fact table, so nothing is mapped to resolve it.
+     */
+    /** @scenario "Cost attributed to dimension names rather than identifiers" */
+    it("answers the same spend attributed to project, model, and prompt names", async () => {
+      const body = await ask(
+        `SELECT p.ProjectName AS project,
+                arrayJoin(t.Models) AS model,
+                pr.PromptName AS prompt,
+                pv.VersionNumber AS prompt_version,
+                round(sum(t.TotalCost), 6) AS spend
+         FROM ${database}.traces AS t
+         INNER JOIN ${database}.projects AS p ON p.TenantId = t.TenantId
+         INNER JOIN ${database}.prompts AS pr ON pr.PromptId = t.LastUsedPromptId
+         INNER JOIN ${database}.prompt_versions AS pv
+                 ON pv.PromptId = pr.PromptId
+                AND pv.VersionNumber = t.LastUsedPromptVersionNumber
+         WHERE ${within("t.OccurredAt", DAY.cost)}
+         GROUP BY project, model, prompt, prompt_version
+         ORDER BY model, prompt_version`,
+      );
+
+      // The identical numbers the identifier-shaped question above returns,
+      // now carrying the names a report would print.
+      expect(
+        body.rows.map((row: any) => [
+          row.project,
+          row.model,
+          row.prompt,
+          Number(row.prompt_version),
+          row.spend,
+        ]),
+      ).toEqual([
+        [`Project ${asking.id}`, SECOND_MODEL, `Prompt ${asking.id}`, 1, 0.1],
+        [`Project ${asking.id}`, PRIMARY_MODEL, `Prompt ${asking.id}`, 1, 0.2],
+        [`Project ${asking.id}`, PRIMARY_MODEL, `Prompt ${asking.id}`, 2, 0.4],
+      ]);
+      // Diagnostics are deliberately not pinned here. A star-shaped dimension
+      // join earns several advisory notes that are all true — each dimension is
+      // read without a range on its own time column, and each dimension row is
+      // repeated once per fact row — and none of them bears on whether the
+      // answer above is right. See the report accompanying this change for the
+      // noise this raises on healthy dimension joins.
+      expect(codes(body).every((code: string) => code !== "RESULT_TRUNCATED")).toBe(
+        true,
+      );
     });
   });
 
@@ -1101,9 +1217,8 @@ describe("given the governed analytics SQL API and a seed with known answers", (
 
   describe("when metrics are compared across runs", () => {
     /**
-     * Simulation batches are the run grouping the governed catalog exposes.
-     * Comparing them by an experiment's *name* needs the PostgreSQL-resident
-     * experiment dimension, which no governed dataset carries yet.
+     * Simulation batches are the run grouping ClickHouse holds. The
+     * experiment-shaped comparison, by an experiment's name, is the case below.
      */
     /** @scenario "Run comparisons across simulation batches" */
     it("answers the seeded success rate and mean duration for each batch", async () => {
@@ -1130,6 +1245,97 @@ describe("given the governed analytics SQL API and a seed with known answers", (
         ["batch-2", 2, 1, 600],
       ]);
       expect(codes(body)).toEqual([]);
+    });
+
+    /**
+     * The experiment-shaped comparison: runs joined to the experiment that
+     * names them, both PostgreSQL-resident and reached through the mapping.
+     */
+    /** @scenario "Experiment run comparisons" */
+    it("compares each run's score against the others under the experiment's name", async () => {
+      const body = await ask(
+        `SELECT e.ExperimentName AS experiment,
+                r.ExperimentRunId AS run,
+                r.Score AS score,
+                r.Passed AS passed,
+                round(r.Score - avg(r.Score) OVER (PARTITION BY e.ExperimentId), 4) AS score_vs_experiment_mean
+         FROM ${database}.experiment_runs AS r
+         INNER JOIN ${database}.experiments AS e ON e.ExperimentId = r.ExperimentId
+         ORDER BY run`,
+      );
+
+      const [lower, higher] = EXPERIMENT_RUN_SCORES;
+      const mean = (lower! + higher!) / 2;
+      expect(
+        body.rows.map((row: any) => [
+          row.experiment,
+          Number(row.score),
+          Boolean(row.passed),
+          Number(row.score_vs_experiment_mean),
+        ]),
+      ).toEqual([
+        [`Experiment ${asking.id}`, lower, false, Number((lower! - mean).toFixed(4))],
+        [`Experiment ${asking.id}`, higher, true, Number((higher! - mean).toFixed(4))],
+      ]);
+      // The other tenant's experiment and runs exist and contributed nothing.
+      expect(
+        body.rows.every((row: any) => !String(row.run).startsWith(other.id)),
+      ).toBe(true);
+
+      // The grain the PostgreSQL-resident entries declare reaches the
+      // diagnostics engine: an experiment row really is repeated once per run,
+      // and the fanout rule says so without anything being written for it.
+      const fanout = diagnostic(body, "POSSIBLE_FANOUT");
+      expect(fanout, JSON.stringify(codes(body))).toBeDefined();
+      expect(fanout.meta.dataset).toBe(`${database}.experiments`);
+      expect(fanout.meta.multipliedBy).toBe(`${database}.experiment_runs`);
+      expect(fanout.meta.unmatchedGrainColumns).toEqual(["ExperimentRunId"]);
+    });
+  });
+
+  describe("when human annotations are compared against evaluator verdicts", () => {
+    /** @scenario "Annotation-versus-evaluation agreement" */
+    it("answers how often the human thumbs matched the evaluator's pass", async () => {
+      const body = await ask(
+        `SELECT count() AS compared,
+                countIf(a.IsThumbsUp = e.Passed) AS agreed,
+                round(countIf(a.IsThumbsUp = e.Passed) / count(), 4) AS agreement_rate
+         FROM ${database}.annotations AS a
+         INNER JOIN ${database}.evaluations AS e ON e.TraceId = a.TraceId
+         WHERE ${within("e.ScheduledAt", DAY.evaluations)}`,
+      );
+
+      const [row] = body.rows;
+      expect(
+        Number(row.compared),
+        "no annotation joined an evaluation — the agreement rate below would be over nothing",
+      ).toBe(annotatedTraceIds(asking.id).length);
+      expect(Number(row.agreed)).toBe(EXPECTED_AGREEMENTS);
+      expect(Number(row.agreement_rate)).toBe(
+        Number(
+          (EXPECTED_AGREEMENTS / annotatedTraceIds(asking.id).length).toFixed(4),
+        ),
+      );
+    });
+
+    /**
+     * The isolation half, stated separately because the aggregate above would
+     * have the same shape if the other tenant's annotations had joined in.
+     */
+    /** @scenario "Annotation-versus-evaluation agreement" */
+    it("counts only the asking tenant's annotations", async () => {
+      const foreign = await postgres.asAdmin(
+        `SELECT count(*) FROM public."Annotation" WHERE "projectId" = '${other.id}'`,
+      );
+      expect(
+        Number(foreign.stdout.trim()),
+        "the other tenant has no annotations — the isolation claim below is vacuous",
+      ).toBeGreaterThan(0);
+
+      const body = await ask(
+        `SELECT DISTINCT TenantId FROM ${database}.annotations`,
+      );
+      expect(body.rows.map((row: any) => row.TenantId)).toEqual([asking.id]);
     });
   });
 

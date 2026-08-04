@@ -73,20 +73,31 @@ import {
 import { expect } from "vitest";
 import { TEST_CLICKHOUSE_IMAGE } from "~/test-utils/clickhouseTestEndpoints";
 import { migrateUp } from "../../../clickhouse/goose";
+import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
+import {
+  type GovernedPostgresMapping,
+  type GovernedViewDefinition,
+  governedPostgresViews,
+} from "../catalog/types";
 import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML,
+  DEFAULT_POSTGRES_READER_LIMITS,
   clickHouseAccessManagementConfigXml,
   type GovernedSqlNames,
   type GovernedTable,
   governedClickHouseSetupStatements,
-  governedGrantStatement,
   governedRowPolicyStatement,
-  postgresEngineTableStatement,
   postgresNamedCollectionStatements,
   postgresReaderRoleStatements,
 } from "../provisioning";
+import {
+  governedApprovedPostgresViewNames,
+  governedPostgresApprovedViewStatements,
+  governedPostgresEngineTableStatements,
+  governedPostgresReaderConnectionLimit,
+} from "../views";
 
 /** PostgreSQL image the PG-engine half of the proof runs against. */
 export const TEST_POSTGRES_IMAGE = "postgres:17";
@@ -127,6 +138,8 @@ export const CLICKHOUSE_ERROR_CODE = {
 export const POSTGRES_SQLSTATE = {
   READ_ONLY_TRANSACTION: "25006",
   INSUFFICIENT_PRIVILEGE: "42501",
+  /** What `statement_timeout` raises when it fires. */
+  QUERY_CANCELED: "57014",
 } as const;
 
 /** A tenant, its API key, and the hash that is all ClickHouse ever sees. */
@@ -1167,15 +1180,46 @@ const PG_READER_PASSWORD = "governed-pg-reader-test-password";
 const PG_ADMIN_USER = "test";
 const PG_ADMIN_PASSWORD = "test";
 const PG_DATABASE = "lwtest";
-/** The base table. Never granted to the reader; only the view over it is. */
-const PG_BASE_TABLE = "annotations";
-/** The approved view. Excludes `secret_note`, which no governed query can reach. */
-const PG_APPROVED_VIEW = "approved_annotations";
+const PG_SCHEMA = "public";
 const PG_NAMED_COLLECTION = "pg_analytics";
-/** The mapped table's name inside the governed ClickHouse database. */
-export const PG_MAPPED_TABLE = "annotations";
-/** The mapped table's tenant column. Lower-case: it is PostgreSQL's. */
-export const PG_MAPPED_TENANT_COLUMN = "tenant_id";
+
+/**
+ * The dataset the PostgreSQL isolation proof is written against.
+ *
+ * Annotations rather than a dimension, because it is the one mapped dataset
+ * that joins against a multi-million-row fact table and therefore the one the
+ * issue names as most likely to need the projection fallback. Read from the
+ * shipped catalog rather than restated, so a rename cannot leave the proof
+ * pointing at something that no longer exists.
+ */
+export const PG_MAPPED_VIEW = "annotations";
+/** The PostgreSQL-engine table behind it, inside the governed database. */
+export const PG_MAPPED_TABLE = mappedCatalogEntry(PG_MAPPED_VIEW).sourceTable;
+/** The tenant column, which every approved view exposes under the same name. */
+export const PG_MAPPED_TENANT_COLUMN = "TenantId";
+/**
+ * A column of the base relation the approved view leaves out.
+ *
+ * `Annotation.comment` is a free-text carrier the catalog deliberately does not
+ * expose. Taken from the real model rather than a synthetic `secret_note`, so
+ * the unreachability proof is about the shipped exclusion policy.
+ */
+export const PG_EXCLUDED_COLUMN = "comment";
+
+/** One PostgreSQL-resident catalog entry, by the name a caller writes. */
+function mappedCatalogEntry(
+  name: string,
+): GovernedViewDefinition & { postgres: GovernedPostgresMapping } {
+  const entry = governedPostgresViews(GOVERNED_VIEW_CATALOG).find(
+    (view) => view.name === name,
+  );
+  if (!entry) {
+    throw new Error(
+      `governed-sql harness: "${name}" is not a PostgreSQL-resident dataset in the shipped catalog`,
+    );
+  }
+  return entry;
+}
 
 export interface PostgresExecResult {
   stdout: string;
@@ -1185,7 +1229,9 @@ export interface PostgresExecResult {
 
 export interface GovernedPostgresHarness {
   container: StartedPostgreSqlContainer;
+  /** The base relation behind {@link PG_MAPPED_VIEW}. Never granted to the reader. */
   baseTable: string;
+  /** The approved view over it. The reader's only relation for that dataset. */
   approvedView: string;
   readerRole: string;
   /** Runs SQL as the PostgreSQL superuser, over the local socket. */
@@ -1194,7 +1240,220 @@ export interface GovernedPostgresHarness {
   asReader(sql: string): Promise<PostgresExecResult>;
   /** Everything the server has logged so far. */
   readLog(): Promise<string>;
+  /** Clears the server's table statistics, so the next {@link rowsRead} is a delta. */
+  resetStatistics(): Promise<void>;
+  /**
+   * Makes every read done so far visible to {@link rowsRead}, by ending the
+   * backends that did it.
+   *
+   * PostgreSQL flushes a backend's pending statistics at transaction end, rate
+   * limited to once a second, and otherwise only when the backend has been idle
+   * for ten. ClickHouse *pools* its connections, so the backend that did the
+   * read is idle rather than gone and its numbers are not there yet — measured,
+   * a two-second wait reports the previous measurement's rows, which is worse
+   * than reporting none, and even twelve seconds raced.
+   *
+   * Terminating the backend runs its shutdown hook, which flushes. That turns
+   * the measurement from a wait long enough to probably work into one that is
+   * true when it returns. ClickHouse reconnects on the next read.
+   */
+  flushStatistics(): Promise<void>;
+  /**
+   * Rows PostgreSQL actually read off a base relation since the last reset.
+   *
+   * The load number the projection-fallback decision turns on, taken from the
+   * server's own accounting rather than inferred from the statement text.
+   * Sequential and index reads summed, because which one the planner picks is
+   * its business and both are rows off the primary.
+   */
+  rowsRead(baseRelation: string): Promise<number>;
   stop(): Promise<void>;
+}
+
+
+
+/**
+ * The application tables the mapped catalog reads, in the shape Prisma creates
+ * them.
+ *
+ * Hand-written rather than migrated because the suite needs the *relations the
+ * catalog names*, not the application's whole schema — every mapped base
+ * relation, with every column the catalog reads plus at least one it
+ * deliberately excludes. Quoted and mixed-case exactly as Prisma emits them, so
+ * that a mapping which forgot to quote fails here rather than in production.
+ */
+const PG_BASE_TABLE_DDL: Record<string, string> = {
+  Annotation:
+    '("id" text primary key, "projectId" text not null, "traceId" text not null, ' +
+    '"isThumbsUp" boolean, "comment" text, "email" text, "createdAt" timestamptz not null, ' +
+    '"updatedAt" timestamptz not null)',
+  Project:
+    '("id" text primary key, "name" text not null, "slug" text not null, ' +
+    '"apiKey" text not null, "createdAt" timestamptz not null)',
+  // `type` is a PostgreSQL *enum* here, not text, because that is what Prisma
+  // creates for `ExperimentType` — and whether ClickHouse's PostgreSQL engine
+  // can read an enum column at all is exactly the kind of thing a `text` stand-in
+  // would hide until production.
+  Experiment:
+    '("id" text primary key, "projectId" text not null, "name" text, "slug" text not null, ' +
+    '"type" "ExperimentType" not null, "workbenchState" jsonb, "createdAt" timestamptz not null, ' +
+    '"archivedAt" timestamptz)',
+  BatchEvaluation:
+    '("id" text primary key, "projectId" text not null, "experimentId" text not null, ' +
+    '"evaluation" text not null, "status" text not null, "score" double precision not null, ' +
+    '"label" text, "passed" boolean not null, "cost" double precision not null, ' +
+    '"datasetId" text not null, "datasetSlug" text not null, "details" text not null, ' +
+    '"data" jsonb not null, "createdAt" timestamptz not null)',
+  LlmPromptConfig:
+    '("id" text primary key, "projectId" text not null, "name" text not null, ' +
+    '"handle" text, "createdAt" timestamptz not null, "deletedAt" timestamptz)',
+  LlmPromptConfigVersion:
+    '("id" text primary key, "projectId" text not null, "configId" text not null, ' +
+    '"version" integer not null, "commitMessage" text, "configData" jsonb not null, ' +
+    '"createdAt" timestamptz not null)',
+};
+
+/**
+ * Governed databases that map this one PostgreSQL role at the same time.
+ *
+ * Container reuse is what makes this more than one: every suite that maps the
+ * PostgreSQL half gets its own governed database inside the *same* reused
+ * ClickHouse server, and each of those databases holds its own connection pool
+ * per mapped table against the same role. Sized for one catalog, the role's cap
+ * is exhausted by idle pooled connections from the suites that ran before, and
+ * the failure is a refused login rather than a queue.
+ *
+ * Production maps one catalog from one deployment, which is the function's
+ * default.
+ */
+const GOVERNED_TEST_CONCURRENT_CATALOGS = 6;
+
+/** The role's cap in this harness, so a test can assert the value that was set. */
+export const GOVERNED_TEST_POSTGRES_CONNECTION_LIMIT =
+  governedPostgresReaderConnectionLimit({
+    concurrentCatalogs: GOVERNED_TEST_CONCURRENT_CATALOGS,
+  });
+
+/** Filler tenants in the annotation load fixture. See below for why. */
+const PG_LOAD_FIXTURE_TENANTS = 40;
+/** Annotations each filler tenant holds. */
+const PG_LOAD_FIXTURE_ROWS_PER_TENANT = 250;
+
+/**
+ * A realistically-shaped annotation table, so the load measurement measures
+ * something.
+ *
+ * Not padding. With only the two fixture tenants the table is four rows split
+ * evenly, and at 50% selectivity a sequential scan is genuinely the cheaper
+ * plan — so PostgreSQL reads every row whether or not the tenant predicate
+ * reached it, and "the predicate bounds what PostgreSQL reads" is unmeasurable
+ * rather than untrue. A real deployment has many tenants and one of them asking,
+ * which is the shape that makes the index worth using; these filler tenants
+ * restore it.
+ *
+ * The index is the one Prisma already declares (`@@index([projectId])`), and
+ * `ANALYZE` is what gives the planner the statistics to choose it.
+ */
+const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
+  `INSERT INTO ${PG_SCHEMA}."Annotation" ` +
+    `SELECT 'filler-note-' || g, 'filler-tenant-' || (g % ${PG_LOAD_FIXTURE_TENANTS}), ` +
+    `'filler-trace-' || g, true, 'excluded-comment-of-filler', 'excluded-email-of-filler', ` +
+    `now(), now() ` +
+    `FROM generate_series(1, ${PG_LOAD_FIXTURE_TENANTS * PG_LOAD_FIXTURE_ROWS_PER_TENANT}) g`,
+  `CREATE INDEX IF NOT EXISTS "Annotation_projectId_idx" ON ${PG_SCHEMA}."Annotation" ("projectId")`,
+  `ANALYZE ${PG_SCHEMA}."Annotation"`,
+];
+
+/**
+ * One tenant's rows in every mapped base relation.
+ *
+ * Parameterized rather than fixed to the two harness fixtures because the
+ * endpoint suites authenticate as *real project ids* and need PostgreSQL rows
+ * under those, exactly as they already seed their own ClickHouse rows. Every
+ * relation for every tenant, so that an isolation assertion always has
+ * something it could have leaked.
+ *
+ * Excluded columns carry a recognisable `excluded-` marker, which is what lets
+ * a test assert the *data* never reached the governed schema rather than only
+ * that the column name was refused.
+ *
+ * `traceIds` ties annotations to whatever traces the caller seeded on the
+ * ClickHouse side, so an annotation-to-trace join has matching rows; the
+ * default is the shape the isolation suite seeds.
+ */
+export function postgresTenantSeedStatements({
+  tenantId,
+  traceIds = [`${tenantId}-trace-1`, `${tenantId}-trace-2`],
+  thumbsUp = [true, false],
+  scores = [0.5, 0.9],
+  promptId = `${tenantId}-prompt`,
+  stamp = "2026-01-01T00:00:00Z",
+}: {
+  tenantId: string;
+  /** Traces the seeded annotations point at. One annotation per entry. */
+  traceIds?: readonly string[];
+  /** The verdict of the annotation at each index, cycled if shorter. */
+  thumbsUp?: readonly (boolean | null)[];
+  /** The score of the experiment run at each index. */
+  scores?: readonly number[];
+  /**
+   * Identifier of the seeded prompt.
+   *
+   * Parameterized because a caller joining `traces.LastUsedPromptId` to
+   * `prompts.PromptId` needs the two sides to agree, and a prompt id is a
+   * primary key in PostgreSQL — so two tenants cannot both be given the same
+   * one, and which tenant gets which is the caller's to decide.
+   */
+  promptId?: string;
+  stamp?: string;
+}): string[] {
+  const at = `'${stamp}'`;
+  const rows = (table: string, values: string[]): string =>
+    `INSERT INTO ${PG_SCHEMA}."${table}" VALUES ${values.join(", ")}`;
+  const verdict = (index: number): string => {
+    const value = thumbsUp[index % thumbsUp.length];
+    return value === null || value === undefined ? "NULL" : String(value);
+  };
+  return [
+    rows("Project", [
+      `('${tenantId}', 'Project ${tenantId}', '${tenantId}-slug', ` +
+        `'excluded-apikey-of-${tenantId}', ${at})`,
+    ]),
+    rows(
+      "Annotation",
+      traceIds.map(
+        (traceId, index) =>
+          `('${tenantId}-note-${index + 1}', '${tenantId}', '${traceId}', ${verdict(index)}, ` +
+          `'excluded-comment-of-${tenantId}', 'excluded-email-of-${tenantId}', ${at}, ${at})`,
+      ),
+    ),
+    rows("Experiment", [
+      `('${tenantId}-experiment', '${tenantId}', 'Experiment ${tenantId}', ` +
+        `'${tenantId}-exp-slug', 'BATCH_EVALUATION_V2', '{"excluded":"workbench"}'::jsonb, ${at}, NULL)`,
+    ]),
+    rows(
+      "BatchEvaluation",
+      scores.map(
+        (score, index) =>
+          `('${tenantId}-run-${index + 1}', '${tenantId}', '${tenantId}-experiment', ` +
+          `'exact_match', 'finished', ${score}, 'label-${index + 1}', ` +
+          `${score >= 0.8}, ${index + 1}.25, 'dataset-${index + 1}', 'dataset-slug-${index + 1}', ` +
+          `'excluded-details-of-${tenantId}', '{"excluded":"rows"}'::jsonb, ${at})`,
+      ),
+    ),
+    rows("LlmPromptConfig", [
+      `('${promptId}', '${tenantId}', 'Prompt ${tenantId}', ` +
+        `'${tenantId}/handle', ${at}, NULL)`,
+    ]),
+    rows(
+      "LlmPromptConfigVersion",
+      [1, 2].map(
+        (version) =>
+          `('${promptId}-v${version}', '${tenantId}', '${promptId}', ` +
+          `${version}, 'excluded-commit-of-${tenantId}', '{"excluded":"prompt text"}'::jsonb, ${at})`,
+      ),
+    ),
+  ];
 }
 
 /**
@@ -1270,45 +1529,75 @@ export async function startGovernedPostgres(): Promise<GovernedPostgresHarness> 
     }
   };
 
+  const mapped = mappedCatalogEntry(PG_MAPPED_VIEW);
+  const baseRelations = Object.keys(PG_BASE_TABLE_DDL);
   await applyAsAdmin([
     `ALTER DATABASE ${PG_DATABASE} SET log_statement='all'`,
-    `DROP VIEW IF EXISTS ${PG_APPROVED_VIEW}`,
-    `DROP TABLE IF EXISTS ${PG_BASE_TABLE}`,
-    `CREATE TABLE ${PG_BASE_TABLE} (id text primary key, tenant_id text not null, ` +
-      `trace_id text not null, thumbs text not null, secret_note text)`,
-    `CREATE VIEW ${PG_APPROVED_VIEW} AS SELECT id, tenant_id, trace_id, thumbs FROM ${PG_BASE_TABLE}`,
-    `INSERT INTO ${PG_BASE_TABLE} VALUES ` +
-      [TENANT_A, TENANT_B]
-        .flatMap((tenant) =>
-          [1, 2].map(
-            (index) =>
-              `('${tenant.tenantId}-note-${index}', '${tenant.tenantId}', ` +
-              `'${tenant.tenantId}-trace-${index}', 'up', 'secret-of-${tenant.tenantId}')`,
-          ),
-        )
-        .join(", "),
+    ...governedApprovedPostgresViewNames().map(
+      (view) => `DROP VIEW IF EXISTS ${PG_SCHEMA}."${view}"`,
+    ),
+    ...baseRelations.map(
+      (table) => `DROP TABLE IF EXISTS ${PG_SCHEMA}."${table}"`,
+    ),
+    `DROP TYPE IF EXISTS ${PG_SCHEMA}."ExperimentType"`,
+    `CREATE TYPE ${PG_SCHEMA}."ExperimentType" AS ENUM ` +
+      `('DSPY', 'BATCH_EVALUATION', 'BATCH_EVALUATION_V2')`,
+    ...baseRelations.map(
+      (table) => `CREATE TABLE ${PG_SCHEMA}."${table}" ${PG_BASE_TABLE_DDL[table]!}`,
+    ),
+    ...[TENANT_A, TENANT_B].flatMap((tenant) =>
+      postgresTenantSeedStatements({ tenantId: tenant.tenantId }),
+    ),
+    ...POSTGRES_LOAD_FIXTURE_STATEMENTS,
+    // The shipped generator, not a hand-copy: a catalog column the approved
+    // view forgot would be a failure here rather than a silent exposure.
+    ...governedPostgresApprovedViewStatements({ schema: PG_SCHEMA }),
   ]);
   await applyAsAdmin(
     postgresReaderRoleStatements({
       reader: {
         role: PG_READER_ROLE,
         password: PG_READER_PASSWORD,
-        schema: "public",
-        approvedViews: [PG_APPROVED_VIEW],
-        connectionLimit: 5,
-        statementTimeout: "10s",
+        schema: PG_SCHEMA,
+        approvedViews: governedApprovedPostgresViewNames(),
+        ...DEFAULT_POSTGRES_READER_LIMITS,
+        connectionLimit: GOVERNED_TEST_POSTGRES_CONNECTION_LIMIT,
       },
     }),
   );
 
   return {
     container,
-    baseTable: PG_BASE_TABLE,
-    approvedView: PG_APPROVED_VIEW,
+    baseTable: mapped.postgres.baseRelation,
+    approvedView: mapped.postgres.approvedView,
     readerRole: PG_READER_ROLE,
     asAdmin,
     asReader,
     readLog: () => readContainerLog(container.logs()),
+    async resetStatistics() {
+      await applyAsAdmin(["SELECT pg_stat_reset()"]);
+    },
+    async flushStatistics() {
+      await applyAsAdmin([
+        `SELECT pg_terminate_backend(pid) FROM pg_stat_activity ` +
+          `WHERE usename = '${PG_READER_ROLE}' AND pid <> pg_backend_pid()`,
+      ]);
+      // The terminated backends flush as they exit; this is the handoff, not a
+      // hopeful wait for a periodic flush.
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    },
+    async rowsRead(baseRelation: string) {
+      const result = await asAdmin(
+        `SELECT coalesce(seq_tup_read, 0) + coalesce(idx_tup_fetch, 0) ` +
+          `FROM pg_stat_user_tables WHERE relname = '${baseRelation}'`,
+      );
+      if (result.exitCode !== 0) {
+        throw new Error(
+          `governed-sql harness: reading PostgreSQL statistics failed: ${result.stderr}`,
+        );
+      }
+      return Number(result.stdout.trim() || "0");
+    },
     async stop() {
       // Reusable container, deliberately left running.
     },
@@ -1316,8 +1605,14 @@ export async function startGovernedPostgres(): Promise<GovernedPostgresHarness> 
 }
 
 /**
- * Maps the approved PostgreSQL view into the governed ClickHouse database and
- * policies it exactly like a native table.
+ * Maps every PostgreSQL-resident catalog entry into the governed ClickHouse
+ * database as an engine table, and policies each exactly like a native table.
+ *
+ * Stops at the engine tables. The governed views over them — the objects a
+ * caller actually names, and the ones carrying the tenant pushdown predicate —
+ * are `governedViewSetupStatements`' job, so a suite that wants the whole
+ * chain calls both, in that order. Keeping them apart is what lets the
+ * isolation proof read the *unpredicated* engine table directly and compare.
  */
 export async function mapPostgresIntoClickHouse({
   harness,
@@ -1325,11 +1620,13 @@ export async function mapPostgresIntoClickHouse({
 }: {
   harness: GovernedClickHouseHarness;
   postgres: GovernedPostgresHarness;
-}): Promise<GovernedTable> {
-  const governedTable: GovernedTable = {
-    table: PG_MAPPED_TABLE,
-    tenantColumn: PG_MAPPED_TENANT_COLUMN,
-  };
+}): Promise<GovernedTable[]> {
+  const governedTables = governedPostgresViews(GOVERNED_VIEW_CATALOG).map(
+    (view): GovernedTable => ({
+      table: view.sourceTable,
+      tenantColumn: PG_MAPPED_TENANT_COLUMN,
+    }),
+  );
   await harness.applyAsAdmin([
     ...postgresNamedCollectionStatements({
       connection: {
@@ -1343,23 +1640,23 @@ export async function mapPostgresIntoClickHouse({
         password: PG_READER_PASSWORD,
       },
     }),
-    `DROP TABLE IF EXISTS ${harness.names.database}.${PG_MAPPED_TABLE}`,
-    postgresEngineTableStatement({
+    ...governedTables.map(
+      (governedTable) =>
+        `DROP TABLE IF EXISTS ${harness.names.database}.${governedTable.table}`,
+    ),
+    ...governedPostgresEngineTableStatements({
       names: harness.names,
-      table: PG_MAPPED_TABLE,
-      columns: [
-        { name: "id", type: "String" },
-        { name: "tenant_id", type: "String" },
-        { name: "trace_id", type: "String" },
-        { name: "thumbs", type: "String" },
-      ],
       collection: PG_NAMED_COLLECTION,
-      postgresRelation: PG_APPROVED_VIEW,
     }),
-    governedGrantStatement({ names: harness.names, table: PG_MAPPED_TABLE }),
-    governedRowPolicyStatement({ names: harness.names, governedTable }),
+    // No grant here on purpose. `governedViewSetupStatements` issues the
+    // column-scoped one for every source it reads, and ClickHouse grants are
+    // additive: a whole-table grant issued here would sit underneath it and
+    // quietly widen it back out — the same trap the fixture fact tables carry.
+    ...governedTables.map((governedTable) =>
+      governedRowPolicyStatement({ names: harness.names, governedTable }),
+    ),
   ]);
-  return governedTable;
+  return governedTables;
 }
 
 /**

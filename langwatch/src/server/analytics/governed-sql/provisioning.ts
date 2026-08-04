@@ -622,12 +622,15 @@ export function postgresEngineTableStatement({
   columns,
   collection,
   postgresRelation,
+  connectionPoolSize = DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
 }: {
   names: GovernedSqlNames;
   table: string;
   columns: GovernedColumn[];
   collection: string;
   postgresRelation: string;
+  /** Connections this one mapped table may hold open. See the constant. */
+  connectionPoolSize?: number;
 }): string {
   assertNames(names);
   assertIdentifier(collection, "named collection");
@@ -637,6 +640,11 @@ export function postgresEngineTableStatement({
       `governed-sql provisioning: PostgreSQL-engine table "${table}" needs at least one column`,
     );
   }
+  if (!Number.isInteger(connectionPoolSize) || connectionPoolSize < 1) {
+    throw new Error(
+      `governed-sql provisioning: connectionPoolSize must be a positive integer, got ${connectionPoolSize}`,
+    );
+  }
   const columnList = columns
     .map(
       (column) => `${assertIdentifier(column.name, "column")} ${column.type}`,
@@ -644,9 +652,105 @@ export function postgresEngineTableStatement({
     .join(", ");
   return (
     `CREATE TABLE IF NOT EXISTS ${qualified(names, table)} (${columnList}) ` +
-    `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)})`
+    `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}) ` +
+    `SETTINGS postgresql_connection_pool_size = ${connectionPoolSize}`
   );
 }
+
+/**
+ * Connections one mapped table may hold open against the primary.
+ *
+ * The demand on the primary is *per mapped table*, not per deployment:
+ * ClickHouse builds a connection pool for each PostgreSQL-engine storage, so a
+ * catalog of six datasets asks for six pools. At the server default of 16 that
+ * is up to 96 connections from the analytics path alone — measured, an
+ * unbounded pool grew to 5 connections for a single table under eight
+ * concurrent reads, and six tables exhausted a `CONNECTION LIMIT` of 5 with
+ * *idle pooled* connections, which then refused the role's next login outright.
+ *
+ * Two rather than one: one serialises every governed query touching that
+ * dataset behind a single connection, and the point is to bound the primary's
+ * exposure, not to remove concurrency. Pair it with
+ * `governedPostgresReaderConnectionLimit`, which sizes the role's cap above the
+ * catalog's total demand so that the cap stays a backstop rather than becoming
+ * the thing that fails first.
+ */
+export const DEFAULT_POSTGRES_ENGINE_POOL_SIZE = 2;
+
+/**
+ * The approved PostgreSQL view for one mapped dataset.
+ *
+ * The boundary the whole PostgreSQL half rests on. The reader role is granted
+ * `SELECT` on the views this produces and on nothing else, so a column the
+ * catalog does not expose has no path to a governed query — it is unreachable
+ * rather than merely unselected, which is the property
+ * `postgresReaderRoleStatements` documents and this is the other half of.
+ *
+ * Column names are the catalog's, not the application's: the view is where
+ * `projectId` (and, on `Project`, `id`) becomes `TenantId`, which is what lets
+ * one row-policy shape serve every governed object and lets a caller join
+ * across residences without knowing which side is which.
+ *
+ * `CREATE OR REPLACE` rather than `IF NOT EXISTS`, matching the ClickHouse
+ * views: re-provisioning after the catalog changed must converge, and a view
+ * that silently kept an older column list would keep exposing a column the
+ * catalog no longer claims. PostgreSQL refuses to `REPLACE` a view whose
+ * existing columns are not a prefix of the new ones, so a removed or retyped
+ * column fails loudly at provisioning time instead.
+ */
+export function postgresApprovedViewStatement({
+  schema,
+  view,
+  baseRelation,
+  columns,
+}: {
+  schema: string;
+  /** Name of the view to create. */
+  view: string;
+  /** Table in the application's schema it reads. */
+  baseRelation: string;
+  /** Exposed name and the base relation's column behind it, in catalog order. */
+  columns: readonly { exposed: string; source: string }[];
+}): string {
+  assertIdentifier(schema, "PostgreSQL schema");
+  assertIdentifier(view, "approved view");
+  if (columns.length === 0) {
+    throw new Error(
+      `governed-sql provisioning: approved view "${view}" needs at least one column`,
+    );
+  }
+  const projection = columns
+    .map(
+      (column) =>
+        `  ${postgresQuoted(column.source)} AS ${postgresQuoted(column.exposed)}`,
+    )
+    .join(",\n");
+  return (
+    `CREATE OR REPLACE VIEW ${schema}.${view} AS\nSELECT\n${projection}\n` +
+    `FROM ${schema}.${postgresQuoted(baseRelation)}`
+  );
+}
+
+/**
+ * A PostgreSQL identifier as SQL: always double-quoted.
+ *
+ * Not optional here the way it is on the ClickHouse side. Prisma names its
+ * tables and columns in the case the model declares (`Annotation`,
+ * `projectId`), and PostgreSQL folds an unquoted identifier to lower case, so
+ * an unquoted `Annotation` resolves to a relation that does not exist.
+ */
+function postgresQuoted(value: string): string {
+  if (!POSTGRES_SAFE_IDENTIFIER.test(value)) {
+    throw new Error(
+      `governed-sql provisioning: PostgreSQL identifier must match ` +
+        `${String(POSTGRES_SAFE_IDENTIFIER)}, got "${value}"`,
+    );
+  }
+  return `"${value}"`;
+}
+
+/** Identifier shape safe to quote into PostgreSQL DDL. */
+const POSTGRES_SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /** How the dedicated PostgreSQL role is constrained. */
 export interface PostgresReaderRole {
@@ -661,7 +765,15 @@ export interface PostgresReaderRole {
   statementTimeout: string;
 }
 
-/** Matches the ClickHouse-side ceilings, so neither layer outlives the other. */
+/**
+ * Matches the ClickHouse-side ceilings, so neither layer outlives the other.
+ *
+ * `connectionLimit` is a *floor for a one-table deployment* and is not the
+ * number a real catalog should use: the demand is per mapped table, so the cap
+ * has to be derived from how many there are. Use
+ * `governedPostgresReaderConnectionLimit` from `../views.ts`, which does that —
+ * this constant is what a caller mapping a single table by hand would want.
+ */
 export const DEFAULT_POSTGRES_READER_LIMITS = {
   connectionLimit: 5,
   statementTimeout: "10s",

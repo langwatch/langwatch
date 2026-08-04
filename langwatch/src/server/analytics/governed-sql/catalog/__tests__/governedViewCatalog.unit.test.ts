@@ -38,6 +38,7 @@ import {
   governedViewSourceColumns,
   governedVisibleViews,
   isContentGated,
+  isPostgresResident,
 } from "../types";
 
 /** `Map['key']` accesses in a column expression, with the key captured. */
@@ -97,8 +98,30 @@ describe("given the governed view catalog", () => {
           `${view.name} has no dedup key`,
         ).toBeGreaterThan(0);
 
-        // The dedup columns must be granted even when nothing exposes them, or
-        // the view's own subquery cannot be evaluated.
+        // The key columns are the dataset's grain, which the fanout diagnostic
+        // reads against the columns a caller can actually name — so they have
+        // to be exposed, whichever residence the dataset has.
+        for (const column of view.dedup.keyColumns) {
+          expect(
+            columnNames,
+            `${view.name} declares a grain column it does not expose`,
+          ).toContain(column);
+        }
+
+        if (isPostgresResident(view)) {
+          // Nothing to collapse: PostgreSQL keeps one row per key, and a
+          // version column here would be a claim about an engine that is not
+          // underneath this dataset.
+          expect(
+            view.dedup.versionColumn,
+            `${view.name} is PostgreSQL-resident and has no versions to collapse`,
+          ).toBeUndefined();
+          continue;
+        }
+
+        // A ClickHouse-resident view builds its own dedup subquery, so the same
+        // columns must additionally be granted on the source table — even when
+        // nothing exposes them — or that subquery cannot be evaluated.
         const sourceColumns = governedViewSourceColumns(view);
         for (const column of [
           ...view.dedup.keyColumns,

@@ -33,6 +33,7 @@
  */
 
 import { contentFilteredMapSql } from "./contentGating";
+import { GOVERNED_POSTGRES_CATALOG } from "./postgresViews";
 import type { GovernedViewDefinition } from "./types";
 
 /**
@@ -205,13 +206,16 @@ const TRACES: GovernedViewDefinition = {
       gates: [],
       sourceColumns: ["SubTopicId"],
     },
-    {
-      name: "HasAnnotation",
-      type: "Nullable(Bool)",
-      description: "Whether a reviewer annotated the trace.",
-      gates: [],
-      sourceColumns: ["HasAnnotation"],
-    },
+    // `HasAnnotation` is deliberately not exposed, and it is the one absence
+    // here that is about agreement rather than about sensitivity. It is folded
+    // from `trace_summaries.AnnotationIds`, a *best-effort* dual-write of the
+    // annotation ids, while the `annotations` dataset reads PostgreSQL
+    // directly. Publishing both would let one caller ask "how many traces were
+    // annotated" two ways and get two answers, with nothing in the schema
+    // saying which is authoritative. The authoritative one is `annotations`:
+    //   SELECT count(DISTINCT a.TraceId) FROM analytics.annotations AS a
+    // The column itself stays on the fact table — the product's has-annotation
+    // filter reads it — so this removes the second *source*, not the projection.
     {
       name: "ContainsPrompt",
       type: "Bool",
@@ -755,18 +759,27 @@ const SIMULATIONS: GovernedViewDefinition = {
 };
 
 /**
- * The governed schema, in the order the schema endpoint should publish it.
+ * The governed schema, in the order the schema endpoint should publish it:
+ * the ClickHouse-resident facts, then the PostgreSQL-resident entities and
+ * dimensions that name them.
  *
- * Everything the issue enumerates that is not here — generations, sessions,
- * experiment runs, annotations and the by-name dimension joins — needs either a
- * derived view over these tables or the PostgreSQL mapping, and lands with the
- * slices that build them.
+ * One catalog rather than two, because residence is a property of a dataset and
+ * not a property of the schema. Every consumer — the schema endpoint, the
+ * validator, the diagnostics — reads this list and needs no idea which half an
+ * entry came from; only the provisioning generators in `../views.ts` and
+ * `../provisioning.ts` ask, and they ask the entry
+ * ({@link isPostgresResident}) rather than being told.
+ *
+ * Generations and sessions remain unexposed: both are derivable from `spans`
+ * and `traces` rather than resident anywhere of their own, so each needs a
+ * derived view over tables already here, not a mapping.
  */
 export const GOVERNED_VIEW_CATALOG: readonly GovernedViewDefinition[] = [
   TRACES,
   SPANS,
   EVALUATIONS,
   SIMULATIONS,
+  ...GOVERNED_POSTGRES_CATALOG,
 ];
 
 /** Looks a view up by the name a caller writes. */

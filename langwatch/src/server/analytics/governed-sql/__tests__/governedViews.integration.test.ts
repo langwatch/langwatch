@@ -31,8 +31,8 @@ import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
 import {
   governedAllowedTables,
   governedGatedColumns,
-  governedViewSourceColumns,
   isContentGated,
+  isPostgresResident,
 } from "../catalog/types";
 import {
   definerViewAuditQuery,
@@ -43,6 +43,7 @@ import {
 import { validateGovernedSql } from "../validation/validate";
 import {
   type GovernedDedupStrategy,
+  governedGrantedSourceColumns,
   governedSourceTables,
   governedViewSetupStatements,
   governedViewStatement,
@@ -55,6 +56,8 @@ import {
   expectClickHouseError,
   expectOnlyTenantA,
   type GovernedClickHouseHarness,
+  type GovernedPostgresHarness,
+  mapPostgresIntoClickHouse,
   MOVED_PARTITION_FIXTURE,
   measureQuery,
   movedPartitionTraceId,
@@ -65,6 +68,7 @@ import {
   selectRows,
   selectScalar,
   startGovernedClickHouse,
+  startGovernedPostgres,
 } from "./governedClickHouseHarness";
 
 /** A column no view exposes, so the grant must make it unreachable. */
@@ -102,6 +106,7 @@ const GATED_COLUMN_POSITIONS = (database: string) =>
 
 describe("given the governed views provisioned over the shipped fact tables", () => {
   let harness: GovernedClickHouseHarness;
+  let postgres: GovernedPostgresHarness;
   /** The restricted identity carrying tenant-a's valid key-hash context. */
   let tenantA: ClickHouseClient;
   let database: string;
@@ -118,12 +123,18 @@ describe("given the governed views provisioned over the shipped fact tables", ()
   };
 
   beforeAll(async () => {
+    // The catalog spans both residences, and the governed views over the
+    // PostgreSQL-resident half cannot be created until the engine tables they
+    // read exist. Stood up before the views for that reason, not because this
+    // suite is about PostgreSQL — `postgresEngineIsolation` is.
+    postgres = await startGovernedPostgres();
     harness = await startGovernedClickHouse({
       suite: "views",
       facts: "migrated",
     });
     database = harness.names.database;
     facts = harness.factDatabase;
+    await mapPostgresIntoClickHouse({ harness, postgres });
     await applyShippedViews();
     tenantA = await harness.restrictedClient({
       keyHash: harness.tenantA.keyHash,
@@ -132,6 +143,7 @@ describe("given the governed views provisioned over the shipped fact tables", ()
 
   afterAll(async () => {
     await harness?.stop();
+    await postgres?.stop();
   });
 
   describe("when the catalog is compared against the tables the migrations created", () => {
@@ -144,19 +156,28 @@ describe("given the governed views provisioned over the shipped fact tables", ()
      */
     /** @scenario "The catalog's declared columns match the tables the views read" */
     it("declares only columns the source tables have", async () => {
+      // The source of a PostgreSQL-resident dataset is its engine table in the
+      // governed database, not a migrated fact table, so where to look is
+      // derived from the catalog rather than assumed to be one database.
+      const sources = new Map(
+        governedSourceTables({ names: harness.names, sourceDatabase: facts }).map(
+          (source) => [source.table, source.database ?? database],
+        ),
+      );
+
       for (const view of GOVERNED_VIEW_CATALOG) {
         const actual = await selectRows<{ name: string; type: string }>(
           harness.admin,
           `SELECT name, type FROM system.columns ` +
-            `WHERE database = '${facts}' AND table = '${view.sourceTable}'`,
+            `WHERE database = '${sources.get(view.sourceTable)}' AND table = '${view.sourceTable}'`,
         );
         expect(
           actual.length,
-          `${view.sourceTable} has no columns — the migrations did not run`,
+          `${view.sourceTable} has no columns — the migrations or the PostgreSQL mapping did not run`,
         ).toBeGreaterThan(0);
         const known = new Set(actual.map((column) => column.name));
 
-        const missing = governedViewSourceColumns(view).filter(
+        const missing = governedGrantedSourceColumns(view).filter(
           (column) => !known.has(column),
         );
         expect(
@@ -199,7 +220,12 @@ describe("given the governed views provisioned over the shipped fact tables", ()
      */
     /** @scenario "Every governed view names the column that prunes its partitions" */
     it("names a time column the source table actually partitions by", async () => {
-      for (const view of GOVERNED_VIEW_CATALOG) {
+      // Only the ClickHouse-resident half: a PostgreSQL-engine table has no
+      // partitions, and its time column earns its keep a different way — a
+      // predicate on it is pushed down to the primary as an index-usable one.
+      for (const view of GOVERNED_VIEW_CATALOG.filter(
+        (candidate) => !isPostgresResident(candidate),
+      )) {
         const partitionKey = await selectScalar<string>(
           harness.admin,
           `SELECT partition_key AS value FROM system.tables ` +
@@ -225,7 +251,9 @@ describe("given the governed views provisioned over the shipped fact tables", ()
         await recordSeedControl({
           harness,
           table: view.sourceTable,
-          database: facts,
+          // A PostgreSQL-engine table sits in the governed database, which is
+          // `recordSeedControl`'s default; only the fact tables live elsewhere.
+          ...(isPostgresResident(view) ? {} : { database: facts }),
           tenantColumn: "TenantId",
         });
         const rows = await selectRows<{ TenantId: string }>(
@@ -288,6 +316,7 @@ describe("given the governed views provisioned over the shipped fact tables", ()
     /** @scenario "Detaching the row policy makes the other tenant's rows visible" */
     it("exposes the other tenant through the view once the source table's policy is detached", async () => {
       const [sourceTable] = governedSourceTables({
+        names: harness.names,
         sourceDatabase: facts,
         views: GOVERNED_VIEW_CATALOG.filter(
           (view) => view.name === "simulations",
@@ -663,11 +692,27 @@ describe("given the governed views provisioned over the shipped fact tables", ()
       // The audit must be looking at both halves: the views, and the physical
       // tables under them. A query that only saw one would still read clean.
       const audited = coverage.map((row) => `${row.database}.${row.table}`);
+      const sources = governedSourceTables({
+        names: harness.names,
+        sourceDatabase: facts,
+      });
       for (const view of GOVERNED_VIEW_CATALOG) {
         expect(audited).toContain(`${database}.${view.name}`);
-        expect(audited).toContain(`${facts}.${view.sourceTable}`);
       }
-      for (const row of coverage.filter((entry) => entry.database === facts)) {
+      // The source tables live in two databases — the migrated fact tables in
+      // one, the PostgreSQL-engine tables beside the views in the other — so
+      // where to look for each comes from the catalog rather than being assumed.
+      for (const source of sources) {
+        expect(audited).toContain(
+          `${source.database ?? database}.${source.table}`,
+        );
+      }
+      const physical = new Set(
+        sources.map((source) => `${source.database ?? database}.${source.table}`),
+      );
+      for (const row of coverage.filter((entry) =>
+        physical.has(`${entry.database}.${entry.table}`),
+      )) {
         expect(
           Number(row.has_policy),
           `${row.table} is a physical table with no row policy`,
@@ -695,7 +740,12 @@ describe("given the governed views provisioned over the shipped fact tables", ()
      */
     /** @scenario "Row policies leave the application's own reads untouched" */
     it("leaves an administrative read of the fact tables unscoped", async () => {
-      for (const view of GOVERNED_VIEW_CATALOG) {
+      // Only the ClickHouse-resident sources: a PostgreSQL-engine table's rows
+      // come from a relation the whole application also reads, and this case is
+      // about the policies this module creates not reaching the administrator.
+      for (const view of GOVERNED_VIEW_CATALOG.filter(
+        (candidate) => !isPostgresResident(candidate),
+      )) {
         const tenants = await selectRows<{ TenantId: string }>(
           harness.admin,
           `SELECT DISTINCT TenantId FROM ${facts}.${view.sourceTable} ORDER BY TenantId`,

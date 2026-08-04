@@ -43,11 +43,18 @@ import {
 import { GOVERNED_VIEW_CATALOG } from "~/server/analytics/governed-sql/catalog/governedViews";
 import {
   type GovernedClickHouseHarness,
+  type GovernedPostgresHarness,
+  mapPostgresIntoClickHouse,
+  postgresTenantSeedStatements,
   selectRows,
   selectScalar,
   startGovernedClickHouse,
+  startGovernedPostgres,
 } from "~/server/analytics/governed-sql/__tests__/governedClickHouseHarness";
-import type { GovernedViewDefinition } from "~/server/analytics/governed-sql/catalog/types";
+import {
+  type GovernedViewDefinition,
+  isPostgresResident,
+} from "~/server/analytics/governed-sql/catalog/types";
 import {
   SHIPPED_GOVERNED_DEDUP,
   governedViewSetupStatements,
@@ -264,6 +271,7 @@ async function seedTenant({
 
 describe("given the governed analytics SQL REST endpoints", () => {
   let harness: GovernedClickHouseHarness;
+  let postgres: GovernedPostgresHarness;
   let organization: Organization;
   let team: Team;
   /** Fully permitted: the platform default policy captures every category. */
@@ -353,6 +361,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
   };
 
   /** Administrator-side row count per tenant: the control behind every zero-rows claim. */
+  /** Rows one tenant holds in a named fact table, read as the administrator. */
   const adminRowCount = async (table: string, tenantId: string) => {
     const [row] = await selectRows<{ value: string }>(
       harness.admin,
@@ -361,13 +370,34 @@ describe("given the governed analytics SQL REST endpoints", () => {
     return Number(row!.value);
   };
 
+  /**
+   * The same, for a dataset's source table, with the database taken from the
+   * catalog rather than assumed: a PostgreSQL-engine table sits beside the
+   * governed views, not with the migrated fact tables.
+   */
+  const adminSourceRowCount = async (
+    view: GovernedViewDefinition,
+    tenantId: string,
+  ) => {
+    const [row] = await selectRows<{ value: string }>(
+      harness.admin,
+      `SELECT count() AS value FROM ${isPostgresResident(view) ? database : facts}.${view.sourceTable} ` +
+        `WHERE TenantId = '${tenantId}'`,
+    );
+    return Number(row!.value);
+  };
+
   beforeAll(async () => {
+    // The catalog spans both residences; the governed views over the
+    // PostgreSQL-resident half read engine tables that must exist first.
+    postgres = await startGovernedPostgres();
     harness = await startGovernedClickHouse({
       suite: "restapi",
       facts: "migrated",
     });
     database = harness.names.database;
     facts = harness.factDatabase;
+    await mapPostgresIntoClickHouse({ harness, postgres });
     await harness.applyAsAdmin(
       governedViewSetupStatements({
         names: harness.names,
@@ -451,6 +481,15 @@ describe("given the governed analytics SQL REST endpoints", () => {
         database: facts,
         tenantId: project.id,
       });
+      // The PostgreSQL-resident half, under the same project ids: a governed
+      // view a caller can name but has no rows in would make every "reads its
+      // own tenant's rows" case below vacuous for that dataset.
+      for (const statement of postgresTenantSeedStatements({
+        tenantId: project.id,
+      })) {
+        const result = await postgres.asAdmin(statement);
+        expect(result.exitCode, result.stderr).toBe(0);
+      }
     }
 
     setGovernedSqlService(
@@ -476,6 +515,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       await prisma.organization.delete({ where: { id: organization.id } });
     }
     await harness?.stop();
+    await postgres?.stop();
   });
 
   describe("when the caller is not authenticated", () => {
@@ -549,10 +589,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
     /** @scenario "A governed view returns only the calling tenant's rows" */
     it("reads every governed view, seeing exactly its own tenant's rows", async () => {
       for (const view of GOVERNED_VIEW_CATALOG) {
-        const expected = await adminRowCount(
-          view.sourceTable,
-          openProject.id,
-        );
+        const expected = await adminSourceRowCount(view, openProject.id);
         expect(
           expected,
           `${view.sourceTable} holds no rows for the calling tenant — the read below proves nothing`,

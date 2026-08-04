@@ -97,19 +97,64 @@ export interface GovernedViewColumn {
   readonly expression?: (source: (column: string) => string) => string;
 }
 
-/** How a view collapses a `ReplacingMergeTree`'s versions to one row. */
+/** What identifies one row of a view, and how the source's versions collapse to it. */
 export interface GovernedViewDedup {
   /**
    * Columns identifying one logical row — the source table's `ORDER BY`.
    *
-   * Only these narrow both scopes of the dedup. A range filter on a business
-   * -time column inside the `max()` scope silently returns stale rows: if the
-   * newest version moved out of the range, the subquery reports an older
-   * version's stamp and the outer scope matches that older row.
+   * This is the dataset's grain, which is what the fanout diagnostic reads to
+   * decide whether a join can multiply rows. Only these narrow both scopes of
+   * the dedup. A range filter on a business-time column inside the `max()`
+   * scope silently returns stale rows: if the newest version moved out of the
+   * range, the subquery reports an older version's stamp and the outer scope
+   * matches that older row.
    */
   readonly keyColumns: readonly string[];
-  /** The engine's version column: `argMax`/`max` over this picks the survivor. */
-  readonly versionColumn: string;
+  /**
+   * The engine's version column: `argMax`/`max` over this picks the survivor.
+   *
+   * Absent when the source keeps exactly one row per key and there is nothing
+   * to collapse — every PostgreSQL-resident dataset, where the row *is* the
+   * current state. Omitted rather than defaulted, so that a `ReplacingMergeTree`
+   * whose version column was forgotten is a missing field rather than a view
+   * that silently double-counts.
+   */
+  readonly versionColumn?: string;
+}
+
+/**
+ * How a PostgreSQL-resident dataset reaches the governed ClickHouse schema.
+ *
+ * Its presence on an entry is what makes that dataset PostgreSQL-resident —
+ * there is no separate residence flag to disagree with it. The chain is:
+ *
+ *  1. `baseRelation` — the application's own table, which the analytics reader
+ *     role is never granted anything on.
+ *  2. `approvedView` — a view over it exposing exactly the catalog's columns,
+ *     under the catalog's names. The reader role holds `SELECT` on this and
+ *     nothing else, which is what makes an unexposed column *unreachable*
+ *     rather than merely unselected.
+ *  3. {@link GovernedViewDefinition.sourceTable} — the PostgreSQL-engine table
+ *     in the governed database, mapping the approved view through the
+ *     server-side named collection. The row policy sits here.
+ *  4. The governed view the caller names, over that engine table.
+ *
+ * @see ../provisioning.ts — the approved view, the engine table and the role
+ * @see ../views.ts — the governed view and its tenant predicate
+ */
+export interface GovernedPostgresMapping {
+  /** Table in the application's PostgreSQL schema. Never granted to the reader. */
+  readonly baseRelation: string;
+  /** View over it exposing the catalog's columns. The reader's only relation. */
+  readonly approvedView: string;
+  /**
+   * Column of {@link baseRelation} holding the owning project.
+   *
+   * Named separately from the exposed `TenantId` because the application's
+   * schema calls it something else on every table, and the approved view is
+   * what reconciles the two.
+   */
+  readonly tenantSourceColumn: string;
 }
 
 /**
@@ -119,8 +164,20 @@ export interface GovernedViewDedup {
 export interface GovernedViewDefinition {
   /** Name inside the governed database. The `analytics.<name>` a caller writes. */
   readonly name: string;
-  /** Table in the source database the view reads. */
+  /**
+   * Table the view reads.
+   *
+   * For a ClickHouse-resident dataset, the fact table in the application's
+   * database. For a PostgreSQL-resident one, the PostgreSQL-engine table in the
+   * governed database — see {@link GovernedViewDefinition.postgres}.
+   */
   readonly sourceTable: string;
+  /**
+   * How this dataset reaches ClickHouse, when it does not live there.
+   *
+   * Absent for a ClickHouse-resident dataset, which is most of them.
+   */
+  readonly postgres?: GovernedPostgresMapping;
   /** One line for the schema endpoint. */
   readonly description: string;
   /**
@@ -225,9 +282,29 @@ export function governedViewSourceColumns(
     ...new Set([
       ...view.columns.flatMap((column) => column.sourceColumns),
       ...view.dedup.keyColumns,
-      view.dedup.versionColumn,
+      ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
     ]),
   ].sort();
+}
+
+/**
+ * Whether a dataset's rows live in PostgreSQL and reach ClickHouse through the
+ * named-collection mapping.
+ *
+ * Reads the mapping's presence rather than a flag beside it, so there is
+ * nothing to keep in agreement.
+ */
+export function isPostgresResident(
+  view: GovernedViewDefinition,
+): view is GovernedViewDefinition & { postgres: GovernedPostgresMapping } {
+  return view.postgres !== undefined;
+}
+
+/** The PostgreSQL-resident datasets of a catalog, in catalog order. */
+export function governedPostgresViews(
+  views: readonly GovernedViewDefinition[],
+): readonly (GovernedViewDefinition & { postgres: GovernedPostgresMapping })[] {
+  return views.filter(isPostgresResident);
 }
 
 /**
