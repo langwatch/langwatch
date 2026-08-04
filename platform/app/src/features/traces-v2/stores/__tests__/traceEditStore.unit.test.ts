@@ -23,6 +23,9 @@ function draftState() {
   };
 }
 
+/** The name the trace recorded, which every rename below is measured against. */
+const CAPTURED_NAME = "handler";
+
 const storedCorrection: TraceEditOverlayPatch = {
   version: 1,
   spans: [{ spanId: "span-1", name: "renamed earlier" }],
@@ -48,7 +51,11 @@ describe("traceEditStore", () => {
       /** @scenario "Save is unavailable until the reviewer changes something" */
       it("reports a change", () => {
         state().startEditing({ traceId: "trace-1" });
-        state().setSpanName({ spanId: "span-1", name: "search the web" });
+        state().setSpanName({
+          spanId: "span-1",
+          name: "search the web",
+          baselineName: CAPTURED_NAME,
+        });
 
         expect(selectIsTraceEditDirty(draftState())).toBe(true);
       });
@@ -58,7 +65,11 @@ describe("traceEditStore", () => {
       /** @scenario "The bar counts what the correction changes" */
       it("counts one changed field and one deleted span", () => {
         state().startEditing({ traceId: "trace-1" });
-        state().setSpanName({ spanId: "span-1", name: "search the web" });
+        state().setSpanName({
+          spanId: "span-1",
+          name: "search the web",
+          baselineName: CAPTURED_NAME,
+        });
         state().deleteSpan("span-2");
 
         expect(summarizeTraceEdit(draftState())).toEqual({
@@ -74,7 +85,11 @@ describe("traceEditStore", () => {
       /** @scenario "A deep link into edit mode starts the drawer editing" */
       it("starts from a clean slate", () => {
         state().startEditing({ traceId: "trace-1" });
-        state().setSpanName({ spanId: "span-1", name: "left behind" });
+        state().setSpanName({
+          spanId: "span-1",
+          name: "left behind",
+          baselineName: CAPTURED_NAME,
+        });
 
         state().startEditing({ traceId: "trace-2" });
 
@@ -106,7 +121,11 @@ describe("traceEditStore", () => {
       /** @scenario "Discarding drops the changes and leaves edit mode" */
       it("drops every change and leaves edit mode", () => {
         state().startEditing({ traceId: "trace-1" });
-        state().setSpanName({ spanId: "span-1", name: "search the web" });
+        state().setSpanName({
+          spanId: "span-1",
+          name: "search the web",
+          baselineName: CAPTURED_NAME,
+        });
         state().deleteSpan("span-2");
 
         state().discard();
@@ -127,7 +146,11 @@ describe("traceEditStore", () => {
           traceId: "trace-1",
           basePatch: storedCorrection,
         });
-        state().setSpanName({ spanId: "span-2", name: "read the file" });
+        state().setSpanName({
+          spanId: "span-2",
+          name: "read the file",
+          baselineName: CAPTURED_NAME,
+        });
 
         const patch = buildTraceEditPatch(draftState());
 
@@ -289,13 +312,206 @@ describe("traceEditStore", () => {
       /** @scenario "Deleting a span marks it and its descendants" */
       it("carries the deletion and no field changes for it", () => {
         state().startEditing({ traceId: "trace-1" });
-        state().setSpanName({ spanId: "span-1", name: "does not matter" });
+        state().setSpanName({
+          spanId: "span-1",
+          name: "does not matter",
+          baselineName: CAPTURED_NAME,
+        });
         state().deleteSpan("span-1");
 
         const patch = buildTraceEditPatch(draftState());
 
         expect(patch.spans).toEqual([]);
         expect(patch.deletedSpanIds).toEqual(["span-1"]);
+      });
+    });
+  });
+
+  describe("given a field the reviewer changed and changed back", () => {
+    describe("when the name is typed back to what was captured", () => {
+      /** @scenario "Touching a field and putting it back leaves nothing to save" */
+      it("leaves no draft behind", () => {
+        state().startEditing({ traceId: "trace-1" });
+        state().setSpanName({
+          spanId: "span-1",
+          name: "search the web",
+          baselineName: CAPTURED_NAME,
+        });
+
+        state().setSpanName({
+          spanId: "span-1",
+          name: CAPTURED_NAME,
+          baselineName: CAPTURED_NAME,
+        });
+
+        expect(state().spanDrafts).toEqual({});
+        expect(selectIsTraceEditDirty(draftState())).toBe(false);
+      });
+    });
+
+    describe("when the name is typed back to what an earlier correction said", () => {
+      /** @scenario "Touching a field and putting it back leaves nothing to save" */
+      it("leaves no draft behind", () => {
+        state().startEditing({
+          traceId: "trace-1",
+          basePatch: storedCorrection,
+        });
+
+        state().setSpanName({
+          spanId: "span-1",
+          name: "renamed earlier",
+          baselineName: "renamed earlier",
+        });
+
+        expect(state().spanDrafts).toEqual({});
+        expect(selectIsTraceEditDirty(draftState())).toBe(false);
+      });
+    });
+
+    describe("when the type is put back", () => {
+      /** @scenario "Touching a field and putting it back leaves nothing to save" */
+      it("leaves no draft behind", () => {
+        state().startEditing({ traceId: "trace-1" });
+        state().setSpanType({
+          spanId: "span-1",
+          type: "tool",
+          baselineType: "llm",
+        });
+
+        state().setSpanType({
+          spanId: "span-1",
+          type: "llm",
+          baselineType: "llm",
+        });
+
+        expect(selectIsTraceEditDirty(draftState())).toBe(false);
+      });
+    });
+
+    describe("when the output editor is left holding the captured value", () => {
+      /** @scenario "Touching a field and putting it back leaves nothing to save" */
+      it("treats the value the editor formatted as unchanged", () => {
+        state().startEditing({ traceId: "trace-1" });
+        state().setSpanIO({
+          spanId: "span-1",
+          field: "output",
+          text: '{"temperature": 21}',
+          baselineText: '{"temperature":18}',
+        });
+
+        // What `seedEditorText` puts in the editor for this captured value.
+        state().setSpanIO({
+          spanId: "span-1",
+          field: "output",
+          text: '{\n  "temperature": 18\n}',
+          baselineText: '{"temperature":18}',
+        });
+
+        expect(state().spanDrafts).toEqual({});
+        expect(selectIsTraceEditDirty(draftState())).toBe(false);
+      });
+    });
+
+    describe("when an attribute is set back to its captured value", () => {
+      /** @scenario "Touching a field and putting it back leaves nothing to save" */
+      it("leaves no draft behind", () => {
+        state().startEditing({ traceId: "trace-1" });
+        const baselineParams = { langwatch: { params: { retries: 0 } } };
+        state().setSpanParam({
+          spanId: "span-1",
+          key: "langwatch.params.retries",
+          value: 3,
+          baselineParams,
+        });
+
+        state().setSpanParam({
+          spanId: "span-1",
+          key: "langwatch.params.retries",
+          value: 0,
+          baselineParams,
+        });
+
+        expect(state().spanDrafts).toEqual({});
+        expect(selectIsTraceEditDirty(draftState())).toBe(false);
+      });
+    });
+  });
+
+  describe("given an attribute edited before the stored correction was read", () => {
+    describe("when the correction lands", () => {
+      /** @scenario "An attribute changed before the stored correction arrives keeps it" */
+      it("keeps the attributes the correction already changed", () => {
+        const correction: TraceEditOverlayPatch = {
+          version: 1,
+          spans: [
+            {
+              spanId: "span-1",
+              params: { model: "gpt-5", temperature: 0.2 },
+            },
+          ],
+          deletedSpanIds: [],
+        };
+        state().startEditing({ traceId: "trace-1" });
+        // The captured attributes, because the correction has not arrived yet.
+        state().setSpanParam({
+          spanId: "span-1",
+          key: "temperature",
+          value: 0.7,
+          baselineParams: { model: "gpt-5-mini", temperature: 0.2 },
+        });
+
+        state().adoptBasePatch({ traceId: "trace-1", basePatch: correction });
+
+        expect(buildTraceEditPatch(draftState()).spans[0]?.params).toEqual({
+          model: "gpt-5",
+          temperature: 0.7,
+        });
+      });
+    });
+  });
+
+  describe("given a correction stored while this one was being written", () => {
+    describe("when the session is rebased onto it", () => {
+      /** @scenario "Saving builds on the correction as it stands" */
+      it("keeps what it changed and carries this session's change too", () => {
+        state().startEditing({ traceId: "trace-1", basePatch: null });
+        state().setSpanName({
+          spanId: "span-2",
+          name: "read the file",
+          baselineName: CAPTURED_NAME,
+        });
+
+        state().rebaseBasePatch({
+          traceId: "trace-1",
+          basePatch: storedCorrection,
+        });
+
+        const patch = buildTraceEditPatch(draftState());
+
+        expect(patch.spans).toEqual([
+          { spanId: "span-1", name: "renamed earlier" },
+          { spanId: "span-2", name: "read the file" },
+        ]);
+        expect(patch.deletedSpanIds).toEqual(["span-9"]);
+      });
+
+      /** @scenario "Saving builds on the correction as it stands" */
+      it("replaces a baseline the session had already adopted", () => {
+        const newer: TraceEditOverlayPatch = {
+          version: 1,
+          spans: [{ spanId: "span-3", name: "renamed by someone else" }],
+          deletedSpanIds: [],
+        };
+        state().startEditing({
+          traceId: "trace-1",
+          basePatch: storedCorrection,
+        });
+
+        state().rebaseBasePatch({ traceId: "trace-1", basePatch: newer });
+
+        expect(buildTraceEditPatch(draftState()).spans).toEqual([
+          { spanId: "span-3", name: "renamed by someone else" },
+        ]);
       });
     });
   });

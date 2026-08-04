@@ -45,9 +45,11 @@ describe("drawer.edit URL parameter", () => {
       it("keeps the session open rather than discarding the work", () => {
         useDrawerStore.getState().setEditing(true);
         useTraceEditStore.getState().startEditing({ traceId: "trace-1" });
-        useTraceEditStore
-          .getState()
-          .setSpanName({ spanId: "span-1", name: "search the web" });
+        useTraceEditStore.getState().setSpanName({
+          spanId: "span-1",
+          name: "search the web",
+          baselineName: "handler",
+        });
 
         useDrawerStore.getState().hydrateUrlState({ editing: false });
 
@@ -67,6 +69,19 @@ describe("drawer.edit URL parameter", () => {
         useDrawerStore.getState().hydrateUrlState({ editing: false });
 
         expect(useDrawerStore.getState().editing).toBe(false);
+      });
+    });
+  });
+
+  describe("given a reader who switched to the captured trace", () => {
+    describe("when they open another trace", () => {
+      /** @scenario "The captured trace is a choice about the trace in front of me" */
+      it("opens it corrected", () => {
+        useTraceEditStore.getState().setOverlayView("original");
+
+        useDrawerStore.getState().openTrace("trace-2", null);
+
+        expect(useTraceEditStore.getState().overlayView).toBe("edited");
       });
     });
   });

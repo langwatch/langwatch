@@ -112,12 +112,34 @@ interface TraceEditState {
     traceId: string;
     basePatch: TraceEditOverlayPatch;
   }) => void;
+  /**
+   * Moves the session onto the correction as it stands right now, however far
+   * the session had already got. Used immediately before a save so a correction
+   * stored while this one was being written is built on rather than replaced.
+   */
+  rebaseBasePatch: (params: {
+    traceId: string;
+    basePatch: TraceEditOverlayPatch;
+  }) => void;
   stopEditing: () => void;
   /** Drops every uncommitted change and leaves edit mode. */
   discard: () => void;
 
-  setSpanName: (params: { spanId: string; name: string }) => void;
-  setSpanType: (params: { spanId: string; type: SpanTypes }) => void;
+  /**
+   * Records a rename. `baselineName` is what the field read before this session
+   * touched it, so typing a change and undoing it leaves no draft behind rather
+   * than storing a correction that changes nothing.
+   */
+  setSpanName: (params: {
+    spanId: string;
+    name: string;
+    baselineName: string;
+  }) => void;
+  setSpanType: (params: {
+    spanId: string;
+    type: SpanTypes;
+    baselineType: string | null;
+  }) => void;
   setSpanIO: (params: {
     spanId: string;
     field: "input" | "output";
@@ -180,6 +202,118 @@ function withSpanDraft(
   return { ...drafts, [spanId]: next };
 }
 
+/**
+ * Moves every draft's attribute snapshot onto the correction that just became
+ * the session's baseline. An attribute edited before the stored correction was
+ * read froze the captured attributes as the record the overrides apply to, and
+ * saving that record would drop whatever attributes the correction already
+ * changed.
+ */
+function rebasedParams(
+  drafts: Record<string, SpanEditDraft>,
+  basePatch: TraceEditOverlayPatch,
+): Record<string, SpanEditDraft> {
+  let next: Record<string, SpanEditDraft> | null = null;
+  for (const [spanId, draft] of Object.entries(drafts)) {
+    if (draft.paramsBase === undefined) continue;
+    const params = basePatchForSpan(basePatch, spanId)?.params;
+    if (params == null) continue;
+    next ??= { ...drafts };
+    next[spanId] = { ...draft, paramsBase: params };
+  }
+  return next ?? drafts;
+}
+
+/** Whether two attribute values say the same thing. */
+function sameAttributeValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** Reads the value a nested attribute path holds, or undefined when it has none. */
+function readAtPath(source: Record<string, unknown>, path: string[]): unknown {
+  let cursor: unknown = source;
+  for (const segment of path) {
+    if (!isPlainObject(cursor)) return undefined;
+    cursor = cursor[segment];
+  }
+  return cursor;
+}
+
+/**
+ * Whether writing this value at this attribute would leave the span exactly as
+ * the baseline already has it: the same value, or removing a key the baseline
+ * never carried.
+ */
+function attributeIsUnchanged({
+  baselineParams,
+  key,
+  value,
+}: {
+  baselineParams: Record<string, unknown>;
+  key: string;
+  value: unknown;
+}): boolean {
+  const path = attributePathsByFlatKey(baselineParams).get(key);
+  if (!path) return value === null;
+  return (
+    value !== null &&
+    sameAttributeValue(readAtPath(baselineParams, path), value)
+  );
+}
+
+/** The value a text field holds, when it holds JSON, and undefined when not. */
+function parsedOrUndefined(text: string): unknown {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return undefined;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether the reviewer's text still says what the field said before they
+ * touched it. A captured JSON value is seeded into the editor formatted across
+ * lines, so the comparison is on what the two texts parse to whenever both are
+ * JSON; anything else compares as written.
+ */
+function ioTextIsUnchanged({
+  text,
+  baselineText,
+}: {
+  text: string;
+  baselineText: string | null;
+}): boolean {
+  const baseline = baselineText ?? "";
+  if (text === baseline) return true;
+  const parsedText = parsedOrUndefined(text);
+  const parsedBaseline = parsedOrUndefined(baseline);
+  if (parsedText === undefined || parsedBaseline === undefined) return false;
+  return JSON.stringify(parsedText) === JSON.stringify(parsedBaseline);
+}
+
+/** Drops one field from a draft, leaving the rest of it alone. */
+function withoutField(
+  draft: SpanEditDraft,
+  field: SpanDraftField,
+): SpanEditDraft {
+  const { [field]: _dropped, ...rest } = draft;
+  return rest;
+}
+
+/** Drops one attribute override, and the snapshot once none are left. */
+function withoutParam(draft: SpanEditDraft, key: string): SpanEditDraft {
+  if (!draft.params) return draft;
+  const { [key]: _dropped, ...rest } = draft.params;
+  if (Object.keys(rest).length === 0) {
+    const { params: _params, paramsBase: _base, ...withoutParams } = draft;
+    return withoutParams;
+  }
+  return { ...draft, params: rest };
+}
+
 type SetTraceEditState = StoreApi<TraceEditState>["setState"];
 
 /** Starting an editing session, and every way of ending one. */
@@ -213,7 +347,22 @@ const sessionActions = (set: SetTraceEditState) => ({
     basePatch: TraceEditOverlayPatch;
   }) =>
     set((s) =>
-      s.editingTraceId === traceId && s.basePatch === null ? { basePatch } : s,
+      s.editingTraceId === traceId && s.basePatch === null
+        ? { basePatch, spanDrafts: rebasedParams(s.spanDrafts, basePatch) }
+        : s,
+    ),
+
+  rebaseBasePatch: ({
+    traceId,
+    basePatch,
+  }: {
+    traceId: string;
+    basePatch: TraceEditOverlayPatch;
+  }) =>
+    set((s) =>
+      s.editingTraceId === traceId
+        ? { basePatch, spanDrafts: rebasedParams(s.spanDrafts, basePatch) }
+        : s,
     ),
 
   stopEditing: () =>
@@ -232,22 +381,47 @@ const sessionActions = (set: SetTraceEditState) => ({
     }),
 });
 
-/** Editing the fields and attributes of one span. */
-const spanDraftActions = (set: SetTraceEditState) => ({
-  setSpanName: ({ spanId, name }: { spanId: string; name: string }) =>
+/**
+ * Editing the name, type, input and output of one span.
+ *
+ * Every setter drops its field when the reviewer has typed their way back to
+ * what the field already said. Without that, changing a value and undoing it
+ * leaves a draft that enables Save, stores a correction identical to what was
+ * there, and marks the field as edited for good.
+ */
+const spanFieldActions = (set: SetTraceEditState) => ({
+  setSpanName: ({
+    spanId,
+    name,
+    baselineName,
+  }: {
+    spanId: string;
+    name: string;
+    baselineName: string;
+  }) =>
     set((s) => ({
-      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
-        ...draft,
-        name,
-      })),
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
+        name === baselineName
+          ? withoutField(draft, "name")
+          : { ...draft, name },
+      ),
     })),
 
-  setSpanType: ({ spanId, type }: { spanId: string; type: SpanTypes }) =>
+  setSpanType: ({
+    spanId,
+    type,
+    baselineType,
+  }: {
+    spanId: string;
+    type: SpanTypes;
+    baselineType: string | null;
+  }) =>
     set((s) => ({
-      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
-        ...draft,
-        type,
-      })),
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
+        type === baselineType
+          ? withoutField(draft, "type")
+          : { ...draft, type },
+      ),
     })),
 
   setSpanIO: ({
@@ -262,10 +436,11 @@ const spanDraftActions = (set: SetTraceEditState) => ({
     baselineText: string | null;
   }) =>
     set((s) => ({
-      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
-        ...draft,
-        [field]: { text, baselineText },
-      })),
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
+        ioTextIsUnchanged({ text, baselineText })
+          ? withoutField(draft, field)
+          : { ...draft, [field]: { text, baselineText } },
+      ),
     })),
 
   resetSpanField: ({
@@ -276,12 +451,14 @@ const spanDraftActions = (set: SetTraceEditState) => ({
     field: SpanDraftField;
   }) =>
     set((s) => ({
-      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => {
-        const { [field]: _dropped, ...rest } = draft;
-        return rest;
-      }),
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
+        withoutField(draft, field),
+      ),
     })),
+});
 
+/** Editing the attributes of one span, which are corrected key by key. */
+const spanParamActions = (set: SetTraceEditState) => ({
   setSpanParam: ({
     spanId,
     key,
@@ -294,28 +471,22 @@ const spanDraftActions = (set: SetTraceEditState) => ({
     baselineParams: Record<string, unknown>;
   }) =>
     set((s) => ({
-      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
-        ...draft,
-        paramsBase: draft.paramsBase ?? baselineParams,
-        params: { ...draft.params, [key]: value },
-      })),
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
+        attributeIsUnchanged({ baselineParams, key, value })
+          ? withoutParam(draft, key)
+          : {
+              ...draft,
+              paramsBase: draft.paramsBase ?? baselineParams,
+              params: { ...draft.params, [key]: value },
+            },
+      ),
     })),
 
   resetSpanParam: ({ spanId, key }: { spanId: string; key: string }) =>
     set((s) => ({
-      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => {
-        if (!draft.params) return draft;
-        const { [key]: _dropped, ...rest } = draft.params;
-        if (Object.keys(rest).length === 0) {
-          const {
-            params: _params,
-            paramsBase: _base,
-            ...withoutParams
-          } = draft;
-          return withoutParams;
-        }
-        return { ...draft, params: rest };
-      }),
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
+        withoutParam(draft, key),
+      ),
     })),
 });
 
@@ -352,7 +523,8 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
   diffOpen: false,
 
   ...sessionActions(set),
-  ...spanDraftActions(set),
+  ...spanFieldActions(set),
+  ...spanParamActions(set),
   ...spanRemovalActions(set),
 
   setTraceOutput: ({ text, baselineText }) =>

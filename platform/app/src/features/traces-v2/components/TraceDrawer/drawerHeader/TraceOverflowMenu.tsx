@@ -24,6 +24,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
+import { isPreviewTraceId } from "../../../onboarding/data/samplePreviewTraces";
 import { enterTraceEditMode } from "../../../utils/traceEditMode";
 
 interface TraceOverflowMenuProps {
@@ -74,7 +75,12 @@ export function TraceOverflowMenu({
   const canQueueForAnnotation = hasPermission("annotations:create");
   // Correcting a trace is review work, which is the permission external
   // reviewers hold, and it is the same one the correction write itself checks.
-  const canEditTrace = !readOnly && hasPermission("annotations:update");
+  // A sample preview trace is left out: it exists only to show an empty project
+  // what a trace looks like, so an edit session on one could never be saved.
+  const canEditTrace =
+    !readOnly &&
+    !isPreviewTraceId(traceId) &&
+    hasPermission("annotations:update");
 
   const handleEditTrace = useCallback(
     () => enterTraceEditMode(traceId),

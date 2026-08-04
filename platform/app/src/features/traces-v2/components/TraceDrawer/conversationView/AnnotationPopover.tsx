@@ -11,7 +11,13 @@ import {
 import type { AnnotationScoreDataType } from "@prisma/client";
 import { diffWordsWithSpace } from "diff";
 import { Check, MessageSquareText, RotateCcw, Trash2 } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Popover } from "~/components/ui/popover";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
@@ -191,6 +197,19 @@ function useAnnotationForm(props: AnnotationPopoverProps): AnnotationFormState {
   const update = api.annotation.updateByTraceId.useMutation();
   const remove = api.annotation.deleteById.useMutation();
 
+  // A suggested output is stored as a correction to the trace, so the drawer's
+  // copy of that correction is no longer current once one is written. Left
+  // alone it stays cached for minutes, and an edit session started in that
+  // window would build on the old one and undo the suggestion on save.
+  const invalidateTraceReads = useCallback(() => {
+    void trpc.annotation.getByTraceId.invalidate();
+    if (!project?.id) return;
+    void trpc.traceEditOverlay.getByTraceId.invalidate({
+      projectId: project.id,
+      traceId: props.traceId,
+    });
+  }, [trpc, project?.id, props.traceId]);
+
   const handleSave = () => {
     if (!project?.id) return;
     const cleanScores = Object.fromEntries(
@@ -208,7 +227,7 @@ function useAnnotationForm(props: AnnotationPopoverProps): AnnotationFormState {
       expectedOutput: props.mode === "suggest" ? expectedOutput : undefined,
     };
     const onSuccess = () => {
-      void trpc.annotation.getByTraceId.invalidate();
+      invalidateTraceReads();
       toaster.create({
         title: isEdit ? "Annotation updated" : "Annotation saved",
         type: "success",
@@ -234,7 +253,7 @@ function useAnnotationForm(props: AnnotationPopoverProps): AnnotationFormState {
       { projectId: project.id, annotationId: existing.id },
       {
         onSuccess: () => {
-          void trpc.annotation.getByTraceId.invalidate();
+          invalidateTraceReads();
           toaster.create({ title: "Annotation deleted", type: "success" });
           props.onOpenChange(false);
         },

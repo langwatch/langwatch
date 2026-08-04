@@ -108,6 +108,26 @@ describe("AttributeTable editing", () => {
       });
     });
 
+    describe("when an attribute is added with a key the filter is hiding", () => {
+      /** @scenario "Adding an attribute rejects a key the filter is hiding" */
+      it("says the key already exists and adds nothing", () => {
+        const onEditAttribute = vi.fn();
+        const { getByLabelText, getByPlaceholderText, getByRole, getByText } =
+          renderEditable({ onEditAttribute });
+
+        fireEvent.change(getByPlaceholderText("Filter attributes…"), {
+          target: { value: "temperature" },
+        });
+        fireEvent.change(getByLabelText("New attribute name"), {
+          target: { value: "gen_ai.request.model" },
+        });
+        fireEvent.click(getByRole("button", { name: "Add attribute" }));
+
+        expect(getByText("This key already exists")).toBeInTheDocument();
+        expect(onEditAttribute).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when an attribute is added with a new key", () => {
       /** @scenario "Adding an attribute rejects a key that already exists" */
       it("records the addition", () => {

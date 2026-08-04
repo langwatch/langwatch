@@ -806,6 +806,7 @@ function AttrSection({
   leadingKeys,
   restrictionFor,
   editing,
+  allKeys,
   correctionFor,
 }: {
   title: string;
@@ -820,6 +821,12 @@ function AttrSection({
   restrictionFor?: (key: string) => AttributeRestriction | null;
   /** Present while this section's attributes are being corrected. */
   editing?: AttributeEditing;
+  /**
+   * Every key the span carries, not only the rows the filter left on screen. A
+   * new attribute has to be checked against all of them: a key hidden by the
+   * filter still collides, and the correction would quietly overwrite it.
+   */
+  allKeys?: Set<string>;
   /** Resolves the captured value a stored correction replaced, when it did. */
   correctionFor?: (key: string) => AttributeCorrection | null;
 }) {
@@ -914,7 +921,7 @@ function AttrSection({
       )}
       {editing && (
         <AddAttributeRow
-          existingKeys={new Set(Object.keys(flat))}
+          existingKeys={allKeys ?? new Set(Object.keys(flat))}
           {...editing}
         />
       )}
@@ -1058,6 +1065,10 @@ export function AttributeTable({
     () => filterAttributesBySearch(flatAttrs, searchTerm),
     [flatAttrs, searchTerm],
   );
+  const allAttributeKeys = useMemo(
+    () => new Set(Object.keys(flatAttrs)),
+    [flatAttrs],
+  );
   const filterResAttrs = useMemo(() => {
     if (!flatResAttrs) return undefined;
     const filtered = filterAttributesBySearch(flatResAttrs, searchTerm);
@@ -1114,6 +1125,7 @@ export function AttributeTable({
         leadingKeys={spanId ? SPAN_ID_LEADING_KEYS : undefined}
         restrictionFor={restrictionFor}
         editing={editing}
+        allKeys={allAttributeKeys}
         correctionFor={correctionFor}
       />
       {filterResAttrs && (

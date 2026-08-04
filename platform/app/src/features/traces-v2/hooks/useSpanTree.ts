@@ -134,23 +134,38 @@ export function useSpanTreeCanonical() {
 }
 
 /**
- * The span tree the reader sees: corrected when a correction applies, captured
- * otherwise. The correction is applied to the query's result and never written
- * back into the cache, so the delta poll's high-water mark keeps tracking what
- * was actually ingested.
+ * Both readings of the span tree from one read: the trace as captured, and the
+ * trace as the reader sees it. A caller that needs each of them (the drawer
+ * scaffold, whose header counts captured spans while its panes render corrected
+ * ones) takes them from here rather than instantiating the query twice, which
+ * would put a second observer on the live delta poll for the same data.
+ *
+ * The correction is applied to the query's result and never written back into
+ * the cache, so the delta poll's high-water mark keeps tracking what was
+ * actually ingested.
  */
-export function useSpanTree() {
-  const query = useSpanTreeCanonical();
+export function useSpanTreeWithCaptured() {
+  const captured = useSpanTreeCanonical();
   const patch = useAppliedTraceEditPatch();
-  const nodes = query.data;
+  const nodes = captured.data;
 
   const data = useMemo(
     () => (nodes ? applyOverlayToSpanTreeNodes({ nodes, patch }) : nodes),
     [nodes, patch],
   );
 
-  return useMemo(
-    () => (data === nodes ? query : { ...query, data }),
-    [query, data, nodes],
+  const corrected = useMemo(
+    () => (data === nodes ? captured : { ...captured, data }),
+    [captured, data, nodes],
   );
+
+  return useMemo(() => ({ captured, corrected }), [captured, corrected]);
+}
+
+/**
+ * The span tree the reader sees: corrected when a correction applies, captured
+ * otherwise.
+ */
+export function useSpanTree() {
+  return useSpanTreeWithCaptured().corrected;
 }

@@ -562,7 +562,11 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   traceBackStack: [],
 
-  openTrace: (traceId, occurredAtMs, expectedSpanCount) =>
+  openTrace: (traceId, occurredAtMs, expectedSpanCount) => {
+    // Reading the captured trace is a decision about the trace in front of the
+    // reader, not a preference: the next one opens corrected, the way every
+    // trace does until they ask otherwise.
+    useTraceEditStore.getState().setOverlayView("edited");
     set({
       isOpen: true,
       traceId,
@@ -574,7 +578,8 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       // trace leaves it, and the caller re-enters explicitly when a link asked
       // for it.
       editing: false,
-    }),
+    });
+  },
 
   backfillOccurredAtMs: (occurredAtMs) =>
     set((s) => {

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { parseEditParam, useDrawerStore } from "../stores/drawerStore";
 import {
@@ -22,8 +22,13 @@ import { enterTraceEditMode, exitTraceEditMode } from "../utils/traceEditMode";
  * click ran in.
  */
 export function useTraceDrawerUrlHydrator(): void {
-  const { currentDrawer } = useDrawer();
+  const { currentDrawer, openDrawer, closeDrawer } = useDrawer();
   const params = useDrawerParams();
+  // Held in a ref rather than as dependencies: both change identity with every
+  // query change on the page, and this effect answers to the drawer parameters
+  // alone.
+  const drawerRef = useRef({ openDrawer, closeDrawer });
+  drawerRef.current = { openDrawer, closeDrawer };
 
   useEffect(() => {
     const wantsOpen = currentDrawer === "traceV2Details";
@@ -45,10 +50,52 @@ export function useTraceDrawerUrlHydrator(): void {
     }
 
     if (!wantsOpen && store.traceId) {
+      if (keepDrawerForUnsavedEdit(drawerRef.current)) return;
       store.closeDrawer();
       exitTraceEditMode();
     }
   }, [currentDrawer, params.traceId, params.t, params.edit]);
+}
+
+/**
+ * Browser history must not throw away work. A link from before the correction
+ * was started says nothing about the correction, so following it back would
+ * drop an unsaved one with no way to get it back.
+ *
+ * The reviewer is asked instead, and the question lives in the edit bar, which
+ * only exists while the drawer is mounted — parking the exit on its own would
+ * park it on a dialog that just unmounted. So the drawer's link is re-asserted
+ * first, and the parked exit closes it for real once the reviewer says they are
+ * done with the correction.
+ *
+ * Returns whether the close was held back.
+ */
+function keepDrawerForUnsavedEdit({
+  openDrawer,
+  closeDrawer,
+}: Pick<ReturnType<typeof useDrawer>, "openDrawer" | "closeDrawer">): boolean {
+  const editStore = useTraceEditStore.getState();
+  const drawer = useDrawerStore.getState();
+  const editingTraceId = editStore.editingTraceId;
+  if (editingTraceId === null || editingTraceId !== drawer.traceId) {
+    return false;
+  }
+  if (!selectIsTraceEditDirty(editStore)) return false;
+
+  drawer.setEditing(true);
+  openDrawer("traceV2Details", {
+    traceId: editingTraceId,
+    ...(drawer.occurredAtMs !== null ? { t: String(drawer.occurredAtMs) } : {}),
+    urlParams: { edit: "1" },
+  });
+  editStore.requestExit(() => {
+    useDrawerStore.getState().closeDrawer();
+    exitTraceEditMode();
+    // The link was put back to keep the drawer on screen for the question, so
+    // taking the answer means taking it out again.
+    closeDrawer();
+  });
+  return true;
 }
 
 /**
@@ -68,7 +115,12 @@ function syncEditMode({
   const editingTraceId = useTraceEditStore.getState().editingTraceId;
 
   if (wantsEdit) {
+    // Starting over would drop the drafts, so only a different trace does that.
+    // The drawer's own flag is asserted either way: opening a trace clears it,
+    // and leaving it cleared would strip `drawer.edit` from a link that asks
+    // for edit mode and take the drafts with it.
     if (editingTraceId !== traceId) enterTraceEditMode(traceId);
+    else useDrawerStore.getState().setEditing(true);
     return;
   }
 

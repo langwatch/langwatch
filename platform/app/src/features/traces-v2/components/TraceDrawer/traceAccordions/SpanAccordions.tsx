@@ -259,6 +259,7 @@ export function SpanAccordions({
                             field="input"
                             label="Input"
                             capturedText={detail.input ?? null}
+                            capturedParams={detail.params}
                           />
                         ) : detail?.input ? (
                           <MaybeCorrected

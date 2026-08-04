@@ -179,6 +179,12 @@ const renderPage = () => render(page());
 const datasetCheckbox = () =>
   screen.getByRole("checkbox", { name: "Add to dataset at the end" });
 
+// The control's own state, off the root. The hidden input's DOM property is
+// only written when that state changes, so an answer that went up and came back
+// down inside one tick leaves the input reading stale.
+const datasetMarkReadsTicked = () =>
+  datasetCheckbox().closest("label")?.getAttribute("data-state") === "checked";
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.queuesLoading = false;
@@ -292,6 +298,20 @@ describe("given a reviewer walking their annotation queue", () => {
       await user.click(datasetCheckbox());
 
       expect(datasetCheckbox()).toBeChecked();
+    });
+
+    /** @scenario "The checkbox answers immediately, before the mark is stored" */
+    it("takes the tick back when the mark cannot be stored", async () => {
+      const user = userEvent.setup();
+      mocks.markForDataset.mockImplementation(
+        (_input: unknown, options?: { onError?: () => void }) =>
+          options?.onError?.(),
+      );
+      renderPage();
+
+      await user.click(datasetCheckbox());
+
+      await waitFor(() => expect(datasetMarkReadsTicked()).toBe(false));
     });
   });
 

@@ -136,7 +136,7 @@ function OriginalHoverBadge({
                 setDiffOpen(true);
               }}
             >
-              <Text textStyle="2xs">Open View diff to compare in full.</Text>
+              <Text textStyle="2xs">Open the full diff</Text>
             </Button>
           </HoverCard.Content>
         </HoverCard.Positioner>

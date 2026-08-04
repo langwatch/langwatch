@@ -143,6 +143,28 @@ describe("given a reviewer reading a message in the legacy conversation", () => 
     });
   });
 
+  describe("when the reviewer reaches the suggest action from the keyboard", () => {
+    /** @scenario "The suggest action on a queued message opens the correction popover" */
+    it("opens the correction popover the same way a click does", async () => {
+      const user = userEvent.setup();
+      render(<Harness />);
+
+      suggestButton().focus();
+      await user.keyboard("{Enter}");
+
+      expect(screen.getByTestId("correction-popover")).toBeInTheDocument();
+    });
+
+    it("reaches every action by tabbing", async () => {
+      const user = userEvent.setup();
+      render(<Harness />);
+
+      await user.tab();
+
+      expect(screen.getByRole("button", { name: "View Trace" })).toHaveFocus();
+    });
+  });
+
   describe("when the reviewer has not used the suggest action", () => {
     it("keeps the correction popover out of the page", () => {
       render(<Harness />);

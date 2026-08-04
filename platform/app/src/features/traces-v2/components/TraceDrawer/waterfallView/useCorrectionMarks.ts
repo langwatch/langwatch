@@ -17,8 +17,9 @@ const NO_MARKS = {
  * Which rows a stored correction changed, and which ones it removed.
  *
  * The removed set is only populated while the reader is on the captured trace:
- * on the corrected one those rows are already gone, so there is nothing to
- * mark.
+ * on the corrected one those rows are already gone, and while the correction is
+ * being written the editing marks already say what is going away, so there is
+ * nothing left to mark.
  */
 export function useCorrectionMarks(spans: SpanTreeNode[]): {
   correctedSpanIds: Set<string>;
@@ -26,18 +27,25 @@ export function useCorrectionMarks(spans: SpanTreeNode[]): {
 } {
   const overlay = useTraceEditOverlay();
   const overlayView = useTraceEditStore((s) => s.overlayView);
+  const basePatch = useTraceEditStore((s) => s.basePatch);
   const isEditing = useDrawerStore((s) => s.editing);
-  const patch = overlay.data?.patch;
+  // While editing, the correction the session builds on is the one that counts:
+  // a row it already changed still reads as edited, so a second pass never looks
+  // like it lost the first one. It is adopted a beat after editing starts, and
+  // the read it comes from stands in until then.
+  const patch = isEditing
+    ? (basePatch ?? overlay.data?.patch)
+    : overlay.data?.patch;
 
   return useMemo(() => {
-    if (!patch || isEditing) return NO_MARKS;
+    if (!patch) return NO_MARKS;
     const correctedSpanIds = new Set(
       spans
         .map((span) => span.spanId)
         .filter((spanId) => overlayTouchesSpan({ patch, spanId })),
     );
     const deletedByCorrectionSpanIds =
-      overlayView === "original"
+      !isEditing && overlayView === "original"
         ? expandDeletedSpanIds({
             links: spans.map((span) => ({
               id: span.spanId,

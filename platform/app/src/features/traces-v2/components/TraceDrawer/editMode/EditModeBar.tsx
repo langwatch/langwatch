@@ -56,15 +56,10 @@ function useTraceEditDraft() {
 }
 
 /** Writing the correction, confirming it, and leaving edit mode behind it. */
-function useSaveTraceEdit({
-  traceId,
-  draft,
-}: {
-  traceId: string;
-  draft: ReturnType<typeof useTraceEditDraft>;
-}) {
+function useSaveTraceEdit({ traceId }: { traceId: string }) {
   const { project } = useOrganizationTeamProject();
   const utils = api.useUtils();
+  const [isRebasing, setIsRebasing] = useState(false);
 
   const upsert = api.traceEditOverlay.upsert.useMutation({
     onSuccess: () => {
@@ -81,16 +76,39 @@ function useSaveTraceEdit({
       showErrorToast({ error, fallbackTitle: "Couldn't save trace edits" }),
   });
 
-  const save = useCallback(() => {
+  const save = useCallback(async () => {
     if (!project) return;
+    // Read the correction back before merging onto it. The one adopted when
+    // editing started can be minutes old — a suggestion saved in between writes
+    // the same record — and building on a stale one would drop whatever was
+    // stored since. Two people saving in the same instant still race, and the
+    // last write wins; a reviewer racing themselves does not.
+    setIsRebasing(true);
+    try {
+      const latest = await utils.traceEditOverlay.getByTraceId.fetch(
+        { projectId: project.id, traceId },
+        { staleTime: 0 },
+      );
+      if (latest?.patch) {
+        useTraceEditStore
+          .getState()
+          .rebaseBasePatch({ traceId, basePatch: latest.patch });
+      }
+    } catch (error) {
+      showErrorToast({ error, fallbackTitle: "Couldn't save trace edits" });
+      return;
+    } finally {
+      setIsRebasing(false);
+    }
+
     upsert.mutate({
       projectId: project.id,
       traceId,
-      patch: buildTraceEditPatch(draft),
+      patch: buildTraceEditPatch(useTraceEditStore.getState()),
     });
-  }, [project, traceId, upsert, draft]);
+  }, [project, traceId, upsert, utils]);
 
-  return { save, isSaving: upsert.isLoading };
+  return { save, isSaving: upsert.isLoading || isRebasing };
 }
 
 /**
@@ -113,7 +131,8 @@ export function EditModeBar({ traceId }: { traceId: string }) {
   const draft = useTraceEditDraft();
   const summary = summarizeTraceEdit(draft);
   const isDirty = summary.changedFields > 0 || summary.deletedSpans > 0;
-  const { save, isSaving } = useSaveTraceEdit({ traceId, draft });
+  const { save, isSaving } = useSaveTraceEdit({ traceId });
+  const handleSave = useCallback(() => void save(), [save]);
 
   const handleCancel = useCallback(() => {
     if (isDirty) {
@@ -178,7 +197,7 @@ export function EditModeBar({ traceId }: { traceId: string }) {
           <Button
             size="xs"
             colorPalette="blue"
-            onClick={save}
+            onClick={handleSave}
             disabled={!isDirty || isSaving}
             gap={1.5}
           >

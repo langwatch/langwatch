@@ -17,7 +17,6 @@ import "@testing-library/jest-dom/vitest";
 const mocks = vi.hoisted(() => ({
   canUpdateAnnotations: true,
   openDrawer: vi.fn(),
-  enterTraceEditMode: vi.fn(),
 }));
 
 vi.mock("~/hooks/useDrawer", () => ({
@@ -34,10 +33,6 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("../../../../hooks/useConversationTurns", () => ({
   useConversationTurns: () => ({ data: undefined }),
-}));
-
-vi.mock("../../../../utils/traceEditMode", () => ({
-  enterTraceEditMode: mocks.enterTraceEditMode,
 }));
 
 vi.mock("~/components/ui/toaster", () => ({
@@ -61,13 +56,21 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+const { useDrawerStore } = await import("../../../../stores/drawerStore");
+const { useTraceEditStore } = await import("../../../../stores/traceEditStore");
 const { TraceOverflowMenu } = await import("../TraceOverflowMenu");
 
-const renderMenu = ({ readOnly = false }: { readOnly?: boolean } = {}) =>
+const renderMenu = ({
+  readOnly = false,
+  traceId = "trace-1",
+}: {
+  readOnly?: boolean;
+  traceId?: string;
+} = {}) =>
   render(
     <ChakraProvider value={defaultSystem}>
       <TraceOverflowMenu
-        traceId="trace-1"
+        traceId={traceId}
         conversationId={null}
         onCopyTraceId={vi.fn()}
         onFindSimilar={null}
@@ -99,6 +102,9 @@ const editTraceItem = () => screen.queryByText("Edit trace");
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.canUpdateAnnotations = true;
+  useTraceEditStore.getState().discard();
+  useDrawerStore.getState().setEditing(false);
+  useDrawerStore.getState().setViewModeTransient("trace");
 });
 
 afterEach(() => {
@@ -124,7 +130,38 @@ describe("given a reviewer reading a trace in the drawer", () => {
 
       await user.click(screen.getByText("Edit trace"));
 
-      expect(mocks.enterTraceEditMode).toHaveBeenCalledWith("trace-1");
+      expect(useTraceEditStore.getState().editingTraceId).toBe("trace-1");
+      expect(useDrawerStore.getState().editing).toBe(true);
+    });
+  });
+
+  describe("when they are reading the conversation view", () => {
+    beforeEach(() => {
+      useDrawerStore.getState().setViewModeTransient("conversation");
+    });
+
+    /** @scenario "Entering edit mode from the conversation view moves to the trace view" */
+    it("moves them to the trace view to make the correction", async () => {
+      const user = userEvent.setup();
+      renderMenu();
+      await openMenu(user);
+
+      await user.click(screen.getByText("Edit trace"));
+
+      expect(useDrawerStore.getState().viewMode).toBe("trace");
+      expect(useDrawerStore.getState().editing).toBe(true);
+    });
+  });
+
+  describe("when the trace is a sample preview trace", () => {
+    /** @scenario "A sample preview trace is never offered for editing" */
+    it("offers no action to edit the trace", async () => {
+      const user = userEvent.setup();
+      renderMenu({ traceId: "lw-preview-chat" });
+
+      await openMenu(user);
+
+      expect(editTraceItem()).not.toBeInTheDocument();
     });
   });
 

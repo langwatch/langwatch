@@ -9,7 +9,7 @@ import { useConversationContext } from "../../hooks/useConversationContext";
 import { useConversationPrefetch } from "../../hooks/useConversationPrefetch";
 import { useDrawerUrlSync } from "../../hooks/useDrawerUrlSync";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
-import { useSpanTree, useSpanTreeCanonical } from "../../hooks/useSpanTree";
+import { useSpanTreeWithCaptured } from "../../hooks/useSpanTree";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import { useTraceDrawerShortcuts } from "../../hooks/useTraceDrawerShortcuts";
 import { useTraceHeader } from "../../hooks/useTraceHeader";
@@ -24,7 +24,7 @@ interface TraceDrawerScaffold {
   selectedSpan: SpanTreeNode | null;
   isLoading: boolean;
   headerQuery: ReturnType<typeof useTraceHeader>;
-  spanTreeQuery: ReturnType<typeof useSpanTree>;
+  spanTreeQuery: ReturnType<typeof useSpanTreeWithCaptured>["corrected"];
   canGoBack: boolean;
   goBackInTraceHistory: () => void;
   handleClose: () => void;
@@ -67,10 +67,11 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
 
   // The captured tree feeds the header the one thing it cannot work out on its
   // own: how many of the trace's spans a correction removes, which is what
-  // keeps the header's span count agreeing with the waterfall below it.
-  const capturedSpanTree = useSpanTreeCanonical();
+  // keeps the header's span count agreeing with the waterfall below it. Both
+  // readings come from one read, so the live delta poll keeps a single observer.
+  const { captured: capturedSpanTree, corrected: spanTreeQuery } =
+    useSpanTreeWithCaptured();
   const headerQuery = useTraceHeader({ spans: capturedSpanTree.data });
-  const spanTreeQuery = useSpanTree();
   // `useTraceHeader` uses React Query's `keepPreviousData`, so the
   // previous trace's data lingers until the new fetch resolves. That
   // matters now that the drawer is mounted optimistically: switching

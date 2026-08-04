@@ -1,7 +1,10 @@
 import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { type SpanTypes, spanTypesSchema } from "~/server/tracer/types";
-import { useTraceEditStore } from "../../../stores/traceEditStore";
+import {
+  selectSpanEditBaseline,
+  useTraceEditStore,
+} from "../../../stores/traceEditStore";
 
 const SPAN_TYPES: SpanTypes[] = spanTypesSchema.options.map(
   (option) => option.value,
@@ -26,25 +29,36 @@ export function SpanNameTypeEditor({
   capturedName: string;
   capturedType: string | null;
 }) {
+  const basePatch = useTraceEditStore((s) => s.basePatch);
   const draft = useTraceEditStore((s) => s.spanDrafts[spanId]);
   const setSpanName = useTraceEditStore((s) => s.setSpanName);
   const setSpanType = useTraceEditStore((s) => s.setSpanType);
 
-  const name = draft?.name ?? capturedName;
-  const type = draft?.type ?? capturedType ?? "span";
+  // A correction already stored for this span is what the editors start from,
+  // so a second reviewer opening the same trace reads the corrected name rather
+  // than reverting it the moment they touch the field.
+  const baseline = useMemo(
+    () => selectSpanEditBaseline({ basePatch, spanId }),
+    [basePatch, spanId],
+  );
+  const baselineName = baseline.name ?? capturedName;
+  const baselineType = baseline.type ?? capturedType ?? "span";
+
+  const name = draft?.name ?? baselineName;
+  const type = draft?.type ?? baselineType;
 
   const handleNameChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) =>
-      setSpanName({ spanId, name: event.target.value }),
-    [setSpanName, spanId],
+      setSpanName({ spanId, name: event.target.value, baselineName }),
+    [setSpanName, spanId, baselineName],
   );
 
   const handleTypeChange = useCallback(
     (event: React.ChangeEvent<HTMLSelectElement>) => {
       const next = event.target.value;
-      if (isSpanType(next)) setSpanType({ spanId, type: next });
+      if (isSpanType(next)) setSpanType({ spanId, type: next, baselineType });
     },
-    [setSpanType, spanId],
+    [setSpanType, spanId, baselineType],
   );
 
   return (

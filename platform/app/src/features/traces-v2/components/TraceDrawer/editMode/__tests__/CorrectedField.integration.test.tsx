@@ -69,9 +69,7 @@ describe("CorrectedField", () => {
         renderFrame(long);
 
         fireEvent.focus(editedMarker());
-        const openDiff = await screen.findByText(
-          "Open View diff to compare in full.",
-        );
+        const openDiff = await screen.findByText("Open the full diff");
 
         expect(previewOriginal(long).truncated).toBe(true);
         expect(screen.queryByText(long)).not.toBeInTheDocument();

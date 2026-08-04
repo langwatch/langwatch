@@ -1,13 +1,38 @@
 import { useCallback, useMemo } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { expandDeletedSpanIds } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
+import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import {
+  type SpanEditDraft,
   selectIsSpanDeleted,
   useTraceEditStore,
 } from "../../../stores/traceEditStore";
 
 const NO_DRAFT_NAMES: ReadonlyMap<string, string> = new Map();
+
+/**
+ * The name each row should read with while the correction is being written:
+ * what an earlier correction renamed it to, with this session's rename on top.
+ * The tree itself is the captured one while editing, so leaving the stored
+ * rename out would read as this session having lost it.
+ */
+function correctedNames({
+  basePatch,
+  spanDrafts,
+}: {
+  basePatch: TraceEditOverlayPatch | null;
+  spanDrafts: Record<string, SpanEditDraft>;
+}): ReadonlyMap<string, string> {
+  const names = new Map<string, string>();
+  for (const span of basePatch?.spans ?? []) {
+    if (span.name != null) names.set(span.spanId, span.name);
+  }
+  for (const [spanId, draft] of Object.entries(spanDrafts)) {
+    if (draft.name !== undefined) names.set(spanId, draft.name);
+  }
+  return names;
+}
 
 /**
  * The waterfall's half of edit mode: which rows the correction removes, what
@@ -50,17 +75,11 @@ export function useWaterfallEditing(spans: SpanTreeNode[]): {
     });
   }, [isEditing, spans, basePatch, sessionDeleted, restoredSpanIds]);
 
-  // The rename each row should read with while it is unsaved. Only this
-  // session's drafts: the stored correction is already in the tree the reader
-  // came from.
-  const draftNames = useMemo(() => {
-    if (!isEditing) return NO_DRAFT_NAMES;
-    const names = new Map<string, string>();
-    for (const [spanId, draft] of Object.entries(spanDrafts)) {
-      if (draft.name !== undefined) names.set(spanId, draft.name);
-    }
-    return names;
-  }, [isEditing, spanDrafts]);
+  const draftNames = useMemo(
+    () =>
+      isEditing ? correctedNames({ basePatch, spanDrafts }) : NO_DRAFT_NAMES,
+    [isEditing, basePatch, spanDrafts],
+  );
 
   const toggleSpanDeleted = useCallback(
     (spanId: string) => {

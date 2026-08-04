@@ -74,15 +74,21 @@ Feature: Editing a trace in the drawer
       When the drawer hydrates from that link
       Then the trace opens without edit mode
 
+    @integration
+    Scenario: A sample preview trace is never offered for editing
+      Given I am reading a sample preview trace
+      When I open the trace actions menu
+      Then I do not see an action to edit the trace
+
   Rule: While editing, the reader stays on a view that can be edited
 
-    @planned
+    @integration
     Scenario: Entering edit mode from the conversation view moves to the trace view
       Given I am reading the conversation view
       When I start editing the trace
       Then the trace view is shown
 
-    @planned
+    @integration
     Scenario: Views that cannot be edited are unavailable while editing
       Given I am editing the trace
       Then the conversation, usage and terminal tabs cannot be opened
@@ -113,6 +119,15 @@ Feature: Editing a trace in the drawer
       And the drawer is no longer editing
 
     @integration
+    Scenario: Saving builds on the correction as it stands
+      Given I am editing the trace
+      And a correction was stored after I started editing
+      And I have renamed a span
+      When I save the correction
+      Then the stored correction keeps what the other correction changed
+      And it carries my rename as well
+
+    @integration
     Scenario: A failed save keeps the reviewer in edit mode with their work
       Given I am editing the trace
       And I have renamed a span
@@ -128,6 +143,20 @@ Feature: Editing a trace in the drawer
       When I rename a span
       Then the waterfall lists that span under its new name
       And the row reads as edited
+
+    @integration
+    Scenario: A rename from an earlier correction still reads while editing
+      Given the trace has a correction that renames a span
+      When I start editing the trace
+      Then the waterfall lists that span under its corrected name
+      And the row still reads as edited
+
+    @integration
+    Scenario: A second correction starts from what the first one said
+      Given the trace has a correction that renames a span
+      When I open that span while editing
+      Then the name editor shows the corrected name
+      And correcting another field keeps that rename
 
   Rule: Unsaved work is never discarded silently
 
@@ -153,19 +182,42 @@ Feature: Editing a trace in the drawer
       When I cancel editing
       Then the drawer is no longer editing
 
-    @planned
+    @integration
     Scenario: Closing the drawer with unsaved changes asks first
       Given I am editing the trace
       And I have renamed a span
       When I close the drawer
       Then I am asked whether to discard my changes
 
-    @planned
+    @integration
     Scenario: Navigating to another trace with unsaved changes asks first
       Given I am editing the trace
       And I have renamed a span
       When I open a different trace
       Then I am asked whether to discard my changes
+
+    @integration
+    Scenario: Going back to an earlier trace with unsaved changes asks first
+      Given I am editing a trace I opened from another one
+      And I have renamed a span
+      When I go back to the trace I came from
+      Then I am asked whether to discard my changes
+      And I am still on the trace I was correcting
+
+    @integration
+    Scenario: Browser back with unsaved changes keeps the correction
+      Given I am editing the trace
+      And I have renamed a span
+      When I use the browser's back button
+      Then the trace is still open with my changes
+      And I am asked whether to discard them
+
+    @unit
+    Scenario: Touching a field and putting it back leaves nothing to save
+      Given I am editing the trace
+      When I rename a span and type its captured name back
+      Then there is nothing to save
+      And the field no longer reads as edited
 
   Rule: Editing a field is a plain text edit that keeps its shape
 
@@ -196,10 +248,16 @@ Feature: Editing a trace in the drawer
       Then the output cannot be edited here
       And the reason is explained
 
-    @planned
+    @integration
     Scenario: A redacted field carries no editor
       Given I am editing a span whose input is hidden from me
       Then the input cannot be edited
+
+    @unit
+    Scenario: The system prompt shown with the messages is not edited into them
+      Given I am editing a span whose system prompt is recorded apart from its messages
+      When I open the input editor
+      Then the editor shows the messages without the system prompt
 
   Rule: Attributes are editable as key and value pairs
 
@@ -222,6 +280,21 @@ Feature: Editing a trace in the drawer
       When I add an attribute using a key that already exists
       Then I am told the key already exists
       And the attribute is not added
+
+    @integration
+    Scenario: Adding an attribute rejects a key the filter is hiding
+      Given I am editing a span with attributes
+      And I have filtered the attributes down to a few rows
+      When I add an attribute using a key the filter is hiding
+      Then I am told the key already exists
+      And the attribute is not added
+
+    @unit
+    Scenario: An attribute changed before the stored correction arrives keeps it
+      Given the trace has a correction that changes a span attribute
+      And I change another attribute on that span before the correction is read
+      When I save the correction
+      Then it carries both attributes
 
     @integration
     Scenario: An attribute hidden from me carries no editor
@@ -248,7 +321,7 @@ Feature: Editing a trace in the drawer
       Given I am editing a trace whose spans form a tree
       Then each span's delete action names that span
 
-    @planned
+    @integration
     Scenario: Deleting the selected span closes its detail pane
       Given I am editing the trace
       And a span is selected
@@ -281,6 +354,12 @@ Feature: Editing a trace in the drawer
       Given the trace has no correction
       When I open the trace
       Then there is nothing to switch between
+
+    @unit
+    Scenario: The captured trace is a choice about the trace in front of me
+      Given I switched to the captured trace
+      When I open another trace
+      Then it opens corrected
 
     @unit
     Scenario: A deleted span is hidden in the corrected trace

@@ -39,7 +39,7 @@ export const useTranslationState = () => {
 
 type ActionButtonProps = {
   tooltipContent: string;
-  onClick: (e: React.MouseEvent) => void;
+  onClick: () => void;
   children: ReactNode;
 };
 
@@ -57,6 +57,15 @@ const ActionButton = ({
       <Box
         role="button"
         aria-label={tooltipContent}
+        // A box that says it is a button has to behave like one: reachable by
+        // Tab, and fired by the keys a real button fires on.
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          e.stopPropagation();
+          onClick();
+        }}
         width="38px"
         height="38px"
         display="flex"
@@ -70,7 +79,7 @@ const ActionButton = ({
         backgroundColor="bg.panel"
         onClick={(e) => {
           e.stopPropagation();
-          onClick(e);
+          onClick();
         }}
         cursor="pointer"
       >
