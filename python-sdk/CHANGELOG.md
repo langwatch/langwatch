@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.0.0...python-sdk@v1.1.0) (2026-08-04)
+
+
+### Features
+
+* **gateway:** align the REST provisioning surface with the service layer, six-scope budgets with live spend, per-key spend read, CLI n-by-n ([#6268](https://github.com/langwatch/langwatch/issues/6268)) ([5459a31](https://github.com/langwatch/langwatch/commit/5459a31a0f82a1c2579c084322fbaf46f290c985))
+* **gateway:** billing-grade spend pipeline, webhook endpoints platform, and the reconciliation surface ([#6395](https://github.com/langwatch/langwatch/issues/6395)) ([75ae272](https://github.com/langwatch/langwatch/commit/75ae272c4835f29c370a66691adb3e533aa113d8))
+
+
+### Bug Fixes
+
+* **sdk:** normalize the configured endpoint so a trailing slash stops 404ing ([#6509](https://github.com/langwatch/langwatch/issues/6509)) ([dc337b0](https://github.com/langwatch/langwatch/commit/dc337b0f8dd3edabda34b5e15a36fd547a8929fe))
+
 ## [1.0.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.26.0...python-sdk@v1.0.0) (2026-07-24)
 
 
