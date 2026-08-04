@@ -94,10 +94,10 @@ Governance routes register through the same `describeRoute` + `hono-openapi` pip
 # from langwatch/
 pnpm run task generateOpenAPISpec   # regenerate openapiLangWatch.json from the Hono routes
 
-# from typescript-sdk/
+# from sdks/typescript/
 pnpm generate:openapi-types         # regenerate the TS generated client from that spec
 
-# from python-sdk/ (regenerates the spec first, then the client)
+# from sdks/python/ (regenerates the spec first, then the client)
 make generate/api-client            # regenerate the Python generated client
 ```
 

@@ -13703,10 +13703,10 @@ Governance routes register through the same `describeRoute` + `hono-openapi` pip
 # from langwatch/
 pnpm run task generateOpenAPISpec   # regenerate openapiLangWatch.json from the Hono routes
 
-# from typescript-sdk/
+# from sdks/typescript/
 pnpm generate:openapi-types         # regenerate the TS generated client from that spec
 
-# from python-sdk/ (regenerates the spec first, then the client)
+# from sdks/python/ (regenerates the spec first, then the client)
 make generate/api-client            # regenerate the Python generated client
 ```
 
@@ -17338,9 +17338,9 @@ obligation on your own application. MIT still asks you to retain its copyright
 and permission notice when you redistribute the SDK or a substantial portion of
 it, which is the usual third-party-notices entry rather than a constraint on how
 you license your own code. The rows are read most-specific
-first: the SDK directories are MIT even though they sit outside `langwatch/ee/`.
+first: the SDK directories are MIT even though they sit outside `platform/app/ee/`.
 
-The header is the first line of the file, written as `SPDX-License-Identifier: <identifier>` behind whatever the language uses for a line comment: `//` in TypeScript and Go, `#` in Python and YAML. It is a single line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary flip one line to record the result. Recording it is not the same as making it true: the SPDX line states a file's license, it does not relicense existing contributions, so a move across the boundary needs the rights checked and any applicable notices preserved before the line changes. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives in [`langwatch/ee/LICENSE.md`](https://github.com/langwatch/langwatch/blob/main/langwatch/ee/LICENSE.md), and the per-directory breakdown is in [`NOTICE`](https://github.com/langwatch/langwatch/blob/main/NOTICE).
+The header is the first line of the file, written as `SPDX-License-Identifier: <identifier>` behind whatever the language uses for a line comment: `//` in TypeScript and Go, `#` in Python and YAML. It is a single line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary flip one line to record the result. Recording it is not the same as making it true: the SPDX line states a file's license, it does not relicense existing contributions, so a move across the boundary needs the rights checked and any applicable notices preserved before the line changes. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives in [`platform/app/ee/LICENSE.md`](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md), and the per-directory breakdown is in [`NOTICE`](https://github.com/langwatch/langwatch/blob/main/NOTICE).
 
 The directory is what the license follows, read most-specific row first rather than as a single Apache-2.0-unless-`ee` rule. The SPDX header records the result per file, and files that predate the convention do not carry one yet.
 
@@ -56443,7 +56443,7 @@ Volume is bounded by your own hardware, not by us. Self-hosted deployments are n
 | **Extended retention** | Multi-class retention policies configured per category. |
 | **Support and SLA** | Named contact, response targets, upgrade guidance. |
 
-The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`langwatch/ee/`](https://github.com/langwatch/langwatch/tree/main/langwatch/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/langwatch/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
+The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
 
 ## SSO requires a license
 
