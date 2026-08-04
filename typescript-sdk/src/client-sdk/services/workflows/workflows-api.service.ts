@@ -19,6 +19,7 @@ import type {
   RunWithResultsOptions,
   ExperimentRunWithResults,
 } from "@/client-sdk/services/experiments/platformTypes";
+import { resolveEndpoint } from "@/internal/endpoint";
 
 export type WorkflowResponse = NonNullable<
   paths["/api/workflows"]["get"]["responses"]["200"]["content"]["application/json"]
@@ -70,10 +71,7 @@ export class WorkflowsApiService {
     config?: Pick<InternalConfig, "langwatchApiClient"> & { endpoint?: string },
   ) {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
-    this.endpoint =
-      config?.endpoint ??
-      process.env.LANGWATCH_ENDPOINT ??
-      "https://app.langwatch.ai";
+    this.endpoint = resolveEndpoint(config?.endpoint);
     this.experimentsApiService = new ExperimentsApiService({
       langwatchApiClient: this.apiClient,
     });

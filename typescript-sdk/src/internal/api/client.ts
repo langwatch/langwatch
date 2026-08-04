@@ -7,7 +7,7 @@ import {
   LANGWATCH_SDK_RUNTIME,
   LANGWATCH_SDK_VERSION,
 } from "../constants";
-import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { resolveEndpoint } from "@/internal/endpoint";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { buildAuthHeaders } from "./auth";
 import { handledErrorFrom } from "./errors";
@@ -79,11 +79,11 @@ export const createLangWatchApiClient = (
   // requests can't read each other's credential. A plain SDK embed sets no
   // scope and falls back to the environment unchanged.
   apiKey: string = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "",
-  endpoint: string = process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT,
+  endpoint?: string,
   projectId: string | undefined = process.env.LANGWATCH_PROJECT_ID,
 ) => {
   const client = openApiCreateClient<paths>({
-    baseUrl: endpoint,
+    baseUrl: resolveEndpoint(endpoint),
     headers: {
       ...buildAuthHeaders({ apiKey, projectId }),
       "content-type": "application/json",

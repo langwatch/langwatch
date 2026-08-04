@@ -16,6 +16,7 @@
  */
 
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { normalizeEndpoint } from "@/internal/endpoint";
 import { loadConfig } from "./config";
 
 export interface ResolveEndpointOptions {
@@ -42,11 +43,11 @@ export function resolveControlPlaneEndpoint(
   opts: ResolveEndpointOptions = {},
 ): ResolvedEndpoint {
   if (opts.flag) {
-    return { url: stripTrailingSlash(opts.flag), source: "flag" };
+    return { url: normalizeEndpoint(opts.flag), source: "flag" };
   }
   const env = process.env.LANGWATCH_ENDPOINT;
   if (env && env.trim() !== "") {
-    return { url: stripTrailingSlash(env), source: "env" };
+    return { url: normalizeEndpoint(env), source: "env" };
   }
   // Reading the config involves disk I/O; only do it if we need to.
   // Callers that already have a cfg in scope can pass it in to skip.
@@ -64,9 +65,9 @@ export function resolveControlPlaneEndpoint(
   // the hardcoded default, treat it as a user choice.
   const persisted = cfg?.control_plane_url;
   if (persisted && persisted !== DEFAULT_ENDPOINT) {
-    return { url: stripTrailingSlash(persisted), source: "config" };
+    return { url: normalizeEndpoint(persisted), source: "config" };
   }
-  return { url: stripTrailingSlash(DEFAULT_ENDPOINT), source: "default" };
+  return { url: normalizeEndpoint(DEFAULT_ENDPOINT), source: "default" };
 }
 
 /**
@@ -78,8 +79,4 @@ export function resolveControlPlaneUrl(
   opts: ResolveEndpointOptions = {},
 ): string {
   return resolveControlPlaneEndpoint(opts).url;
-}
-
-function stripTrailingSlash(url: string): string {
-  return url.replace(/\/+$/, "");
 }
