@@ -3,10 +3,10 @@ name: code-scanners
 # The deterministic scanners that were configured but never executed.
 #
 # `.coderabbit.yaml` has enabled gitleaks and pointed semgrep at
-# `.semgrep/langwatch.yml` for a long time, and `coderabbit-config-check.yml`
+# `dev/lint/semgrep/langwatch.yml` for a long time, and `coderabbit-config-check.yml`
 # proves that ruleset PARSES — but nothing has ever run either against the
 # repository except CodeRabbit itself, once per PR, as a comment. Same shape as
-# the ast-grep ruleset before it moved to /.ast-grep/.
+# the ast-grep ruleset before it moved to dev/lint/ast-grep/.
 #
 # Everything here is DIFF-SCOPED. Measured baselines at the time of writing:
 #
@@ -133,7 +133,7 @@ jobs:
       # check coderabbit-config-check.yml already does, repeated here so this
       # workflow fails honestly rather than scanning with a broken config.
       - name: Ruleset validates
-        run: semgrep --validate --config .semgrep/langwatch.yml
+        run: semgrep --validate --config dev/lint/semgrep/langwatch.yml
 
       # REPORT-ONLY for now, for two measured reasons — promote to --error
       # once both are dealt with:
@@ -154,10 +154,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             git fetch --no-tags origin "${{ github.base_ref }}"
-            semgrep --config .semgrep/langwatch.yml --quiet \
+            semgrep --config dev/lint/semgrep/langwatch.yml --quiet \
               --baseline-commit "$(git merge-base HEAD "origin/${{ github.base_ref }}")" .
           else
-            semgrep --config .semgrep/langwatch.yml --quiet .
+            semgrep --config dev/lint/semgrep/langwatch.yml --quiet .
           fi
 
   # Two jobs rather than one, because they are on different tiers and a single
@@ -223,7 +223,7 @@ jobs:
         continue-on-error: true
         run: |
           pip install pip-audit==2.9.0
-          for req in $(git ls-files '*requirements*.txt' 'python-sdk/pyproject.toml' 'langevals/pyproject.toml'); do
+          for req in $(git ls-files '*requirements*.txt' 'sdks/python/pyproject.toml' 'services/langevals/pyproject.toml'); do
             echo "==> $req"
             pip-audit -r "$req" || true
           done

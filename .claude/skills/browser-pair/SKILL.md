@@ -41,7 +41,7 @@ Before starting, create a task for each step below using TaskCreate. Chain seque
 Navigate to the app URL. Take a snapshot to see the page state.
 
 If you land on a login/signup page:
-1. Check `scripts/verify-browser-test.js` in the project for test credentials
+1. Check `dev/scripts/verify-browser-test.js` in the project for test credentials
 2. Register or sign in with those credentials
 3. Complete any onboarding flow (pick quick defaults)
 4. Navigate to the main app

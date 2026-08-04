@@ -1,5 +1,5 @@
 // Harness for the prompt-spans integration tests. The wire-format
-// helper (sdk-go/prompts) is unit-tested in sdk-go/prompts/prompts_test.go;
+// helper (sdks/go/prompts) is unit-tested in sdks/go/prompts/prompts_test.go;
 // the engine-side helper (emitPromptSpans) is unit-tested in
 // services/nlpgo/app/engine/prompt_spans_emit_test.go. This file's job
 // is to validate the DISPATCH BOUNDARY — that an HTTP request to

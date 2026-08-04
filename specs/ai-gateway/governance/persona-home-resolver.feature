@@ -16,7 +16,7 @@ Feature: Persona-aware home resolver
   Plus an override: `User.lastHomePath` (when explicitly set by user pinning).
 
   Spec scope: the resolver function contract and its 4 personas. Implementation
-  in `langwatch/src/server/governance/personaResolver.service.ts`. UI plumbing
+  in `platform/app/src/server/governance/personaResolver.service.ts`. UI plumbing
   in `pages/index.tsx` via the existing client-side hook + redirect pattern
   (the Vite SPA architecture rarely uses `getServerSideProps`; the tRPC
   procedure `api.governance.resolveHome` runs the resolver server-side).

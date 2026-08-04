@@ -8,7 +8,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   See _shared/contract.md §7.
 
-  # The feature-parity checker (langwatch/scripts/check-feature-parity.ts) has a
+  # The feature-parity checker (platform/app/scripts/check-feature-parity.ts) has a
   # Go walker, so scenarios here bind to Go tests via a `@scenario` comment above
   # the test func. The execution-semantics scenarios are bound to
   # services/nlpgo/tests/integration (code_block_spec_test.go and

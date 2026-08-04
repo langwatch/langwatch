@@ -13,6 +13,7 @@ import (
 
 type fakeSupervisor struct {
 	shells []string
+	dirs   []string
 	envs   [][]string
 	err    error
 	// errOn, when non-empty, fails only the shell containing this substring —
@@ -20,8 +21,9 @@ type fakeSupervisor struct {
 	errOn string
 }
 
-func (f *fakeSupervisor) RunOnce(_ context.Context, _, _, shell string, env []string) error {
+func (f *fakeSupervisor) RunOnce(_ context.Context, _, dir, shell string, env []string) error {
 	f.shells = append(f.shells, shell)
+	f.dirs = append(f.dirs, dir)
 	f.envs = append(f.envs, env)
 	if f.errOn != "" {
 		if strings.Contains(shell, f.errOn) {

@@ -8,7 +8,7 @@ import (
 
 // `haven up` has three presentations and one stack. The attached viewer takes
 // the alt-screen, so it is only ever right for a human terminal: rendering it
-// into `pnpm dev:haven | tee` would write escape codes into the pipe, and into
+// into `make haven up | tee` would write escape codes into the pipe, and into
 // an agent's stdout would bury the output it is reading.
 //
 // @scenario "A piped up streams in the foreground"
