@@ -71,8 +71,9 @@ export interface CodingAgentSessionData {
   /**
    * Spawn lineage, when the agent stamps it: the session that spawned this
    * one, and whether this session FORKED the parent's context (inheriting the
-   * whole window, and its cost) rather than starting fresh. Most agents emit
-   * no lineage today, so these honestly stay null/false for them.
+   * whole window, and its cost) rather than starting fresh. No agent observed
+   * to date stamps lineage, so these stay null/false: empty means it was
+   * never reported, not that the session has no parent.
    */
   parentSessionId: string | null;
   isFork: boolean;

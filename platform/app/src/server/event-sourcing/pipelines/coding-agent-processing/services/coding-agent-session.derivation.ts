@@ -386,6 +386,12 @@ function withIdentity(
       str(attrs["user.account_id"]),
     // Spawn lineage, for agents that stamp it. Once-set like the rest of the
     // identity: a session has ONE parent, and a fork stays a fork.
+    //
+    // Nothing observed so far stamps it. A session that spawned a sub-agent
+    // with every enhanced-telemetry knob on carried neither key, while that
+    // sub-agent's own `agent_id` does arrive and is counted by `seenSubAgent`.
+    // So empty reads as "no lineage was reported", never as "this is a root
+    // session": the two are indistinguishable from here.
     parentSessionId: state.parentSessionId ?? str(attrs.parent_session_id),
     isFork: state.isFork || scalarStr(attrs.is_fork) === "true",
   };
