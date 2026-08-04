@@ -990,6 +990,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // per-job path below is unchanged.
     const maxBatch = this.coalesceMaxBatch?.(payload) ?? 1;
     let batchPayloads: Payload[] | null = null;
+    // Staged-job id per batch member, index-aligned with batchPayloads, so a
+    // bisected failure can name the payload it narrowed to.
+    let batchJobIds: string[] = [];
     let drainedSiblings: DrainedJob[] = [];
     if (maxBatch > 1 && this.processBatch) {
       // Byte bound (ADR-066 pillar 2): the drain also stops before a job that
@@ -1075,6 +1078,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           drainedSiblings = liveSiblings;
           if (siblingPayloads.length > 0) {
             batchPayloads = [payload, ...siblingPayloads];
+            batchJobIds = [
+              stagedJobId,
+              ...liveSiblings.map((sibling) => sibling.stagedJobId),
+            ];
           }
         } catch (err) {
           if (err instanceof TransientBlobStoreError) {
@@ -1236,7 +1243,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     batchPayloads.length,
                   );
                   await this.processBatchBisecting({
-                    payloads: batchPayloads,
+                    entries: batchPayloads.map((batchPayload, index) => ({
+                      payload: batchPayload,
+                      stagedJobId: batchJobIds[index] ?? stagedJobId,
+                    })),
                     attempt,
                     routingLabels,
                     span,
@@ -1808,61 +1818,152 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * size, so bisecting one only multiplies the work before the same verdict.
    */
   private async processBatchBisecting({
-    payloads,
+    entries,
     attempt,
     routingLabels,
     span,
+    narrowed = false,
   }: {
-    payloads: Payload[];
+    /**
+     * Payloads paired with the staged job each came from, so a failure that
+     * narrows to one payload can name it. Carrying the id is the whole reason
+     * bisection is worth more than a retry: without it the throw is anonymous
+     * and the terminal record anchors to the DISPATCHED job, which for a failing
+     * drained sibling is the wrong job entirely.
+     */
+    entries: { payload: Payload; stagedJobId: string }[];
     attempt: number;
     routingLabels: Record<string, string>;
     span: Span;
+    /** True in a recursive call — i.e. this batch is the product of a split. */
+    narrowed?: boolean;
   }): Promise<void> {
     if (!this.processBatch) {
       throw new Error("processBatchBisecting called without a batch handler");
     }
 
     try {
-      await this.processBatch(payloads, { attempt });
-      return;
-    } catch (err) {
-      // A single payload is already the smallest attributable unit, and a
-      // non-retryable error fails the same way at every size.
-      if (payloads.length <= 1 || !isRetryableJobError(err)) {
-        throw err;
-      }
-
-      const mid = Math.ceil(payloads.length / 2);
-      gqBatchBisectionsTotal.inc(routingLabels);
-      span.addEvent("queue.batch_bisected", {
-        "queue.batch_size": payloads.length,
-        "queue.batch_split_at": mid,
-      });
-      this.logger.warn(
-        {
-          queueName: this.queueName,
-          batchSize: payloads.length,
-          splitAt: mid,
-          attempt,
-          error: err instanceof Error ? err : new Error(String(err)),
-        },
-        "Coalesced batch failed; splitting in half and retrying each half in order",
+      await this.processBatch(
+        entries.map((entry) => entry.payload),
+        { attempt },
       );
-
-      // Sequential and contiguous — see the ordering note above.
-      await this.processBatchBisecting({
-        payloads: payloads.slice(0, mid),
+    } catch (err) {
+      await this.splitFailedBatch({
+        entries,
         attempt,
         routingLabels,
         span,
-      });
-      await this.processBatchBisecting({
-        payloads: payloads.slice(mid),
-        attempt,
-        routingLabels,
-        span,
+        narrowed,
+        err,
       });
     }
+  }
+
+  /**
+   * The failure half of {@link processBatchBisecting}: decide whether this
+   * batch can usefully be made smaller, and if so run both halves in order.
+   *
+   * Split out so each half of the decision stays readable on its own — the
+   * happy path is one call, and everything about *why* a failure does or does
+   * not warrant a split lives here.
+   */
+  private async splitFailedBatch({
+    entries,
+    attempt,
+    routingLabels,
+    span,
+    narrowed,
+    err,
+  }: {
+    entries: { payload: Payload; stagedJobId: string }[];
+    attempt: number;
+    routingLabels: Record<string, string>;
+    span: Span;
+    narrowed: boolean;
+    err: unknown;
+  }): Promise<void> {
+    // Fails the same way at every size, so splitting only multiplies the work
+    // before reaching the identical verdict.
+    if (!isRetryableJobError(err)) {
+      throw err;
+    }
+
+    if (entries.length <= 1) {
+      // Smallest attributable unit — report it, then let the existing retry
+      // and quarantine path take over.
+      this.reportBisectedIsolate({
+        entry: narrowed ? entries[0] : undefined,
+        attempt,
+        span,
+        err,
+      });
+      throw err;
+    }
+
+    const mid = Math.ceil(entries.length / 2);
+    gqBatchBisectionsTotal.inc(routingLabels);
+    span.addEvent("queue.batch_bisected", {
+      "queue.batch_size": entries.length,
+      "queue.batch_split_at": mid,
+    });
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        batchSize: entries.length,
+        splitAt: mid,
+        attempt,
+        error: err instanceof Error ? err : new Error(String(err)),
+      },
+      "Coalesced batch failed; splitting in half and retrying each half in order",
+    );
+
+    // Sequential and contiguous — see the ordering note on the caller.
+    await this.processBatchBisecting({
+      entries: entries.slice(0, mid),
+      attempt,
+      routingLabels,
+      span,
+      narrowed: true,
+    });
+    await this.processBatchBisecting({
+      entries: entries.slice(mid),
+      attempt,
+      routingLabels,
+      span,
+      narrowed: true,
+    });
+  }
+
+  /**
+   * Names the payload a bisection narrowed to, so the offender is attributable
+   * rather than "something in that batch".
+   *
+   * `entry` is undefined when the failing batch of one was never split — an
+   * un-split single is just a job that failed, and reporting it as an isolate
+   * would send an investigator hunting for a bisection that never happened.
+   */
+  private reportBisectedIsolate({
+    entry,
+    attempt,
+    span,
+    err,
+  }: {
+    entry: { payload: Payload; stagedJobId: string } | undefined;
+    attempt: number;
+    span: Span;
+    err: unknown;
+  }): void {
+    if (!entry) return;
+    this.logger.error(
+      {
+        queueName: this.queueName,
+        offendingStagedJobId: entry.stagedJobId,
+        attempt,
+        error: err instanceof Error ? err : new Error(String(err)),
+      },
+      "Coalesced batch narrowed to a single failing payload; this staged job is the offender",
+    );
+    span.setAttribute("queue.batch_offending_job_id", entry.stagedJobId);
   }
 
   private async restageDrainedSiblings(

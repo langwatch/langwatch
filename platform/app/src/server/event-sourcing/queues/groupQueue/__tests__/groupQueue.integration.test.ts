@@ -15,6 +15,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
+import { ConfigurationError } from "../../../services/errorHandling";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
 
@@ -881,8 +882,9 @@ describe.skipIf(!hasTestcontainers)(
 
           const queue = createQueue(
             async (p) => {
-              // The isolate ends up here only if it is ever dispatched alone;
-              // healthy singles land here too once a half narrows to one.
+              // Only reached when the queue dispatches a job with no siblings
+              // to coalesce. A split that narrows to one payload still goes
+              // through processBatch with a one-element batch, never here.
               if (p.id === POISON) throw new Error("unprocessable payload");
               committed.push(p.id);
             },
@@ -911,7 +913,7 @@ describe.skipIf(!hasTestcontainers)(
             })),
           );
 
-          const HEALTHY_PREFIX = ["j0", "j1", "j2", "j3", "j4"];
+          const HEALTHY_PREFIX = ["j0", "j1", "j2", "j3", "j4"] as const;
 
           // j0..j4 commit despite sharing a batch with the offender. Without
           // bisection the whole batch fails together and NONE of them apply —
@@ -1006,6 +1008,10 @@ describe.skipIf(!hasTestcontainers)(
           const MAX_WORKABLE = 2;
           const seen: string[] = [];
 
+          const sizes: number[] = [];
+          let inFlight = 0;
+          let maxConcurrent = 0;
+
           const queue = createQueue(
             async (p) => {
               seen.push(p.id);
@@ -1013,6 +1019,14 @@ describe.skipIf(!hasTestcontainers)(
             {
               processBatch: async (ps) => {
                 const batch = ps as TestPayload[];
+                sizes.push(batch.length);
+                inFlight += 1;
+                maxConcurrent = Math.max(maxConcurrent, inFlight);
+                // Yield so a concurrent sibling call would overlap here and be
+                // caught by maxConcurrent, rather than being hidden by a
+                // handler that never awaits.
+                await new Promise((resolve) => setTimeout(resolve, 5));
+                inFlight -= 1;
                 // Models a size-driven downstream limit (a query that exceeds
                 // its memory budget): nothing is wrong with any individual
                 // payload, the batch is simply too big for one pass.
@@ -1046,6 +1060,57 @@ describe.skipIf(!hasTestcontainers)(
           // re-assemble a smaller batch — and without re-applying a payload
           // that already succeeded inside this dispatch.
           expect(seen.length).toBe(8);
+
+          // The exact descent, which a "sizes are non-increasing" assertion
+          // would not pin: 8 fails, its left half 4 fails, that half's two 2s
+          // succeed, then the right 4 fails and its two 2s succeed. Any
+          // concurrency between halves, or a fallback to one-at-a-time instead
+          // of halving, produces a different sequence.
+          expect(sizes).toEqual([8, 4, 2, 2, 4, 2, 2]);
+
+          // Sequential, not merely ordered: no batch ever started while
+          // another was still running.
+          expect(maxConcurrent).toBe(1);
+        });
+      });
+
+      describe("when a coalesced batch fails non-retryably", () => {
+        it("fails fast without splitting", async () => {
+          const attempts: number[] = [];
+
+          const queue = createQueue(async () => {}, {
+            processBatch: async (ps) => {
+              attempts.push(ps.length);
+              // CRITICAL category — `isRetryableJobError` is false for this, so
+              // the batch must not be split: it would fail identically at every
+              // size, and bisecting only multiplies work before the same
+              // verdict.
+              throw new ConfigurationError("test-handler", "not retryable");
+            },
+            coalesceMaxBatch: () => 50,
+            score: (p) => Number(p.value) * 1000,
+          });
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
+          );
+
+          await vi.waitFor(
+            () => {
+              expect(attempts.length).toBeGreaterThan(0);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // Give any split a chance to appear before asserting none did.
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          expect(attempts.every((n) => n === attempts[0])).toBe(true);
+          expect(Math.min(...attempts)).toBeGreaterThan(1);
         });
       });
 
