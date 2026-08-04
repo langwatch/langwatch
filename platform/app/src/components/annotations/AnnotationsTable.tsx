@@ -55,6 +55,10 @@ function SelectCheckbox({
   return (
     <ChakraButton
       type="button"
+      // `aria-checked` is a checkbox state, and the `button` role drops it, so
+      // the wrapper takes the checkbox role. A native <button> still gives it
+      // click and Space/Enter handling for free.
+      role="checkbox"
       aria-label={ariaLabel}
       aria-checked={
         checked === true ? "true" : checked === false ? "false" : "mixed"
@@ -72,7 +76,10 @@ function SelectCheckbox({
         onToggle();
       }}
     >
-      <Box pointerEvents="none" display="inline-flex">
+      {/* The Chakra control is decoration: it renders its own hidden input,
+          which would otherwise sit inside the button as a second, inert
+          checkbox node. */}
+      <Box pointerEvents="none" display="inline-flex" aria-hidden="true">
         <Checkbox size="sm" checked={checked} />
       </Box>
     </ChakraButton>
@@ -228,11 +235,11 @@ export const AnnotationsTable = ({
     [allQueueItems],
   );
   const selectedCount = selectedTraceIds.size;
-  const allPageSelected =
+  const isAllPageSelected =
     pageTraceIds.length > 0 &&
     pageTraceIds.every((traceId) => selectedTraceIds.has(traceId));
-  const headerChecked: boolean | "indeterminate" =
-    selectedCount === 0 ? false : allPageSelected ? true : "indeterminate";
+  const headerCheckedState: boolean | "indeterminate" =
+    selectedCount === 0 ? false : isAllPageSelected ? true : "indeterminate";
 
   const toggleTrace = useCallback((traceId: string) => {
     setSelectedTraceIds((current) => {
@@ -247,8 +254,8 @@ export const AnnotationsTable = ({
   }, []);
 
   const togglePage = useCallback(() => {
-    setSelectedTraceIds(allPageSelected ? new Set() : new Set(pageTraceIds));
-  }, [allPageSelected, pageTraceIds]);
+    setSelectedTraceIds(isAllPageSelected ? new Set() : new Set(pageTraceIds));
+  }, [isAllPageSelected, pageTraceIds]);
 
   const addSelectionToDataset = useCallback(async () => {
     const allowed = await datasetGate.requestEnable();
@@ -503,7 +510,7 @@ export const AnnotationsTable = ({
                         {pageTraceIds.length > 0 && (
                           <SelectCheckbox
                             ariaLabel="Select all on this page"
-                            checked={headerChecked}
+                            checked={headerCheckedState}
                             onToggle={togglePage}
                           />
                         )}

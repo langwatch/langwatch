@@ -17,7 +17,9 @@ import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
 const PROJECT_ID = "test-project-id";
-const TRACE_ID = "trace-edit-overlay-integration";
+/** Every trace this suite writes starts with it, so cleanup can be scoped. */
+const TRACE_ID_PREFIX = "trace-edit-overlay";
+const TRACE_ID = `${TRACE_ID_PREFIX}-integration`;
 
 const renameSpanPatch = (name: string): TraceEditOverlayPatch => ({
   version: 1,
@@ -105,15 +107,26 @@ describe("Trace edit overlay storage", () => {
     await joinProject({ userId: readOnly.id, role: TeamUserRole.VIEWER });
     viewer = callerFor(readOnly.id);
 
+    // Scoped to this suite's own trace ids: the project is a shared fixture, so
+    // a project-wide delete would take another suite's rows with it.
     await prisma.traceEditOverlay.deleteMany({
-      where: { projectId: PROJECT_ID },
+      where: {
+        projectId: PROJECT_ID,
+        traceId: { startsWith: TRACE_ID_PREFIX },
+      },
     });
   });
 
   afterAll(async () => {
     const reviewers = [otherReviewerId, readOnlyId];
     await cleanupTestRows(prisma, [
-      ["traceEditOverlay", { projectId: PROJECT_ID }],
+      [
+        "traceEditOverlay",
+        {
+          projectId: PROJECT_ID,
+          traceId: { startsWith: TRACE_ID_PREFIX },
+        },
+      ],
       ["teamUser", { userId: { in: reviewers }, teamId }],
       ["organizationUser", { userId: { in: reviewers }, organizationId }],
       ["user", { id: { in: reviewers } }],

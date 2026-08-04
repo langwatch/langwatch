@@ -45,7 +45,11 @@ export function useTraceDrawerUrlHydrator(): void {
       const alreadyOnTrace =
         store.traceId === traceId && store.occurredAtMs === validTimestamp;
       if (!alreadyOnTrace) store.openTrace(traceId, validTimestamp);
-      syncEditMode({ traceId, editParam: params.edit });
+      syncEditMode({
+        traceId,
+        editParam: params.edit,
+        openDrawer: drawerRef.current.openDrawer,
+      });
       return;
     }
 
@@ -82,7 +86,7 @@ function keepDrawerForUnsavedEdit({
   }
   if (!selectIsTraceEditDirty(editStore)) return false;
 
-  drawer.setEditing(true);
+  drawer.setIsEditing(true);
   openDrawer("traceV2Details", {
     traceId: editingTraceId,
     ...(drawer.occurredAtMs !== null ? { t: String(drawer.occurredAtMs) } : {}),
@@ -107,12 +111,15 @@ function keepDrawerForUnsavedEdit({
 function syncEditMode({
   traceId,
   editParam,
+  openDrawer,
 }: {
   traceId: string;
   editParam: string | undefined;
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
 }): void {
   const wantsEdit = parseEditParam({ raw: editParam, traceId });
-  const editingTraceId = useTraceEditStore.getState().editingTraceId;
+  const editStore = useTraceEditStore.getState();
+  const editingTraceId = editStore.editingTraceId;
 
   if (wantsEdit) {
     // Starting over would drop the drafts, so only a different trace does that.
@@ -120,11 +127,24 @@ function syncEditMode({
     // and leaving it cleared would strip `drawer.edit` from a link that asks
     // for edit mode and take the drafts with it.
     if (editingTraceId !== traceId) enterTraceEditMode(traceId);
-    else useDrawerStore.getState().setEditing(true);
+    else useDrawerStore.getState().setIsEditing(true);
     return;
   }
 
   if (editingTraceId === null) return;
-  if (selectIsTraceEditDirty(useTraceEditStore.getState())) return;
-  exitTraceEditMode();
+  if (!selectIsTraceEditDirty(editStore)) {
+    exitTraceEditMode();
+    return;
+  }
+  // The correction stays, so the link has to say so. Leaving the URL without
+  // `drawer.edit` would keep the edit bar on screen over a link that reads as
+  // "not editing", and the next reload would take the work with it unasked.
+  if (editingTraceId !== traceId) return;
+  const drawer = useDrawerStore.getState();
+  drawer.setIsEditing(true);
+  openDrawer("traceV2Details", {
+    traceId,
+    ...(drawer.occurredAtMs !== null ? { t: String(drawer.occurredAtMs) } : {}),
+    urlParams: { edit: "1" },
+  });
 }

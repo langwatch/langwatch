@@ -55,7 +55,13 @@ export function TraceEditDiffDialog({
     <Dialog.Root
       open={open}
       onOpenChange={(e) => {
-        if (!e.open) onClose();
+        if (!e.open) {
+          // The pick belongs to one reading of the difference. The dialog stays
+          // mounted between openings, so keeping it would land the next one on
+          // a side that may have nothing to read this time.
+          setPickedTab(null);
+          onClose();
+        }
       }}
       size="xl"
       placement="center"

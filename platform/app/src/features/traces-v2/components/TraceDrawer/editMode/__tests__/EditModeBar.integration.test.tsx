@@ -80,7 +80,7 @@ describe("EditModeBar", () => {
     mutationOptions = {};
     storedCorrectionIs(null);
     useTraceEditStore.getState().discard();
-    useDrawerStore.getState().setEditing(true);
+    useDrawerStore.getState().setIsEditing(true);
     useTraceEditStore.getState().startEditing({ traceId: "trace-1" });
   });
 
@@ -106,7 +106,7 @@ describe("EditModeBar", () => {
         expect(
           screen.queryByText("Discard trace edits?"),
         ).not.toBeInTheDocument();
-        expect(useDrawerStore.getState().editing).toBe(false);
+        expect(useDrawerStore.getState().isEditing).toBe(false);
         expect(useTraceEditStore.getState().editingTraceId).toBeNull();
       });
     });
@@ -176,7 +176,7 @@ describe("EditModeBar", () => {
           projectId: "proj-1",
           traceId: "trace-1",
         });
-        expect(useDrawerStore.getState().editing).toBe(false);
+        expect(useDrawerStore.getState().isEditing).toBe(false);
       });
 
       /** @scenario "Saving builds on the correction as it stands" */
@@ -215,7 +215,7 @@ describe("EditModeBar", () => {
 
         await waitFor(() => expect(showErrorToast).toHaveBeenCalled());
         expect(mutate).not.toHaveBeenCalled();
-        expect(useDrawerStore.getState().editing).toBe(true);
+        expect(useDrawerStore.getState().isEditing).toBe(true);
       });
     });
 
@@ -233,7 +233,7 @@ describe("EditModeBar", () => {
             fallbackTitle: "Couldn't save trace edits",
           }),
         );
-        expect(useDrawerStore.getState().editing).toBe(true);
+        expect(useDrawerStore.getState().isEditing).toBe(true);
         expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe(
           "search the web",
         );
@@ -253,7 +253,7 @@ describe("EditModeBar", () => {
         expect(
           screen.getByText("Your changes to this trace have not been saved."),
         ).toBeInTheDocument();
-        expect(useDrawerStore.getState().editing).toBe(true);
+        expect(useDrawerStore.getState().isEditing).toBe(true);
       });
 
       /** @scenario "Cancelling with unsaved changes asks first" */
@@ -265,7 +265,7 @@ describe("EditModeBar", () => {
           await screen.findByRole("button", { name: "Keep editing" }),
         );
 
-        expect(useDrawerStore.getState().editing).toBe(true);
+        expect(useDrawerStore.getState().isEditing).toBe(true);
         expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe(
           "search the web",
         );
@@ -280,7 +280,7 @@ describe("EditModeBar", () => {
           await screen.findByRole("button", { name: "Discard changes" }),
         );
 
-        expect(useDrawerStore.getState().editing).toBe(false);
+        expect(useDrawerStore.getState().isEditing).toBe(false);
         expect(useTraceEditStore.getState().spanDrafts).toEqual({});
         expect(useTraceEditStore.getState().deletedSpanIds).toEqual([]);
       });

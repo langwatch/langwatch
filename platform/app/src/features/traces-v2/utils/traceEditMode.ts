@@ -1,15 +1,8 @@
-import { useDrawerStore } from "../stores/drawerStore";
+import { isUneditableViewMode, useDrawerStore } from "../stores/drawerStore";
 import {
   selectIsTraceEditDirty,
   useTraceEditStore,
 } from "../stores/traceEditStore";
-
-/**
- * Views that replay an agent run rather than showing the trace's own spans.
- * There is nothing to correct in them, so entering edit mode moves the reader
- * to the Trace view first.
- */
-const READ_ONLY_VIEW_MODES = new Set(["conversation", "terminal", "session"]);
 
 /**
  * Starts correcting a trace: the drawer flips into edit mode (which the URL
@@ -18,19 +11,19 @@ const READ_ONLY_VIEW_MODES = new Set(["conversation", "terminal", "session"]);
  */
 export function enterTraceEditMode(traceId: string): void {
   const drawer = useDrawerStore.getState();
-  if (READ_ONLY_VIEW_MODES.has(drawer.viewMode)) {
+  if (isUneditableViewMode(drawer.viewMode)) {
     // Transient: the reviewer did not choose the Trace view, so it must not
     // become the tab they land on for every trace afterwards.
     drawer.setViewModeTransient("trace");
   }
   useTraceEditStore.getState().startEditing({ traceId });
-  drawer.setEditing(true);
+  drawer.setIsEditing(true);
 }
 
 /** Leaves edit mode and drops the uncommitted correction. */
 export function exitTraceEditMode(): void {
   useTraceEditStore.getState().discard();
-  useDrawerStore.getState().setEditing(false);
+  useDrawerStore.getState().setIsEditing(false);
 }
 
 /**
@@ -41,7 +34,7 @@ export function exitTraceEditMode(): void {
 export function guardTraceEditExit(run: () => void): boolean {
   const editStore = useTraceEditStore.getState();
   if (
-    !useDrawerStore.getState().editing ||
+    !useDrawerStore.getState().isEditing ||
     !selectIsTraceEditDirty(editStore)
   ) {
     run();

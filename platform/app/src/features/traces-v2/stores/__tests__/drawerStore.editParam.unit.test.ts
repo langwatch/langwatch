@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { parseEditParam, useDrawerStore } from "../drawerStore";
+import {
+  parseEditParam,
+  useDrawerStore,
+  viewModeForEditState,
+} from "../drawerStore";
 import { selectIsTraceEditDirty, useTraceEditStore } from "../traceEditStore";
 
 describe("drawer.edit URL parameter", () => {
   beforeEach(() => {
     useTraceEditStore.getState().discard();
-    useDrawerStore.getState().setEditing(false);
+    useDrawerStore.getState().setIsEditing(false);
   });
 
   describe("given a link that asks for edit mode", () => {
@@ -39,11 +43,43 @@ describe("drawer.edit URL parameter", () => {
     });
   });
 
+  describe("given a link that asks for edit mode and a view that cannot be edited", () => {
+    describe("when the drawer reads it", () => {
+      /** @scenario "A link naming edit mode and a view that cannot be edited opens on the trace" */
+      it("opens on the trace view", () => {
+        for (const viewMode of [
+          "conversation",
+          "terminal",
+          "session",
+        ] as const) {
+          expect(viewModeForEditState({ viewMode, isEditing: true })).toBe(
+            "trace",
+          );
+        }
+      });
+
+      it("keeps the view the link names when it is not editing", () => {
+        expect(
+          viewModeForEditState({
+            viewMode: "conversation",
+            isEditing: false,
+          }),
+        ).toBe("conversation");
+      });
+
+      it("keeps a view that can be edited", () => {
+        expect(
+          viewModeForEditState({ viewMode: "summary", isEditing: true }),
+        ).toBe("summary");
+      });
+    });
+  });
+
   describe("given an editing session with unsaved changes", () => {
     describe("when browser history moves to a URL without the parameter", () => {
       /** @scenario "Cancelling with unsaved changes asks first" */
       it("keeps the session open rather than discarding the work", () => {
-        useDrawerStore.getState().setEditing(true);
+        useDrawerStore.getState().setIsEditing(true);
         useTraceEditStore.getState().startEditing({ traceId: "trace-1" });
         useTraceEditStore.getState().setSpanName({
           spanId: "span-1",
@@ -51,9 +87,9 @@ describe("drawer.edit URL parameter", () => {
           baselineName: "handler",
         });
 
-        useDrawerStore.getState().hydrateUrlState({ editing: false });
+        useDrawerStore.getState().hydrateUrlState({ isEditing: false });
 
-        expect(useDrawerStore.getState().editing).toBe(true);
+        expect(useDrawerStore.getState().isEditing).toBe(true);
         expect(selectIsTraceEditDirty(useTraceEditStore.getState())).toBe(true);
       });
     });
@@ -63,12 +99,12 @@ describe("drawer.edit URL parameter", () => {
     describe("when browser history moves to a URL without the parameter", () => {
       /** @scenario "Cancelling without changes leaves edit mode straight away" */
       it("leaves edit mode", () => {
-        useDrawerStore.getState().setEditing(true);
+        useDrawerStore.getState().setIsEditing(true);
         useTraceEditStore.getState().startEditing({ traceId: "trace-1" });
 
-        useDrawerStore.getState().hydrateUrlState({ editing: false });
+        useDrawerStore.getState().hydrateUrlState({ isEditing: false });
 
-        expect(useDrawerStore.getState().editing).toBe(false);
+        expect(useDrawerStore.getState().isEditing).toBe(false);
       });
     });
   });

@@ -17,19 +17,19 @@ import { useTraceEditOverlay } from "./useTraceEditOverlay";
  * Mounted by the drawer body, which is the only place edit mode exists.
  */
 export function useTraceEditSession(traceId: string | undefined): void {
-  const editing = useDrawerStore((s) => s.editing);
+  const isEditing = useDrawerStore((s) => s.isEditing);
   const overlay = useTraceEditOverlay();
   const overlayPatch = overlay.data?.patch;
 
   useEffect(() => {
-    if (!editing || !traceId || !overlayPatch) return;
+    if (!isEditing || !traceId || !overlayPatch) return;
     useTraceEditStore
       .getState()
       .adoptBasePatch({ traceId, basePatch: overlayPatch });
-  }, [editing, traceId, overlayPatch]);
+  }, [isEditing, traceId, overlayPatch]);
 
   useEffect(() => {
-    if (!editing) return;
+    if (!isEditing) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (!selectIsTraceEditDirty(useTraceEditStore.getState())) return;
       // The browser shows its own wording here; assigning is what arms it.
@@ -38,5 +38,5 @@ export function useTraceEditSession(traceId: string | undefined): void {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [editing]);
+  }, [isEditing]);
 }

@@ -110,11 +110,11 @@ const trace = (traceId: string, overrides: Partial<Trace> = {}): Trace =>
     ...overrides,
   }) as Trace;
 
-const renamePatch = (name: string): TraceEditOverlayPatch => ({
+const traceOutputPatch = (output: string): TraceEditOverlayPatch => ({
   version: 1,
   spans: [],
   deletedSpanIds: [],
-  trace: { output: { value: name } },
+  trace: { output: { value: output } },
 });
 
 const buildService = () =>
@@ -196,7 +196,7 @@ describe("TraceService read seam for reviewer corrections", () => {
         trace("trace-3"),
       ]);
       mockGetPatchesByTraceIds.mockResolvedValue(
-        new Map([["trace-2", renamePatch("only trace two")]]),
+        new Map([["trace-2", traceOutputPatch("only trace two")]]),
       );
 
       const traces = await buildService().getTracesWithSpans(
@@ -229,8 +229,8 @@ describe("TraceService read seam for reviewer corrections", () => {
       ]);
       mockGetPatchesByTraceIds.mockResolvedValue(
         new Map([
-          ["trace-1", renamePatch("first correction")],
-          ["trace-2", renamePatch("second correction")],
+          ["trace-1", traceOutputPatch("first correction")],
+          ["trace-2", traceOutputPatch("second correction")],
         ]),
       );
 

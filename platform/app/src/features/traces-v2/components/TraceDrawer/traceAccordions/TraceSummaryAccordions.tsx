@@ -48,12 +48,19 @@ export function TraceSummaryAccordions({
   spans: SpanTreeNode[];
   onSelectSpan?: (spanId: string) => void;
 }) {
-  const isEditing = useDrawerStore((s) => s.editing);
+  const isEditing = useDrawerStore((s) => s.isEditing);
   // The trace's own output is the one trace-level field a correction can
   // replace, so it is the only one that carries the corrected treatment here.
   const appliedPatch = useAppliedTraceEditPatch();
   const outputCorrected = appliedPatch?.trace?.output !== undefined;
-  const capturedOutput = useTraceHeaderCanonical().data?.output;
+  const canonicalHeader = useTraceHeaderCanonical().data;
+  // `keepPreviousData` leaves the previous trace's header in place until the
+  // new read lands, so the captured value is only this trace's while the two
+  // agree on which trace it belongs to.
+  const capturedOutput =
+    canonicalHeader?.traceId === trace.traceId
+      ? canonicalHeader.output
+      : undefined;
   const hasIO = !!(trace.input || trace.output);
   // A restrict privacy rule hides content the viewer may not see — the server
   // nulls `input`/`output` and sets these flags. The IO section then reads as a

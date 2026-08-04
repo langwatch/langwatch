@@ -64,7 +64,7 @@ describe("EditedOriginalToggle", () => {
   beforeEach(() => {
     overlayData.current = null;
     useTraceEditStore.getState().discard();
-    useDrawerStore.getState().setEditing(false);
+    useDrawerStore.getState().setIsEditing(false);
   });
 
   afterEach(cleanup);
@@ -115,7 +115,7 @@ describe("EditedOriginalToggle", () => {
 
     describe("when the reviewer is editing", () => {
       it("steps out of the way", () => {
-        useDrawerStore.getState().setEditing(true);
+        useDrawerStore.getState().setIsEditing(true);
 
         renderToggle();
 

@@ -129,7 +129,7 @@ describe("AttributeTable editing", () => {
     });
 
     describe("when an attribute is added with a new key", () => {
-      /** @scenario "Adding an attribute rejects a key that already exists" */
+      /** @scenario "Adding an attribute with a key the span does not have records it" */
       it("records the addition", () => {
         const onEditAttribute = vi.fn();
         const { getByLabelText, getByRole } = renderEditable({

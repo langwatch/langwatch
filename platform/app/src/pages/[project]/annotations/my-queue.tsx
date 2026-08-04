@@ -12,7 +12,7 @@ import { Check, ChevronLeft, ChevronRight } from "react-feather";
 import { LuPencil } from "react-icons/lu";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { Checkbox } from "~/components/ui/checkbox";
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -66,11 +66,15 @@ export default function TraceAnnotations() {
   }
 
   const refetchQueueItems = useCallback(async () => {
-    await queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
-    await queryClient.annotation.getMarkedForDatasetItems.invalidate();
-    await queryClient.annotation.getPendingItemsCount.invalidate();
-    await queryClient.annotation.getAssignedItemsCount.invalidate();
-    await queryClient.annotation.getQueueItemsCounts.invalidate();
+    // Five independent reads, so they go together: one queue action should not
+    // cost five sequential round trips.
+    await Promise.all([
+      queryClient.annotation.getOptimizedAnnotationQueues.invalidate(),
+      queryClient.annotation.getMarkedForDatasetItems.invalidate(),
+      queryClient.annotation.getPendingItemsCount.invalidate(),
+      queryClient.annotation.getAssignedItemsCount.invalidate(),
+      queryClient.annotation.getQueueItemsCounts.invalidate(),
+    ]);
   }, [queryClient]);
 
   const traceDetails = api.traces.getById.useQuery(
@@ -127,14 +131,14 @@ export default function TraceAnnotations() {
   const projectId = project?.id;
   // The hand-off waits for a queue that has been read, walked to its end, and
   // still has marks to answer for.
-  const handoffDue =
+  const isHandoffDue =
     !queuesLoading &&
     !markedItemsQuery.isLoading &&
     pendingQueueItems.length === 0 &&
     markedTraceIds.length > 0;
 
   useEffect(() => {
-    if (!handoffDue || !projectId) return;
+    if (!isHandoffDue || !projectId) return;
     if (offeredHandoffFor.current === markSignature) return;
 
     offeredHandoffFor.current = markSignature;
@@ -149,7 +153,7 @@ export default function TraceAnnotations() {
     });
     openDrawer("addDatasetRecord", { selectedTraceIds: markedTraceIds });
   }, [
-    handoffDue,
+    isHandoffDue,
     markSignature,
     markedTraceIds,
     markedItemIds,
@@ -315,18 +319,16 @@ const AnnotationQueuePicker = ({
       },
       {
         onSuccess: () => void refetchQueueItems(),
-        onError: () => {
+        onError: (error) => {
           setMarkAnswers((answers) => ({
             ...answers,
             [currentQueueItem.id]: !marked,
           }));
-          toaster.create({
-            title: marked
-              ? "Could not mark this item for the dataset"
-              : "Could not remove the mark from this item",
-            description: "Please try again.",
-            type: "error",
-            meta: { closable: true },
+          showErrorToast({
+            error,
+            fallbackTitle: marked
+              ? "Couldn't mark this item for the dataset"
+              : "Couldn't remove the mark from this item",
           });
         },
       },

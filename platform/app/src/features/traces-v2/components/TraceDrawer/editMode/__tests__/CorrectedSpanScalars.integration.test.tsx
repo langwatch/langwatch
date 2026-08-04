@@ -59,7 +59,7 @@ describe("CorrectedSpanScalars", () => {
 
   describe("given a correction that changed the span type", () => {
     describe("when the span detail renders", () => {
-      /** @scenario "A corrected span name names its captured name" */
+      /** @scenario "A corrected span type names its captured type" */
       it("names the captured type", () => {
         renderScalars(["type"]);
 

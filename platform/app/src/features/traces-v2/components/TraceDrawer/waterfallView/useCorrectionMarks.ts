@@ -28,7 +28,7 @@ export function useCorrectionMarks(spans: SpanTreeNode[]): {
   const overlay = useTraceEditOverlay();
   const overlayView = useTraceEditStore((s) => s.overlayView);
   const basePatch = useTraceEditStore((s) => s.basePatch);
-  const isEditing = useDrawerStore((s) => s.editing);
+  const isEditing = useDrawerStore((s) => s.isEditing);
   // While editing, the correction the session builds on is the one that counts:
   // a row it already changed still reads as edited, so a second pass never looks
   // like it lost the first one. It is adopted a beat after editing starts, and

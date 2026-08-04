@@ -143,7 +143,7 @@ export const MessageHoverActions = ({
   };
 
   const { setCommentState } = useAnnotationCommentStore();
-  const [suggestingCorrection, setSuggestingCorrection] = useState(false);
+  const [isSuggestingCorrection, setIsSuggestingCorrection] = useState(false);
 
   const { drawerOpen } = useDrawer();
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
@@ -208,7 +208,7 @@ export const MessageHoverActions = ({
 
       <ActionButton
         tooltipContent="Suggest"
-        onClick={() => setSuggestingCorrection(true)}
+        onClick={() => setIsSuggestingCorrection(true)}
       >
         <TextCursorInput size={"20px"} />
       </ActionButton>
@@ -216,13 +216,13 @@ export const MessageHoverActions = ({
       {/* Mounted only while it is open, and anchored to a hidden span beside
           the action column, the same way the trace drawer anchors its own
           correction popover. */}
-      {suggestingCorrection && (
+      {isSuggestingCorrection && (
         <AnnotationPopover
           traceId={trace.trace_id}
           output={stringifyIfObject(trace.output?.value)}
           mode="suggest"
-          open={suggestingCorrection}
-          onOpenChange={setSuggestingCorrection}
+          open={isSuggestingCorrection}
+          onOpenChange={setIsSuggestingCorrection}
           trigger={
             <Box
               as="span"

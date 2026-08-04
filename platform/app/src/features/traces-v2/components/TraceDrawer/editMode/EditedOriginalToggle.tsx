@@ -26,7 +26,7 @@ const VIEW_OPTIONS = [
  */
 export function EditedOriginalToggle() {
   const overlay = useTraceEditOverlay();
-  const isEditing = useDrawerStore((s) => s.editing);
+  const isEditing = useDrawerStore((s) => s.isEditing);
   const overlayView = useTraceEditStore((s) => s.overlayView);
   const setOverlayView = useTraceEditStore((s) => s.setOverlayView);
   // Shared with the hover on every corrected field, so both reach one dialog.

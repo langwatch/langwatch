@@ -48,7 +48,7 @@ export function useWaterfallEditing(spans: SpanTreeNode[]): {
   draftNames: ReadonlyMap<string, string>;
   toggleSpanDeleted: (spanId: string) => void;
 } {
-  const isEditing = useDrawerStore((s) => s.editing);
+  const isEditing = useDrawerStore((s) => s.isEditing);
   const clearSpan = useDrawerStore((s) => s.clearSpan);
   const unpinSpan = useDrawerStore((s) => s.unpinSpan);
   const basePatch = useTraceEditStore((s) => s.basePatch);

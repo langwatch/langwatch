@@ -72,7 +72,11 @@ export function TraceOverflowMenu({
   const { openDrawer } = useDrawer();
   const { project, hasPermission } = useOrganizationTeamProject();
   const canShare = hasPermission("traces:share");
-  const canQueueForAnnotation = hasPermission("annotations:create");
+  // Queueing a trace for annotation is the same authenticated review work the
+  // correction is, so the share view leaves it out rather than relying on the
+  // reader happening to hold no permission on the project.
+  const canQueueForAnnotation =
+    !readOnly && hasPermission("annotations:create");
   // Correcting a trace is review work, which is the permission external
   // reviewers hold, and it is the same one the correction write itself checks.
   // A sample preview trace is left out: it exists only to show an empty project

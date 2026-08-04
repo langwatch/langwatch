@@ -186,6 +186,14 @@ const EMPTY_DRAFTS = {
   traceOutputDraft: null as SpanIODraft | null,
 };
 
+/** No session, and nothing left over from the last one. */
+const CLEARED_SESSION = {
+  editingTraceId: null as string | null,
+  basePatch: null as TraceEditOverlayPatch | null,
+  pendingExit: null as (() => void) | null,
+  ...EMPTY_DRAFTS,
+};
+
 function withSpanDraft(
   drafts: Record<string, SpanEditDraft>,
   spanId: string,
@@ -365,20 +373,10 @@ const sessionActions = (set: SetTraceEditState) => ({
         : s,
     ),
 
-  stopEditing: () =>
-    set({
-      editingTraceId: null,
-      basePatch: null,
-      pendingExit: null,
-      ...EMPTY_DRAFTS,
-    }),
-  discard: () =>
-    set({
-      editingTraceId: null,
-      basePatch: null,
-      pendingExit: null,
-      ...EMPTY_DRAFTS,
-    }),
+  // Leaving edit mode and discarding the drafts clear the same session; the two
+  // names are kept because the call sites read as different intentions.
+  stopEditing: () => set(CLEARED_SESSION),
+  discard: () => set(CLEARED_SESSION),
 });
 
 /**
@@ -528,7 +526,11 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
   ...spanRemovalActions(set),
 
   setTraceOutput: ({ text, baselineText }) =>
-    set({ traceOutputDraft: { text, baselineText } }),
+    set({
+      traceOutputDraft: ioTextIsUnchanged({ text, baselineText })
+        ? null
+        : { text, baselineText },
+    }),
   resetTraceOutput: () => set({ traceOutputDraft: null }),
 
   setOverlayView: (view) => set({ overlayView: view }),

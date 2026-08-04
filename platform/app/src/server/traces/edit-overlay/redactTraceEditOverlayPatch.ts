@@ -24,11 +24,11 @@ const SPAN_FIELD_CONTENT_CATEGORY: Record<
   output: "output",
 };
 
-/** Which content categories this viewer may not read on this trace. */
-interface DeniedCategories {
-  input: boolean;
-  output: boolean;
-}
+/**
+ * Whether this viewer is denied each content category on this trace. Keyed by
+ * category so a span field can look its own category up directly.
+ */
+type IsDeniedByCategory = Record<"input" | "output", boolean>;
 
 function deniedCategoriesFor({
   protections,
@@ -36,7 +36,7 @@ function deniedCategoriesFor({
 }: {
   protections: Protections;
   windowRedacted?: boolean;
-}): DeniedCategories {
+}): IsDeniedByCategory {
   return {
     input: protections.canSeeCapturedInput !== true || windowRedacted === true,
     output:
@@ -53,18 +53,18 @@ function deniedCategoriesFor({
 function readableFieldValue({
   field,
   spanPatch,
-  denied,
+  isDeniedByCategory,
   hiddenAttributes,
 }: {
   field: TraceEditSpanField;
   spanPatch: TraceEditSpanPatch;
-  denied: DeniedCategories;
+  isDeniedByCategory: IsDeniedByCategory;
   hiddenAttributes: Protections["hiddenAttributes"];
 }): unknown {
   const value = spanPatch[field];
   if (value === undefined) return void 0;
   const category = SPAN_FIELD_CONTENT_CATEGORY[field];
-  if (category !== null && denied[category]) return void 0;
+  if (category !== null && isDeniedByCategory[category]) return void 0;
   if (field === "params") {
     return redactHiddenAttributes(spanPatch.params, hiddenAttributes);
   }
@@ -74,11 +74,11 @@ function readableFieldValue({
 /** The span edits this viewer may read, or null when none of them survive. */
 function redactSpanPatch({
   spanPatch,
-  denied,
+  isDeniedByCategory,
   hiddenAttributes,
 }: {
   spanPatch: TraceEditSpanPatch;
-  denied: DeniedCategories;
+  isDeniedByCategory: IsDeniedByCategory;
   hiddenAttributes: Protections["hiddenAttributes"];
 }): TraceEditSpanPatch | null {
   const next: TraceEditSpanPatch = { spanId: spanPatch.spanId };
@@ -93,7 +93,7 @@ function redactSpanPatch({
     const value = readableFieldValue({
       field,
       spanPatch,
-      denied,
+      isDeniedByCategory,
       hiddenAttributes,
     });
     changed ||= value !== spanPatch[field];
@@ -111,18 +111,18 @@ function redactSpanPatch({
  */
 function redactTraceEdits({
   traceEdits,
-  denied,
+  isDeniedByCategory,
 }: {
   traceEdits: TraceEditOverlayPatch["trace"];
-  denied: DeniedCategories;
+  isDeniedByCategory: IsDeniedByCategory;
 }): { value: TraceEditOverlayPatch["trace"]; changed: boolean } {
   if (!traceEdits) return { value: traceEdits, changed: false };
 
   const next: NonNullable<TraceEditOverlayPatch["trace"]> = {};
-  if (!denied.input && traceEdits.input !== undefined) {
+  if (!isDeniedByCategory.input && traceEdits.input !== undefined) {
     next.input = traceEdits.input;
   }
-  if (!denied.output && traceEdits.output !== undefined) {
+  if (!isDeniedByCategory.output && traceEdits.output !== undefined) {
     next.output = traceEdits.output;
   }
 
@@ -159,17 +159,25 @@ export function redactPatchForViewer({
   protections: Protections;
   windowRedacted?: boolean;
 }): TraceEditOverlayPatch {
-  const denied = deniedCategoriesFor({ protections, windowRedacted });
-  const hiddenAttributes = denied.input ? void 0 : protections.hiddenAttributes;
+  const isDeniedByCategory = deniedCategoriesFor({
+    protections,
+    windowRedacted,
+  });
+  const hiddenAttributes = isDeniedByCategory.input
+    ? void 0
+    : protections.hiddenAttributes;
 
-  const traceEdits = redactTraceEdits({ traceEdits: patch.trace, denied });
+  const traceEdits = redactTraceEdits({
+    traceEdits: patch.trace,
+    isDeniedByCategory,
+  });
   let changed = traceEdits.changed;
 
   const spans: TraceEditSpanPatch[] = [];
   for (const spanPatch of patch.spans) {
     const redacted = redactSpanPatch({
       spanPatch,
-      denied,
+      isDeniedByCategory,
       hiddenAttributes,
     });
     if (redacted !== spanPatch) changed = true;

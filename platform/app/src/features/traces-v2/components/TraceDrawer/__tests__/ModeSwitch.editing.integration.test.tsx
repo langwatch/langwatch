@@ -88,9 +88,15 @@ describe("given a reviewer reading a trace", () => {
     it("opens every view", () => {
       const { onViewModeChange } = renderTabs({ isEditing: false });
 
-      fireEvent.click(tab("Conversation"));
+      for (const [label, mode] of [
+        ["Conversation", "conversation"],
+        ["Usage", "session"],
+        ["Terminal", "terminal"],
+      ] as const) {
+        fireEvent.click(tab(label));
 
-      expect(onViewModeChange).toHaveBeenCalledWith("conversation");
+        expect(onViewModeChange).toHaveBeenCalledWith(mode);
+      }
       expect(screen.queryByText(EDITING_REASON)).not.toBeInTheDocument();
     });
   });

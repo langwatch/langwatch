@@ -31,19 +31,28 @@ const buildService = (stored: unknown | null) => {
   const upsert = vi.fn(async ({ patch }: { patch: TraceEditOverlayPatch }) =>
     row(patch),
   );
+  const deleteRow = vi.fn(async () => undefined);
   const repository = {
     findByProjectAndTrace: vi.fn(async () => (stored ? row(stored) : null)),
     findAllByProjectAndTraces: vi.fn(async () => (stored ? [row(stored)] : [])),
     upsert,
-    delete: vi.fn(async () => undefined),
+    delete: deleteRow,
   } as unknown as TraceEditOverlayRepository;
 
   return {
     service: new TraceEditOverlayService(repository),
     repository,
     upsert,
+    deleteRow,
   };
 };
+
+const removeOutput = (service: TraceEditOverlayService) =>
+  service.removeTraceOutputEdit({
+    projectId: "project-1",
+    traceId: "trace-1",
+    userId: "user-2",
+  });
 
 describe("TraceEditOverlayService", () => {
   describe("given a stored correction that deletes and renames spans", () => {
@@ -129,6 +138,94 @@ describe("TraceEditOverlayService", () => {
       expect(merged.patch.spans).toEqual([]);
       expect(merged.patch.trace?.output).toEqual({
         value: "the right answer",
+      });
+    });
+  });
+
+  describe("given a correction whose only edit is the trace output", () => {
+    describe("when the corrected output is taken back off", () => {
+      /** @scenario "Clearing the only suggestion returns the trace to uncorrected" */
+      it("removes the correction outright", async () => {
+        const { service, deleteRow, upsert } = buildService({
+          version: 1,
+          spans: [],
+          deletedSpanIds: [],
+          trace: { output: { value: "the right answer" } },
+        });
+
+        expect(await removeOutput(service)).toBeNull();
+        expect(deleteRow).toHaveBeenCalledTimes(1);
+        expect(upsert).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a correction that also carries a corrected trace input", () => {
+    describe("when the corrected output is taken back off", () => {
+      it("keeps the input and leaves the correction in place", async () => {
+        const { service, deleteRow } = buildService({
+          version: 1,
+          spans: [],
+          deletedSpanIds: [],
+          trace: {
+            input: { value: "the real question" },
+            output: { value: "the right answer" },
+          },
+        });
+
+        const remaining = await removeOutput(service);
+
+        expect(remaining?.patch.trace).toEqual({
+          input: { value: "the real question" },
+        });
+        expect(deleteRow).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a correction that also renames and deletes spans", () => {
+    describe("when the corrected output is taken back off", () => {
+      /** @scenario "Clearing the suggestion takes the corrected output back off" */
+      it("keeps the span edits and drops only the trace output", async () => {
+        const { service, deleteRow } = buildService({
+          version: 1,
+          spans: [{ spanId: "span-1", name: "cleaned up" }],
+          deletedSpanIds: ["span-noise"],
+          trace: { output: { value: "the right answer" } },
+        });
+
+        const remaining = await removeOutput(service);
+
+        expect(remaining?.patch.trace).toBeUndefined();
+        expect(remaining?.patch.spans).toEqual([
+          { spanId: "span-1", name: "cleaned up" },
+        ]);
+        expect(remaining?.patch.deletedSpanIds).toEqual(["span-noise"]);
+        expect(deleteRow).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a trace with nothing to take off", () => {
+    describe("when the corrected output is taken back off", () => {
+      it("writes nothing when the trace has no correction", async () => {
+        const { service, deleteRow, upsert } = buildService(null);
+
+        expect(await removeOutput(service)).toBeNull();
+        expect(deleteRow).not.toHaveBeenCalled();
+        expect(upsert).not.toHaveBeenCalled();
+      });
+
+      it("writes nothing when the correction never touched the trace output", async () => {
+        const { service, deleteRow, upsert } = buildService({
+          version: 1,
+          spans: [{ spanId: "span-1", name: "cleaned up" }],
+          deletedSpanIds: [],
+        });
+
+        expect(await removeOutput(service)).toBeNull();
+        expect(deleteRow).not.toHaveBeenCalled();
+        expect(upsert).not.toHaveBeenCalled();
       });
     });
   });

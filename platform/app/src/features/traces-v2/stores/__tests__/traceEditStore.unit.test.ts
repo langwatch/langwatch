@@ -412,6 +412,25 @@ describe("traceEditStore", () => {
       });
     });
 
+    describe("when the trace output is typed back to what was captured", () => {
+      /** @scenario "Touching a field and putting it back leaves nothing to save" */
+      it("leaves no draft behind", () => {
+        state().startEditing({ traceId: "trace-1" });
+        state().setTraceOutput({
+          text: "a different answer",
+          baselineText: "the captured answer",
+        });
+
+        state().setTraceOutput({
+          text: "the captured answer",
+          baselineText: "the captured answer",
+        });
+
+        expect(state().traceOutputDraft).toBeNull();
+        expect(selectIsTraceEditDirty(draftState())).toBe(false);
+      });
+    });
+
     describe("when an attribute is set back to its captured value", () => {
       /** @scenario "Touching a field and putting it back leaves nothing to save" */
       it("leaves no draft behind", () => {

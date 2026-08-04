@@ -504,9 +504,9 @@ function isApiKeyIdRow(attrKey: string, value: unknown): value is string {
 /** How one row behaves while the reviewer is correcting the span. */
 interface RowEditing {
   /** True when the correction removes this key. */
-  removed: boolean;
+  isRemoved: boolean;
   /** True when the correction replaces this key's value. */
-  changed: boolean;
+  isChanged: boolean;
   onChangeValue: (value: unknown) => void;
   onRemove: () => void;
   onRestore: () => void;
@@ -527,8 +527,16 @@ function EditableValueCell({
   editing: RowEditing;
 }) {
   const display = formatValue(value);
+  // `formatValue` is the read-only renderer and answers an em dash for an
+  // empty value, which must never become text the reviewer is editing.
+  const editorText =
+    value === undefined || value === null
+      ? ""
+      : typeof value === "object"
+        ? JSON.stringify(value)
+        : String(value);
 
-  if (editing.removed) {
+  if (editing.isRemoved) {
     return (
       <HStack flex={1} minWidth={0} gap={2} paddingY={1}>
         <Text
@@ -559,13 +567,13 @@ function EditableValueCell({
       <Input
         size="xs"
         aria-label={`Edit ${attrKey}`}
-        value={value === undefined || value === null ? "" : display}
+        value={editorText}
         onChange={(e) =>
           editing.onChangeValue(parseAttributeInput(e.target.value))
         }
         fontFamily="mono"
-        bg={editing.changed ? "green.subtle" : undefined}
-        borderColor={editing.changed ? "green.muted" : "border.muted"}
+        bg={editing.isChanged ? "green.subtle" : undefined}
+        borderColor={editing.isChanged ? "green.muted" : "border.muted"}
       />
       <Button
         size="xs"
@@ -581,19 +589,19 @@ function EditableValueCell({
 
 /** A corrected row is tinted and ticked; a pinned one is only tinted. */
 function rowHighlight({
-  corrected,
-  pinned,
+  isCorrected,
+  isPinned,
 }: {
-  corrected: boolean;
-  pinned: boolean;
+  isCorrected: boolean;
+  isPinned: boolean;
 }): { bg?: string; boxShadow?: string } {
-  if (corrected) {
+  if (isCorrected) {
     return {
       bg: "green.subtle",
       boxShadow: "inset 2px 0 0 var(--chakra-colors-green-solid)",
     };
   }
-  if (pinned) return { bg: "bg.subtle" };
+  if (isPinned) return { bg: "bg.subtle" };
   return {};
 }
 
@@ -601,14 +609,14 @@ function rowHighlight({
 function RowLabelCell({
   attrKey,
   labelWidth,
-  pinned,
-  removed,
+  isPinned,
+  isRemoved,
 }: {
   attrKey: string;
   labelWidth: number;
-  pinned: boolean;
+  isPinned: boolean;
   /** The correction removes this attribute, so the name is struck through. */
-  removed: boolean;
+  isRemoved: boolean;
 }) {
   return (
     <Tooltip
@@ -621,9 +629,9 @@ function RowLabelCell({
         flexShrink={0}
         textStyle="xs"
         fontFamily="mono"
-        color={pinned ? "fg" : "fg.muted"}
-        fontWeight={pinned ? "semibold" : "normal"}
-        textDecoration={removed ? "line-through" : undefined}
+        color={isPinned ? "fg" : "fg.muted"}
+        fontWeight={isPinned ? "semibold" : "normal"}
+        textDecoration={isRemoved ? "line-through" : undefined}
         truncate
         paddingX={3}
         paddingY={1.5}
@@ -725,7 +733,7 @@ function FlatRow({
       gap={0}
       paddingRight={2}
       className="attr-row"
-      {...rowHighlight({ corrected: !!correction, pinned })}
+      {...rowHighlight({ isCorrected: !!correction, isPinned: pinned })}
     >
       {pinnable ? (
         <PinToggle
@@ -743,8 +751,8 @@ function FlatRow({
       <RowLabelCell
         attrKey={attrKey}
         labelWidth={labelWidth}
-        pinned={pinned}
-        removed={editing?.removed === true}
+        isPinned={pinned}
+        isRemoved={editing?.isRemoved === true}
       />
       <LabelResizeHandle onResize={onLabelResize} />
       <RowValueCell
@@ -788,8 +796,8 @@ function rowEditingFor({
 }): RowEditing | undefined {
   if (!editing || isLeading) return undefined;
   return {
-    removed: editing.edits[key] === null,
-    changed: key in editing.edits && editing.edits[key] !== null,
+    isRemoved: editing.edits[key] === null,
+    isChanged: key in editing.edits && editing.edits[key] !== null,
     onChangeValue: (value) => editing.onEditAttribute({ key, value }),
     onRemove: () => editing.onEditAttribute({ key, value: null }),
     onRestore: () => editing.onResetAttribute(key),

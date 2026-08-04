@@ -40,14 +40,14 @@ const storedCorrection: TraceEditOverlayPatch = {
 beforeEach(() => {
   mocks.storedPatch = null;
   useTraceEditStore.getState().discard();
-  useDrawerStore.getState().setEditing(false);
+  useDrawerStore.getState().setIsEditing(false);
   useDrawerStore.getState().clearSpan();
 });
 
 describe("given a trace that was already corrected once", () => {
   beforeEach(() => {
     mocks.storedPatch = storedCorrection;
-    useDrawerStore.getState().setEditing(true);
+    useDrawerStore.getState().setIsEditing(true);
     useTraceEditStore
       .getState()
       .startEditing({ traceId: "trace-1", basePatch: storedCorrection });
@@ -89,7 +89,7 @@ describe("given a trace that was already corrected once", () => {
 
 describe("given a span open in the detail pane while editing", () => {
   beforeEach(() => {
-    useDrawerStore.getState().setEditing(true);
+    useDrawerStore.getState().setIsEditing(true);
     useTraceEditStore.getState().startEditing({ traceId: "trace-1" });
     useDrawerStore.getState().selectSpan("span-2");
   });

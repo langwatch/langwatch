@@ -155,20 +155,25 @@ describe("Reading a trace correction", () => {
   });
 
   afterAll(async () => {
-    await cleanupTestRows(prisma, [
-      ["traceEditOverlay", { projectId: project.id }],
-      ["dataPrivacyPolicy", { organizationId }],
-      [
-        "roleBinding",
-        { userId: { in: [adminUserId, memberUserId] }, organizationId },
-      ],
-      [
-        "organizationUser",
-        { userId: { in: [adminUserId, memberUserId] }, organizationId },
-      ],
-      ["user", { id: { in: [adminUserId, memberUserId] } }],
-    ]);
-    globalForApp.__langwatch_app = previousApp;
+    // The swapped-in app is put back whatever cleanup reports, so a teardown
+    // failure here cannot leak this suite's app into the ones that follow.
+    try {
+      await cleanupTestRows(prisma, [
+        ["traceEditOverlay", { projectId: project.id }],
+        ["dataPrivacyPolicy", { organizationId }],
+        [
+          "roleBinding",
+          { userId: { in: [adminUserId, memberUserId] }, organizationId },
+        ],
+        [
+          "organizationUser",
+          { userId: { in: [adminUserId, memberUserId] }, organizationId },
+        ],
+        ["user", { id: { in: [adminUserId, memberUserId] } }],
+      ]);
+    } finally {
+      globalForApp.__langwatch_app = previousApp;
+    }
   });
 
   describe("given a reviewer the privacy policy keeps from captured content", () => {

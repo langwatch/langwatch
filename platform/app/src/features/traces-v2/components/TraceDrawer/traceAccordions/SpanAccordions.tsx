@@ -73,7 +73,7 @@ export function SpanAccordions({
 }) {
   const detailQuery = useSpanDetail();
   const detail = detailQuery.data;
-  const isEditing = useDrawerStore((s) => s.editing);
+  const isEditing = useDrawerStore((s) => s.isEditing);
   // What a stored correction changed about this span, and the span exactly as
   // captured, so each corrected field can show what it replaced.
   const { changedFields, captured } = useSpanCorrection(span.spanId);
@@ -89,7 +89,9 @@ export function SpanAccordions({
   const { logsBySpanId, isLoading: logsLoading } = useSpanLogs();
   const spanLogs = logsBySpanId.get(span.spanId) ?? [];
 
-  const hasIO = !!(detail?.input || detail?.output);
+  // Null checks rather than truthiness: a correction can set a field to the
+  // empty string, and that is content the section holds, not an absence.
+  const hasIO = detail?.input != null || detail?.output != null;
   // Any content category that is dropped, restricted, or restricted-but-visible
   // gives the I/O section something to show even when the content itself is
   // empty (so a fully hidden or dropped span still explains itself).
@@ -261,7 +263,7 @@ export function SpanAccordions({
                             capturedText={detail.input ?? null}
                             capturedParams={detail.params}
                           />
-                        ) : detail?.input ? (
+                        ) : detail?.input != null ? (
                           <MaybeCorrected
                             label="Input"
                             corrected={changedFields.includes("input")}
@@ -289,7 +291,7 @@ export function SpanAccordions({
                             label="Output"
                             capturedText={detail.output ?? null}
                           />
-                        ) : detail?.output ? (
+                        ) : detail?.output != null ? (
                           <MaybeCorrected
                             label="Output"
                             corrected={changedFields.includes("output")}

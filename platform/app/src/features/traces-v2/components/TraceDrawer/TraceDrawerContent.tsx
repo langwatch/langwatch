@@ -96,7 +96,7 @@ export function TraceDrawerContent({
   const expectedSpanCount = useDrawerStore((s) => s.expectedSpanCount);
   // Edit mode is an authenticated affordance, so the share surface never has
   // one to keep alive.
-  const isEditing = useDrawerStore((s) => s.editing) && !readOnly;
+  const isEditing = useDrawerStore((s) => s.isEditing) && !readOnly;
   useTraceEditSession(readOnly ? undefined : traceId);
 
   // Watch the actual rendered container so the layout decision reflects

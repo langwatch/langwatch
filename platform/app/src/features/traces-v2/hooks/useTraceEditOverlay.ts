@@ -15,7 +15,7 @@ export function useTraceEditOverlay() {
   const shared = useSharedTrace();
   const { isReady, queryArgs } = useTraceQueryArgs();
 
-  return api.traceEditOverlay.getByTraceId.useQuery(
+  const query = api.traceEditOverlay.getByTraceId.useQuery(
     { projectId: queryArgs.projectId, traceId: queryArgs.traceId },
     {
       enabled: isReady && !shared,
@@ -24,6 +24,15 @@ export function useTraceEditOverlay() {
       keepPreviousData: true,
     },
   );
+
+  // Guard against `keepPreviousData`: on a trace switch the previous trace's
+  // correction lingers in `query.data` until the new read lands. Handing it on
+  // would apply one trace's correction to another, and adopt it as the editing
+  // baseline for a trace it was never written against.
+  if (query.data && query.data.traceId !== queryArgs.traceId) {
+    return { ...query, data: null };
+  }
+  return query;
 }
 
 /**
@@ -37,9 +46,9 @@ export function useTraceEditOverlay() {
 export function useAppliedTraceEditPatch(): TraceEditOverlayPatch | null {
   const overlay = useTraceEditOverlay();
   const overlayView = useTraceEditStore((s) => s.overlayView);
-  const editing = useDrawerStore((s) => s.editing);
+  const isEditing = useDrawerStore((s) => s.isEditing);
 
-  if (editing) return null;
+  if (isEditing) return null;
   if (overlayView !== "edited") return null;
   return overlay.data?.patch ?? null;
 }

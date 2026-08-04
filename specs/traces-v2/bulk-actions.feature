@@ -298,7 +298,7 @@ Rule: Send selected traces to an annotation queue
 
   Background:
     Given the user is authenticated with "traces:view" permission
-    And the user is authenticated with "annotations:create" permission
+    And the user has "annotations:create" permission
     And the project has traces
 
   @integration
@@ -368,6 +368,7 @@ Rule: Send selected traces to an annotation queue
     Then the failure is reported as "Couldn't add to annotation queue"
     And the counts are not refreshed
 
+  @integration
   Scenario: The trace drawer offers the same action for a single trace
     # Same dialog, one trace: `TraceOverflowMenu` -> `DrawerHeader` owns the
     # open state, alongside the share dialog and behind the same read-only guard.
@@ -375,6 +376,7 @@ Rule: Send selected traces to an annotation queue
     When the user picks "Add to annotation queue" from the overflow menu
     Then the same dialog opens for that one trace
 
+  @integration
   Scenario: A shared trace never offers the action
     Given the trace drawer is rendered read-only on a share page
     Then no annotation queue action is offered

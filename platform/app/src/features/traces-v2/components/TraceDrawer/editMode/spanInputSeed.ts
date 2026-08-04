@@ -16,7 +16,13 @@ function readSystemInstructions(
   return null;
 }
 
-function isSystemMessageFor(message: unknown, instructions: string): boolean {
+function isSystemMessageFor({
+  message,
+  instructions,
+}: {
+  message: unknown;
+  instructions: string;
+}): boolean {
   if (!message || typeof message !== "object" || Array.isArray(message)) {
     return false;
   }
@@ -53,6 +59,6 @@ export function capturedInputForEditing({
     return text;
   }
   if (!Array.isArray(messages)) return text;
-  if (!isSystemMessageFor(messages[0], instructions)) return text;
+  if (!isSystemMessageFor({ message: messages[0], instructions })) return text;
   return JSON.stringify(messages.slice(1));
 }

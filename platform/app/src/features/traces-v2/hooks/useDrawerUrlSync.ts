@@ -11,6 +11,7 @@ import {
   serializePinnedSpansParam,
   useDrawerStore,
   type VizTab,
+  viewModeForEditState,
 } from "../stores/drawerStore";
 
 const DEFAULTS = {
@@ -37,20 +38,24 @@ function readUrlState(): DrawerUrlState {
       vizTab: DEFAULTS.viz,
       selectedSpanId: null,
       pinnedSpanIds: [],
-      editing: false,
+      isEditing: false,
     };
   }
   const params = new URLSearchParams(window.location.search);
   const span = params.get("drawer.span");
+  const isEditing = parseEditParam({
+    raw: params.get("drawer.edit"),
+    traceId: params.get("drawer.traceId"),
+  });
   return {
-    viewMode: parseMode(params.get("drawer.mode") ?? undefined),
+    viewMode: viewModeForEditState({
+      viewMode: parseMode(params.get("drawer.mode") ?? undefined),
+      isEditing,
+    }),
     vizTab: parseViz(params.get("drawer.viz") ?? undefined),
     selectedSpanId: span,
     pinnedSpanIds: parsePinnedSpansParam(params.get("drawer.pinnedSpans")),
-    editing: parseEditParam({
-      raw: params.get("drawer.edit"),
-      traceId: params.get("drawer.traceId"),
-    }),
+    isEditing,
   };
 }
 
@@ -94,7 +99,7 @@ export function useDrawerUrlSync() {
   const vizTab = useDrawerStore((s) => s.vizTab);
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
-  const editing = useDrawerStore((s) => s.editing);
+  const isEditing = useDrawerStore((s) => s.isEditing);
 
   // Parsed URL view of the same fields. We compare against these — not
   // raw store-vs-store — so a freshly-clicked tab never re-pushes when the
@@ -109,7 +114,7 @@ export function useDrawerUrlSync() {
     () => serializePinnedSpansParam(pinnedSpanIds) ?? "",
     [pinnedSpanIds],
   );
-  const urlEditing = params.edit === "1";
+  const isEditingInUrl = params.edit === "1";
 
   useEffect(() => {
     if (!drawerOpenInUrl) return;
@@ -124,10 +129,10 @@ export function useDrawerUrlSync() {
       // keeps the URL clean instead of trailing an empty `drawer.pinnedSpans=`.
       updates.pinnedSpans = storePinnedRaw || undefined;
     }
-    if (editing !== urlEditing) {
+    if (isEditing !== isEditingInUrl) {
       // Absent rather than `drawer.edit=0` when reading: the URL only names
       // the mode when it is on.
-      updates.edit = editing ? "1" : undefined;
+      updates.edit = isEditing ? "1" : undefined;
     }
     if (Object.keys(updates).length === 0) return;
     // Replace, don't push: mode / viz / span / pinned are view-state WITHIN an
@@ -143,12 +148,12 @@ export function useDrawerUrlSync() {
     vizTab,
     selectedSpanId,
     storePinnedRaw,
-    editing,
+    isEditing,
     urlMode,
     urlViz,
     urlSpan,
     urlPinnedRaw,
-    urlEditing,
+    isEditingInUrl,
     updateDrawerParams,
   ]);
 

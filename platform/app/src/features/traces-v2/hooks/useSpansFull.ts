@@ -3,6 +3,7 @@ import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import {
   applyOverlayToSpanDetail,
   expandDeletedSpanIds,
+  indexSpanPatches,
 } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import { api } from "~/utils/api";
@@ -58,6 +59,10 @@ export function applyOverlayToSpansFull({
     deletedSpanIds: patch.deletedSpanIds,
   });
 
+  // Built once for the whole page: the per-span call would otherwise rebuild it
+  // every time, and a large corrected trace would block the UI walking it.
+  const spanPatches = indexSpanPatches(patch);
+
   let changed = false;
   const next: SpanDetail[] = [];
   for (const span of spans) {
@@ -65,7 +70,11 @@ export function applyOverlayToSpansFull({
       changed = true;
       continue;
     }
-    const corrected = applyOverlayToSpanDetail({ detail: span, patch });
+    const corrected = applyOverlayToSpanDetail({
+      detail: span,
+      patch,
+      spanPatches,
+    });
     if (corrected !== span) changed = true;
     next.push(corrected);
   }

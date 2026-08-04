@@ -59,7 +59,7 @@ import { useTraceEditStore } from "../../stores/traceEditStore";
 import { useSpanTree } from "../useSpanTree";
 
 function appliedPatch(): TraceEditOverlayPatch | null {
-  if (useDrawerStore.getState().editing) return null;
+  if (useDrawerStore.getState().isEditing) return null;
   if (useTraceEditStore.getState().overlayView !== "edited") return null;
   return overlay.current?.patch ?? null;
 }
@@ -80,7 +80,7 @@ function node(over: { spanId: string; parentSpanId?: string; name?: string }) {
 describe("useSpanTree with a correction", () => {
   beforeEach(() => {
     useTraceEditStore.getState().discard();
-    useDrawerStore.getState().setEditing(false);
+    useDrawerStore.getState().setIsEditing(false);
     spans.current = [
       node({ spanId: "root" }),
       node({ spanId: "tool", parentSpanId: "root", name: "web_search" }),
@@ -130,7 +130,7 @@ describe("useSpanTree with a correction", () => {
 
     describe("when the reviewer is editing", () => {
       it("reads the captured trace so the correction is not applied twice", () => {
-        useDrawerStore.getState().setEditing(true);
+        useDrawerStore.getState().setIsEditing(true);
 
         const { result } = renderHook(() => useSpanTree());
 

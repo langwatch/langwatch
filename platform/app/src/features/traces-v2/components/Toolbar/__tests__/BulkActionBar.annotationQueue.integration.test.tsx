@@ -12,7 +12,6 @@ import "@testing-library/jest-dom/vitest";
 
 const mocks = vi.hoisted(() => ({
   permissions: new Set<string>(["annotations:create"]),
-  dialogProps: [] as { open: boolean; traceIds: string[] }[],
 }));
 
 vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
@@ -48,7 +47,6 @@ vi.mock("../../AddToAnnotationQueueDialog", () => ({
     open: boolean;
     traceIds: string[];
   }) => {
-    mocks.dialogProps.push({ open: props.open, traceIds: props.traceIds });
     return props.open ? (
       <div data-testid="annotation-queue-dialog">
         {props.traceIds.join(",")}
@@ -77,7 +75,6 @@ const buttonNames = () =>
 
 beforeEach(() => {
   mocks.permissions = new Set<string>(["annotations:create"]);
-  mocks.dialogProps.length = 0;
   useSelectionStore.getState().clear();
 });
 afterEach(cleanup);

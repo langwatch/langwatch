@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,7 +39,7 @@ const mocks = vi.hoisted(() => ({
   pageOffset: 0,
   openDrawer: vi.fn(),
   push: vi.fn(),
-  gateAllows: true,
+  requestEnable: vi.fn<() => Promise<boolean>>(),
 }));
 
 vi.mock("~/hooks/useAnnotationQueues", () => ({
@@ -79,7 +85,7 @@ vi.mock("~/components/me/PersonalFeatureGateDialog", () => ({
 }));
 vi.mock("~/components/me/usePersonalFeatureGate", () => ({
   usePersonalFeatureGate: () => ({
-    requestEnable: async () => mocks.gateAllows,
+    requestEnable: mocks.requestEnable,
     dialogState: { open: false },
   }),
 }));
@@ -104,10 +110,10 @@ const renderTable = () =>
   );
 
 const rowCheckbox = (traceId: string) =>
-  screen.getByRole("button", { name: `Select trace ${traceId}` });
+  screen.getByRole("checkbox", { name: `Select trace ${traceId}` });
 
 const headerCheckbox = () =>
-  screen.getByRole("button", { name: "Select all on this page" });
+  screen.getByRole("checkbox", { name: "Select all on this page" });
 
 const selectionBar = () => screen.queryByTestId("annotations-selection-bar");
 
@@ -115,7 +121,8 @@ beforeEach(() => {
   mocks.openDrawer.mockClear();
   mocks.push.mockClear();
   mocks.pageOffset = 0;
-  mocks.gateAllows = true;
+  mocks.requestEnable.mockReset();
+  mocks.requestEnable.mockResolvedValue(true);
   setItems([
     { id: "item-1", traceId: "trace-1", doneAt: null },
     { id: "item-2", traceId: "trace-2", doneAt: null },
@@ -269,13 +276,24 @@ describe("AnnotationsTable selection", () => {
 
       /** @scenario "Add to dataset waits for the personal workspace to allow datasets" */
       it("does not open the drawer when the datasets gate is declined", async () => {
-        mocks.gateAllows = false;
+        // The gate is answered by hand so the assertion runs after the handler
+        // resumed from it, rather than on whichever tick came first.
+        let decline: (allowed: boolean) => void = () => undefined;
+        mocks.requestEnable.mockReturnValue(
+          new Promise<boolean>((resolve) => {
+            decline = resolve;
+          }),
+        );
         renderTable();
 
         fireEvent.click(rowCheckbox("trace-1"));
         fireEvent.click(screen.getByRole("button", { name: /Add to dataset/ }));
 
-        await vi.waitFor(() => expect(mocks.gateAllows).toBe(false));
+        await vi.waitFor(() => expect(mocks.requestEnable).toHaveBeenCalled());
+        await act(async () => {
+          decline(false);
+        });
+
         expect(mocks.openDrawer).not.toHaveBeenCalled();
       });
     });

@@ -54,6 +54,7 @@ import {
   STATUS_COLORS,
 } from "../../../utils/formatters";
 import { isTerminalOrigin } from "../../../utils/terminalOrigin";
+import { guardTraceEditExit } from "../../../utils/traceEditMode";
 import { AddToAnnotationQueueDialog } from "../../AddToAnnotationQueueDialog";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
 import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
@@ -490,7 +491,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   const pinned = useDrawerStore((s) => s.pinned);
   const togglePinned = useDrawerStore((s) => s.togglePinned);
   const viewMode = useDrawerStore((s) => s.viewMode);
-  const isEditing = useDrawerStore((s) => s.editing);
+  const isEditing = useDrawerStore((s) => s.isEditing);
   const setViewMode = useDrawerStore((s) => s.setViewMode);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
@@ -688,10 +689,11 @@ export const DrawerHeader = memo(function DrawerHeader({
         auto: true,
         category: def.category,
         onFilter: filterField
-          ? () => {
-              toggleFacet(filterField, value);
-              closeDrawer();
-            }
+          ? () =>
+              guardTraceEditExit(() => {
+                toggleFacet(filterField, value);
+                closeDrawer();
+              })
           : undefined,
         onNavigate: navigate?.onNavigate,
         navigateLabel: navigate?.navigateLabel,
@@ -737,10 +739,11 @@ export const DrawerHeader = memo(function DrawerHeader({
         auto: true,
         category: "custom",
         onFilter: filterQuery
-          ? () => {
-              applyQueryTextFromPin(filterQuery);
-              closeDrawer();
-            }
+          ? () =>
+              guardTraceEditExit(() => {
+                applyQueryTextFromPin(filterQuery);
+                closeDrawer();
+              })
           : undefined,
       });
     }
@@ -763,10 +766,11 @@ export const DrawerHeader = memo(function DrawerHeader({
         category: "custom",
         onFilter:
           filterField && value
-            ? () => {
-                toggleFacet(filterField, value);
-                closeDrawer();
-              }
+            ? () =>
+                guardTraceEditExit(() => {
+                  toggleFacet(filterField, value);
+                  closeDrawer();
+                })
             : undefined,
         onNavigate: navigate?.onNavigate,
         navigateLabel: navigate?.navigateLabel,
@@ -841,8 +845,10 @@ export const DrawerHeader = memo(function DrawerHeader({
   }, [trace.serviceName, trace.status, trace.traceName]);
   const handleFindSimilar = useCallback(() => {
     if (!findSimilarQuery) return;
-    applyQueryText(findSimilarQuery);
-    closeDrawer();
+    guardTraceEditExit(() => {
+      applyQueryText(findSimilarQuery);
+      closeDrawer();
+    });
   }, [applyQueryText, closeDrawer, findSimilarQuery]);
 
   const { refresh: handleRefresh, isRefreshing } = useTraceRefresh(

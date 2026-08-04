@@ -74,7 +74,12 @@ export function countRemovedSpans({
   return removed;
 }
 
-function indexSpanPatches(
+/**
+ * A patch's span corrections keyed by span id. Exported so a caller applying
+ * one correction across a whole page of spans builds the index once instead of
+ * once per span.
+ */
+export function indexSpanPatches(
   patch: TraceEditOverlayPatch,
 ): Map<string, TraceEditSpanPatch> {
   const bySpanId = new Map<string, TraceEditSpanPatch>();
@@ -269,12 +274,19 @@ function spanDetailFieldValue({
 export function applyOverlayToSpanDetail({
   detail,
   patch,
+  spanPatches,
 }: {
   detail: SpanDetail;
   patch: TraceEditOverlayPatch | null | undefined;
+  /**
+   * The patch's span index when the caller already built one. Without it the
+   * index is rebuilt per call, which turns a page of spans into O(spans ×
+   * corrected spans).
+   */
+  spanPatches?: Map<string, TraceEditSpanPatch>;
 }): SpanDetail {
   if (!patch || !patchHasAnyEdit(patch)) return detail;
-  const spanPatch = indexSpanPatches(patch).get(detail.spanId);
+  const spanPatch = (spanPatches ?? indexSpanPatches(patch)).get(detail.spanId);
   if (!spanPatch) return detail;
 
   let next = detail;

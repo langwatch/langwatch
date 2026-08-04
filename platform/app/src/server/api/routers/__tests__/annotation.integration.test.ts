@@ -56,6 +56,7 @@ describe("Annotation CRUD", () => {
 
   beforeAll(async () => {
     await prisma.annotation.deleteMany({ where: { projectId } });
+    await prisma.traceEditOverlay.deleteMany({ where: { projectId } });
 
     const user = await getTestUser();
     const ctx = createInnerTRPCContext({
@@ -511,13 +512,19 @@ describe("Annotation CRUD", () => {
           role: OrganizationUserRole.MEMBER,
         },
       });
-      await prisma.roleBinding.deleteMany({
-        where: {
-          userId: createOnlyUserId,
-          organizationId: createOnlyOrganizationId,
-          scopeId: project.teamId,
-        },
-      });
+      // Re-running against a shared local database must not trip the binding's
+      // uniqueness, and the guarded helper refuses the sweep outright if any
+      // of these ids is still unassigned.
+      await cleanupTestRows(prisma, [
+        [
+          "roleBinding",
+          {
+            userId: createOnlyUserId,
+            organizationId: createOnlyOrganizationId,
+            scopeId: project.teamId,
+          },
+        ],
+      ]);
       await prisma.roleBinding.create({
         data: {
           organizationId: createOnlyOrganizationId,

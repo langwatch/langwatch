@@ -34,5 +34,10 @@ ALTER TABLE "AnnotationQueueItem" ADD COLUMN "markedForDatasetAt" TIMESTAMP(3);
 
 -- Down (manual): reverses in dependency order; run only to roll back this
 -- migration.
+--
+-- WARNING: this destroys data. Dropping "TraceEditOverlay" permanently deletes
+-- every reviewer correction and its author attribution, and dropping
+-- "markedForDatasetAt" permanently deletes which queue items were marked for
+-- the dataset hand-off. Neither can be reconstructed from anywhere else.
 --   ALTER TABLE "AnnotationQueueItem" DROP COLUMN "markedForDatasetAt";
 --   DROP TABLE "TraceEditOverlay";

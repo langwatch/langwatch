@@ -155,13 +155,20 @@ describe("given a reviewer reading a message in the legacy conversation", () => 
       expect(screen.getByTestId("correction-popover")).toBeInTheDocument();
     });
 
-    it("reaches every action by tabbing", async () => {
+    it("reaches every action in order by tabbing", async () => {
       const user = userEvent.setup();
       render(<Harness />);
 
-      await user.tab();
+      for (const name of [
+        "View Trace",
+        "Translate message to English",
+        "Annotate",
+        "Suggest",
+      ]) {
+        await user.tab();
 
-      expect(screen.getByRole("button", { name: "View Trace" })).toHaveFocus();
+        expect(screen.getByRole("button", { name })).toHaveFocus();
+      }
     });
   });
 

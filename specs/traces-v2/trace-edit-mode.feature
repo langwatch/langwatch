@@ -82,6 +82,12 @@ Feature: Editing a trace in the drawer
 
   Rule: While editing, the reader stays on a view that can be edited
 
+    @unit
+    Scenario: A link naming edit mode and a view that cannot be edited opens on the trace
+      Given a link that asks for edit mode and for the conversation view
+      When the drawer opens from it
+      Then it opens on the trace view
+
     @integration
     Scenario: Entering edit mode from the conversation view moves to the trace view
       Given I am reading the conversation view
@@ -275,6 +281,12 @@ Feature: Editing a trace in the drawer
       And I can restore it
 
     @integration
+    Scenario: Adding an attribute with a key the span does not have records it
+      Given I am editing a span with attributes
+      When I add an attribute using a key the span does not have
+      Then the correction carries that key and its value
+
+    @integration
     Scenario: Adding an attribute rejects a key that already exists
       Given I am editing a span with attributes
       When I add an attribute using a key that already exists
@@ -361,7 +373,7 @@ Feature: Editing a trace in the drawer
       When I open another trace
       Then it opens corrected
 
-    @unit
+    @integration
     Scenario: A deleted span is hidden in the corrected trace
       Given the trace has a correction that deletes a span
       When I read the corrected trace
@@ -411,6 +423,13 @@ Feature: Editing a trace in the drawer
       When I open that span
       Then the corrected name is highlighted as edited
       And it names the captured name
+
+    @integration
+    Scenario: A corrected span type names its captured type
+      Given the trace has a correction that changes a span's type
+      When I open that span
+      Then the corrected type is highlighted as edited
+      And it names the captured type
 
   Rule: The full difference is one click away
 

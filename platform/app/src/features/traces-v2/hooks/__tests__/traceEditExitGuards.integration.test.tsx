@@ -125,7 +125,7 @@ beforeEach(() => {
   mocks.drawerParams = { traceId: TRACE, edit: "1" };
   useTraceEditStore.getState().discard();
   useDrawerStore.getState().openTrace(TRACE, null);
-  useDrawerStore.getState().setEditing(true);
+  useDrawerStore.getState().setIsEditing(true);
   useTraceEditStore.getState().startEditing({ traceId: TRACE });
   useTraceEditStore.getState().setSpanName({
     spanId: "span-1",

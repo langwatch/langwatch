@@ -226,7 +226,7 @@ describe("given a reviewer walking their annotation queue", () => {
     });
   });
 
-  describe("when the reviewer may not update annotations", () => {
+  describe("given the reviewer may not update annotations", () => {
     beforeEach(() => {
       mocks.canUpdateAnnotations = false;
     });
@@ -315,7 +315,7 @@ describe("given a reviewer walking their annotation queue", () => {
     });
   });
 
-  describe("when the open item was already marked", () => {
+  describe("given the open item was already marked", () => {
     beforeEach(() => {
       setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
       setMarks([{ id: "item-1", traceId: "trace-1" }]);

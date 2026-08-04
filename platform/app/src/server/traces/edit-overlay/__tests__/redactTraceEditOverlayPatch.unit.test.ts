@@ -230,7 +230,7 @@ describe("redacting a correction for its reader", () => {
     });
   });
 
-  describe("given a trace teased by the plan's visibility window", () => {
+  describe("given a trace beyond the plan's visibility window", () => {
     /** @scenario "Corrected content is withheld beyond the plan's visibility window" */
     it("withholds every corrected content field and keeps the structure", () => {
       const redacted = redactPatchForViewer({
