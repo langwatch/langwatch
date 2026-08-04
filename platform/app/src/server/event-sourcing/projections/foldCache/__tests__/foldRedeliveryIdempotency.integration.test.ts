@@ -728,7 +728,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
 
     describe("given a retry chain that has not yet acked", () => {
       it("accumulates across attempts so nothing in the chain is forgotten", async () => {
-        const { queue, readAppliedIds, applied } = createFoldQueue({
+        const { queue, readAppliedIds } = createFoldQueue({
           keyPrefix: "it_lifecycle_chain",
           failures: 2,
           coalesce: 10,
@@ -744,17 +744,22 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
           });
         }
 
+        // Wait on the condition being asserted, not on a proxy for it. Counting
+        // handler applications used to be a sound barrier because a failing
+        // batch retried whole, so the chain's events could only ever land
+        // together. A failing batch is now bisected, so they can land in
+        // separate sub-batches within one attempt — and a count of 2 no longer
+        // means the third has been applied. Polling the set itself is immune to
+        // however the queue chooses to divide the work, and still fails within
+        // the timeout if accumulation is genuinely broken, which is the point
+        // of the test.
         await vi.waitFor(
-          () => expect(applied.length).toBeGreaterThanOrEqual(2),
-          {
-            timeout: 20_000,
-            interval: 50,
+          async () => {
+            expect(await readAppliedIds()).toEqual(
+              expect.arrayContaining(["chain-0", "chain-1", "chain-2"]),
+            );
           },
-        );
-
-        const ids = await readAppliedIds();
-        expect(ids).toEqual(
-          expect.arrayContaining(["chain-0", "chain-1", "chain-2"]),
+          { timeout: 20_000, interval: 50 },
         );
       }, 40_000);
     });
