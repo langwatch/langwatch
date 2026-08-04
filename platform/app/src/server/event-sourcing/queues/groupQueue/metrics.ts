@@ -40,6 +40,7 @@ const metricNames = [
   // ADR-066 pillar 2 mixed-command isolation
   "gq_foreign_siblings_restaged_total",
   "gq_jobs_unroutable_total",
+  "gq_batch_bisections_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -411,4 +412,29 @@ export const gqForeignSiblingsRestagedTotal = new Counter({
   name: "gq_foreign_siblings_restaged_total",
   help: "Drained siblings restaged untouched because their __jobName differed from the dispatched job (ADR-066 mixed-command isolation) — excludes the batch-failure restage paths",
   labelNames: ["queue_name"] as const,
+});
+
+/**
+ * A coalesced batch failed retryably and was split in half to isolate the
+ * cause.
+ *
+ * Counts SPLITS, not batches: isolating one poison payload out of a full batch
+ * costs `log2(batchSize)` increments, so a single stubborn payload shows up as
+ * a burst rather than a single event. Read it as a rate, not a total.
+ *
+ * A steady non-zero rate is the signal worth acting on, and it means one of two
+ * things — both real:
+ * - the batch bound is too generous for what the handler can process in one
+ *   pass (size-driven; the fix is a tighter budget, not more bisection), or
+ * - a payload in this pipeline is persistently unprocessable (poison; bisection
+ *   is containing the blast radius but something still needs to look at it).
+ *
+ * Zero means batches either succeed whole or fail non-retryably. Correlate with
+ * `gq_jobs_retried_total` to tell "we recovered inside the dispatch" from "we
+ * gave the whole batch back to the queue".
+ */
+export const gqBatchBisectionsTotal = new Counter({
+  name: "gq_batch_bisections_total",
+  help: "Retryable coalesced-batch failures that were split in half to isolate the cause — counts splits, so isolating one payload costs log2(batchSize)",
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });

@@ -6,6 +6,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   context as otelContext,
   ROOT_CONTEXT,
+  type Span,
   SpanKind,
   TraceFlags,
   trace,
@@ -62,6 +63,7 @@ import {
 } from "./jobEnvelope";
 import { legacyStagedJobAttempt } from "./legacyStagedJobAttempt";
 import {
+  gqBatchBisectionsTotal,
   gqForeignSiblingsRestagedTotal,
   gqGroupAttemptReadFailuresTotal,
   gqGroupsBlockedTotal,
@@ -1233,7 +1235,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     "queue.coalesced_batch_size",
                     batchPayloads.length,
                   );
-                  await this.processBatch(batchPayloads, { attempt });
+                  await this.processBatchBisecting({
+                    payloads: batchPayloads,
+                    attempt,
+                    routingLabels,
+                    span,
+                  });
                 } else {
                   await this.process(payload, { attempt });
                 }
@@ -1760,6 +1767,101 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       await this.redisConnection.del(this.groupAttemptKey(groupId));
     } catch {
       // The TTL reclaims it.
+    }
+  }
+
+  /**
+   * Runs a coalesced batch, halving it on a retryable failure until it either
+   * succeeds or the failure is attributable to a single payload.
+   *
+   * Why this exists: a coalesced batch is all-or-nothing, so without bisection
+   * ONE unprocessable payload fails the whole batch, and the retry re-drains
+   * the same siblings into the same batch — the poison payload takes up to
+   * `coalesceMaxBatch - 1` healthy payloads down with it on every attempt until
+   * the group blocks. Recovery from a *size*-driven failure (a batch too heavy
+   * for a downstream query's memory budget) was equally undirected: it only
+   * succeeded if the retry happened to re-assemble a lighter set.
+   *
+   * One split handles both, because both are "this set of payloads fails but a
+   * smaller set might not": a too-heavy batch halves until it fits, and a
+   * poison payload halves until it is alone, at which point the throw is
+   * attributable to it and the existing retry / quarantine path takes over.
+   *
+   * Ordering is preserved: the halves are CONTIGUOUS and awaited in sequence,
+   * never concurrently, because a fold derives fields from arrival order (the
+   * same invariant that makes splitting a group across lanes unsafe).
+   *
+   * That invariant also sets the limit of what this can do. A throw propagates
+   * immediately, so payloads AFTER the offender are not attempted — stepping
+   * over it would apply them across a gap the fold cannot see, producing wrong
+   * values silently. So bisection recovers everything BEFORE the offender and
+   * names it; it does not rescue what queued behind it. Doing that needs an
+   * explicit decision about the gap, which is the side-lining work in #6482.
+   *
+   * Re-running a payload that already applied is safe — fold redelivery is
+   * idempotent via the store's applied-event-id set (#6016) — which is what
+   * makes a partially-applied batch a recoverable state rather than a
+   * double-count. Bisection therefore does not widen the known residual there
+   * (a lost cache can still double-count), it only reaches it by a new route.
+   *
+   * Non-retryable failures are NOT split: they will fail identically at every
+   * size, so bisecting one only multiplies the work before the same verdict.
+   */
+  private async processBatchBisecting({
+    payloads,
+    attempt,
+    routingLabels,
+    span,
+  }: {
+    payloads: Payload[];
+    attempt: number;
+    routingLabels: Record<string, string>;
+    span: Span;
+  }): Promise<void> {
+    if (!this.processBatch) {
+      throw new Error("processBatchBisecting called without a batch handler");
+    }
+
+    try {
+      await this.processBatch(payloads, { attempt });
+      return;
+    } catch (err) {
+      // A single payload is already the smallest attributable unit, and a
+      // non-retryable error fails the same way at every size.
+      if (payloads.length <= 1 || !isRetryableJobError(err)) {
+        throw err;
+      }
+
+      const mid = Math.ceil(payloads.length / 2);
+      gqBatchBisectionsTotal.inc(routingLabels);
+      span.addEvent("queue.batch_bisected", {
+        "queue.batch_size": payloads.length,
+        "queue.batch_split_at": mid,
+      });
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          batchSize: payloads.length,
+          splitAt: mid,
+          attempt,
+          error: err instanceof Error ? err : new Error(String(err)),
+        },
+        "Coalesced batch failed; splitting in half and retrying each half in order",
+      );
+
+      // Sequential and contiguous — see the ordering note above.
+      await this.processBatchBisecting({
+        payloads: payloads.slice(0, mid),
+        attempt,
+        routingLabels,
+        span,
+      });
+      await this.processBatchBisecting({
+        payloads: payloads.slice(mid),
+        attempt,
+        routingLabels,
+        span,
+      });
     }
   }
 

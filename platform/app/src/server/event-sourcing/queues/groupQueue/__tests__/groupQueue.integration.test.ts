@@ -864,6 +864,175 @@ describe.skipIf(!hasTestcontainers)(
         });
       });
 
+      describe("when one payload in a coalesced batch is unprocessable", () => {
+        it("commits every payload ahead of it and narrows the failure to it alone", async () => {
+          // Payloads AFTER the offender deliberately do not commit here: the
+          // fold derives fields from arrival order, so applying j6 while j5 is
+          // unresolved would leave a silent gap. Bisection's job is to stop
+          // losing the payloads BEFORE the offender and to name it — not to
+          // step over it. Letting later work past requires deciding what to do
+          // about that gap, which is the side-lining decision (#6482).
+          const POISON = "j5";
+          const attempted: TestPayload[][] = [];
+          const processedIds = new Set<string>();
+
+          const queue = createQueue(
+            async (p) => {
+              // The isolate ends up here only if it is ever dispatched alone;
+              // healthy singles land here too once a half narrows to one.
+              if (p.id === POISON) throw new Error("unprocessable payload");
+              processedIds.add(p.id);
+            },
+            {
+              processBatch: async (ps) => {
+                const batch = ps as TestPayload[];
+                attempted.push(batch);
+                // Fails for any batch containing the poison payload — including
+                // the batch of exactly one, which is what makes it attributable.
+                if (batch.some((p) => p.id === POISON)) {
+                  throw new Error("unprocessable payload");
+                }
+                for (const p of batch) processedIds.add(p.id);
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
+          );
+
+          // j0..j4 commit despite sharing a batch with the offender. Without
+          // bisection the whole batch fails together and NONE of them apply —
+          // that is the regression this pins.
+          await vi.waitFor(
+            () => {
+              expect([...processedIds].sort()).toEqual([
+                "j0",
+                "j1",
+                "j2",
+                "j3",
+                "j4",
+              ]);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+          expect(processedIds.has(POISON)).toBe(false);
+
+          // The split actually narrowed to the offender rather than retrying
+          // the batch whole: some attempt isolated it on its own.
+          const isolated = attempted.filter(
+            (b) => b.length === 1 && b[0]?.id === POISON,
+          );
+          expect(isolated.length).toBeGreaterThanOrEqual(1);
+        });
+
+        it("keeps each half in arrival order while splitting", async () => {
+          const POISON = "j6";
+          const attempted: TestPayload[][] = [];
+
+          const queue = createQueue(
+            async (p) => {
+              if (p.id === POISON) throw new Error("unprocessable payload");
+            },
+            {
+              processBatch: async (ps) => {
+                const batch = ps as TestPayload[];
+                attempted.push(batch);
+                if (batch.some((p) => p.id === POISON)) {
+                  throw new Error("unprocessable payload");
+                }
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
+          );
+
+          await vi.waitFor(
+            () => {
+              expect(
+                attempted.some((b) => b.length === 1 && b[0]?.id === POISON),
+              ).toBe(true);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // The ordering invariant: a fold derives fields from arrival order, so
+          // every sub-batch a split produces must still be ascending and
+          // contiguous — never a reshuffle or an interleave.
+          for (const batch of attempted) {
+            const values = batch.map((p) => Number(p.value));
+            expect(values).toEqual([...values].sort((a, b) => a - b));
+            for (let i = 1; i < values.length; i++) {
+              expect(values[i]! - values[i - 1]!).toBe(1);
+            }
+          }
+        });
+      });
+
+      describe("when a coalesced batch fails only because it is too large", () => {
+        it("halves it until it fits and commits every payload once", async () => {
+          const MAX_WORKABLE = 2;
+          const seen: string[] = [];
+
+          const queue = createQueue(
+            async (p) => {
+              seen.push(p.id);
+            },
+            {
+              processBatch: async (ps) => {
+                const batch = ps as TestPayload[];
+                // Models a size-driven downstream limit (a query that exceeds
+                // its memory budget): nothing is wrong with any individual
+                // payload, the batch is simply too big for one pass.
+                if (batch.length > MAX_WORKABLE) {
+                  throw new Error("batch exceeded the downstream budget");
+                }
+                for (const p of batch) seen.push(p.id);
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
+          );
+
+          await vi.waitFor(
+            () => {
+              expect(new Set(seen).size).toBe(8);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // Converged by construction rather than by a retry happening to
+          // re-assemble a smaller batch — and without re-applying a payload
+          // that already succeeded inside this dispatch.
+          expect(seen.length).toBe(8);
+        });
+      });
+
       describe("when coalescing is disabled (maxBatch 1)", () => {
         /** @scenario 'Coalescing is a no-op when disabled' */
         it("processes each event individually and never calls processBatch", async () => {
