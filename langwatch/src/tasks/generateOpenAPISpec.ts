@@ -5,6 +5,7 @@ import path from "path";
 
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
@@ -52,6 +53,8 @@ export default async function execute() {
   const agentsSpec = await generateSpecs(agentsApp);
   console.log("Building analytics spec...");
   const analyticsSpec = await generateSpecs(analyticsApp);
+  console.log("Building governed analytics SQL spec...");
+  const analyticsSqlSpec = await generateSpecs(analyticsSqlApp);
   console.log("Building dashboards spec...");
   const dashboardsSpec = await generateSpecs(dashboardsApp);
   console.log("Building dataset spec...");
@@ -99,6 +102,7 @@ export default async function execute() {
       currentSpec,
       agentsSpec,
       analyticsSpec,
+      analyticsSqlSpec,
       dashboardsSpec,
       datasetSpec,
       evaluatorsSpec,
@@ -129,6 +133,7 @@ export default async function execute() {
         if (
           key.includes("/api/agents") ||
           key.includes("/api/analytics") ||
+          key.includes("/api/v1/projects") ||
           key.includes("/api/dashboards") ||
           key.includes("/api/evaluators") ||
           key.includes("/api/events") ||

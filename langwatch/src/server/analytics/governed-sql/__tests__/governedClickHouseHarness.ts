@@ -219,6 +219,17 @@ export interface GovernedClickHouseHarness {
    * accidentally run as the administrator.
    */
   restrictedClient(options?: { keyHash?: string }): Promise<ClickHouseClient>;
+  /**
+   * The restricted identity's credentials, for a caller that must build its own
+   * client rather than borrow one — the REST endpoint suite, which drives the
+   * shipped executor and therefore needs a connection, not a connection object
+   * someone else opened.
+   */
+  restrictedConnection(): {
+    url: string;
+    username: string;
+    password: string;
+  };
   /** Runs statements as the administrator, in order. */
   applyAsAdmin(statements: string[]): Promise<void>;
   container: StartedClickHouseContainer;
@@ -390,6 +401,13 @@ export async function startGovernedClickHouse({
       openedClients.push(client);
       await expectRestrictedIdentity({ client, names });
       return client;
+    },
+    restrictedConnection() {
+      return {
+        url: httpUrl,
+        username: names.restrictedUser,
+        password: RESTRICTED_PASSWORD,
+      };
     },
     async stop() {
       await Promise.all(openedClients.map((client) => client.close()));

@@ -355,8 +355,12 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   # Public API (later PR of this issue — #6480)
   # ---------------------------------------------------------------------------
 
-  # @unimplemented: gateway endpoints are a later PR of #6480; the isolation
-  # proof above gates them.
+  # @unimplemented: the endpoint ships, and publishes descriptions, types, grain,
+  # freshness, join keys, per-column content restrictions and example SQL — but
+  # two of this scenario's claims are not delivered. The catalog declares no unit
+  # per column, and permissions gate COLUMNS rather than datasets, so no dataset
+  # is ever absent. Both need a catalog change, which is a slice of its own; the
+  # part that does ship is bound by the scenario below.
   @integration @unimplemented
   Scenario: Authenticated client discovers its governed schema scoped to its own permissions
     Given an authenticated API client
@@ -364,26 +368,38 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then it receives the governed analytics datasets with descriptions, types, units, grain, freshness, allowed joins, content restrictions, and example SQL
     And datasets outside its permissions are absent
 
-  # @unimplemented: gateway endpoints are a later PR of #6480.
-  @integration @unimplemented
+  @integration
+  Scenario: The schema endpoint names which permission unlocks each gated column
+    Given an authenticated API client without every content permission
+    When it calls the schema discovery endpoint
+    Then a column it may not read is still listed, marked unavailable
+    And the column names the permission kinds that would unlock it, rather than a bare refusal
+    And a caller holding every permission is refused no column
+
+  @integration
   Scenario: Client executes native ClickHouse SQL through the documented REST endpoint
     Given an authenticated API client
     When it submits native ClickHouse SQL using joins, window functions, comparisons, percentiles, aliases, math, CTEs, and subqueries
     Then the query executes and returns tabular results
 
-  # @unimplemented: gateway endpoints are a later PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Results carry typed columns, rows, execution statistics, truncation state, and diagnostics
     Given an authenticated API client
     When it executes a governed query
     Then the response contains typed columns, rows, execution statistics, truncation state, and structured diagnostics
 
-  # @unimplemented: gateway endpoints are a later PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Parameterized queries re-run deterministically through the REST API
     Given an authenticated API client
     When it re-submits the same parameterized query with the same bound parameters
     Then the result is identical across runs over unchanged data
+
+  @integration
+  Scenario: A parameterized query missing a bound value is refused before execution
+    Given an authenticated API client
+    When it submits a parameterized query without a value for one of its parameters
+    Then the query is refused with a coded error naming the missing parameter
+    And the query never reaches the database
 
   # ---------------------------------------------------------------------------
   # Answerable-question coverage (later PR of this issue — #6480)
@@ -481,8 +497,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   # Tenant isolation and authorization at the gateway (later PR of this issue — #6480)
   # ---------------------------------------------------------------------------
 
-  # @unimplemented: gateway behavior lands with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Tenant scope derives exclusively from authenticated server context
     Given an authenticated API client
     When it attempts to supply, override, inspect, or widen tenant scope via SQL text or request parameters
@@ -500,8 +515,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   # (later PR of this issue — #6480; the database-identity half is bound above)
   # ---------------------------------------------------------------------------
 
-  # @unimplemented: gateway AST policy lands with the validator PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: External and table-function access is blocked by AST policy before reaching the database
     Given an authenticated API client
     When it submits SQL using postgresql, url, s3, remote, or any table function
@@ -552,8 +566,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   # Diagnostics (later PR of this issue — #6480)
   # ---------------------------------------------------------------------------
 
-  # @unimplemented: diagnostics rules land with the diagnostics PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Truncation diagnostic fires when results are cut off
     Given an authenticated API client
     When a query's results are truncated by the result-size limit
@@ -606,8 +619,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
   # Non-goals held as scope guards (later PR of this issue — #6480)
   # ---------------------------------------------------------------------------
 
-  # @unimplemented: route-absence guard lands with the query endpoint PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: No PostgreSQL native-SQL execution endpoint exists
     Given the public API surface
     When a client attempts to execute SQL against a PostgreSQL query endpoint
@@ -619,8 +631,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When inspected for a custom query grammar, compiler, IR, or a Cube or Trino dependency
     Then none is present
 
-  # @unimplemented: no-rewrite guarantee lands with the executor PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Submitted SQL is never automatically rewritten
     Given an authenticated API client
     When it submits a governed query
@@ -678,10 +689,18 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #   → Scenario: A time predicate on a governed view prunes partitions
 #
 # Product:
-# AC "schema discovery scoped to own permissions" → Scenario: Authenticated client discovers its governed schema scoped to its own permissions
+# AC "schema discovery scoped to own permissions"
+#   → Scenario: Authenticated client discovers its governed schema scoped to its own permissions
+#     (still @unimplemented: no per-column unit, and permissions gate columns rather
+#      than datasets — both need a catalog change)
+#   → Scenario: The schema endpoint names which permission unlocks each gated column
+#     (the shipped half: per-column gate kinds, not a collapsed boolean)
 # AC "execute native ClickHouse SQL via REST" → Scenario: Client executes native ClickHouse SQL through the documented REST endpoint
 # AC "typed columns, rows, stats, truncation, diagnostics" → Scenario: Results carry typed columns, rows, execution statistics, truncation state, and diagnostics
-# AC "parameterized queries re-run deterministically" → Scenario: Parameterized queries re-run deterministically through the REST API
+# AC "parameterized queries re-run deterministically"
+#   → Scenario: Parameterized queries re-run deterministically through the REST API
+#   → Scenario: A parameterized query missing a bound value is refused before execution
+#     (the failure path of the same feature, refused at the gateway)
 #
 # Answerable-question coverage (one scenario each, same titles in order):
 # p50/p95/p99 → Latency percentiles by model in time buckets
@@ -732,8 +751,12 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #
 # Resource safety:
 # AC "database-enforced ceilings" → Scenario: Database-enforced ceilings bound every resource dimension
+#   (the settings profile pins readonly, max_execution_time and max_memory_usage CONST;
+#    the endpoint adds row and byte ceilings on what is returned, and can relax neither)
 # AC "pathological join contained; no tenant monopoly" → Scenario: A pathological join is contained within its resource envelope
 # AC "overflow throws, never silent truncation" → Scenario: Overflow throws and never silently truncates
+#   (the never-SILENT half ships and is bound by the truncation scenario below; the
+#    throws-on-a-database-ceiling half needs a deterministic way to exhaust one)
 #
 # Diagnostics:
 # AC "four rules, each fixture-triggered"
