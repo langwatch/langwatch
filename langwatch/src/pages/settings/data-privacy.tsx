@@ -331,7 +331,7 @@ export function DataPrivacyPage({ projectId }: { projectId: string }) {
         ) : (
           snapshot && (
             <Card.Root width="full" overflow="hidden">
-              <Card.Body paddingX={0} paddingY={0}>
+              <Card.Body paddingX={0} paddingY={0} overflowX="auto">
                 <Table.Root variant="line" size="md" width="full">
                   <Table.Header>
                     <Table.Row>
