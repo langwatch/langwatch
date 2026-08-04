@@ -586,7 +586,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/accessibility.feature",
   "specs/traces-v2/annotations.feature",
   "specs/traces-v2/attribute-value-readability.feature",
-  "specs/traces-v2/bulk-actions.feature",
   "specs/traces-v2/column-configuration.feature",
   "specs/traces-v2/conditional-formatting.feature",
   "specs/traces-v2/conversation-context-turn-counts.feature",

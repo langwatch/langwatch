@@ -1,7 +1,8 @@
 # Bulk Actions — Gherkin Spec
-# Multi-select traces in the table, then export or add to dataset.
-# Reuses existing useExportTraces hook, ExportConfigDialog, and
-# AddDatasetRecordDrawerV2 — all already wired into the OLD MessagesTable.
+# Multi-select traces in the table, then export, add to dataset, or send to an
+# annotation queue.
+# Reuses existing useExportTraces hook, ExportConfigDialog,
+# AddDatasetRecordDrawerV2, and the AddParticipants queue picker.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CHECKBOX COLUMN
@@ -284,6 +285,99 @@ Rule: Add selected traces to a dataset
     Then the drawer closes
     And the selection is cleared
     And a success toast confirms the insert
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADD TO ANNOTATION QUEUE
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Send selected traces to an annotation queue
+  Picking rows and handing them to a reviewer is a first-class bulk action,
+  next to export and add-to-dataset. The dialog reuses the same participants
+  picker (people and queues) the rest of the product uses.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the user is authenticated with "annotations:create" permission
+    And the project has traces
+
+  @integration
+  Scenario: Add to annotation queue sits between Add to context and Add to dataset
+    Given 3 rows are selected
+    Then the bulk action bar offers "Add to annotation queue"
+    And it reads after "Add to context" and before "Add to dataset"
+
+  @integration
+  Scenario: The action is hidden without permission to create annotations
+    Given the user cannot create annotations
+    When rows are selected
+    Then the bulk action bar does not offer "Add to annotation queue"
+    And the other bulk actions are unaffected
+
+  @integration
+  Scenario: Add to annotation queue is disabled in select-all-matching mode
+    Given select-all-matching is active for 1,234 traces
+    Then the "Add to annotation queue" button is disabled
+    And a tooltip explains the action needs an explicit row selection
+
+  @integration
+  Scenario: Opening the dialog carries the selected trace ids
+    Given 3 rows are selected
+    When the user clicks "Add to annotation queue"
+    Then the dialog opens for exactly those 3 traces
+
+  @integration
+  Scenario: The dialog says where the traces are going
+    Given the dialog is open for 3 selected traces
+    Then it is titled "Add to annotation queue"
+    And it explains that the selected traces are sent to people or queues for annotation
+
+  @integration
+  Scenario: Sending queues every selected trace for the chosen participants
+    Given the dialog is open for 3 selected traces
+    And the user picked a person and a queue
+    When the user sends
+    Then the three traces are queued for both participants
+
+  @integration
+  Scenario: A successful send refreshes the annotation counts
+    Given the dialog is open for 3 selected traces
+    When the send succeeds
+    Then the pending, assigned and per-queue counts are refreshed
+    And the queue listing is refreshed
+    And the dialog closes
+
+  @integration
+  Scenario: A successful send confirms and offers a way to open the queues
+    Given the dialog is open for 3 selected traces
+    When the send succeeds
+    Then a confirmation reads "Added to annotation queue"
+    And it says how many traces were sent for annotation
+    And it offers "View queues", which opens the project's annotations page
+
+  @integration
+  Scenario: A queue can be created without leaving the dialog
+    Given the dialog is open and none of the existing queues fit
+    When the user chooses to add a new queue
+    Then the new queue drawer opens over the dialog
+
+  @integration
+  Scenario: A failed send says the traces were not queued
+    Given the dialog is open for 3 selected traces
+    When the send fails
+    Then the failure is reported as "Couldn't add to annotation queue"
+    And the counts are not refreshed
+
+  Scenario: The trace drawer offers the same action for a single trace
+    # Same dialog, one trace: `TraceOverflowMenu` -> `DrawerHeader` owns the
+    # open state, alongside the share dialog and behind the same read-only guard.
+    Given a trace is open in the drawer
+    When the user picks "Add to annotation queue" from the overflow menu
+    Then the same dialog opens for that one trace
+
+  Scenario: A shared trace never offers the action
+    Given the trace drawer is rendered read-only on a share page
+    Then no annotation queue action is offered
 
 
 # ─────────────────────────────────────────────────────────────────────────────

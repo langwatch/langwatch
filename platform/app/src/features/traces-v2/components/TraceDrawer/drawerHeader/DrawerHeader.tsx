@@ -18,6 +18,8 @@ import {
   LuRefreshCw,
   LuX,
 } from "react-icons/lu";
+import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
+import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import {
   MenuContent,
@@ -52,6 +54,7 @@ import {
   STATUS_COLORS,
 } from "../../../utils/formatters";
 import { isTerminalOrigin } from "../../../utils/terminalOrigin";
+import { AddToAnnotationQueueDialog } from "../../AddToAnnotationQueueDialog";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
 import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
 import { ModelsTooltip } from "../../TraceTable/registry/cells/trace/ModelCell";
@@ -786,6 +789,14 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   const [rawOpen, setRawOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [annotationQueueOpen, setAnnotationQueueOpen] = useState(false);
+  const annotationGate = usePersonalFeatureGate("annotations");
+
+  const handleAddToAnnotationQueue = useCallback(async () => {
+    const allowed = await annotationGate.requestEnable();
+    if (!allowed) return;
+    setAnnotationQueueOpen(true);
+  }, [annotationGate]);
 
   // Local listener for the `\` shortcut. Lives here (rather than in
   // TraceDrawerShell) because the raw-JSON dialog's open state is also
@@ -1067,6 +1078,7 @@ export const DrawerHeader = memo(function DrawerHeader({
               onOpenRawJson={() => setRawOpen(true)}
               onShowShortcuts={() => setShortcutsOpen(true)}
               onShare={() => setShareOpen(true)}
+              onAddToAnnotationQueue={handleAddToAnnotationQueue}
               pinned={pinned}
               onTogglePinned={togglePinned}
             />
@@ -1341,12 +1353,20 @@ export const DrawerHeader = memo(function DrawerHeader({
         trace={trace}
       />
       {!readOnly && (
-        <ShareTraceDialog
-          open={shareOpen}
-          onClose={() => setShareOpen(false)}
-          projectId={project?.id}
-          traceId={trace.traceId}
-        />
+        <>
+          <ShareTraceDialog
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            projectId={project?.id}
+            traceId={trace.traceId}
+          />
+          <AddToAnnotationQueueDialog
+            open={annotationQueueOpen}
+            onClose={() => setAnnotationQueueOpen(false)}
+            traceIds={[trace.traceId]}
+          />
+          <PersonalFeatureGateDialog state={annotationGate.dialogState} />
+        </>
       )}
     </VStack>
   );

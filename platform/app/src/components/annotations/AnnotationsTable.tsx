@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  chakra,
   Heading,
   HStack,
   Skeleton,
@@ -11,8 +12,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Annotation } from "@prisma/client";
-import { useMemo, useState } from "react";
+import { Database } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
+import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
+import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
@@ -27,8 +31,53 @@ import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
 import { NavigationFooter, useNavigationFooter } from "../NavigationFooter";
 import { NoDataInfoBlock } from "../NoDataInfoBlock";
+import { Checkbox } from "../ui/checkbox";
 import { RedactedField } from "../ui/RedactedField";
+import { SelectionActionBar } from "../ui/SelectionActionBar";
 import UserAvatarGroup from "./AvatarGroup";
+
+const ChakraButton = chakra("button");
+
+/**
+ * Whole-cell checkbox hit target, kept separate from the row's own click so
+ * picking rows never navigates to the queue item or the trace. Mirrors the
+ * trace table's select cells.
+ */
+function SelectCheckbox({
+  ariaLabel,
+  checked,
+  onToggle,
+}: {
+  ariaLabel: string;
+  checked: boolean | "indeterminate";
+  onToggle: () => void;
+}) {
+  return (
+    <ChakraButton
+      type="button"
+      aria-label={ariaLabel}
+      aria-checked={
+        checked === true ? "true" : checked === false ? "false" : "mixed"
+      }
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      minHeight="32px"
+      paddingX={2}
+      bg="transparent"
+      border="none"
+      cursor="pointer"
+      onClick={(e: React.MouseEvent) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+    >
+      <Box pointerEvents="none" display="inline-flex">
+        <Checkbox size="sm" checked={checked} />
+      </Box>
+    </ChakraButton>
+  );
+}
 
 /**
  * Coerce a trace `started_at` value into a numeric ms partition hint, or
@@ -141,6 +190,22 @@ export const AnnotationsTable = ({
     }));
   };
 
+  const datasetGate = usePersonalFeatureGate("datasets");
+  const [selectedTraceIds, setSelectedTraceIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  // A selection only means something for the rows it was made on. Filtering or
+  // paging swaps those rows out, so the picks go with them.
+  useEffect(() => {
+    setSelectedTraceIds(new Set());
+  }, [
+    selectedAnnotations,
+    queueId,
+    navigationFooter.pageOffset,
+    navigationFooter.pageSize,
+  ]);
+
   const allQueueItems: UnifiedQueueItem[] = groupedAnnotations
     ? groupedAnnotations.map((item) => ({
         id: item.traceId,
@@ -155,6 +220,43 @@ export const AnnotationsTable = ({
         scoreOptions: item.scoreOptions,
       }))
     : transformToUnifiedQueueItems(assignedQueueItems || []);
+
+  // Several queue items can point at the same trace, and a dataset record is
+  // per trace, so the selection is a set of traces rather than of rows.
+  const pageTraceIds = useMemo(
+    () => Array.from(new Set(allQueueItems.map((item) => item.traceId))),
+    [allQueueItems],
+  );
+  const selectedCount = selectedTraceIds.size;
+  const allPageSelected =
+    pageTraceIds.length > 0 &&
+    pageTraceIds.every((traceId) => selectedTraceIds.has(traceId));
+  const headerChecked: boolean | "indeterminate" =
+    selectedCount === 0 ? false : allPageSelected ? true : "indeterminate";
+
+  const toggleTrace = useCallback((traceId: string) => {
+    setSelectedTraceIds((current) => {
+      const next = new Set(current);
+      if (next.has(traceId)) {
+        next.delete(traceId);
+      } else {
+        next.add(traceId);
+      }
+      return next;
+    });
+  }, []);
+
+  const togglePage = useCallback(() => {
+    setSelectedTraceIds(allPageSelected ? new Set() : new Set(pageTraceIds));
+  }, [allPageSelected, pageTraceIds]);
+
+  const addSelectionToDataset = useCallback(async () => {
+    const allowed = await datasetGate.requestEnable();
+    if (!allowed) return;
+    openDrawer("addDatasetRecord", {
+      selectedTraceIds: Array.from(selectedTraceIds),
+    });
+  }, [datasetGate, openDrawer, selectedTraceIds]);
 
   const openAnnotationQueue = (queueItemId: string, traceId: string) => {
     void router.push(
@@ -397,6 +499,15 @@ export const AnnotationsTable = ({
                 <Table.Root variant="line">
                   <Table.Header>
                     <Table.Row>
+                      <Table.ColumnHeader width="1px" paddingX={0}>
+                        {pageTraceIds.length > 0 && (
+                          <SelectCheckbox
+                            ariaLabel="Select all on this page"
+                            checked={headerChecked}
+                            onToggle={togglePage}
+                          />
+                        )}
+                      </Table.ColumnHeader>
                       <Table.ColumnHeader></Table.ColumnHeader>
                       {!isDone && (
                         <Table.ColumnHeader>Date created</Table.ColumnHeader>
@@ -458,6 +569,13 @@ export const AnnotationsTable = ({
                               }
                               padding={2}
                             >
+                              <Table.Cell width="1px" paddingX={0}>
+                                <SelectCheckbox
+                                  ariaLabel={`Select trace ${item.traceId}`}
+                                  checked={selectedTraceIds.has(item.traceId)}
+                                  onToggle={() => toggleTrace(item.traceId)}
+                                />
+                              </Table.Cell>
                               <Table.Cell>
                                 <Tooltip
                                   content={
@@ -618,7 +736,7 @@ export const AnnotationsTable = ({
                       })
                     ) : (
                       <Table.Row>
-                        <Table.Cell colSpan={5}>
+                        <Table.Cell colSpan={6}>
                           <Text>
                             No annotations found for selected filters.
                           </Text>
@@ -641,6 +759,19 @@ export const AnnotationsTable = ({
           prevPage={navigationFooter.prevPage}
           changePageSize={navigationFooter.changePageSize}
         />
+        {selectedCount > 0 && (
+          <SelectionActionBar
+            label={`${selectedCount} selected`}
+            onClear={() => setSelectedTraceIds(new Set())}
+            testId="annotations-selection-bar"
+          >
+            <Button size="xs" variant="outline" onClick={addSelectionToDataset}>
+              <Database size={14} />
+              Add to dataset
+            </Button>
+          </SelectionActionBar>
+        )}
+        <PersonalFeatureGateDialog state={datasetGate.dialogState} />
       </VStack>
     );
   }
