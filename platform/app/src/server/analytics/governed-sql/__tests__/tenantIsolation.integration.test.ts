@@ -19,7 +19,6 @@
  * @see specs/analytics/governed-sql-api.feature
  */
 
-import { createHash } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -467,9 +466,13 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
     /** @scenario "Key hash is auditable in the query log without exposing the raw key" */
     it("records the key hash and never the raw API key", async () => {
       // Pins the construction the audit depends on: only a digest is ever sent.
-      expect(
-        createHash("sha256").update(harness.tenantA.rawApiKey).digest("hex"),
-      ).toBe(harness.tenantA.keyHash);
+      // The expected value is written out rather than recomputed, so this stays
+      // an independent check — recomputing it here would only restate whatever
+      // `governedTenantCapability` does and would agree with it after any
+      // change, including a change that stopped hashing at all.
+      expect(harness.tenantA.keyHash).toBe(
+        "22e5ba9afad81c15c4dbfb5813e1ca169057f674932e7d0679e93cd268f19b3d",
+      );
       expect(harness.tenantA.rawApiKey.length).toBeGreaterThanOrEqual(24);
 
       const queryId = `governed-sql-audit-${Date.now()}-${Math.random().toString(36).slice(2)}`;

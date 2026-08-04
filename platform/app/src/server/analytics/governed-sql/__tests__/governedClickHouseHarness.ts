@@ -73,6 +73,7 @@ import {
 import { expect } from "vitest";
 import { TEST_CLICKHOUSE_IMAGE } from "~/test-utils/clickhouseTestEndpoints";
 import { migrateUp } from "../../../clickhouse/goose";
+import { governedTenantCapability } from "../capability";
 import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
 import {
   type GovernedPostgresMapping,
@@ -161,7 +162,14 @@ function tenantFixture(
   return {
     tenantId,
     rawApiKey,
-    keyHash: createHash("sha256").update(rawApiKey).digest("hex"),
+    // Derived through the production function rather than re-hashed here: the
+    // key map only resolves a tenant when the two agree, and a fixture with its
+    // own copy of the algorithm would drift into seeding a digest production
+    // never computes — surfacing as every governed read returning zero rows,
+    // which is indistinguishable from a tenant that simply has no data. What
+    // pins the digest to SHA-256 is a known-answer assertion, in
+    // `tenantIsolation.integration.test.ts`.
+    keyHash: governedTenantCapability({ apiKey: rawApiKey }),
   };
 }
 

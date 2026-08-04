@@ -275,6 +275,21 @@ function sourceRelation({
  * rather than a leak — but it is why `governedPolicyCoverageQuery` auditing
  * that policy matters here too.
  *
+ * ## Why the `LIMIT 1`
+ *
+ * The self-policy narrows the subquery to one *hash*, not to one *row*. The key
+ * map is `ENGINE = MergeTree ORDER BY KeyHash`, which enforces no uniqueness,
+ * so a retried provisioning step or a re-issued key leaves two rows the policy
+ * both admits and the scalar subquery fails the whole query with
+ * `INCORRECT_RESULT_OF_SCALAR_SUBQUERY`. That failure is invisible from the
+ * query text and takes out every PostgreSQL-resident dataset for the affected
+ * key at once. Bounding it is safe because duplicates are copies: a hash maps
+ * to one API key, which belongs to one project, so every admitted row carries
+ * the same `TenantId` and which one is taken cannot change the answer. `LIMIT
+ * 1` is the bound that keeps the shape scalar — an `IN (subquery)` would stop
+ * pushing down and hand the primary the full scan this predicate exists to
+ * prevent.
+ *
  * ## Why this is a performance control and not a security boundary
  *
  * The row policy still applies underneath it, so a wrong predicate costs a
@@ -299,6 +314,7 @@ function postgresTenantPredicate({
     `WHERE ${sourceColumn(TENANT_COLUMN)} = (\n` +
     `    SELECT ${KEY_MAP_ALIAS}.${quotedColumn(KEY_MAP_COLUMNS.tenantId)}\n` +
     `    FROM ${keyMap} AS ${KEY_MAP_ALIAS}\n` +
+    `    LIMIT 1\n` +
     `  )`
   );
 }

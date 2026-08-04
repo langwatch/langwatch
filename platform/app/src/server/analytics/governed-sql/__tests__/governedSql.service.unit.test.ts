@@ -14,7 +14,6 @@
  * @see specs/analytics/governed-sql-api.feature
  */
 
-import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import type { Protections } from "../../../traces/protections";
@@ -144,8 +143,12 @@ describe("given the governed SQL service", () => {
         sql: "SELECT count() FROM analytics.traces",
       });
 
+      // Written out rather than recomputed here. Re-deriving the expectation
+      // through the same algorithm the service uses would agree with it after
+      // any change to that algorithm, so the digest the key map is provisioned
+      // against is stated as a constant instead.
       expect(executor.calls[0]!.tenantCapability).toBe(
-        createHash("sha256").update(PROJECT.apiKey).digest("hex"),
+        "fc9673013bca53b035b608d7d0179f7998f313061274826407da7c49010d6ccd",
       );
       // The raw key is the secret the digest exists to keep out of the
       // database; a capability that merely contained it would be a leak.
