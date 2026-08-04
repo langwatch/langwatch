@@ -30,6 +30,7 @@ import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
@@ -145,6 +146,7 @@ export function createApiRouter() {
   api.route("/", apiKeysApp);
   api.route("/", projectsApp);
   api.route("/", promptsApp);
+  api.route("/", queryApp); // /api/query — LWQL, the read-only query layer
   api.route("/", scenarioEventsApp);
   api.route("/", scenariosApp);
   api.route("/", secretsApp);

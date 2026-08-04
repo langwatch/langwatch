@@ -48,6 +48,7 @@ import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
 import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
+import { lwqlRouter } from "./routers/lwql";
 import { modelProviderRouter } from "./routers/modelProviders";
 import { monitorsRouter } from "./routers/monitors";
 import { onboardingRouter } from "./routers/onboarding/onboarding.router";
@@ -95,6 +96,7 @@ const coreRouters = {
   team: teamRouter,
   traces: tracesRouter,
   tracesV2: tracesV2Router,
+  lwql: lwqlRouter,
   codingAgents: codingAgentsRouter,
   spans: spansRouter,
   analytics: analyticsRouter,
