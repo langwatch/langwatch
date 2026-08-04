@@ -251,4 +251,42 @@ describe("VirtualKeysApiService cursor paging", () => {
       ).rejects.toThrow(/cursor/i);
     });
   });
+  describe("filtering by your own identifier", () => {
+    it("sends external_id as an exact-match query filter", async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(page(["a"], null)));
+
+      await new VirtualKeysApiService().listPage({ externalId: "tenant-7" });
+
+      expect(new URLSearchParams(queryOf(0)).get("external_id")).toBe("tenant-7");
+    });
+
+    it("keeps the filter on EVERY page of an eager walk", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(page(["a"], "cursor-1")))
+        .mockResolvedValueOnce(jsonResponse(page(["b"], null)));
+
+      await new VirtualKeysApiService().list({ externalId: "tenant-7" });
+
+      // A filter dropped after page one silently widens the answer.
+      for (const call of [0, 1]) {
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
+          "tenant-7",
+        );
+      }
+    });
+
+    it("keeps the filter on every page of a lazy walk too", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(page(["a"], "cursor-1")))
+        .mockResolvedValueOnce(jsonResponse(page(["b"], null)));
+
+      await drain(new VirtualKeysApiService().iterate({ externalId: "tenant-7" }));
+
+      for (const call of [0, 1]) {
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
+          "tenant-7",
+        );
+      }
+    });
+  });
 });

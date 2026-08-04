@@ -8,7 +8,7 @@ with an organization API key (``sk-lw-...``) via ``langwatch.setup``.
 Uses httpx via the generated REST API client for HTTP transport.
 """
 
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional
 
 import httpx
 
@@ -17,6 +17,8 @@ from langwatch.generated.langwatch_rest_api_client.client import (
 )
 from langwatch.state import get_instance
 from langwatch.utils.gateway_http import (
+    idempotency_headers,
+    note_idempotent_replay,
     quote_path_segment,
     raise_for_status,
     walk_cursor_pages,
@@ -69,8 +71,22 @@ class WebhooksFacade:
         max_batch_size: Optional[int] = None,
         max_batch_delay_ms: Optional[int] = None,
         max_in_flight: Optional[int] = None,
+        idempotency_key: Optional[str] = None,
+        on_idempotent_replay: Optional[Callable[[], None]] = None,
     ) -> Dict[str, Any]:
-        """Create an endpoint. The response carries the signing secret ONCE."""
+        """Create an endpoint. The response carries the signing secret ONCE.
+
+        ``idempotency_key`` makes the create safe to retry. A dropped
+        connection after the write looks exactly like a dropped request, and
+        retrying without a key mints a SECOND endpoint that also receives every
+        delivery. Send the same key again and the server answers with the first
+        response, signing secret included, which is the only way to recover a
+        secret nothing else ever serves twice. Keys are unique within the
+        ORGANIZATION on this surface; receipts answer for 24 hours, and reusing
+        a key with a different body is refused rather than answered wrongly.
+
+        ``on_idempotent_replay`` is called when the answer came from a receipt
+        rather than a fresh write."""
         body: Dict[str, Any] = {"url": url, "enabled_events": enabled_events}
         if description is not None:
             body["description"] = description
@@ -80,8 +96,13 @@ class WebhooksFacade:
             body["max_batch_delay_ms"] = max_batch_delay_ms
         if max_in_flight is not None:
             body["max_in_flight"] = max_in_flight
-        response = self._http().post("/api/webhooks/v1/endpoints", json=body)
+        response = self._http().post(
+            "/api/webhooks/v1/endpoints",
+            json=body,
+            headers=idempotency_headers(idempotency_key),
+        )
         raise_for_status(response, operation="create endpoint")
+        note_idempotent_replay(response, on_idempotent_replay)
         return response.json()["data"]
 
     def update(

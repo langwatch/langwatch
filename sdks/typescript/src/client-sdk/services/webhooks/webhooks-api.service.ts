@@ -3,6 +3,13 @@ import {
   CURSOR_WALK_PAGE_SIZE,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import {
+  idempotentCreateInit,
+  mutationInit,
+  type IdempotentCreateOptions,
+  type MutationOptions,
+  type ObservedRequestInit,
+} from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -153,7 +160,7 @@ export class WebhooksApiService {
   private async request<T>(
     operation: string,
     path: string,
-    init?: RequestInit,
+    init?: ObservedRequestInit,
   ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
@@ -185,6 +192,7 @@ export class WebhooksApiService {
       });
       throw new WebhooksApiError(message, operation, parsedBody);
     }
+    init?.onResponse?.(response);
     return (await response.json()) as T;
   }
 
@@ -204,14 +212,23 @@ export class WebhooksApiService {
     return res.data;
   }
 
-  /** The signing secret comes back on this response and never again. */
+  /**
+   * The signing secret comes back on this response and never again, so a
+   * create that times out is recovered with `idempotencyKey`: the replay
+   * carries the same secret, and nothing else ever will.
+   */
   async create(
     input: CreateWebhookEndpointInput,
+    options?: IdempotentCreateOptions,
   ): Promise<WebhookEndpointWithSecret> {
     const res = await this.request<{ data: WebhookEndpointWithSecret }>(
       "create webhook endpoint",
       "/api/webhooks/v1/endpoints",
-      { method: "POST", body: JSON.stringify(input) },
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        ...idempotentCreateInit(options),
+      },
     );
     return res.data;
   }
@@ -219,11 +236,12 @@ export class WebhooksApiService {
   async update(
     id: string,
     input: UpdateWebhookEndpointInput,
+    options?: MutationOptions,
   ): Promise<WebhookEndpointSummary> {
     const res = await this.request<{ data: WebhookEndpointSummary }>(
       "update webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}`,
-      { method: "PATCH", body: JSON.stringify(input) },
+      { method: "PATCH", body: JSON.stringify(input), ...mutationInit(options) },
     );
     return res.data;
   }
@@ -238,28 +256,34 @@ export class WebhooksApiService {
    * Nothing comes back: the response body carries only an `archived: true`
    * acknowledgement, and a non-2xx already raises.
    */
-  async archive(id: string): Promise<void> {
+  async archive(id: string, options?: MutationOptions): Promise<void> {
     await this.request<unknown>(
       "archive webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}`,
-      { method: "DELETE" },
+      { method: "DELETE", ...mutationInit(options) },
     );
   }
 
-  async rollSecret(id: string): Promise<WebhookEndpointWithSecret> {
+  async rollSecret(
+    id: string,
+    options?: MutationOptions,
+  ): Promise<WebhookEndpointWithSecret> {
     const res = await this.request<{ data: WebhookEndpointWithSecret }>(
       "roll webhook endpoint secret",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/roll-secret`,
-      { method: "POST" },
+      { method: "POST", ...mutationInit(options) },
     );
     return res.data;
   }
 
-  async test(id: string): Promise<WebhookTestResult> {
+  async test(
+    id: string,
+    options?: MutationOptions,
+  ): Promise<WebhookTestResult> {
     const res = await this.request<{ data: WebhookTestResult }>(
       "test webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/test`,
-      { method: "POST" },
+      { method: "POST", ...mutationInit(options) },
     );
     return res.data;
   }

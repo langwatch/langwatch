@@ -10,7 +10,7 @@ generated REST API client for HTTP transport.
 """
 
 import os
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional
 
 import httpx
 
@@ -19,6 +19,8 @@ from langwatch.generated.langwatch_rest_api_client.client import (
 )
 from langwatch.state import get_instance
 from langwatch.utils.gateway_http import (
+    idempotency_headers,
+    note_idempotent_replay,
     quote_path_segment,
     raise_for_status,
     walk_cursor_pages,
@@ -61,6 +63,7 @@ class GatewayBudgetsFacade:
         scope_types: Optional[List[str]] = None,
         cursor: Optional[str] = None,
         limit: Optional[int] = None,
+        external_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """One page of non-archived budgets with live spend, as
         {data, spend_available, next_cursor}.
@@ -75,13 +78,15 @@ class GatewayBudgetsFacade:
             params["cursor"] = cursor
         if limit is not None:
             params["limit"] = limit
+        if external_id is not None:
+            params["external_id"] = external_id
         response = self._http().get(
             "/api/gateway/v1/budgets", params=params, headers=self._headers()
         )
         raise_for_status(response, operation="list budgets")
         return response.json()
 
-    def list(self) -> Dict[str, Any]:
+    def list(self, *, external_id: Optional[str] = None) -> Dict[str, Any]:
         """Every budget across scopes with live spend, following the cursor
         to exhaustion, as {data, spend_available}.
 
@@ -94,7 +99,9 @@ class GatewayBudgetsFacade:
         spend makes the whole answer say so."""
         rows: List[Dict[str, Any]] = []
         spend_available = True
-        for page in walk_cursor_pages(lambda cursor: self.list_page(cursor=cursor)):
+        for page in walk_cursor_pages(
+            lambda cursor: self.list_page(cursor=cursor, external_id=external_id)
+        ):
             rows.extend(page["data"])
             spend_available = spend_available and bool(
                 page.get("spend_available", True)
@@ -106,6 +113,7 @@ class GatewayBudgetsFacade:
         *,
         scope_types: Optional[List[str]] = None,
         limit: Optional[int] = None,
+        external_id: Optional[str] = None,
     ) -> Iterator[Dict[str, Any]]:
         """Every budget, one row at a time, fetching a page only when the
         previous one runs out.
@@ -114,7 +122,10 @@ class GatewayBudgetsFacade:
         ``spent_usd`` has to be told apart from zero spend."""
         for page in walk_cursor_pages(
             lambda cursor: self.list_page(
-                scope_types=scope_types, cursor=cursor, limit=limit
+                scope_types=scope_types,
+                cursor=cursor,
+                limit=limit,
+                external_id=external_id,
             )
         ):
             yield from page["data"]
@@ -137,15 +148,37 @@ class GatewayBudgetsFacade:
         window: str,
         limit_usd: str,
         on_breach: str = "block",
+        idempotency_key: Optional[str] = None,
+        on_idempotent_replay: Optional[Callable[[], None]] = None,
         **fields: Any,
     ) -> Dict[str, Any]:
         """Create a budget. ``scope`` is the discriminated target, e.g.
         {"kind": "virtual_key", "virtual_key_id": vk} or the per-end-user
         template {"kind": "attributed_user", "anchor_virtual_key_id": vk}.
-        ``manual`` windows accrue until an explicit reset. A
-        ``cycle_anchor_at`` field (an RFC3339 instant) phases a cyclic window
-        off that moment instead of the calendar, and is not valid on
-        ``total`` or ``manual``."""
+        ``manual`` windows accrue until an explicit reset.
+
+        ``fields`` are passed to the route as they are, which is where the
+        rest of the create body goes:
+
+        * ``cycle_anchor_at``, an RFC3339 instant that phases a cyclic window
+          off that moment instead of the calendar, so a ``month`` budget
+          anchored ``2026-01-17T09:00:00Z`` rolls every 17th at 09:00 UTC. It
+          is immutable once set and is refused on the windows that never cycle
+          (``total``, ``manual``).
+        * ``external_id``, your own identifier for the budget.
+        * ``metadata``, up to 40 string labels. An update sends the map WHOLE:
+          it replaces the stored one rather than merging, and {} clears it.
+        * ``description``, ``timezone``, ``provider_key``.
+
+        ``idempotency_key`` makes the create safe to retry: a dropped
+        connection after the write looks exactly like a dropped request, and
+        retrying without a key mints a SECOND budget counting the same spend.
+        Send the same key again and the server answers with the first
+        response. Receipts answer for 24 hours; reusing a key with a different
+        body is refused rather than answered wrongly.
+
+        ``on_idempotent_replay`` is called when the answer came from a receipt
+        rather than a fresh write."""
         body = {
             "scope": scope,
             "name": name,
@@ -155,9 +188,12 @@ class GatewayBudgetsFacade:
             **fields,
         }
         response = self._http().post(
-            "/api/gateway/v1/budgets", json=body, headers=self._headers()
+            "/api/gateway/v1/budgets",
+            json=body,
+            headers={**self._headers(), **idempotency_headers(idempotency_key)},
         )
         raise_for_status(response, operation="create budget")
+        note_idempotent_replay(response, on_idempotent_replay)
         return response.json()["budget"]
 
     def update(self, budget_id: str, **fields: Any) -> Dict[str, Any]:

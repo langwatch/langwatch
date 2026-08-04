@@ -14,6 +14,14 @@ import httpx
 
 from langwatch.utils.exceptions import extract_api_error_detail
 
+IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
+"""The request header the control plane deduplicates creates on."""
+
+IDEMPOTENT_REPLAY_HEADER = "X-Idempotent-Replay"
+"""The response header a replayed create carries. Only ever ``"true"``, and
+ABSENT rather than false on a first execution, so its presence is the whole
+signal."""
+
 MAX_CURSOR_WALK_PAGES = 1000
 """More pages than any real listing has, so passing it is evidence of a
 cursor chain that never ends."""
@@ -47,6 +55,31 @@ def raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
     if status >= 500:
         raise RuntimeError(f"{label}server error ({status})" + (f": {detail}" if detail else ""))
     raise RuntimeError(f"{label}unexpected status {status}" + (f": {detail}" if detail else ""))
+
+
+def idempotency_headers(idempotency_key: Optional[str]) -> Dict[str, str]:
+    """The header that makes a create safe to retry, or nothing at all.
+
+    Callers that never pass a key must send no header: the unkeyed path stores
+    no receipt and is left exactly as it was.
+    """
+    return {IDEMPOTENCY_KEY_HEADER: idempotency_key} if idempotency_key else {}
+
+
+def note_idempotent_replay(
+    response: httpx.Response, on_idempotent_replay: Optional[Callable[[], None]]
+) -> None:
+    """Tell a caller who asked that this answer came from a receipt rather
+    than a fresh write, i.e. that this exact create had already succeeded.
+
+    A callback rather than an extra key on the returned dict: the resource is
+    identical either way, so nothing about handling it changes, and the
+    returned dict is the wire's own envelope, which has no such key.
+    """
+    if on_idempotent_replay is None:
+        return
+    if response.headers.get(IDEMPOTENT_REPLAY_HEADER) == "true":
+        on_idempotent_replay()
 
 
 def quote_path_segment(value: str) -> str:

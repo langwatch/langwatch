@@ -4,6 +4,13 @@ import {
   collectCursorPages,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import {
+  idempotentCreateInit,
+  mutationInit,
+  type IdempotentCreateOptions,
+  type MutationOptions,
+  type ObservedRequestInit,
+} from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -128,6 +135,17 @@ export interface CreateGatewayBudgetInput {
    * rejected on the windows that never cycle (`total`, `manual`).
    */
   cycle_anchor_at?: string;
+  /**
+   * Your own identifier for this budget. Lets you look it up by the id your
+   * system already has instead of storing ours alongside it.
+   */
+  external_id?: string | null;
+  /**
+   * Free-form string labels, up to 40 of them. Sent WHOLE on an update: the
+   * map you pass replaces the stored one rather than merging into it, and
+   * `{}` clears it.
+   */
+  metadata?: Record<string, string>;
 }
 
 export interface UpdateGatewayBudgetInput {
@@ -178,7 +196,11 @@ export class GatewayBudgetsApiService {
     };
   }
 
-  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
+  private async request<T>(
+    operation: string,
+    path: string,
+    init?: ObservedRequestInit,
+  ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
       // A hung control plane must fail the command, not freeze it.
@@ -205,6 +227,7 @@ export class GatewayBudgetsApiService {
       });
       throw new GatewayBudgetsApiError(message, operation, parsedBody);
     }
+    init?.onResponse?.(response);
     return (await response.json()) as T;
   }
 
@@ -221,8 +244,11 @@ export class GatewayBudgetsApiService {
     scopeTypes?: BudgetScopeKind[];
     cursor?: string;
     limit?: number;
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
   }): Promise<GatewayBudgetPage> {
     const params = new URLSearchParams();
+    if (options?.externalId) params.set("external_id", options.externalId);
     if (options?.scopeTypes?.length) {
       params.set("scope_type", options.scopeTypes.join(","));
     }
@@ -258,6 +284,8 @@ export class GatewayBudgetsApiService {
     scopeTypes?: BudgetScopeKind[];
     cursor?: string;
     limit?: number;
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
   }): Promise<GatewayBudgetListing> {
     const pages = await collectCursorPages<GatewayBudgetPage>({
       startCursor: options?.cursor,
@@ -272,6 +300,7 @@ export class GatewayBudgetsApiService {
           scopeTypes: options?.scopeTypes,
           cursor,
           limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+          externalId: options?.externalId,
         }),
     });
     return {
@@ -294,6 +323,8 @@ export class GatewayBudgetsApiService {
     scopeTypes?: BudgetScopeKind[];
     cursor?: string;
     limit?: number;
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
   }): AsyncGenerator<GatewayBudget> {
     const pages = walkCursorPages<GatewayBudgetPage>({
       startCursor: options?.cursor,
@@ -308,6 +339,7 @@ export class GatewayBudgetsApiService {
           scopeTypes: options?.scopeTypes,
           cursor,
           limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+          externalId: options?.externalId,
         }),
     });
     for await (const page of pages) {
@@ -315,29 +347,62 @@ export class GatewayBudgetsApiService {
     }
   }
 
-  async create(input: CreateGatewayBudgetInput): Promise<GatewayBudget> {
+  /**
+   * One budget by id, in the same row shape the listing serves.
+   *
+   * Archived budgets are not served, so a budget that existed yesterday can
+   * answer 404 today. A null `spent_usd` means spend could not be totalled
+   * rather than that nothing was spent, which is the same signal the listing
+   * carries as `spend_available`.
+   */
+  async get(id: string): Promise<GatewayBudget> {
+    const { budget } = await this.request<{
+      budget: GatewayBudget;
+      spend_available: boolean;
+    }>(
+      `get gateway budget "${id}"`,
+      `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,
+    );
+    return budget;
+  }
+
+  async create(
+    input: CreateGatewayBudgetInput,
+    options?: IdempotentCreateOptions,
+  ): Promise<GatewayBudget> {
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       "create gateway budget",
       "/api/gateway/v1/budgets",
-      { method: "POST", body: JSON.stringify(input) },
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        ...idempotentCreateInit(options),
+      },
     );
     return budget;
   }
 
-  async update(id: string, input: UpdateGatewayBudgetInput): Promise<GatewayBudget> {
+  async update(
+    id: string,
+    input: UpdateGatewayBudgetInput,
+    options?: MutationOptions,
+  ): Promise<GatewayBudget> {
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       `update gateway budget "${id}"`,
       `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,
-      { method: "PATCH", body: JSON.stringify(input) },
+      { method: "PATCH", body: JSON.stringify(input), ...mutationInit(options) },
     );
     return budget;
   }
 
-  async archive(id: string): Promise<GatewayBudget> {
+  async archive(
+    id: string,
+    options?: MutationOptions,
+  ): Promise<GatewayBudget> {
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       `archive gateway budget "${id}"`,
       `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,
-      { method: "DELETE" },
+      { method: "DELETE", ...mutationInit(options) },
     );
     return budget;
   }
@@ -348,7 +413,7 @@ export class GatewayBudgetsApiService {
    */
   async reset(
     id: string,
-    options: { endUserId?: string; reason?: string } = {},
+    options: { endUserId?: string; reason?: string } & MutationOptions = {},
   ): Promise<GatewayBudget> {
     const query = options.endUserId
       ? `?end_user_id=${encodeURIComponent(options.endUserId)}`
@@ -360,6 +425,7 @@ export class GatewayBudgetsApiService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(options.reason ? { reason: options.reason } : {}),
+        ...mutationInit(options),
       },
     );
     return budget;

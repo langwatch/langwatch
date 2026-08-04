@@ -4,6 +4,13 @@ import {
   collectCursorPages,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import {
+  idempotentCreateInit,
+  mutationInit,
+  type IdempotentCreateOptions,
+  type MutationOptions,
+  type ObservedRequestInit,
+} from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -78,6 +85,18 @@ export interface CreateVirtualKeyInput {
   /** Optional cap created atomically with the key. */
   budget?: VirtualKeyBudgetInput | null;
   config?: Record<string, unknown>;
+  /**
+   * Your own identifier for this key, unique within the organization. Lets
+   * you look the key up by the id your system already has instead of storing
+   * ours alongside it.
+   */
+  external_id?: string | null;
+  /**
+   * Free-form string labels, up to 40 of them. Sent WHOLE on an update: the
+   * map you pass replaces the stored one rather than merging into it, and
+   * `{}` clears it.
+   */
+  metadata?: Record<string, string>;
 }
 
 export interface UpdateVirtualKeyInput {
@@ -90,6 +109,18 @@ export interface UpdateVirtualKeyInput {
   /** Undefined leaves the cap alone; a value upserts it; null archives it. */
   budget?: VirtualKeyBudgetInput | null;
   config?: Record<string, unknown>;
+  /**
+   * Your own identifier for this key, unique within the organization. Lets
+   * you look the key up by the id your system already has instead of storing
+   * ours alongside it.
+   */
+  external_id?: string | null;
+  /**
+   * Free-form string labels, up to 40 of them. Sent WHOLE on an update: the
+   * map you pass replaces the stored one rather than merging into it, and
+   * `{}` clears it.
+   */
+  metadata?: Record<string, string>;
 }
 
 export interface VirtualKeyWithSecret {
@@ -158,7 +189,11 @@ export class VirtualKeysApiService {
     };
   }
 
-  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
+  private async request<T>(
+    operation: string,
+    path: string,
+    init?: ObservedRequestInit,
+  ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
       // A hung control plane must fail the command, not freeze it.
@@ -185,6 +220,7 @@ export class VirtualKeysApiService {
       });
       throw new VirtualKeysApiError(message, operation, parsedBody);
     }
+    init?.onResponse?.(response);
     return (await response.json()) as T;
   }
 
@@ -200,8 +236,11 @@ export class VirtualKeysApiService {
   async listPage(options?: {
     cursor?: string;
     limit?: number;
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
   }): Promise<VirtualKeyPage> {
     const params = new URLSearchParams();
+    if (options?.externalId) params.set("external_id", options.externalId);
     if (options?.cursor) params.set("cursor", options.cursor);
     if (options?.limit !== undefined) params.set("limit", String(options.limit));
     const query = params.toString() !== "" ? `?${params.toString()}` : "";
@@ -228,6 +267,8 @@ export class VirtualKeysApiService {
   async list(options?: {
     cursor?: string;
     limit?: number;
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
   }): Promise<VirtualKey[]> {
     const pages = await collectCursorPages<VirtualKeyPage>({
       startCursor: options?.cursor,
@@ -241,6 +282,7 @@ export class VirtualKeysApiService {
         this.listPage({
           cursor,
           limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+          externalId: options?.externalId,
         }),
     });
     return pages.flatMap((page) => page.data);
@@ -256,6 +298,8 @@ export class VirtualKeysApiService {
   async *iterate(options?: {
     cursor?: string;
     limit?: number;
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
   }): AsyncGenerator<VirtualKey> {
     const pages = walkCursorPages<VirtualKeyPage>({
       startCursor: options?.cursor,
@@ -269,6 +313,7 @@ export class VirtualKeysApiService {
         this.listPage({
           cursor,
           limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+          externalId: options?.externalId,
         }),
     });
     for await (const page of pages) {
@@ -284,42 +329,64 @@ export class VirtualKeysApiService {
     return virtual_key;
   }
 
-  async create(input: CreateVirtualKeyInput): Promise<VirtualKeyWithSecret> {
+  /**
+   * Mint a key. The response carries the secret ONCE; nothing ever serves it
+   * again, so a create that times out is recovered with `idempotencyKey`
+   * rather than by listing.
+   */
+  async create(
+    input: CreateVirtualKeyInput,
+    options?: IdempotentCreateOptions,
+  ): Promise<VirtualKeyWithSecret> {
     return this.request<VirtualKeyWithSecret>(
       "create virtual key",
       "/api/gateway/v1/virtual-keys",
-      { method: "POST", body: JSON.stringify(input) },
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        ...idempotentCreateInit(options),
+      },
     );
   }
 
-  async update(id: string, input: UpdateVirtualKeyInput): Promise<VirtualKey> {
+  async update(
+    id: string,
+    input: UpdateVirtualKeyInput,
+    options?: MutationOptions,
+  ): Promise<VirtualKey> {
     const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
       `update virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}`,
-      { method: "PATCH", body: JSON.stringify(input) },
+      { method: "PATCH", body: JSON.stringify(input), ...mutationInit(options) },
     );
     return virtual_key;
   }
 
-  async rotate(id: string): Promise<VirtualKeyWithSecret> {
+  async rotate(
+    id: string,
+    options?: MutationOptions,
+  ): Promise<VirtualKeyWithSecret> {
     return this.request<VirtualKeyWithSecret>(
       `rotate virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/rotate`,
-      { method: "POST" },
+      { method: "POST", ...mutationInit(options) },
     );
   }
 
-  async revoke(id: string): Promise<VirtualKey> {
+  async revoke(id: string, options?: MutationOptions): Promise<VirtualKey> {
     const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
       `revoke virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/revoke`,
-      { method: "POST" },
+      { method: "POST", ...mutationInit(options) },
     );
     return virtual_key;
   }
 
   /** Reversible stop; enable() restores the key exactly as it was. */
-  async disable(id: string, options: { reason?: string } = {}): Promise<VirtualKey> {
+  async disable(
+    id: string,
+    options: { reason?: string } & MutationOptions = {},
+  ): Promise<VirtualKey> {
     const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
       `disable virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/disable`,
@@ -327,16 +394,17 @@ export class VirtualKeysApiService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(options.reason ? { reason: options.reason } : {}),
+        ...mutationInit(options),
       },
     );
     return virtual_key;
   }
 
-  async enable(id: string): Promise<VirtualKey> {
+  async enable(id: string, options?: MutationOptions): Promise<VirtualKey> {
     const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
       `enable virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/enable`,
-      { method: "POST" },
+      { method: "POST", ...mutationInit(options) },
     );
     return virtual_key;
   }

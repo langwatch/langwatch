@@ -270,4 +270,67 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       ).rejects.toThrow(/cursor/i);
     });
   });
+  describe("get()", () => {
+    it("reads one budget by id and unwraps the envelope", async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({ budget: budget("b1"), spend_available: true }),
+      );
+
+      const result = await new GatewayBudgetsApiService().get("b1");
+
+      expect(result.id).toBe("b1");
+      expect(String(mockFetch.mock.calls[0]![0])).toContain(
+        "/api/gateway/v1/budgets/b1",
+      );
+    });
+
+    it("percent-encodes an id so it stays one path segment", async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({ budget: budget("a/b"), spend_available: true }),
+      );
+
+      await new GatewayBudgetsApiService().get("a/b");
+
+      expect(String(mockFetch.mock.calls[0]![0])).toContain("budgets/a%2Fb");
+    });
+  });
+
+  describe("filtering by your own identifier", () => {
+    it("sends external_id as an exact-match query filter", async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(page(["a"], null)));
+
+      await new GatewayBudgetsApiService().listPage({ externalId: "acct-42" });
+
+      expect(new URLSearchParams(queryOf(0)).get("external_id")).toBe("acct-42");
+    });
+
+    it("keeps the filter on EVERY page of an eager walk", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(page(["a"], "cursor-1")))
+        .mockResolvedValueOnce(jsonResponse(page(["b"], null)));
+
+      await new GatewayBudgetsApiService().list({ externalId: "acct-42" });
+
+      // A filter dropped after page one silently widens the answer.
+      for (const call of [0, 1]) {
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
+          "acct-42",
+        );
+      }
+    });
+
+    it("keeps the filter on every page of a lazy walk too", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(page(["a"], "cursor-1")))
+        .mockResolvedValueOnce(jsonResponse(page(["b"], null)));
+
+      await drain(new GatewayBudgetsApiService().iterate({ externalId: "acct-42" }));
+
+      for (const call of [0, 1]) {
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
+          "acct-42",
+        );
+      }
+    });
+  });
 });

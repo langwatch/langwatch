@@ -11,7 +11,7 @@ generated REST API client for HTTP transport.
 """
 
 import os
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional
 
 import httpx
 
@@ -20,6 +20,8 @@ from langwatch.generated.langwatch_rest_api_client.client import (
 )
 from langwatch.state import get_instance
 from langwatch.utils.gateway_http import (
+    idempotency_headers,
+    note_idempotent_replay,
     quote_path_segment,
     raise_for_status,
     walk_cursor_pages,
@@ -57,7 +59,11 @@ class VirtualKeysFacade:
         return {"X-Project-Id": self._project_id} if self._project_id else {}
 
     def list_page(
-        self, *, cursor: Optional[str] = None, limit: Optional[int] = None
+        self,
+        *,
+        cursor: Optional[str] = None,
+        limit: Optional[int] = None,
+        external_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """One page of visible virtual keys, newest first, as
         {data, next_cursor}.
@@ -71,13 +77,15 @@ class VirtualKeysFacade:
             params["cursor"] = cursor
         if limit is not None:
             params["limit"] = limit
+        if external_id is not None:
+            params["external_id"] = external_id
         response = self._http().get(
             "/api/gateway/v1/virtual-keys", params=params, headers=self._headers()
         )
         raise_for_status(response, operation="list virtual keys")
         return response.json()
 
-    def list(self) -> List[Dict[str, Any]]:
+    def list(self, *, external_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Every virtual key visible to the caller, following the cursor to
         exhaustion.
 
@@ -85,15 +93,27 @@ class VirtualKeysFacade:
         would silently truncate any organization holding more keys than
         that."""
         rows: List[Dict[str, Any]] = []
-        for page in walk_cursor_pages(lambda cursor: self.list_page(cursor=cursor)):
+        for page in walk_cursor_pages(
+            lambda cursor: self.list_page(cursor=cursor, external_id=external_id)
+        ):
             rows.extend(page["data"])
         return rows
 
-    def iterate(self, *, limit: Optional[int] = None) -> Iterator[Dict[str, Any]]:
+    def iterate(
+        self,
+        *,
+        limit: Optional[int] = None,
+        external_id: Optional[str] = None,
+    ) -> Iterator[Dict[str, Any]]:
         """Every visible virtual key, one row at a time, fetching a page only
-        when the previous one runs out."""
+        when the previous one runs out.
+
+        ``external_id`` is an exact match on your own identifier, and rides
+        every page of the walk rather than only the first."""
         for page in walk_cursor_pages(
-            lambda cursor: self.list_page(cursor=cursor, limit=limit)
+            lambda cursor: self.list_page(
+                cursor=cursor, limit=limit, external_id=external_id
+            )
         ):
             yield from page["data"]
 
@@ -107,17 +127,43 @@ class VirtualKeysFacade:
         return response.json()["virtual_key"]
 
     def create(
-        self, *, name: str, description: Optional[str] = None, **fields: Any
+        self,
+        *,
+        name: str,
+        description: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+        on_idempotent_replay: Optional[Callable[[], None]] = None,
+        **fields: Any,
     ) -> Dict[str, Any]:
         """Mint a key. The response carries the secret ONCE; the virtual
-        key object rides under ``virtual_key``."""
+        key object rides under ``virtual_key``.
+
+        ``fields`` are passed to the route as they are, which is where the
+        rest of the create body goes: ``scopes``, ``budget``, ``config``,
+        ``principal_user_id``, ``routing_policy_id``, ``routing_mode``,
+        ``external_id`` (your own identifier for the key, unique within the
+        organization) and ``metadata`` (up to 40 string labels).
+
+        ``idempotency_key`` makes the create safe to retry. A dropped
+        connection after the write looks exactly like a dropped request, and
+        retrying without a key mints a SECOND key whose secret you now also
+        hold. Send the same key again and the server answers with the first
+        response, secret included, which is the only way to recover a secret
+        nothing else ever serves twice. Receipts answer for 24 hours; reusing
+        a key with a different body is refused rather than answered wrongly.
+
+        ``on_idempotent_replay`` is called when the answer came from a receipt
+        rather than a fresh write."""
         body: Dict[str, Any] = {"name": name, **fields}
         if description is not None:
             body["description"] = description
         response = self._http().post(
-            "/api/gateway/v1/virtual-keys", json=body, headers=self._headers()
+            "/api/gateway/v1/virtual-keys",
+            json=body,
+            headers={**self._headers(), **idempotency_headers(idempotency_key)},
         )
         raise_for_status(response, operation="create virtual key")
+        note_idempotent_replay(response, on_idempotent_replay)
         return response.json()
 
     def update(self, virtual_key_id: str, **fields: Any) -> Dict[str, Any]:

@@ -124,6 +124,18 @@ export {
   EvaluationsApiError,
 } from "./client-sdk/services/evaluations";
 
+/**
+ * The per-call options every mutating call on the gateway and webhook
+ * surfaces accepts, including the idempotency key that makes a create safe to
+ * retry after a timeout.
+ */
+export {
+  IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENT_REPLAY_HEADER,
+  type MutationOptions,
+  type IdempotentCreateOptions,
+} from "./client-sdk/services/_shared/mutation-options";
+
 // AI Gateway management API exports (virtual keys + budgets)
 export {
   VirtualKeysApiService,
@@ -173,6 +185,7 @@ export {
   type SpendEventsPage,
   type SpendSummaryRow,
   type SpendSummariesPage,
+  type SpendEventStatus,
   type SpendReplayResult,
   type EndUserSpend,
   type EndUserCap,

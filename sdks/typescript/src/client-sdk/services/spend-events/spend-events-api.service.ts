@@ -3,6 +3,10 @@ import {
   CURSOR_WALK_PAGE_SIZE,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import {
+  mutationInit,
+  type MutationOptions,
+} from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -73,6 +77,20 @@ export interface SpendSummaryRow {
   };
   cost: { total_usd: string; nano_usd: number };
 }
+
+/**
+ * The states a request can be filtered by, which is more than the two a
+ * caller usually thinks in: a request is `admitted` when it starts,
+ * `confirmed` or `failed` when it ends, and `settled` once its cost is final.
+ * `success` and `error` are the coarse outcome pair over those.
+ */
+export type SpendEventStatus =
+  | "success"
+  | "error"
+  | "admitted"
+  | "confirmed"
+  | "failed"
+  | "settled";
 
 export interface SpendSummariesPage {
   data: SpendSummaryRow[];
@@ -222,7 +240,7 @@ export class SpendEventsApiService {
     endUserId?: string;
     projectId?: string;
     model?: string;
-    status?: "success" | "error";
+    status?: SpendEventStatus;
   }): Promise<SpendEventsPage> {
     const params = new URLSearchParams();
     params.set("from", String(options.from));
@@ -260,7 +278,7 @@ export class SpendEventsApiService {
     endUserId?: string;
     projectId?: string;
     model?: string;
-    status?: "success" | "error";
+    status?: SpendEventStatus;
   }): AsyncGenerator<SpendEvent> {
     const pages = walkCursorPages<SpendEventsPage>({
       startCursor: options.cursor,
@@ -361,11 +379,13 @@ export class SpendEventsApiService {
    * window before replaying old ranges. The window is capped server-side
    * at 7 days per call.
    */
-  async replay(options: {
-    from: number;
-    to: number;
-    endpointId: string;
-  }): Promise<SpendReplayResult> {
+  async replay(
+    options: {
+      from: number;
+      to: number;
+      endpointId: string;
+    } & MutationOptions,
+  ): Promise<SpendReplayResult> {
     const response = await this.request<{ data: SpendReplayResult }>(
       "replay spend events",
       "/api/gateway/v1/spend-events/replay",
@@ -376,6 +396,7 @@ export class SpendEventsApiService {
           to: options.to,
           endpoint_id: options.endpointId,
         }),
+        ...mutationInit(options),
       },
     );
     return response.data;
