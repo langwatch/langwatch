@@ -2,10 +2,10 @@ Feature: AI Gateway — Budgets
 
   # Four scenarios below are bound to budget.service.unit.test.ts. The
   # remaining @unimplemented scenarios are split between two unbindable
-  # categories: (1) gateway data-plane behaviour (HTTP 402 on debit,
-  # /budget/check materialised view, ClickHouse ledger reactor, monthly
-  # window reset, timezone handling) — implemented in Go and out of
-  # scope for the TS parity check; and (2) UI page-level rendering
+  # categories: (1) gateway data-plane behaviour (HTTP 402 at admission,
+  # enforcement bucket-spend reads, monthly window reset, timezone
+  # handling), implemented in Go and out of scope for the TS parity
+  # check; and (2) UI page-level rendering
   # (budget detail drawer, banners, list columns, audit history) — needs
   # component-test fixtures against the Gateway settings pages. All
   # aspirational pending those harnesses.
@@ -30,16 +30,25 @@ Feature: AI Gateway — Budgets
   approaching a hard cap warn too: the request still succeeds, and the header is
   the only notice before the 402 starts.
 
-  Spend is derived from traces. The gateway emits one OTel span per request
-  carrying gen_ai.usage.* + langwatch.virtual_key_id + langwatch.gateway_request_id.
-  The trace-processing pipeline enriches the span with cost (pricing catalog ×
-  tokens), and a dedicated reactor writes one row per applicable budget to
-  gateway_budget_ledger_events in ClickHouse. An AggregatingMergeTree
-  materialised view (gateway_budget_scope_totals) rolls up spend per (scope,
-  scope_id, window, period_start). /budget/check reads from the materialised
-  view using sumMerge. There is no separate debit endpoint — the OTel trace
-  itself IS the debit signal. Idempotency is guaranteed by the ReplacingMergeTree
-  ORDER BY (TenantId, BudgetId, GatewayRequestId).
+  Spend is derived from the gateway's own spend commands. Every request
+  emits admit and outcome records (priced once at the ingest seam), and the
+  debits process manager on the gateway-spend pipeline writes one row per
+  applicable budget to gateway_budget_ledger_events in ClickHouse. It is the
+  sole writer. An AggregatingMergeTree materialised view
+  (gateway_budget_scope_totals) rolls up spend per (scope, scope_id, window,
+  period_start, budget_id), which is what enforcement reads. There is no
+  debit endpoint: the spend command itself is the debit signal, and a
+  request the gateway refused is a record too. Idempotency is guaranteed by
+  the ReplacingMergeTree ORDER BY (TenantId, BudgetId, GatewayRequestId).
+
+  The budget belongs in that rollup key because it belongs in the ledger's.
+  Several budgets can apply to the same key, and provisioning one usually
+  means provisioning two: a hard cap that blocks and a soft cap that warns
+  earlier. Each gets its own ledger row for the same request, carrying the
+  same cost, so a total that identified a budget's rows by scope alone would
+  charge every budget for every sibling's row. Each budget reports and
+  enforces on what the requests actually cost, however many budgets share
+  its scope.
 
   Background:
     Given organization "acme" exists with team "platform" and project "gateway-demo"
@@ -82,6 +91,57 @@ Feature: AI Gateway — Budgets
     Then the gateway rejects the request with 402
     And the error envelope is { error: { type: "budget_exceeded", code: "budget.project.exceeded", ... } }
     And no upstream provider is called
+
+  # ----------------------------------------------------------------------------
+  # Several budgets on one scope
+  # ----------------------------------------------------------------------------
+
+  @integration
+  Scenario: Two budgets on one key each report the request's own cost
+    Given virtual key "prod-key" has a daily hard cap and a daily soft cap
+    And one request costing $0.001 has been served on that key
+    Then the hard cap reports $0.001 spent
+    And the soft cap reports $0.001 spent
+
+  @integration
+  Scenario: The budget list shows a shared key's budgets undoubled
+    Given virtual key "prod-key" has a daily hard cap and a daily soft cap
+    And one request costing $0.001 has been served on that key
+    When I open the "AI Gateway → Budgets" section
+    Then both budgets show $0.001 spent
+
+  @integration
+  Scenario: A hard cap sharing a key does not block at half its limit
+    Given virtual key "prod-key" has a hard cap of $0.0015 and a soft cap beside it
+    And one request costing $0.001 has been served on that key
+    When a gateway request is estimated to cost $0.0001
+    Then the gateway admits the request
+    And no budget is reported as breached
+
+  @integration
+  Scenario: A third budget on a shared key does not inflate the others
+    Given virtual key "prod-key" has three daily budgets
+    And one request costing $0.001 has been served on that key
+    Then each of the three reports $0.001 spent
+
+  @integration
+  Scenario: Sibling budgets on different windows total independently
+    Given virtual key "prod-key" has a daily budget and a monthly budget
+    And two requests costing $0.001 each have been served on that key
+    Then the daily budget reports $0.002 spent
+    And the monthly budget reports $0.002 spent
+
+  @integration
+  Scenario: Manual-window budgets sharing a key each report once
+    Given virtual key "prod-key" has two manual-window budgets
+    And one request costing $0.001 has been served on that key
+    Then each budget reports $0.001 spent
+
+  @integration
+  Scenario: Two per-seat templates on one key each see the seat's own spend
+    Given virtual key "prod-key" has two per-seat allowances anchored on it
+    And one request costing $0.001 has been served for end user "seat-holder@acme.test"
+    Then each template reports $0.001 against that seat
 
   @integration
   Scenario: Soft budget emits warning header but allows the call
@@ -149,25 +209,24 @@ Feature: AI Gateway — Budgets
     Then the request is blocked because vk-block breaches, even though project is only warn
 
   # ============================================================================
-  # Ledger — trace-driven fold in ClickHouse
+  # Ledger: spend-command debits in ClickHouse
   # ============================================================================
 
   @integration @unimplemented
-  Scenario: Gateway trace lands one row per applicable budget in ClickHouse
+  Scenario: A gateway request lands one row per applicable budget in ClickHouse
     Given a gateway request is completed with gateway_request_id "grq_01H..."
-    And the emitted span carries langwatch.virtual_key_id, gen_ai.usage.input_tokens,
-      gen_ai.usage.output_tokens, and a resolved gen_ai.request.model
+    And its confirm command carries the token quantities by class and the resolved model
     And the project has three applicable budgets: org-monthly, team-monthly, project-daily
-    When the trace lands in ClickHouse and the gatewayBudgetSync reactor runs
+    When the debits process consumes the admission and the outcome
     Then gateway_budget_ledger_events has three rows keyed by
       (TenantId, BudgetId, GatewayRequestId)
-    And each row's AmountUSD equals the enriched cost for the span
+    And each row's AmountUSD equals the price the outcome event carried
     And gateway_budget_scope_totals reflects the increment under the matching PeriodStart
 
   @integration @unimplemented
-  Scenario: Trace replay does not double-count spend (idempotency by gateway_request_id)
-    Given a trace with gateway_request_id "grq_01H..." has already produced a debit row
-    When the same trace is re-ingested (OTel replay, retry, or dev replay tooling)
+  Scenario: Redelivery does not double-count spend (idempotency by gateway_request_id)
+    Given a request with gateway_request_id "grq_01H..." has already produced a debit row
+    When its commands are redelivered (spool retry, drainer replay, or backfill)
     Then gateway_budget_ledger_events collapses the duplicate via ReplacingMergeTree
     And gateway_budget_scope_totals does NOT double-count the spend
 
@@ -176,27 +235,27 @@ Feature: AI Gateway — Budgets
     Given a gateway request completes with provider-reported usage
       { prompt_tokens: 1000, completion_tokens: 500 }
     And the control plane's pricing catalog has per-token costs for the resolved model
-    When the span is enriched and the reactor writes to gateway_budget_ledger_events
+    When the ingest seam prices the outcome and the debits process writes the rows
     Then AmountUSD is derived from provider tokens × unit cost
     And the gateway's pre-request cost estimate is used only for pre-flight
       budget-check gating, never for the ledger
 
   @integration @unimplemented
-  Scenario: /budget/check reads from the CH materialised view
+  Scenario: Enforcement spend reads the ClickHouse scope-totals rollup
     Given project "gateway-demo" has a monthly budget with limit $100
-    And 42.00 USD of spend has been attributed to this project this month via traces
-    When the gateway calls POST /api/internal/gateway/budget/check
-    Then the response is derived from sumMerge(SpendUSD) on gateway_budget_scope_totals
+    And 42.00 USD of spend has been attributed to this project this month
+    When the control plane serves the gateway an enforcement spend figure
+    Then the figure is derived from sumMerge(SpendUSD) on gateway_budget_scope_totals
       bounded to the current month's PeriodStart
-    And the response returns { spent_usd: "42.00", remaining_usd: "58.00" }
+    And it reports 42.00 spent against the 100.00 limit
     And no Postgres gatewayBudgetLedger row is read
 
   # ============================================================================
   # Spend must read back for every window offered
   # ============================================================================
   #
-  # Spend is written to the ledger by the trace fold and read back from the
-  # pre-aggregated rollup. The two sides bucket spend into periods, and they
+  # Spend is written to the ledger by the debits process and read back from
+  # the pre-aggregated rollup. The two sides bucket spend into periods, and they
   # only ever agree if they compute the start of the period the same way. When
   # they disagree the write lands in a bucket the read never looks at, so a
   # budget accrues nothing forever, blocks nothing, and warns about nothing,
@@ -260,6 +319,37 @@ Feature: AI Gateway — Budgets
     When recorded spend reaches 80% of the limit but has not passed it
     Then a request through "prod-key" still reaches the provider
     And the response carries a budget warning
+
+  # ============================================================================
+  # Keeping the gateway's cached spend fresh
+  # ============================================================================
+  #
+  # After each gateway request the platform tells the gateway to drop the spend
+  # figures it has cached, so the next request re-reads them. Every request
+  # doing that costs every other key in the project a cache miss, and the
+  # notices are interchangeable: one of them refreshes everything the rest
+  # would have. So they are collapsed to one per project per short window.
+  #
+  # Collapsing them is only safe where nothing is being enforced on the number.
+  # A budget that blocks decides whether the next request is refused, so its
+  # notice is never held back; a budget that only warns is advisory, and a
+  # slightly later warning costs nothing anyone acts on.
+
+  @unit
+  Scenario: A blocking budget's spend update is never held back
+    Given a project whose budget refuses requests once it is exceeded
+    And the project already sent a spend update moments ago
+    When another request records spend against that budget
+    Then the gateway is told immediately that the spend changed
+    And how fast a refusal takes effect is unchanged
+
+  @unit
+  Scenario: Repeat updates for a warn-only budget collapse into one
+    Given a project whose budget only warns when it is exceeded
+    And the project already sent a spend update moments ago
+    When another request records spend against that budget
+    Then no second update is sent for it
+    And the spend itself is still recorded in full
 
   # ============================================================================
   # Provider-filtered budgets
@@ -428,6 +518,34 @@ Feature: AI Gateway — Budgets
     When I open the Budgets list
     Then the budget carries no scope warning
 
+  @integration
+  Scenario: A per-person budget anchored on a key that serves traffic carries no warning
+    Given a per-person budget is anchored on virtual key "gateway-demo-key"
+    And that key is active
+    When I open the Budgets list
+    Then the budget carries no scope warning
+
+  @integration
+  Scenario: A per-person budget anchored where no key sends traffic warns
+    Given a per-person budget is anchored on project "retired"
+    But no active key sends traffic to project "retired"
+    When I open the Budgets list
+    Then the budget warns that no active key sends traffic it can see
+
+  @integration
+  Scenario: A group budget carries no warning when a member holds a key
+    Given a group budget targets group "platform"
+    And an active key is attributed to a member of group "platform"
+    When I open the Budgets list
+    Then the budget carries no scope warning
+
+  @integration
+  Scenario: A group budget warns when its members' traffic cannot be attributed to them
+    Given a group budget targets group "platform"
+    And the only active key a member of "platform" holds is attributed to nobody
+    When I open the Budgets list
+    Then the budget warns that no active key sends traffic it can see
+
   # ============================================================================
   # Window resets
   # ============================================================================
@@ -436,7 +554,7 @@ Feature: AI Gateway — Budgets
   Scenario: Monthly budget resets at month start
     Given project has limit $100 for window "month" with last reset on 2026-04-01T00:00Z
     When the wall clock crosses 2026-05-01T00:00Z
-    Then the ledger's "spent_usd" for this budget is set to 0
+    Then no ledger row is mutated: the month's PeriodStart advances, and the new period reads zero spend
     And the next_reset_at is advanced to 2026-06-01T00:00Z
     And a "budget.window.reset" event is recorded
 
@@ -449,6 +567,66 @@ Feature: AI Gateway — Budgets
   # ============================================================================
   # Dashboard and spend visibility
   # ============================================================================
+
+  # A per-person template is one row that fans out into one bucket per end
+  # user, so no single total describes it. What the screens report instead is
+  # the cap each person carries and how many people have passed it.
+
+  @integration
+  Scenario: A per-person template counts the people it has seen and the people over cap
+    Given a "$1.00 per person" template anchored on virtual key "prod-openai"
+    And 10 end users have spent against it this period
+    And 3 of them have spent $1.00 or more
+    When the budget list totals its spend
+    Then the template reports 10 end users seen and 3 over cap
+    And an end user at exactly the limit counts as over, matching what the gateway blocks on
+
+  @integration
+  Scenario: A per-person template counts an unpriced user but not a user who only ever failed
+    Given a "$1.00 per person" template anchored on virtual key "prod-openai"
+    And one end user's only requests were served by a model with no price
+    And another end user's only requests all failed
+    When the budget list totals its spend
+    Then the unpriced end user counts as seen, spending $0.00
+    But the end user who only ever failed does not count as seen
+
+  @integration
+  Scenario: A per-person template only counts buckets under its own anchor
+    Given a "$1.00 per person" template anchored on virtual key "vk_anchor"
+    And spend exists on a bucket keyed to the bare anchor with no end user
+    And spend exists under a different anchor whose id starts with "vk_anchor"
+    When the budget list totals its spend
+    Then neither the bare-anchor row nor the other anchor's buckets are counted
+
+  @integration
+  Scenario: A provider-filtered template and its unfiltered twin never count each other's people
+    Given an unfiltered "$1.00 per person" template on virtual key "prod-openai"
+    And an OpenAI-filtered "$1.00 per person" template on the same key
+    When the budget list totals both
+    Then the unfiltered template counts only buckets carrying no provider suffix
+    And the filtered template counts only buckets carrying its own provider suffix
+
+  @integration
+  Scenario: Resetting one end user's period drops them from the count until they spend again
+    Given a "$1.00 per person" template with 2 end users over cap
+    When one of those end users has their own bucket period reset
+    Then that end user no longer counts as seen or over cap
+    And the other end user's standing is untouched
+
+  @unit
+  Scenario: The budget list shows a per-person template as a cap and a headcount
+    Given a "$1.00 per person" template with 10 end users seen and 3 over cap
+    When I open the Budgets list
+    Then the row headlines "$1.00 per person" instead of a single spend total
+    And it reads "3 of 10 people over cap"
+    And the bar is filled 3/10 and coloured red because somebody is over
+
+  @unit
+  Scenario: A per-person template nobody has used yet says so instead of showing a dash
+    Given a "$1.00 per person" template no end user has spent against
+    When I open the Budgets list
+    Then the row reads "0 of 0 people over cap" with an empty bar
+    And the bar is not red, because nobody is over
 
   @visual
   Scenario: Budget detail drawer shows current spend, projection, and top consumers

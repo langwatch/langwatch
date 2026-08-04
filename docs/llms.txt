@@ -161,6 +161,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Help
 
 - [Pricing](https://langwatch.ai/docs/pricing.md): How LangWatch Cloud pricing works — events, data retention, and answers to common questions.
+- [What counts as a billable event](https://langwatch.ai/docs/pricing/billable-events.md): The complete list of events LangWatch Cloud bills for, what is never billed, and how deduplication works
 - [Troubleshooting and Support](https://langwatch.ai/docs/support.md): Get troubleshooting help, FAQs, and technical support paths for LangWatch so you can quickly resolve issues in observability, evaluations, and agent testing setups.
 - [Status Page](https://langwatch.ai/docs/status.md): Something wrong? Check our status page
 
@@ -381,12 +382,20 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Rate limits](https://langwatch.ai/docs/ai-gateway/rate-limits.md): How the gateway enforces RPM and RPD (and v1.1 TPM) across VKs, bindings, and providers, including the precedence model and the 429 envelope.
 - [RBAC](https://langwatch.ai/docs/ai-gateway/rbac.md): Role-based access control for the LangWatch AI Gateway, resources, actions, and default role mappings.
 
+## Billing & Metering
+
+- [Billing & Spend Events](https://langwatch.ai/docs/ai-gateway/billing-events.md): One spend event per gateway request, delivered by signed webhooks and reconcilable over REST. The money contract, settled requests, supersession, and the two-grain reconciliation workflow.
+- [Webhooks](https://langwatch.ai/docs/features/webhooks.md): Signed, retried, replayable event delivery to your endpoints, with per-endpoint subscriptions, a delivery log, health, and automatic disabling of dead receivers.
+- [Metering and rebilling your customers through the gateway](https://langwatch.ai/docs/ai-gateway/cookbooks/metering-and-rebilling.md): The end-to-end pattern for platforms that rebill their own customers, provision a tenant key and caps, ingest signed spend events, reconcile, handle breaches, and close periods.
+- [Demo: a rebilling agent platform](https://langwatch.ai/docs/ai-gateway/demo-agent-platform.md): The open-source agent-billing-demo repo, a tiny agent SaaS that meters and rebills its customers entirely through LangWatch, in TypeScript and Python.
+
 ## Governance
 
 - [Governance overview](https://langwatch.ai/docs/ai-gateway/governance/overview.md): One control plane for every AI tool in your enterprise — virtual keys, SSO, per-user identity, policy, and budgets across Claude Code, Codex, Cursor, Gemini CLI, and your custom agents.
 - [Personal IDE keys — your AI tools, governed by your company](https://langwatch.ai/docs/ai-gateway/governance/personal-keys.md): Install LangWatch, run `langwatch login`, and use Claude Code / Cursor / Codex with org-attributed spend, a personal monthly budget, and zero per-tool config.
 - [Admin setup](https://langwatch.ai/docs/ai-gateway/governance/admin-setup.md): One-time configuration for an organization rolling out LangWatch Governance — SSO, providers, routing policies, and budgets.
 - [Routing policies](https://langwatch.ai/docs/ai-gateway/governance/routing-policies.md): Decouple the credential from the provider chain — admins publish routing policies once, virtual keys reference them by ID.
+- [Retention](https://langwatch.ai/docs/ai-gateway/governance/retention.md): How long governance and gateway data lives, tenant retention policies, what is deliberately exempt, and what that means for compliance evidence.
 
 ## Providers
 
@@ -476,6 +485,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Workspaces Personal, Team, Project](https://langwatch.ai/docs/ai-governance/workspaces.md): The three scopes every LangWatch artifact lives in. Personal for you, Team for groups of humans, Project for shared applications. How they nest, how budgets and routing policies attach, and how the workspace switcher in the chrome routes between them.
 - [Members & invites](https://langwatch.ai/docs/ai-governance/members-and-invites.md): Add people to your organization, assign organization roles, scope team memberships, manage invite requests, and self-service per-user sign-in methods. Lives at /settings/members + /settings/authentication.
 - [Roles & permissions](https://langwatch.ai/docs/ai-governance/roles-and-permissions.md): The org-role, team-role, permission catalog and how role bindings stitch them together. Pre-built ADMIN, MEMBER, EXTERNAL, VIEWER roles plus custom roles via the CustomRolePermissions JSON column. Lives at /settings/roles + /settings/role-bindings.
+- [Audit log](https://langwatch.ai/docs/ai-governance/audit-log.md): Every governance and gateway mutation in one append-only log. Timestamp, actor, action, target kind + ID, project context, IP, and error, searchable by user, action, project, and date range. Lives at /settings/audit-log.
 
 ## Dashboards
 
@@ -556,6 +566,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Overview
 
 - [Self-Hosting Overview](https://langwatch.ai/docs/self-hosting/overview.md): Deploy LangWatch on your own infrastructure for full data control
+- [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing.md): What self-hosted LangWatch gives you for free, what an Enterprise license unlocks, and how to activate one
 - [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane, keep full data ownership while leveraging LangWatch's managed control plane.
 - [Troubleshooting & FAQ](https://langwatch.ai/docs/self-hosting/troubleshooting.md): Common issues and solutions for LangWatch self-hosting
 
@@ -567,14 +578,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [SSO Configuration](https://langwatch.ai/docs/self-hosting/configuration/sso.md): Set up Single Sign-On for LangWatch with your identity provider
 - [Observability & Monitoring](https://langwatch.ai/docs/self-hosting/configuration/observability.md): Monitor LangWatch infrastructure with Prometheus, Grafana, and health checks
 - [Third-Party Integrations](https://langwatch.ai/docs/self-hosting/configuration/third-party-integrations.md): Configure email, error tracking, analytics, and external services for LangWatch
-
-## Langy
-
-- [Self-Hosting Langy](https://langwatch.ai/docs/self-hosting/langy/overview.md): Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
-- [Langy Assistant](https://langwatch.ai/docs/self-hosting/langy/setup.md): Run LangWatch's in-product AI assistant on your own cluster
-- [Register the Langy GitHub App](https://langwatch.ai/docs/self-hosting/langy/github-app.md): Deployment-time guide for the GitHub App that lets Langy open bot-authored pull requests, covering registration, permissions, the GITHUB_LANGY env vars, install, verify, and disconnect.
-- [Langy Environment Variables](https://langwatch.ai/docs/self-hosting/langy/environment-variables.md): The environment variable reference for the Langy agent pod and its control-plane integration, grouped by core, workers, egress, mirror lane, and GitHub.
-- [Langy Networking and Egress](https://langwatch.ai/docs/self-hosting/langy/networking-and-egress.md): The NetworkPolicy and L7 egress adapter that govern what the Langy agent pod can reach, the GitHub FQDN floor, and the cooperative-vs-mandatory enforcement limit.
+- [Webhooks & Billing Events](https://langwatch.ai/docs/self-hosting/webhooks.md): Operating the webhook endpoints platform on a self-hosted deployment, egress policy, local receivers, the license flag, and billing settlement tuning.
 
 ## Deployment
 
@@ -604,6 +608,14 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Projection Replay](https://langwatch.ai/docs/self-hosting/ops/projection-replay.md): Rebuild projection state by replaying events from ClickHouse
 - [Deja View](https://langwatch.ai/docs/self-hosting/ops/dejaview.md): Time-travel debugger for event-sourced aggregates
 - [The Foundry](https://langwatch.ai/docs/self-hosting/ops/foundry.md): Interactive trace playground for building and sending synthetic traces
+
+## Langy
+
+- [Self-Hosting Langy](https://langwatch.ai/docs/self-hosting/langy/overview.md): Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
+- [Langy Assistant](https://langwatch.ai/docs/self-hosting/langy/setup.md): Run LangWatch's in-product AI assistant on your own cluster
+- [Register the Langy GitHub App](https://langwatch.ai/docs/self-hosting/langy/github-app.md): Deployment-time guide for the GitHub App that lets Langy open bot-authored pull requests, covering registration, permissions, the GITHUB_LANGY env vars, install, verify, and disconnect.
+- [Langy Environment Variables](https://langwatch.ai/docs/self-hosting/langy/environment-variables.md): The environment variable reference for the Langy agent pod and its control-plane integration, grouped by core, workers, egress, mirror lane, and GitHub.
+- [Langy Networking and Egress](https://langwatch.ai/docs/self-hosting/langy/networking-and-egress.md): The NetworkPolicy and L7 egress adapter that govern what the Langy agent pod can reach, the GitHub FQDN floor, and the cooperative-vs-mandatory enforcement limit.
 
 # API Reference
 

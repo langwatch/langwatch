@@ -20,7 +20,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/langwatch/langwatch/sdk-go/prompts"
+	"github.com/langwatch/langwatch/sdks/go/prompts"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
@@ -902,7 +902,7 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 	}
 
 	// Evaluator slug lives on the typed `data.evaluator` field in the
-	// canonical Studio shape (langwatch/src/optimization_studio/types/
+	// canonical Studio shape (platform/app/src/optimization_studio/types/
 	// dsl.ts → `evaluator?: EvaluatorTypes | "custom/<id>" | "evaluators/<id>"`).
 	// Older workflows may have stuffed it into parameters[]; honor both
 	// so existing user workflows keep evaluating.

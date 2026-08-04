@@ -820,6 +820,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       name: {{ include "langwatch.appSecretName" . }}
       key: nextAuthSecret
 {{- end }}
+
+# Enterprise license. Optional: without one the deployment runs the open
+# source edition, which caps nothing it stores on your own infrastructure.
+# Setting it here entitles the whole instance, so an operator does not have
+# to activate a license per organization through the UI.
+#
+# In sharedEnv rather than the app Deployment because plan resolution runs in
+# the workers too, and a worker that reads a different entitlement than the
+# app would enforce different limits on the same organization.
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 {{- end }}
 
 {{/* ============================================================ */}}
@@ -906,6 +917,47 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   would still create the RWO PVC and mount it into multiple replicas — only
   one would attach, the others crash-loop (Sergio review 2026-05-20).
 */}}
+{{/*
+  Worker-pool size for the evaluations service, derived from the CPU the
+  container is actually allowed to use.
+
+  The service sizes its gunicorn pool from its own get_cpu_count(), whose
+  "Kubernetes" branch reads /sys/fs/cgroup/cpu/cpu.shares — a cgroup **v1**
+  path. Every current node runs cgroup v2, where that file does not exist, so
+  the lookup raises and it falls through to sched_getaffinity(), which reports
+  the NODE's CPU count. A container limited to 500m therefore forks one worker
+  per node core: eight on an 8-vCPU node, sixty-four on a 64-vCPU one.
+
+  That matters because the pool is not cheap. Each worker lazily loads its OWN
+  copy of every local model it serves (PII detection, language detection), so
+  resident memory grows by roughly 2.1Gi per worker as traffic round-robins
+  across the pool, until every worker holds every model. Measured on a 1-CPU
+  container on an 8-vCPU node: 11Gi and still climbing, having OOM-killed at
+  the chart's own 8Gi default. Pinned to one worker, the same load holds flat
+  at 2.5Gi.
+
+  CPU_COUNT is the env var get_cpu_count() honours before any of that
+  detection, so setting it from the limit restores the relationship an operator
+  expects: ask for less CPU, get a smaller pool and a smaller footprint.
+
+  Emitted only when the operator has not set CPU_COUNT in extraEnvs, so an
+  explicit choice always wins.
+*/}}
+{{- define "langwatch.langevals.cpuCount" -}}
+{{- $cpu := "" -}}
+{{- with .Values.langevals.resources -}}
+{{- $cpu = (dig "limits" "cpu" (dig "requests" "cpu" "" .) .) -}}
+{{- end -}}
+{{- $cpu = $cpu | toString -}}
+{{- if eq $cpu "" -}}
+1
+{{- else if hasSuffix "m" $cpu -}}
+{{- max 1 (ceil (divf (float64 (trimSuffix "m" $cpu)) 1000.0)) -}}
+{{- else -}}
+{{- max 1 (ceil (float64 $cpu)) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "langwatch.storedObjects.localFilesystemIsActive" -}}
 {{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}
 true

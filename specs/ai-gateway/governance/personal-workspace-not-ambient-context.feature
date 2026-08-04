@@ -146,6 +146,18 @@ Feature: A personal workspace is never the ambient context for organization work
       # carries no project of its own.
 
     @integration
+    Scenario: A team slug that matches nothing does not address the personal workspace
+      Given jane has just been in her personal project
+      When jane opens an organization-scoped page carrying a team slug no team in "ACME" has
+      Then the ambient team is the shared team
+      And the ambient project is "acme-app"
+      # A team slug left over from a team that was archived, renamed, or
+      # belongs to an organization jane is not in resolves to no team at all,
+      # so it says nothing about where she wants to be. Reading it as intent
+      # would hand the page back to the personal selection the rule above
+      # releases, on a page that never names the project it writes to.
+
+    @integration
     Scenario: The remembered selection heals after one organization-scoped page
       Given jane has just been in her personal project
       When jane opens an organization-scoped settings page

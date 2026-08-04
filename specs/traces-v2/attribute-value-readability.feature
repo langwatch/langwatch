@@ -1,8 +1,8 @@
 # Attribute value viewer — JSON highlighting + readable text
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/TraceDrawer/AttributeValue.tsx  (JsonBody / text FormatBody)
-#   langwatch/src/features/traces-v2/components/TraceDrawer/JsonHighlight.tsx   (existing Shiki JSON renderer to reuse)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/AttributeValue.tsx  (JsonBody / text FormatBody)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/JsonHighlight.tsx   (existing Shiki JSON renderer to reuse)
 #
 # Motivation (round 5): the attribute-value data viewer (used for span
 # attribute values, event content, etc.) prettifies JSON but renders it as

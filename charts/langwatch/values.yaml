@@ -119,21 +119,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.8.0 # x-release-please-version
+    tag: 3.9.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.8.0 # x-release-please-version
+    tag: 3.9.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.8.0 # x-release-please-version
+    tag: 3.9.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -397,6 +397,34 @@ app:
           ## @param app.email.providers.sendgrid.apiKey.secretKeyRef [object] Secret ref for SendGrid API key.
           secretKeyRef: { name: "", key: "" }
 
+  # Enterprise license, applied to the whole instance.
+  #
+  # Leave empty to run the open source edition: unlimited people, projects,
+  # teams and history, with no license needed. A license adds the enterprise
+  # security surface (SSO, SCIM provisioning, audit logs) and support.
+  # See https://docs.langwatch.ai/self-hosting/licensing
+  #
+  # The alternative to setting it here is activating the same key per
+  # organization in Settings > License, which suits a single-tenant install
+  # but has to be repeated for every organization the instance hosts.
+  ## @extra app.license Enterprise license configuration.
+  ## @param app.license.key.value [string] License key issued by LangWatch.
+  ## @param app.license.key.secretKeyRef [object] Secret ref holding the license key.
+  ## @param app.license.publicKey.value [string] Verification key, only for a private signing chain.
+  ## @param app.license.publicKey.secretKeyRef [object] Secret ref holding the verification key.
+  license:
+    key:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+    # Overrides the built-in verification key. Almost no deployment sets this:
+    # it exists for installs that LangWatch issues licenses to from a separate
+    # signing chain. Replacing this key does not grant an Enterprise License,
+    # and a key that verifies only against a replaced value is not one; see
+    # platform/app/ee/LICENSE.md.
+    publicKey:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
   # Note: publicUrl is automatically used from http.publicUrl
@@ -404,14 +432,15 @@ app:
   ## @param app.nextAuth.provider [string, default: email] Default auth provider.
   ## @param app.nextAuth.secret.value [string] NextAuth secret value (not recommended inline for production).
   nextAuth:
-    # Authentication provider to use. Options: email (default), google, github, gitlab, azureAd, cognito, okta
-    # When set to 'email', enables email-based authentication
-    # When set to 'google', enables Google OAuth integration
-    # When set to 'github', enables GitHub OAuth integration
-    # When set to 'gitlab', enables GitLab OAuth integration
-    # When set to 'azureAd', enables Azure Active Directory OAuth integration
-    # When set to 'cognito', enables AWS Cognito OAuth integration
-    # When set to 'okta', enables Okta OAuth integration
+    # Authentication provider to use. This value is passed to the app verbatim
+    # as NEXTAUTH_PROVIDER, so it has to be one the app recognises:
+    #   email (default), google, github, gitlab, azure-ad, auth0, okta
+    # Note that Azure AD is 'azure-ad' here while its credentials live under
+    # providers.azureAd below — the first is the app's provider id, the second
+    # is this chart's key for the AZURE_AD_* variables.
+    # A value the app does not recognise, or one whose credentials are missing,
+    # starts the deployment in email mode rather than leaving it unsignable.
+    # Every provider except email needs an Enterprise license to take effect.
     provider: email
     secret:
       value: ""
@@ -459,24 +488,6 @@ app:
           ## @param app.nextAuth.providers.azureAd.tenantId.value [string] Azure AD tenant ID.
           value: ""
           ## @param app.nextAuth.providers.azureAd.tenantId.secretKeyRef [object] Secret ref for Azure AD tenant ID.
-          secretKeyRef: { name: "", key: "" }
-      # AWS Cognito OAuth integration
-      ## @extra app.nextAuth.providers.cognito AWS Cognito OAuth configuration.
-      cognito:
-        clientId:
-          ## @param app.nextAuth.providers.cognito.clientId.value [string] Cognito client ID.
-          value: ""
-          ## @param app.nextAuth.providers.cognito.clientId.secretKeyRef [object] Secret ref for Cognito client ID.
-          secretKeyRef: { name: "", key: "" }
-        clientSecret:
-          ## @param app.nextAuth.providers.cognito.clientSecret.value [string] Cognito client secret.
-          value: ""
-          ## @param app.nextAuth.providers.cognito.clientSecret.secretKeyRef [object] Secret ref for Cognito client secret.
-          secretKeyRef: { name: "", key: "" }
-        issuer:
-          ## @param app.nextAuth.providers.cognito.issuer.value [string] Cognito issuer URL.
-          value: ""
-          ## @param app.nextAuth.providers.cognito.issuer.secretKeyRef [object] Secret ref for Cognito issuer URL.
           secretKeyRef: { name: "", key: "" }
       # GitHub OAuth integration
       ## @extra app.nextAuth.providers.github GitHub OAuth configuration.
@@ -976,6 +987,13 @@ langevals:
 
   # Resource requirements for evaluation tasks
   # Higher memory requirements due to model loading and evaluation
+  #
+  # The CPU limit here also sizes the service's worker pool, via the CPU_COUNT
+  # the chart derives from it: each worker loads its own copy of every local
+  # model it serves (~2.1Gi), so memory scales with the pool. Raise the CPU and
+  # the memory together, or pin the pool with a CPU_COUNT of your own in
+  # extraEnvs. See langwatch.langevals.cpuCount in templates/_helpers.tpl.
+  #
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   ## @extra langevals.resources Resource requests and limits.
   ## @param langevals.resources.requests.cpu [string, default: 1000m] Requested CPU.

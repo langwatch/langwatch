@@ -6,7 +6,7 @@ Feature: Role-based default models with per-scope overrides
   # The data, resolver, and ModelNotConfiguredError shape live with B3.1
   # (specs/model-providers/model-resolver-and-registry.feature). This file
   # describes the settings UI in
-  # `langwatch/src/components/settings/DefaultModelsSection.tsx` and the
+  # `platform/app/src/components/settings/DefaultModelsSection.tsx` and the
   # tRPC payload that drives it.
   #
   # Mental model:

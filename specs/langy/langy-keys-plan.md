@@ -104,7 +104,7 @@ Spec: `specs/langy/langy-api-key-provisioning.feature`.
       **shared dev RDS**; do NOT run create/delete tests against it. Bring up a local PG and override:
       ```bash
       make quickstart migration            # local postgres on host :5432
-      cd langwatch
+      cd platform/app
       DATABASE_URL="postgresql://prisma:prisma@localhost:5432/mydb?schema=langwatch_db" \
         pnpm prisma migrate deploy
       DATABASE_URL="postgresql://prisma:prisma@localhost:5432/mydb?schema=langwatch_db" \

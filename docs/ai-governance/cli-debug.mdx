@@ -227,7 +227,7 @@ The 409 contract is asserted in `specs/ai-gateway/governance/personal-keys.featu
 
 ## CLI wrapper e2e coverage
 
-The five wrapped tools (`langwatch claude`, `langwatch codex`, `langwatch cursor`, `langwatch gemini`, `langwatch opencode`) are exercised by a Node-only end-to-end suite at `typescript-sdk/__tests__/e2e/cli/governance-wrapper.e2e.test.ts`, fake control-plane Express + fake gateway Express + mocked tool binaries on `PATH`. No Docker, no live LLM, ~3-second total runtime; runs on every PR.
+The five wrapped tools (`langwatch claude`, `langwatch codex`, `langwatch cursor`, `langwatch gemini`, `langwatch opencode`) are exercised by a Node-only end-to-end suite at `sdks/typescript/__tests__/e2e/cli/governance-wrapper.e2e.test.ts`, fake control-plane Express + fake gateway Express + mocked tool binaries on `PATH`. No Docker, no live LLM, ~3-second total runtime; runs on every PR.
 
 Per-tool assertions:
 
