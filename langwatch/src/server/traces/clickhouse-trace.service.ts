@@ -1920,10 +1920,109 @@ export class ClickHouseTraceService {
   private static readonly SUMMARY_BATCH_SIZE = 25;
 
   /**
+   * Ceiling on the EXTRA chunk-runs one call may spend on bisection, on top of
+   * its `ceil(ids.length / batchSize)` baseline chunks.
+   *
+   * Bisection generates unbounded work by construction: a chunk of 25 driven
+   * all the way down costs 49 runs instead of 1, and the download path hands
+   * this helper up to `pageSize ?? 10_000` ids (`api/routers/traces.ts`) — 400
+   * chunks — so an uncapped descent can issue ~20k sequential queries (~40k
+   * round trips on the join path, which runs two per chunk) against an
+   * instance that has *already told us it is out of memory*. The dangerous
+   * regime is server-wide memory pressure, where chunks fail at 25 and succeed
+   * small: every chunk bisects and nothing aborts early.
+   *
+   * Fast-fail IS the backpressure that protected that instance before
+   * bisection existed, so this budget restores it. Once spent, the next
+   * chunk-level OOM propagates instead of descending, capping one call at
+   * `ceil(ids.length / batchSize) + MAX_BISECT_RETRIES` runs.
+   */
+  private static readonly MAX_BISECT_RETRIES = 100;
+
+  /**
+   * Run `runQuery` over `ids` in fixed-size chunks of `batchSize`, returning the
+   * concatenated rows. This is the shared OOM fallback the trace reads use after
+   * a full-list query trips ClickHouse's per-query memory cap.
+   *
+   * If a chunk itself OOMs (MEMORY_LIMIT_EXCEEDED) the chunk is recursively
+   * BISECTED — halve, retry each half — down to a single id, so one unusually
+   * heavy trace can no longer fail the whole page. The two halves run
+   * SEQUENTIALLY (not in parallel) so a retry never compounds memory pressure on
+   * an instance that just OOMed. A single-id batch that still OOMs — or any
+   * non-OOM error — is rethrown, as is any OOM once `maxBisectRetries` is spent.
+   */
+  private async retryInBatchesWithBisect<T>({
+    runQuery,
+    ids,
+    batchSize,
+    projectId,
+    maxBisectRetries = ClickHouseTraceService.MAX_BISECT_RETRIES,
+  }: {
+    runQuery: (ids: string[]) => Promise<T[]>;
+    ids: string[];
+    batchSize: number;
+    projectId: string;
+    maxBisectRetries?: number;
+  }): Promise<T[]> {
+    if (batchSize <= 0) {
+      // Guards an infinite `for` below rather than a live caller (all three
+      // pass SUMMARY_BATCH_SIZE); a hung read is a worse failure than the
+      // three lines this costs.
+      throw new Error("retryInBatchesWithBisect: batchSize must be > 0");
+    }
+    // Closed over the WHOLE call, not per chunk: the fan-out that has to be
+    // bounded is the request's total, because 400 chunks each bisecting a
+    // little hammers the instance exactly as hard as one chunk bisecting a lot.
+    let bisectRetriesSpent = 0;
+
+    const runChunk = async (chunk: string[], depth: number): Promise<T[]> => {
+      try {
+        return await runQuery(chunk);
+      } catch (error) {
+        if (chunk.length <= 1 || !isClickHouseMemoryLimitError(error)) {
+          throw error;
+        }
+        // Each bisection costs exactly two more chunk-runs; charge them up
+        // front so the budget bounds work issued, not work completed.
+        if (bisectRetriesSpent + 2 > maxBisectRetries) {
+          this.logger.warn(
+            { projectId, chunkSize: chunk.length, depth, maxBisectRetries },
+            "ClickHouse bisect budget exhausted; failing fast instead of descending further",
+          );
+          throw error;
+        }
+        bisectRetriesSpent += 2;
+
+        const mid = Math.floor(chunk.length / 2);
+        // Only the initial full-list OOM logs at the call site; this is the
+        // sole signal that a page descended into per-batch bisection — and it
+        // fires only under memory stress, exactly when the signal matters.
+        // Bounded by the budget above, so it cannot flood the log.
+        this.logger.warn(
+          { projectId, chunkSize: chunk.length, mid, depth },
+          "ClickHouse batch still OOMed; bisecting",
+        );
+        // Sequential, not parallel: running both halves at once would
+        // re-pressure the same instance that just OOMed.
+        const lowerHalf = await runChunk(chunk.slice(0, mid), depth + 1);
+        const upperHalf = await runChunk(chunk.slice(mid), depth + 1);
+        return [...lowerHalf, ...upperHalf];
+      }
+    };
+
+    const rows: T[] = [];
+    for (let i = 0; i < ids.length; i += batchSize) {
+      rows.push(...(await runChunk(ids.slice(i, i + batchSize), 0)));
+    }
+    return rows;
+  }
+
+  /**
    * Fetch full trace summary rows for a set of trace IDs.
-   * On ClickHouse MEMORY_LIMIT_EXCEEDED, retries in smaller batches
-   * so that heavy ComputedInput/ComputedOutput columns don't blow the
-   * per-query memory cap. If a single batch still OOMs the error propagates.
+   * On ClickHouse MEMORY_LIMIT_EXCEEDED, retries in smaller batches —
+   * bisecting any batch that still OOMs down to a single id — so heavy
+   * ComputedInput/ComputedOutput columns don't blow the per-query memory cap.
+   * Only a single-id batch that still OOMs propagates.
    */
   private async fetchTraceSummaryRows({
     clickHouseClient,
@@ -1941,7 +2040,7 @@ export class ClickHouseTraceService {
     startDate: number;
     endDate: number;
     traceIds: string[];
-    orderDirection: string;
+    orderDirection: "ASC" | "DESC";
     /** Fetch the heavy Computed* columns independently. False reads '' instead —
      * the row shape is unchanged but ClickHouse never materializes that column. */
     fetchInput?: boolean;
@@ -2039,20 +2138,15 @@ export class ClickHouseTraceService {
         `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
       );
 
-      const allRows: TraceSummaryRow[] = [];
-      for (
-        let i = 0;
-        i < traceIds.length;
-        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-      ) {
-        const batch = traceIds.slice(
-          i,
-          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-        );
-        const batchRows = await runQuery(batch);
-        allRows.push(...batchRows);
-      }
+      const allRows = await this.retryInBatchesWithBisect({
+        runQuery,
+        ids: traceIds,
+        batchSize: ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+        projectId,
+      });
 
+      // Batches come back in chunk order, not the page's global sort order —
+      // re-impose the ORDER BY (date axis, then TraceId) across the merged set.
       const dir = orderDirection === "DESC" ? -1 : 1;
       allRows.sort((a, b) => {
         const timeDiff = a[sortColumn] - b[sortColumn];
@@ -2252,6 +2346,22 @@ export class ClickHouseTraceService {
   /**
    * Fetch evaluation rows for a set of trace IDs.
    * Same OOM-resilient pattern as fetchTraceSummaryRows.
+   *
+   * ⚠ Partition-safety of the OOM fallback rests on an invariant the schema
+   * does NOT enforce. The dedup below groups on `(TenantId, EvaluationId)`
+   * while the batching splits on `TraceId`, and `evaluation_runs` is
+   * `ORDER BY (TenantId, EvaluationId)` with `TraceId` merely a nullable
+   * column — so nothing structurally stops two versions of one EvaluationId
+   * from carrying different TraceIds. If that happened and the two landed in
+   * different batches, each would compute its own local `max(UpdatedAt)` and
+   * the concatenation would resurrect the stale version alongside the current
+   * one. (The trace-summary read has no such exposure: it groups on
+   * `(TenantId, TraceId)`, which CONTAINS the split key.)
+   *
+   * This is safe only while TraceId never changes across versions of an
+   * EvaluationId. No writer does that today; bisection multiplies the number
+   * of partitions, so if one ever starts, the damage shows up only on the OOM
+   * path and is effectively unreproducible.
    */
   private async fetchEvaluationRows({
     clickHouseClient,
@@ -2297,21 +2407,12 @@ export class ClickHouseTraceService {
         `Evaluations query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
       );
 
-      const allRows: ClickHouseEvaluationRunRow[] = [];
-      for (
-        let i = 0;
-        i < traceIds.length;
-        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-      ) {
-        const batch = traceIds.slice(
-          i,
-          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-        );
-        const batchRows = await runQuery(batch);
-        allRows.push(...batchRows);
-      }
-
-      return allRows;
+      return await this.retryInBatchesWithBisect({
+        runQuery,
+        ids: traceIds,
+        batchSize: ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+        projectId,
+      });
     }
   }
 
@@ -2756,40 +2857,45 @@ export class ClickHouseTraceService {
         // MEMORY_LIMIT_EXCEEDED. Run the list as one query on the happy path, and
         // on OOM retry in fixed-size batches (same fallback as fetchTraceSummaryRows
         // / fetchEvaluationRows) so peak memory is bounded without dropping data.
+        // When the caller knows the traces' approximate time, bound the
+        // summary read to those weekly partitions. trace_summaries is
+        // partitioned on OccurredAt, so a TraceId-only filter cannot prune
+        // partitions and scans every part (incl. cold S3) to locate the rows.
+        // A ±2-day margin around the caller's range is safe headroom; without
+        // a hint we keep the original unbounded read.
+        //
+        // resolveOccurredAtRange yields a RANGE (min/max OccurredAt), not a
+        // point, so map it onto queryWindowed's centre+half-width form: centre
+        // on the range midpoint and grow the half-width to cover half the range
+        // PLUS the ±2-day margin. The emitted fragment's bounds then land on
+        // exactly [from - 2d, to + 2d] — the same predicate the old local
+        // constant produced. Fallback "none": a resolve failure already left
+        // effectiveOccurredAt undefined (hint null -> unbounded read, warn
+        // logged at the resolve site), and a hinted-but-empty summary read is
+        // never widened here — an empty result is authoritative and the caller
+        // below skips the span scan.
+        //
+        // Computed ONCE for the whole trace-id list, deliberately outside
+        // runBatch: it derives from the caller's / the resolve's range over ALL
+        // ids, so every chunk — including a bisected one — reads through the
+        // same window. See the span window below for why that matters.
+        const hasSummaryWindow =
+          effectiveOccurredAt !== undefined &&
+          effectiveOccurredAt.from > 0 &&
+          effectiveOccurredAt.to > 0;
+        const summaryHintMs = hasSummaryWindow
+          ? (effectiveOccurredAt.from + effectiveOccurredAt.to) / 2
+          : null;
+        const summaryWindowMs = hasSummaryWindow
+          ? (effectiveOccurredAt.to - effectiveOccurredAt.from) / 2 +
+            DEFAULT_PARTITION_WINDOW_MS
+          : DEFAULT_PARTITION_WINDOW_MS;
+
         const runBatch = async (
           batchTraceIds: string[],
         ): Promise<
           Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
         > => {
-          // When the caller knows the traces' approximate time, bound the
-          // summary read to those weekly partitions. trace_summaries is
-          // partitioned on OccurredAt, so a TraceId-only filter cannot prune
-          // partitions and scans every part (incl. cold S3) to locate the rows.
-          // A ±2-day margin around the caller's range is safe headroom; without
-          // a hint we keep the original unbounded read.
-          //
-          // resolveOccurredAtRange yields a RANGE (min/max OccurredAt), not a
-          // point, so map it onto queryWindowed's centre+half-width form: centre
-          // on the range midpoint and grow the half-width to cover half the range
-          // PLUS the ±2-day margin. The emitted fragment's bounds then land on
-          // exactly [from - 2d, to + 2d] — the same predicate the old local
-          // constant produced. Fallback "none": a resolve failure already left
-          // effectiveOccurredAt undefined (hint null -> unbounded read, warn
-          // logged at the resolve site), and a hinted-but-empty summary read is
-          // never widened here — an empty result is authoritative and the caller
-          // below skips the span scan.
-          const hasSummaryWindow =
-            effectiveOccurredAt !== undefined &&
-            effectiveOccurredAt.from > 0 &&
-            effectiveOccurredAt.to > 0;
-          const summaryHintMs = hasSummaryWindow
-            ? (effectiveOccurredAt.from + effectiveOccurredAt.to) / 2
-            : null;
-          const summaryWindowMs = hasSummaryWindow
-            ? (effectiveOccurredAt.to - effectiveOccurredAt.from) / 2 +
-              DEFAULT_PARTITION_WINDOW_MS
-            : DEFAULT_PARTITION_WINDOW_MS;
-
           // Summaries first (light, one row per trace): they carry OccurredAt,
           // which bounds the heavy stored_spans scan below to the traces' weekly
           // partitions instead of cold-scanning every partition on S3. A span's
@@ -2900,24 +3006,35 @@ export class ClickHouseTraceService {
             Links_Attributes: Record<string, unknown>[];
           };
 
-          // Bound the stored_spans scan to the weeks the matched traces occurred
-          // in (the cold-scan cost driver). Same range->window mapping as the
-          // summary read above: centre on the matched summaries' OccurredAt
-          // midpoint, half-width = half that range + the ±2-day margin, so the
-          // fragment lands on exactly [min - 2d, max + 2d]. Fallback "none": no
-          // matched OccurredAts -> hint null -> unbounded scan (the old
-          // hasWindow=false branch); a hinted-but-empty span read is
-          // authoritative and never widened.
-          const occurredAts = summaryRows
-            .map((r) => r.ts_OccurredAt)
-            .filter((t): t is number => typeof t === "number" && t > 0);
-          const hasWindow = occurredAts.length > 0;
-          const spanMinMs = hasWindow ? Math.min(...occurredAts) : 0;
-          const spanMaxMs = hasWindow ? Math.max(...occurredAts) : 0;
-          const spanHintMs = hasWindow ? (spanMinMs + spanMaxMs) / 2 : null;
-          const spanWindowMs = hasWindow
-            ? (spanMaxMs - spanMinMs) / 2 + DEFAULT_PARTITION_WINDOW_MS
-            : DEFAULT_PARTITION_WINDOW_MS;
+          // Bound the stored_spans scan to the weeks the traces occurred in
+          // (the cold-scan cost driver), reusing the list-wide window computed
+          // above rather than deriving one from THIS chunk's summary rows.
+          //
+          // Deriving per chunk is what the OOM fallback makes unsafe: the
+          // window would narrow monotonically as bisection halves the chunk,
+          // and at length 1 it collapses to a single trace's OccurredAt ±2d.
+          // Any span outside that — long-running sessions, replays, clock skew
+          // — would then be dropped with no error and no warning, so the same
+          // trace would come back with fewer spans purely because the read hit
+          // memory pressure. Keying off the list-wide range instead makes the
+          // window chunk-INVARIANT: bisecting changes how many queries we run,
+          // never which rows they can see.
+          //
+          // Fallback "none": no list-wide range (caller passed none and the
+          // sort-key resolve failed open) -> hint null -> unbounded scan, the
+          // same slow-but-correct branch the summary read above takes. A
+          // hinted-but-empty span read is authoritative and never widened.
+          //
+          // Cost, accepted knowingly: callers that pass a broad occurredAt
+          // (the trace-list routes forward the user's whole date filter) now
+          // scan spans over that range rather than the matched traces' own
+          // times — more weekly partitions, though the summary read in the
+          // same call already scans exactly this window. Keeping the tight
+          // per-chunk window only when the batch covers the whole id list
+          // would recover that, at the price of a branch whose invariance
+          // argument is far longer than this one's.
+          const spanHintMs = summaryHintMs;
+          const spanWindowMs = summaryWindowMs;
 
           const spanRows = await queryWindowed<SpanRow[]>({
             table: "stored_spans",
@@ -3038,25 +3155,20 @@ export class ClickHouseTraceService {
             `Traces-with-spans join OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
           );
 
-          const merged = new Map<
-            string,
-            { summary: TraceSummaryData; spans: NormalizedSpan[] }
-          >();
-          for (
-            let i = 0;
-            i < traceIds.length;
-            i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-          ) {
-            const batch = traceIds.slice(
-              i,
-              i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-            );
-            const batchMap = await runBatch(batch);
-            for (const [traceId, value] of batchMap) {
-              merged.set(traceId, value);
-            }
-          }
-          return merged;
+          // runBatch returns a Map keyed by TraceId; flatten each batch's
+          // entries so the shared bisecting helper can concatenate them, then
+          // rebuild the Map. The helper partitions by INDEX, not by value, so
+          // this assumes callers do not pass a duplicated trace id — if one
+          // did, it would land in two chunks and the later entry would win the
+          // rebuild. Equivalent to the happy path's `tracesMap.set`, which
+          // collapses duplicates the same way.
+          const mergedEntries = await this.retryInBatchesWithBisect({
+            runQuery: async (ids) => [...(await runBatch(ids))],
+            ids: traceIds,
+            batchSize: ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+            projectId,
+          });
+          return new Map(mergedEntries);
         }
       },
     );
