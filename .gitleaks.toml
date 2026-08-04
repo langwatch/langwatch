@@ -61,3 +61,20 @@ paths = ['''platform/app/src/server/event-sourcing/process-manager/stores/__test
 description = "Signed license test fixtures, verifiable only against the checked-in test keypair"
 targetRules = ["generic-api-key"]
 paths = ['''platform/app/ee/licensing/__tests__/fixtures/testLicenses\.ts''']
+
+# gitleaks scans the branch's whole commit range, not just its tip, so a value
+# removed in a later commit is still found in the commit that added it. This one
+# is the sequential-hex placeholder `0123456789abcdef...` that briefly stood in
+# for CREDENTIALS_SECRET in the CI workflow. It never protected anything: it
+# encrypted and decrypted throwaway rows inside a single CI job, and the workflow
+# generates a random key per run now instead.
+#
+# Scoped by VALUE as well as path, and matched with AND, so any other
+# high-entropy string in a workflow file is still caught. A real credential
+# cannot be this string.
+[[allowlists]]
+description = "Sequential-hex CREDENTIALS_SECRET placeholder once inlined in the CI workflow"
+targetRules = ["generic-api-key"]
+matchCondition = "AND"
+paths = ['''\.github/workflows/langwatch-app-ci\.yml''']
+regexes = ['''(0123456789abcdef){4}''']
