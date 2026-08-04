@@ -102,5 +102,11 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose Down
+-- IRREVERSIBLE: the only rollback is dropping the table, which destroys every
+-- per-call row it holds, and an automated `goose down` is exactly the way that
+-- happens by accident. So the statement is written out but left commented, and
+-- `down` is deliberately a no-op: re-running `up` is idempotent, and a rollback
+-- that has to be pasted by hand is one somebody decided on.
+--
 -- To roll back, uncomment and run manually:
 -- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.coding_agent_session_events;

@@ -81,3 +81,19 @@ describe("given empty or unparsable input", () => {
     });
   });
 });
+
+describe("given more free-text terms than the content search carries", () => {
+  /** @scenario Session content search matches transcript text in log records */
+  it("drops the content branch rather than answering a narrower query", () => {
+    const nine = Array.from({ length: 9 }, (_, i) => `t${i}`).join(" ");
+
+    expect(extractFreeTextTerms(nine)).toEqual([]);
+  });
+
+  /** @scenario Session content search matches transcript text in log records */
+  it("keeps a query sitting on the cap", () => {
+    const eight = Array.from({ length: 8 }, (_, i) => `t${i}`);
+
+    expect(extractFreeTextTerms(eight.join(" "))).toEqual(eight);
+  });
+});

@@ -234,10 +234,15 @@ function turnCellContent({
     case "tokens":
       return <MonoCell>{formatTokens(trace.totalTokens)}</MonoCell>;
     case "contextSize":
-      return trace.contextSizeTokens ? (
-        <MonoCell>{formatTokens(trace.contextSizeTokens)}</MonoCell>
-      ) : (
+      // Nullish, not falsy: a reported zero is an answer, not a gap.
+      return trace.contextSizeTokens == null ? (
         dash
+      ) : (
+        <MonoCell>
+          {trace.contextSizeTokens === 0
+            ? "0"
+            : formatTokens(trace.contextSizeTokens)}
+        </MonoCell>
       );
     // Session-level coding-agent counters have no per-turn meaning.
     case "modelCalls":

@@ -599,6 +599,41 @@ function turnsHiddenForViewer(protections: V2Protections): {
 }
 
 /**
+ * The free-text terms the session search is allowed to match against
+ * transcript bodies, for this viewer.
+ *
+ * These compile into `positionCaseInsensitive` predicates over `log_records`,
+ * which hold captured prompts, tool content and raw request bodies. Whether a
+ * session matches a term IS that content: a viewer who cannot read it must not
+ * be able to probe it either, one guess at a time, through which rows come
+ * back and what the total says. Redacting the previews afterwards does not
+ * help, because the answer already rode out in the row list.
+ *
+ * So a viewer under ANY content protection searches the trace-level columns
+ * only, the same ones the filter translator already applies to them, and the
+ * transcript reach is dropped rather than narrowed: the body is one blob, it
+ * cannot be matched per category.
+ */
+export function contentSearchTermsForViewer({
+  terms,
+  protections,
+}: {
+  terms: string[];
+  protections: V2Protections;
+}): string[] {
+  if (terms.length === 0) return terms;
+  if (
+    protections.canSeeCapturedInput !== true ||
+    protections.canSeeCapturedOutput !== true
+  ) {
+    return [];
+  }
+  const { roles, stripToolCalls } = turnsHiddenForViewer(protections);
+  if (roles.size > 0 || stripToolCalls) return [];
+  return terms;
+}
+
+/**
  * Synthetic hidden-attribute rules for the standalone system/tools attribute
  * keys (`gen_ai.system_instructions`, `gen_ai.tool.call.*`, …) when those
  * categories are hidden from the viewer, so their values are replaced by the
@@ -1137,7 +1172,8 @@ export const tracesV2Router = createTRPCRouter({
    * over every trace of the session in range, unlike the client grouping it
    * replaces, which could only sum the fetched page. The free-text query
    * ALSO matches session transcript content in `log_records`, so searching
-   * "#6418" finds the session whose transcript mentions it.
+   * "#6418" finds the session whose transcript mentions it, for a viewer
+   * allowed to read that content: see `contentSearchTermsForViewer`.
    */
   sessions: protectedProcedure
     .input(
@@ -1163,7 +1199,10 @@ export const tracesV2Router = createTRPCRouter({
         pageSize: input.pageSize,
         cursor: input.cursor,
         filterWhere: buildFilterWhere(input),
-        contentTerms: extractFreeTextTerms(input.query ?? ""),
+        contentTerms: contentSearchTermsForViewer({
+          terms: extractFreeTextTerms(input.query ?? ""),
+          protections,
+        }),
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
         ),

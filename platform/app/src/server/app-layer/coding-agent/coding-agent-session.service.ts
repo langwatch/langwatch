@@ -123,12 +123,17 @@ export class CodingAgentSessionService {
       limit: clampedLimit,
     });
     // A derived window is a hint, not a fact: a session running longer than
-    // the declared width has events outside it. Only a first page that came
-    // back empty under a hint we invented is retried unbounded, so a long
-    // session degrades to a slower read rather than a short answer. An
-    // explicit window is the caller's own bound and is never widened, and a
-    // cursor page is already anchored by the cursor.
-    const derivedWindow = occurredAt === undefined && window !== undefined;
+    // the declared width has events past its upper edge, so a first page that
+    // came back empty under a hint we invented is read again with that edge
+    // pushed out to now. Only the edge moves. The lower edge stays anchored
+    // on the session's own start, which is the earliest event the fold ever
+    // saw, and keeping it is what still prunes every partition from before
+    // the session began. Dropping the bound instead would walk the whole
+    // retention, and because `kinds` can filter a page to empty on its own,
+    // a caller asking for a kind this session never produced would pay that
+    // walk on every read. An explicit window is the caller's own bound and is
+    // never widened; a cursor page is already anchored by the cursor.
+    const derivedWindow = occurredAt === undefined ? window : undefined;
     if (page.events.length > 0 || cursor !== undefined || !derivedWindow) {
       return page;
     }
@@ -136,6 +141,10 @@ export class CodingAgentSessionService {
       tenantId: projectId,
       sessionId,
       kinds,
+      occurredAt: {
+        fromMs: derivedWindow.fromMs,
+        toMs: Math.max(Date.now(), derivedWindow.toMs),
+      },
       cursor,
       limit: clampedLimit,
     });

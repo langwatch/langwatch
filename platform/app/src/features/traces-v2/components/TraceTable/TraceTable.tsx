@@ -1,4 +1,5 @@
 import type React from "react";
+import { HandledErrorState } from "~/features/errors";
 import {
   SESSIONS_MAX_PAGE_SIZE,
   type SessionGroupsResult,
@@ -29,6 +30,14 @@ interface TableShell {
   isLoading: boolean;
   isFetching: boolean;
   isTransitioning: boolean;
+  /**
+   * A failed read has no rows either, and it must never be told as "nothing
+   * matched": that sends someone off widening a filter to find data the
+   * filter was never the problem with. Carried here so the shell can say so
+   * before the empty state gets the chance.
+   */
+  isError: boolean;
+  error: unknown;
   itemNoun: string;
   maxPageSize?: number;
 }
@@ -40,6 +49,8 @@ const sessionsShell = (sessions: SessionGroupsResult): TableShell => ({
   isLoading: sessions.isLoading,
   isFetching: sessions.isFetching,
   isTransitioning: sessions.isPreviousData,
+  isError: sessions.isError,
+  error: sessions.error,
   itemNoun: "sessions",
   maxPageSize: SESSIONS_MAX_PAGE_SIZE,
 });
@@ -47,6 +58,33 @@ const sessionsShell = (sessions: SessionGroupsResult): TableShell => ({
 const tracesShell = (
   list: Omit<TableShell, "itemNoun" | "maxPageSize">,
 ): TableShell => ({ ...list, itemNoun: "traces" });
+
+/**
+ * What the table shell shows before it has rows to show: the failure if the
+ * read failed, the empty state if it genuinely came back empty, and null when
+ * there is a table to render.
+ *
+ * The order is the point. A failed read has no rows either, and reporting it
+ * as "nothing matched" sends someone off widening a filter that was never the
+ * problem. Emptiness is only trusted once nothing is in flight and no stale
+ * previous-key rows are standing in, or the empty state flashes mid-fetch.
+ */
+function shellPlaceholder(shell: TableShell): React.ReactNode | null {
+  if (shell.isError) {
+    return (
+      <HandledErrorState
+        error={shell.error}
+        fallbackTitle={`We could not load your ${shell.itemNoun}`}
+      />
+    );
+  }
+  const isEmpty =
+    !shell.isFetching &&
+    !shell.isTransitioning &&
+    shell.visibleCount === 0 &&
+    shell.totalHits === 0;
+  return isEmpty ? <EmptyFilterState /> : null;
+}
 
 export const TraceTable: React.FC = () => {
   const {
@@ -56,6 +94,8 @@ export const TraceTable: React.FC = () => {
     isLoading,
     isFetching,
     isPreviousData,
+    isError,
+    error,
     newIds,
   } = useTraceList();
   // Sessions lens data source: server-side rollups per conversation id
@@ -77,18 +117,12 @@ export const TraceTable: React.FC = () => {
           isLoading,
           isFetching,
           isTransitioning: isPreviousData,
+          isError,
+          error,
         });
 
-  // Gate EmptyFilterState on true emptiness: only render it when no fetch is
-  // in flight and the data is settled (not showing previous-key stale rows).
-  // This prevents flashing EmptyFilterState during transitional fetches where
-  // `keepPreviousData` may hold the empty result from a prior key.
-  const isEmpty =
-    !shell.isFetching &&
-    !shell.isTransitioning &&
-    shell.visibleCount === 0 &&
-    shell.totalHits === 0;
-  if (isEmpty) return <EmptyFilterState />;
+  const placeholder = shellPlaceholder(shell);
+  if (placeholder) return placeholder;
 
   return (
     <TraceTableLayout

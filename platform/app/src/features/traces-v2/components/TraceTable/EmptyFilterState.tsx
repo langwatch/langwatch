@@ -64,7 +64,7 @@ function emptyContent({
     return {
       title: "No sessions to show",
       description:
-        "Sessions group traces that share a conversation ID. Tag spans with a thread_id or session ID to surface them here.",
+        "A session is every trace from one conversation, rolled up together. They appear here once your integration links related traces into a conversation.",
     };
   }
   if (hasFilters) {

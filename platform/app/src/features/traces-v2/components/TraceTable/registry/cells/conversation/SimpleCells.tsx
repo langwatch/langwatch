@@ -81,22 +81,25 @@ export const SessionContextSizeCell: CellDef<ConversationGroup> = {
   id: "contextSize",
   label: "Context Size",
   render: ({ row }) => {
-    const tokens = row.contextSizeTokens ?? 0;
-    if (tokens <= 0) return <MonoCell>{dash}</MonoCell>;
+    const tokens = row.contextSizeTokens;
+    // Only an absent value is a dash. A session that reported a peak of zero
+    // told us something, and `formatTokens(0)` would hide it behind the same
+    // mark as "never reported".
+    if (tokens == null) return <MonoCell>{dash}</MonoCell>;
     return (
       <Tooltip
         content={CONTEXT_SIZE_EXPLANATION}
         positioning={{ placement: "top" }}
       >
-        <MonoCell>{formatTokens(tokens)}</MonoCell>
+        <MonoCell>{tokens === 0 ? "0" : formatTokens(tokens)}</MonoCell>
       </Tooltip>
     );
   },
   renderComfortable: ({ row }) => {
-    const tokens = row.contextSizeTokens ?? 0;
+    const tokens = row.contextSizeTokens;
     return (
       <Text textStyle="xs" color="fg.muted" textAlign="right">
-        {tokens > 0 ? formatTokens(tokens) : dash}
+        {tokens == null ? dash : tokens === 0 ? "0" : formatTokens(tokens)}
       </Text>
     );
   },

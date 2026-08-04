@@ -20,7 +20,7 @@ let mockTraceListResult = {
   isFetching: false,
   isPreviousData: false,
   isError: false,
-  error: null,
+  error: null as unknown,
   newIds: new Set<string>(),
 };
 
@@ -234,6 +234,33 @@ describe("<TraceTable /> empty-state gating", () => {
           screen.queryByTestId("empty-filter-state"),
         ).not.toBeInTheDocument();
         expect(screen.getByTestId("trace-lens-body")).toBeInTheDocument();
+      });
+    });
+  });
+});
+
+describe("<TraceTable /> failed-read gating", () => {
+  describe("given the list query failed", () => {
+    describe("when the failure leaves no rows behind", () => {
+      // The failure mode this pins: a failed read and an empty result are
+      // indistinguishable by row count, and reporting the failure as "nothing
+      // matched" sends someone to widen a filter that was never the problem.
+      /** @scenario A failed session read is not reported as an empty result */
+      it("renders the error surface instead of the empty state", () => {
+        mockTraceListResult = {
+          ...mockTraceListResult,
+          data: [],
+          totalHits: 0,
+          isError: true,
+          error: new Error("clickhouse unreachable"),
+        };
+
+        renderTable();
+
+        expect(
+          screen.queryByTestId("empty-filter-state"),
+        ).not.toBeInTheDocument();
+        expect(screen.getByText(/could not load/i)).toBeInTheDocument();
       });
     });
   });

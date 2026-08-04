@@ -268,13 +268,18 @@ describe("CodingAgentSessionService", () => {
 
     describe("when the session outlived the window we guessed", () => {
       /** @scenario a session longer than the guessed window still answers in full */
-      it("retries unbounded rather than answering empty", async () => {
+      it("pushes the upper edge out to now rather than answering empty", async () => {
         const windows: ReadWindow[] = [];
         const service = makeService({
           row: makeRow(),
           onEventsRead: ({ occurredAt }) => {
             windows.push(occurredAt);
-            return occurredAt === undefined
+            // Empty until the read reaches past the guessed upper edge.
+            const reachesNow =
+              occurredAt !== undefined &&
+              occurredAt.toMs >
+                STARTED_AT_MS + CODING_AGENT_SESSION_READ_WINDOW_MS;
+            return reachesNow
               ? { events: [SESSION_EVENT], nextCursor: null }
               : { events: [], nextCursor: null };
           },
@@ -287,8 +292,40 @@ describe("CodingAgentSessionService", () => {
         });
 
         expect(windows).toHaveLength(2);
-        expect(windows[1]).toBeUndefined();
         expect(page.events).toHaveLength(1);
+        // The retry stays bounded: only the upper edge moves, so the read
+        // still prunes every partition older than the session itself.
+        expect(windows[1]?.fromMs).toBe(windows[0]?.fromMs);
+        expect(windows[1]!.toMs).toBeGreaterThan(windows[0]!.toMs);
+      });
+
+      // The retry fires on ANY empty first page, and `kinds` can empty one on
+      // its own. Were the retry unbounded, asking for a kind the session never
+      // produced would walk the whole retention on every single read.
+      /** @scenario a session longer than the guessed window still answers in full */
+      it("stays bounded when a kinds filter is what emptied the page", async () => {
+        const windows: ReadWindow[] = [];
+        const service = makeService({
+          row: makeRow(),
+          onEventsRead: ({ occurredAt }) => {
+            windows.push(occurredAt);
+            return { events: [], nextCursor: null };
+          },
+        });
+
+        const page = await service.getSessionEvents({
+          projectId: PROJECT,
+          sessionId: SESSION,
+          kinds: ["compaction"],
+          limit: 25,
+        });
+
+        expect(page.events).toEqual([]);
+        expect(windows).toHaveLength(2);
+        expect(windows[1]).toBeDefined();
+        expect(windows[1]?.fromMs).toBe(
+          STARTED_AT_MS - CODING_AGENT_SESSION_READ_WINDOW_MS,
+        );
       });
     });
   });

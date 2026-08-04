@@ -79,16 +79,20 @@ Feature: Per-call session events for context economics
   # TimeUnixMs is the fact table's partition key. Reading a session's events
   # without a bound on it opens every week the retention holds, cold storage
   # included, to answer about a session that lived for minutes.
+  @unit
   Scenario: reading a session's events prunes to the session's own weeks
     Given a session whose events are asked for without a time window
     When its events are read
     Then the read is bounded to the weeks around when the session started
 
+  @unit
   Scenario: a session longer than the guessed window still answers in full
     Given a session whose events fall outside the window guessed for it
     When its events are read
-    Then the read is retried without a window rather than answering empty
+    Then the read is retried up to now rather than answering empty
+    And the retry still starts no earlier than the session did
 
+  @unit
   Scenario: a caller's own window is never widened behind its back
     Given a caller that asked for a specific time window
     When its events are read

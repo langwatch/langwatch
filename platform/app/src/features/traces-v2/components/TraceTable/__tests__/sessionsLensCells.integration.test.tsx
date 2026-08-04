@@ -30,7 +30,7 @@ const COMPACT_TOKENS = {
   errorRowPaddingY: "4px",
   errorRowFontSize: "12px",
   errorDetailPaddingBottom: "4px",
-};
+} as const;
 
 function cellContext(
   row: ConversationGroup,
@@ -61,8 +61,8 @@ function serverSession(
     totalDurationMs: 3_600_000,
     startedAtMs: Date.now() - 3_600_000,
     lastActivityMs: Date.now() - 60_000,
-    models: ["claude-sonnet-4"],
-    primaryModel: "claude-sonnet-4",
+    models: ["gpt-5-mini"],
+    primaryModel: "gpt-5-mini",
     serviceName: "coding-agent-cli",
     errorCount: 0,
     warningCount: 0,
@@ -128,6 +128,20 @@ describe("sessions lens cells", () => {
 
       renderCell("compactions", row);
       expect(screen.getByText("4")).toBeInTheDocument();
+    });
+
+    // A session that reported a peak of zero said something; only a session
+    // that never reported one is a gap. The mapper preserves the difference,
+    // so the cell has to as well.
+    it("shows a reported context size of zero as zero, not a dash", () => {
+      const row = serverSession({
+        contextSizeTokens: 0,
+        codingAgent: null,
+      });
+
+      renderCell("contextSize", row);
+
+      expect(screen.getByText("0")).toBeInTheDocument();
     });
 
     it("dashes model calls and compactions for sessions without a coding-agent row", () => {

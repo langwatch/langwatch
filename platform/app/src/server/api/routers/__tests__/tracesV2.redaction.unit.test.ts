@@ -3,6 +3,7 @@ import type { ContentCategory } from "~/server/data-privacy/dataPrivacy.types";
 import type { CategoryVisibility } from "~/server/traces/protections";
 import {
   buildContentPrivacy,
+  contentSearchTermsForViewer,
   gateTraceLogVisibility,
   redactTraceLogContent,
   redactV2Content,
@@ -687,6 +688,96 @@ describe("gateTraceLogVisibility", () => {
       expect(gateTraceLogVisibility(old, full, null).attributes.response).toBe(
         "answer",
       );
+    });
+  });
+});
+
+describe("contentSearchTermsForViewer", () => {
+  const TERMS = ["#6418"];
+
+  describe("given a viewer who may read the whole transcript", () => {
+    /** @scenario A viewer allowed the whole transcript still searches it */
+    it("matches the terms against the transcript bodies", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+            contentCategories: cats(),
+          },
+        }),
+      ).toEqual(TERMS);
+    });
+  });
+
+  describe("given a viewer whose captured content is hidden", () => {
+    /** @scenario A viewer who cannot read captured content cannot search it */
+    it("drops the terms when the input is hidden", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: false,
+            canSeeCapturedOutput: true,
+            contentCategories: cats(),
+          },
+        }),
+      ).toEqual([]);
+    });
+
+    /** @scenario A viewer who cannot read captured content cannot search it */
+    it("drops the terms when the output is hidden", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: false,
+            contentCategories: cats(),
+          },
+        }),
+      ).toEqual([]);
+    });
+
+    // The flags default to undefined, which is not `true`, so an unpopulated
+    // protections object must read as "no transcript reach" rather than as a
+    // viewer who may see everything.
+    /** @scenario A viewer who cannot read captured content cannot search it */
+    it("drops the terms when the flags were never set", () => {
+      expect(
+        contentSearchTermsForViewer({ terms: TERMS, protections: {} }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("given a viewer with a transcript category hidden", () => {
+    /** @scenario A viewer with a hidden transcript category cannot search it */
+    it("drops the terms when system turns are hidden", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+            contentCategories: cats({ system: restricted(null) }),
+          },
+        }),
+      ).toEqual([]);
+    });
+
+    /** @scenario A viewer with a hidden transcript category cannot search it */
+    it("drops the terms when tool turns are hidden", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+            contentCategories: cats({ tools: restricted(null) }),
+          },
+        }),
+      ).toEqual([]);
     });
   });
 });

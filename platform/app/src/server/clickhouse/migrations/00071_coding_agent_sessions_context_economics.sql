@@ -60,7 +60,13 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
 -- +goose StatementEnd
 
 -- +goose Down
--- Down migrations are commented out to prevent accidental data loss.
+-- IRREVERSIBLE: every rollback here is a DROP COLUMN, which destroys the
+-- values that column holds for every session already folded, and an automated
+-- `goose down` is exactly the way that happens by accident. The statements are
+-- written out but left commented, so `down` is deliberately a no-op: re-running
+-- `up` is idempotent (`ADD COLUMN IF NOT EXISTS`), and a rollback that has to
+-- be pasted by hand is one somebody decided on.
+--
 -- To roll back, uncomment and run manually.
 --
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions DROP COLUMN IF EXISTS RateLimitEvents;

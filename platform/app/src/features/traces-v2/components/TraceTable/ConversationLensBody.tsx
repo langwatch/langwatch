@@ -161,7 +161,7 @@ const NoSessionsMessage: React.FC = () => (
       No sessions found.
     </Text>
     <Text textStyle="xs" color="fg.subtle">
-      Sessions appear when traces include a conversation ID.
+      Sessions appear once your traces are grouped into conversations.
     </Text>
   </Flex>
 );

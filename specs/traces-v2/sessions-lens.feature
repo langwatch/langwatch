@@ -1,12 +1,12 @@
 # Sessions lens, server-grouped session rollups on the traces list
 #
 # Implementation:
-#   langwatch/src/server/app-layer/traces/repositories/session-groups.repository.ts            (row + cursor types, Null repo)
-#   langwatch/src/server/app-layer/traces/repositories/session-groups.clickhouse.repository.ts (GROUP BY conversation id rollup)
-#   langwatch/src/server/app-layer/traces/session-groups.service.ts                            (DTO mapping, cursor codec, coding-agent enrichment)
-#   langwatch/src/server/api/routers/tracesV2.ts                                               (`sessions` procedure)
-#   langwatch/src/features/traces-v2/hooks/useSessionGroups.ts                                 (lens data hook)
-#   langwatch/src/features/traces-v2/components/TraceTable/ConversationLensBody.tsx            (session rows rendering)
+#   platform/app/src/server/app-layer/traces/repositories/session-groups.repository.ts            (row + cursor types, Null repo)
+#   platform/app/src/server/app-layer/traces/repositories/session-groups.clickhouse.repository.ts (GROUP BY conversation id rollup)
+#   platform/app/src/server/app-layer/traces/session-groups.service.ts                            (DTO mapping, cursor codec, coding-agent enrichment)
+#   platform/app/src/server/api/routers/tracesV2.ts                                               (`sessions` procedure)
+#   platform/app/src/features/traces-v2/hooks/useSessionGroups.ts                                 (lens data hook)
+#   platform/app/src/features/traces-v2/components/TraceTable/ConversationLensBody.tsx            (session rows rendering)
 #
 # Related specs:
 #   specs/traces-v2/grouping-engine.feature   , the by-conversation grouping this lens replaces the data source of
@@ -30,7 +30,10 @@
 #   - Free-text search ALSO matches session transcript content stored in
 #     `log_records` (BodyText / flat attributes), so searching "#6418" finds
 #     the session whose transcript mentions it even when no trace summary
-#     column carries the text.
+#     column carries the text. That reach follows the viewer's content
+#     protections: whether a session matches a term IS the content, so a
+#     viewer who cannot read a transcript searches the trace columns only,
+#     rather than probing the body one guess at a time.
 #   - Keyset pagination over (sort value, conversation id); the cursor is an
 #     opaque string so the sort dimension can change without breaking clients.
 
@@ -66,6 +69,34 @@ Rule: Free-text search also matches session transcript content
     Given two sessions where only one has a log record mentioning "#6418"
     When session groups are queried with the content term "#6418"
     Then only the session whose transcript mentions "#6418" is returned
+
+  @unit
+  Scenario: A viewer who cannot read captured content cannot search it
+    Given a viewer whose captured input or output is hidden
+    When that viewer searches sessions for a term
+    Then the term never reaches the transcript bodies
+
+  @unit
+  Scenario: A viewer with a hidden transcript category cannot search it
+    Given a viewer for whom system or tool turns are hidden
+    When that viewer searches sessions for a term
+    Then the term never reaches the transcript bodies
+
+  @unit
+  Scenario: A viewer allowed the whole transcript still searches it
+    Given a viewer who may read captured content and every turn
+    When that viewer searches sessions for a term
+    Then the term is matched against the transcript bodies
+
+Rule: A failed read is told as a failure, not as an empty result
+
+  # Both lenses read through the same table shell, so this holds for the
+  # session rollups and the flat trace list alike.
+  @integration
+  Scenario: A failed session read is not reported as an empty result
+    Given the list query behind the active lens failed
+    When the table renders
+    Then the failure is shown instead of the no-results state
 
 Rule: Session pages walk with a stable keyset cursor
 

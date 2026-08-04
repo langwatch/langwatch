@@ -83,6 +83,13 @@ export function translateFilterToClickHouse(
 }
 
 /**
+ * How many free-text terms the transcript-content search will carry. A
+ * handful is a search; dozens is a scan of `log_records` wearing a query's
+ * clothes, and the trace-level filter still applies every one of them.
+ */
+const MAX_CONTENT_TERMS = 8;
+
+/**
  * The positive free-text terms of a query: every non-negated implicit-field
  * value ("#6418", a quoted phrase), skipping structured `field:value` tags.
  * The Sessions lens matches these against session transcript content in
@@ -112,6 +119,13 @@ export function extractFreeTextTerms(queryText: string): string[] {
 
   const terms: string[] = [];
   collectFreeTextTerms(ast, false, terms);
+  // Each term becomes its own `positionCaseInsensitive` over the transcript
+  // bodies, so the count decides how many passes that subquery makes. Past
+  // the cap the content branch is dropped whole rather than truncated: the
+  // terms are ANDed, so keeping a prefix would answer a narrower question
+  // than the one asked and return sessions that do not match the rest. Same
+  // call as the OR case above, for the same reason.
+  if (terms.length > MAX_CONTENT_TERMS) return [];
   return terms;
 }
 
