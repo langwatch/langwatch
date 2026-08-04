@@ -35,12 +35,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { projectFactory } from "~/factories/project.factory";
 import {
-  GovernedSqlService,
   createGovernedSqlExecutor,
+  GovernedSqlService,
   governedTenantCapability,
   setGovernedSqlService,
 } from "~/server/analytics/governed-sql";
-import { GOVERNED_VIEW_CATALOG } from "~/server/analytics/governed-sql/catalog/governedViews";
 import {
   type GovernedClickHouseHarness,
   type GovernedPostgresHarness,
@@ -51,21 +50,22 @@ import {
   startGovernedClickHouse,
   startGovernedPostgres,
 } from "~/server/analytics/governed-sql/__tests__/governedClickHouseHarness";
+import { GOVERNED_VIEW_CATALOG } from "~/server/analytics/governed-sql/catalog/governedViews";
 import {
   type GovernedViewDefinition,
   isPostgresResident,
 } from "~/server/analytics/governed-sql/catalog/types";
 import {
-  SHIPPED_GOVERNED_DEDUP,
   governedViewSetupStatements,
+  SHIPPED_GOVERNED_DEDUP,
 } from "~/server/analytics/governed-sql/views";
+import { getProtectionsForProject } from "~/server/api/utils";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
-import { getProtectionsForProject } from "~/server/api/utils";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "~/server/db";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
@@ -313,10 +313,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       ...(parameters ? { parameters } : {}),
     });
     const body = (await response.json()) as Record<string, any>;
-    expect(
-      response.status,
-      `query failed: ${JSON.stringify(body)}`,
-    ).toBe(200);
+    expect(response.status, `query failed: ${JSON.stringify(body)}`).toBe(200);
     return body;
   };
 
@@ -631,7 +628,10 @@ describe("given the governed analytics SQL REST endpoints", () => {
     });
 
     it("resolves an unqualified dataset name to the governed database", async () => {
-      const body = await run(openProject, "SELECT count() AS value FROM traces");
+      const body = await run(
+        openProject,
+        "SELECT count() AS value FROM traces",
+      );
       expect(Number(body.rows[0].value)).toBeGreaterThan(0);
     });
   });
@@ -694,9 +694,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
           `SETTINGS ${harness.names.tenantSetting} = 'anything'`,
       );
       expect(body.error).toBe("governed_sql_not_permitted");
-      expect(
-        body.violations.map((violation: any) => violation.code),
-      ).toContain("SETTINGS_CLAUSE");
+      expect(body.violations.map((violation: any) => violation.code)).toContain(
+        "SETTINGS_CLAUSE",
+      );
     });
 
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
@@ -731,9 +731,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
         `SELECT count() FROM ${facts}.trace_summaries`,
       );
       expect(body.error).toBe("governed_sql_not_permitted");
-      expect(
-        body.violations.map((violation: any) => violation.code),
-      ).toContain("TABLE_NOT_ALLOWED");
+      expect(body.violations.map((violation: any) => violation.code)).toContain(
+        "TABLE_NOT_ALLOWED",
+      );
     });
   });
 
@@ -1029,7 +1029,10 @@ describe("given the governed analytics SQL REST endpoints", () => {
         joinKeys: ["TenantId"],
         timeColumn: "OccurredAt",
         freshness: "seconds behind ingestion",
-        dedup: { keyColumns: ["TenantId", "TraceId"], versionColumn: "UpdatedAt" },
+        dedup: {
+          keyColumns: ["TenantId", "TraceId"],
+          versionColumn: "UpdatedAt",
+        },
         columns: [
           {
             name: "TraceId",
@@ -1281,20 +1284,19 @@ describe("given the governed analytics SQL REST endpoints", () => {
       ["the database the connection is bound to", () => "currentDatabase()"],
     ];
 
-    it.each(SESSION_PROBES)(
-      "refuses a query asking for %s",
-      async (_case, call) => {
-        const body = await refuse(
-          openProject,
-          `SELECT ${call(harness.names.tenantSetting)} AS value FROM ${database}.traces`,
-        );
+    it.each(
+      SESSION_PROBES,
+    )("refuses a query asking for %s", async (_case, call) => {
+      const body = await refuse(
+        openProject,
+        `SELECT ${call(harness.names.tenantSetting)} AS value FROM ${database}.traces`,
+      );
 
-        expect(body.error).toBe("governed_sql_not_permitted");
-        expect(
-          body.violations.map((violation: any) => violation.code),
-        ).toEqual(["FUNCTION_NOT_ALLOWED"]);
-      },
-    );
+      expect(body.error).toBe("governed_sql_not_permitted");
+      expect(body.violations.map((violation: any) => violation.code)).toEqual([
+        "FUNCTION_NOT_ALLOWED",
+      ]);
+    });
 
     it("still answers the same query shape with a function it does support", async () => {
       const body = await run(
@@ -1354,7 +1356,10 @@ describe("given the governed analytics SQL REST endpoints", () => {
       // ClickHouse then refuses. Its message is what an unfiltered error path
       // would relay, so it is captured here and asserted absent below.
       const failing = `SELECT CAST(TraceName AS UInt64) AS value FROM ${database}.traces`;
-      const databaseError = await selectScalar<string>(restricted, failing).then(
+      const databaseError = await selectScalar<string>(
+        restricted,
+        failing,
+      ).then(
         () => "",
         (error: unknown) => String((error as Error)?.message ?? ""),
       );
@@ -1396,9 +1401,15 @@ describe("given the governed analytics SQL REST endpoints", () => {
         parameters?: Record<string, unknown>;
       }[] = [
         // Volunteered: ordinary answers and ordinary refusals.
-        { sql: `SELECT count() AS value FROM ${database}.traces`, answered: true },
+        {
+          sql: `SELECT count() AS value FROM ${database}.traces`,
+          answered: true,
+        },
         { sql: `SELECT * FROM ${database}.nowhere`, answered: false },
-        { sql: `SELECT CapturedInput FROM ${database}.traces`, answered: false },
+        {
+          sql: `SELECT CapturedInput FROM ${database}.traces`,
+          answered: false,
+        },
         { sql: "SELECT FROM WHERE )(", answered: false },
         {
           sql: `SELECT count() FROM ${database}.traces SETTINGS max_threads = 1`,
@@ -1505,11 +1516,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
         `/api/v1/projects/${openProject.id}/analytics/query/postgres`,
         `/api/v1/projects/${openProject.id}/analytics/query/postgresql`,
       ]) {
-        const response = await post(
-          openProject,
-          { sql: "SELECT 1" },
-          { path },
-        );
+        const response = await post(openProject, { sql: "SELECT 1" }, { path });
         expect(response.status, path).toBe(404);
       }
     });

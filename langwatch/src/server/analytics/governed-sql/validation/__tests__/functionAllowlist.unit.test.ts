@@ -208,9 +208,15 @@ describe("the governed-SQL function allowlist", () => {
       ["a URL fetch", "url('http://169.254.169.254/')"],
       ["object storage", "s3('https://bucket/k', 'CSV')"],
       ["another server", "remote('other-host', 'db', 'tbl')"],
-      ["a dictionary, which no row policy covers", "dictGet('d', 'k', TraceId)"],
+      [
+        "a dictionary, which no row policy covers",
+        "dictGet('d', 'k', TraceId)",
+      ],
       ["a JDBC bridge", "jdbc('ds', 'SELECT 1')"],
-      ["encryption over a key the caller names", "encrypt('aes-128-ecb', TraceName, 'k')"],
+      [
+        "encryption over a key the caller names",
+        "encrypt('aes-128-ecb', TraceName, 'k')",
+      ],
     ])("refuses %s in expression position", (_case, call) => {
       expect(codesOf(validate(`SELECT ${call} FROM traces`))).toEqual([
         "FUNCTION_NOT_ALLOWED",
@@ -223,9 +229,9 @@ describe("the governed-SQL function allowlist", () => {
      * the positional one must not quietly become the only thing standing there.
      */
     it("keeps refusing a table function in FROM position, by the positional rule", () => {
-      expect(
-        codesOf(validate("SELECT * FROM url('http://x', CSV)")),
-      ).toContain("TABLE_FUNCTION");
+      expect(codesOf(validate("SELECT * FROM url('http://x', CSV)"))).toContain(
+        "TABLE_FUNCTION",
+      );
     });
   });
 
@@ -235,8 +241,14 @@ describe("the governed-SQL function allowlist", () => {
       ["floating randomness", "randCanonical()"],
       ["a deliberate stall", "sleep(3)"],
       ["a per-row stall", "sleepEachRow(1)"],
-      ["an aggregate named by a string the allowlist cannot read", "arrayReduce('sum', Models)"],
-      ["an aggregation state built from a named aggregate", "initializeAggregation('sumIf', 1, 1)"],
+      [
+        "an aggregate named by a string the allowlist cannot read",
+        "arrayReduce('sum', Models)",
+      ],
+      [
+        "an aggregation state built from a named aggregate",
+        "initializeAggregation('sumIf', 1, 1)",
+      ],
       ["the storage type of a column", "toTypeName(TraceId)"],
       ["a symbol from the server binary", "demangle('x')"],
     ])("refuses %s", (_case, call) => {
@@ -250,9 +262,15 @@ describe("the governed-SQL function allowlist", () => {
     it.each([
       ["conditional aggregation", "countIf(ContainsErrorStatus)"],
       ["conditional summation", "sumIf(TotalCost, ContainsErrorStatus)"],
-      ["a conditional argument aggregate", "argMaxIf(TraceId, TotalCost, SpanCount > 1)"],
+      [
+        "a conditional argument aggregate",
+        "argMaxIf(TraceId, TotalCost, SpanCount > 1)",
+      ],
       ["a distinct aggregate", "sumDistinct(TotalDurationMs)"],
-      ["two combinators at once", "sumIfDistinct(TotalDurationMs, SpanCount > 1)"],
+      [
+        "two combinators at once",
+        "sumIfDistinct(TotalDurationMs, SpanCount > 1)",
+      ],
     ])("accepts %s, because it is one of the allowed aggregates", (_case, call) => {
       expect(codesOf(validate(`SELECT ${call} FROM traces`))).toEqual([]);
     });

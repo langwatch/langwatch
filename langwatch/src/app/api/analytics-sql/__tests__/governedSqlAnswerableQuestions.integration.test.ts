@@ -41,8 +41,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { projectFactory } from "~/factories/project.factory";
 import {
-  GovernedSqlService,
   createGovernedSqlExecutor,
+  GovernedSqlService,
   governedTenantCapability,
   setGovernedSqlService,
 } from "~/server/analytics/governed-sql";
@@ -55,8 +55,8 @@ import {
   startGovernedPostgres,
 } from "~/server/analytics/governed-sql/__tests__/governedClickHouseHarness";
 import {
-  SHIPPED_GOVERNED_DEDUP,
   governedViewSetupStatements,
+  SHIPPED_GOVERNED_DEDUP,
 } from "~/server/analytics/governed-sql/views";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -246,7 +246,14 @@ interface SpanSeed {
 
 function spanRow(
   tenantId: string,
-  { traceId, spanId, spanName, startTime, durationMs = 250, statusCode = 1 }: SpanSeed,
+  {
+    traceId,
+    spanId,
+    spanName,
+    startTime,
+    durationMs = 250,
+    statusCode = 1,
+  }: SpanSeed,
 ): Record<string, unknown> {
   return {
     ProjectionId: `${tenantId}/${spanId}`,
@@ -596,10 +603,30 @@ function evaluationSeeds(): EvaluationSeed[] {
 /** One batch that half-passed, one that passed outright. */
 function simulationSeeds(): SimulationSeed[] {
   return [
-    { runId: "run-1", batchRunId: "batch-1", verdict: "success", durationMs: 1000 },
-    { runId: "run-2", batchRunId: "batch-1", verdict: "failure", durationMs: 2000 },
-    { runId: "run-3", batchRunId: "batch-2", verdict: "success", durationMs: 500 },
-    { runId: "run-4", batchRunId: "batch-2", verdict: "success", durationMs: 700 },
+    {
+      runId: "run-1",
+      batchRunId: "batch-1",
+      verdict: "success",
+      durationMs: 1000,
+    },
+    {
+      runId: "run-2",
+      batchRunId: "batch-1",
+      verdict: "failure",
+      durationMs: 2000,
+    },
+    {
+      runId: "run-3",
+      batchRunId: "batch-2",
+      verdict: "success",
+      durationMs: 500,
+    },
+    {
+      runId: "run-4",
+      batchRunId: "batch-2",
+      verdict: "success",
+      durationMs: 700,
+    },
   ].map((run) => ({ ...run, startedAt: at(DAY.experiments, 13) }));
 }
 
@@ -719,7 +746,11 @@ describe("given the governed analytics SQL API and a seed with known answers", (
    * against an empty second tenant the asserted numbers would be right for the
    * wrong reason.
    */
-  const foreignRowCount = async (table: string, timeColumn: string, day: string) => {
+  const foreignRowCount = async (
+    table: string,
+    timeColumn: string,
+    day: string,
+  ) => {
     const result = await harness.admin.query({
       query:
         `SELECT count() AS value FROM ${facts}.${table} ` +
@@ -954,9 +985,9 @@ describe("given the governed analytics SQL API and a seed with known answers", (
 
       // Seeded errors per bucket are 0, 1, 2, 3 out of five traces each, so the
       // rolling rate walks 0/5, 1/10, 3/15 and 6/20 as the window fills.
-      expect(
-        body.rows.map((row: any) => row.rolling_error_rate),
-      ).toEqual([0, 0.1, 0.2, 0.3]);
+      expect(body.rows.map((row: any) => row.rolling_error_rate)).toEqual([
+        0, 0.1, 0.2, 0.3,
+      ]);
       expect(body.rows.map((row: any) => Number(row.traces))).toEqual([
         5, 5, 5, 5,
       ]);
@@ -990,9 +1021,9 @@ describe("given the governed analytics SQL API and a seed with known answers", (
         [PRIMARY_MODEL, 2, 0.4],
       ]);
       // The project dimension is the tenant itself, and it is the asking one.
-      expect(
-        new Set(body.rows.map((row: any) => row.project)),
-      ).toEqual(new Set([asking.id]));
+      expect(new Set(body.rows.map((row: any) => row.project))).toEqual(
+        new Set([asking.id]),
+      );
       expect(codes(body)).toEqual([]);
     });
 
@@ -1042,9 +1073,9 @@ describe("given the governed analytics SQL API and a seed with known answers", (
       // repeated once per fact row — and none of them bears on whether the
       // answer above is right. See the report accompanying this change for the
       // noise this raises on healthy dimension joins.
-      expect(codes(body).every((code: string) => code !== "RESULT_TRUNCATED")).toBe(
-        true,
-      );
+      expect(
+        codes(body).every((code: string) => code !== "RESULT_TRUNCATED"),
+      ).toBe(true);
     });
   });
 
@@ -1274,8 +1305,18 @@ describe("given the governed analytics SQL API and a seed with known answers", (
           Number(row.score_vs_experiment_mean),
         ]),
       ).toEqual([
-        [`Experiment ${asking.id}`, lower, false, Number((lower! - mean).toFixed(4))],
-        [`Experiment ${asking.id}`, higher, true, Number((higher! - mean).toFixed(4))],
+        [
+          `Experiment ${asking.id}`,
+          lower,
+          false,
+          Number((lower! - mean).toFixed(4)),
+        ],
+        [
+          `Experiment ${asking.id}`,
+          higher,
+          true,
+          Number((higher! - mean).toFixed(4)),
+        ],
       ]);
       // The other tenant's experiment and runs exist and contributed nothing.
       expect(
@@ -1313,7 +1354,9 @@ describe("given the governed analytics SQL API and a seed with known answers", (
       expect(Number(row.agreed)).toBe(EXPECTED_AGREEMENTS);
       expect(Number(row.agreement_rate)).toBe(
         Number(
-          (EXPECTED_AGREEMENTS / annotatedTraceIds(asking.id).length).toFixed(4),
+          (EXPECTED_AGREEMENTS / annotatedTraceIds(asking.id).length).toFixed(
+            4,
+          ),
         ),
       );
     });
@@ -1392,7 +1435,9 @@ describe("given the governed analytics SQL API and a seed with known answers", (
          ORDER BY bucket`,
       );
 
-      expect(body.rows.map((row: any) => Number(row.traces))).toEqual([1, 1, 1]);
+      expect(body.rows.map((row: any) => Number(row.traces))).toEqual([
+        1, 1, 1,
+      ]);
       expect(codes(body)).toEqual(["MISSING_TIME_BUCKETS"]);
       expect(diagnostic(body, "MISSING_TIME_BUCKETS").meta).toMatchObject({
         timeColumn: "bucket",

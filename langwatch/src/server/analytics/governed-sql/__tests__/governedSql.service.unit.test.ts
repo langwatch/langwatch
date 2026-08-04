@@ -353,7 +353,10 @@ describe("given the governed SQL service", () => {
       joinKeys: ["TenantId"],
       timeColumn: "OccurredAt",
       freshness: "seconds behind ingestion",
-      dedup: { keyColumns: ["TenantId", "TranscriptId"], versionColumn: "UpdatedAt" },
+      dedup: {
+        keyColumns: ["TenantId", "TranscriptId"],
+        versionColumn: "UpdatedAt",
+      },
       columns: [
         {
           name: "TranscriptId",

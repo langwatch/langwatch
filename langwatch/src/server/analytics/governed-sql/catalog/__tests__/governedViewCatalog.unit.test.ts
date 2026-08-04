@@ -28,9 +28,9 @@ import {
 } from "../contentGating";
 import { GOVERNED_VIEW_CATALOG, governedViewByName } from "../governedViews";
 import {
+  columnExpression,
   GOVERNED_COLUMN_UNITS,
   type GovernedViewDefinition,
-  columnExpression,
   governedAllowedTables,
   governedColumnGates,
   governedContentGatedColumns,
@@ -198,14 +198,13 @@ describe("given the governed view catalog", () => {
       for (const view of GOVERNED_VIEW_CATALOG) {
         for (const column of view.columns) {
           const where = `${view.name}.${column.name}`;
-          const expected =
-            column.name.endsWith("Ms")
-              ? "ms"
-              : /\bin USD\b/.test(column.description)
-                ? "USD"
-                : column.name.endsWith("TokenCount")
-                  ? "tokens"
-                  : null;
+          const expected = column.name.endsWith("Ms")
+            ? "ms"
+            : /\bin USD\b/.test(column.description)
+              ? "USD"
+              : column.name.endsWith("TokenCount")
+                ? "tokens"
+                : null;
           if (expected === null) continue;
           checked += 1;
           expect(column.unit, `${where} measures ${expected}`).toBe(expected);
@@ -581,9 +580,10 @@ describe("given the governed view catalog", () => {
         views,
       });
       for (const column of TRANSCRIPTS.columns) {
-        expect(withheld, `${column.name} is readable in a hidden dataset`).toContain(
-          column.name,
-        );
+        expect(
+          withheld,
+          `${column.name} is readable in a hidden dataset`,
+        ).toContain(column.name);
       }
     });
 

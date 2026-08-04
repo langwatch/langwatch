@@ -354,7 +354,8 @@ const EXPERIMENTS: GovernedViewDefinition = {
     {
       name: "ExperimentSlug",
       type: "String",
-      description: "URL-safe name of the experiment, unique within the project.",
+      description:
+        "URL-safe name of the experiment, unique within the project.",
       gates: [],
       sourceColumns: ["slug"],
     },

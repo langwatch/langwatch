@@ -41,7 +41,8 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-
+import type { Protections } from "../../traces/protections";
+import { governedTenantCapability } from "./capability";
 import { GOVERNED_VIEW_CATALOG } from "./catalog/governedViews";
 import {
   type GovernedViewDefinition,
@@ -49,26 +50,26 @@ import {
   governedGatedColumns,
   governedVisibleViews,
 } from "./catalog/types";
-import { governedTenantCapability } from "./capability";
 import {
   type GovernedSqlDiagnostic,
   governedSqlDiagnostics,
 } from "./diagnostics";
-import { GovernedSqlParameterMissingError, GovernedSqlUnavailableError } from "./errors";
 import {
+  GovernedSqlParameterMissingError,
+  GovernedSqlUnavailableError,
+} from "./errors";
+import {
+  createGovernedSqlExecutor,
   DEFAULT_GOVERNED_SQL_RESULT_LIMITS,
   type GovernedSqlColumn,
   type GovernedSqlExecutor,
   type GovernedSqlResultLimits,
   type GovernedSqlStatistics,
-  createGovernedSqlExecutor,
   governedSqlConnectionFromEnv,
 } from "./executor";
 import { describeGovernedSchema, type GovernedSchema } from "./schema";
 import { governedSqlValidationError } from "./validation/errors";
 import { validateGovernedSql } from "./validation/validate";
-
-import type { Protections } from "../../traces/protections";
 
 const logger = createLogger("langwatch:analytics:governed-sql");
 
@@ -151,7 +152,11 @@ export class GovernedSqlService {
    * governed identity can still describe what the API would expose. Answering
    * it does not disclose anything a caller could not read in the docs.
    */
-  describeSchema({ protections }: { protections: Protections }): GovernedSchema {
+  describeSchema({
+    protections,
+  }: {
+    protections: Protections;
+  }): GovernedSchema {
     return describeGovernedSchema({
       database: this.deps.database,
       protections,
@@ -306,6 +311,8 @@ export function getGovernedSqlService(): GovernedSqlService {
  * The seam the endpoint suite wires a Testcontainers-provisioned executor
  * through, and the seam a deployment slice will wire the real one through.
  */
-export function setGovernedSqlService(service: GovernedSqlService | null): void {
+export function setGovernedSqlService(
+  service: GovernedSqlService | null,
+): void {
   cached = service;
 }

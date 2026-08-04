@@ -85,10 +85,9 @@ describe("given the governed schema catalog", () => {
     it("gives every column a type and a description", () => {
       for (const column of columnsOf(FULLY_PERMITTED)) {
         expect(column.type, `${column.dataset}.${column.name}`).not.toBe("");
-        expect(
-          column.description,
-          `${column.dataset}.${column.name}`,
-        ).not.toBe("");
+        expect(column.description, `${column.dataset}.${column.name}`).not.toBe(
+          "",
+        );
       }
     });
 
@@ -349,9 +348,10 @@ describe("given the governed schema catalog", () => {
           sql: `SELECT ${column.name} FROM analytics.transcripts`,
           ...policy,
         });
-        expect(result.ok, `${column.name} was readable in a hidden dataset`).toBe(
-          false,
-        );
+        expect(
+          result.ok,
+          `${column.name} was readable in a hidden dataset`,
+        ).toBe(false);
       }
     });
   });

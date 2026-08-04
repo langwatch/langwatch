@@ -234,6 +234,7 @@ export function governedSqlConnectionFromEnv(): GovernedSqlConnection | null {
   const password = process.env.GOVERNED_SQL_CLICKHOUSE_PASSWORD;
   const database = process.env.GOVERNED_SQL_DATABASE;
   const tenantSetting = process.env.GOVERNED_SQL_TENANT_SETTING;
-  if (!url || !username || !password || !database || !tenantSetting) return null;
+  if (!url || !username || !password || !database || !tenantSetting)
+    return null;
   return { url, username, password, database, tenantSetting };
 }

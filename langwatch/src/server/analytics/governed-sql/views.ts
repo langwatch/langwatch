@@ -57,11 +57,11 @@ import {
 } from "./catalog/types";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
-  KEY_MAP_COLUMNS,
   type GovernedSqlNames,
   type GovernedTable,
   governedGrantStatement,
   governedRowPolicyStatement,
+  KEY_MAP_COLUMNS,
   postgresApprovedViewStatement,
   postgresEngineTableStatement,
 } from "./provisioning";
@@ -410,7 +410,9 @@ export function governedSourceColumnGrantStatement({
   sourceDatabase: string;
   view: GovernedViewDefinition;
 }): string {
-  const columns = governedGrantedSourceColumns(view).map(quotedColumn).join(", ");
+  const columns = governedGrantedSourceColumns(view)
+    .map(quotedColumn)
+    .join(", ");
   return (
     `GRANT SELECT(${columns}) ON ${sourceRelation({ names, sourceDatabase, view })} ` +
     `TO ${assertIdentifier(names.restrictedUser, "restrictedUser")}`
@@ -531,7 +533,9 @@ export function governedPostgresReaderConnectionLimit({
   headroom?: number;
 } = {}): number {
   return (
-    governedPostgresViews(views).length * connectionPoolSize * concurrentCatalogs +
+    governedPostgresViews(views).length *
+      connectionPoolSize *
+      concurrentCatalogs +
     headroom
   );
 }
@@ -579,7 +583,9 @@ function singleSourceColumn(
   view: GovernedViewDefinition,
   columnName: string,
 ): string {
-  const column = view.columns.find((candidate) => candidate.name === columnName);
+  const column = view.columns.find(
+    (candidate) => candidate.name === columnName,
+  );
   const [only] = column?.sourceColumns ?? [];
   if (!only || column?.sourceColumns.length !== 1) {
     throw new Error(

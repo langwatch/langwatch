@@ -26,22 +26,21 @@
  * @see specs/analytics/governed-sql-api.feature
  */
 
-import type { Project } from "@prisma/client";
-import { createLogger } from "@langwatch/observability";
 import { NotFoundError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+import type { Project } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
-
-import { type createProjectApp, requires } from "~/server/api/security";
-import { getProtectionsForProject } from "~/server/api/utils";
-import { validator as zValidator } from "~/server/api/validation";
 import {
   GOVERNED_COLUMN_UNITS,
   GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING,
   GOVERNED_SQL_DIAGNOSTIC_CODES,
   getGovernedSqlService,
 } from "~/server/analytics/governed-sql";
+import { type createProjectApp, requires } from "~/server/api/security";
+import { getProtectionsForProject } from "~/server/api/utils";
+import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -148,7 +147,11 @@ function callerProject({
   requestedProjectId: string | undefined;
 }): Project {
   if (requestedProjectId !== project.id) {
-    throw new NotFoundError("project_not_found", "Project", requestedProjectId ?? "");
+    throw new NotFoundError(
+      "project_not_found",
+      "Project",
+      requestedProjectId ?? "",
+    );
   }
   return project;
 }
@@ -167,7 +170,8 @@ export function registerGovernedSqlRoutes(
       responses: {
         ...baseResponses,
         200: {
-          description: "The query ran, and the result is scoped to the caller's project",
+          description:
+            "The query ran, and the result is scoped to the caller's project",
           content: {
             "application/json": { schema: resolver(governedSqlResultSchema) },
           },
@@ -209,7 +213,8 @@ export function registerGovernedSqlRoutes(
       responses: {
         ...baseResponses,
         200: {
-          description: "The governed schema, scoped to the caller's permissions",
+          description:
+            "The governed schema, scoped to the caller's permissions",
           content: {
             "application/json": { schema: resolver(governedSchemaSchema) },
           },

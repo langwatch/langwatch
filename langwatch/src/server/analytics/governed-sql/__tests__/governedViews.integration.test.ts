@@ -57,8 +57,8 @@ import {
   expectOnlyTenantA,
   type GovernedClickHouseHarness,
   type GovernedPostgresHarness,
-  mapPostgresIntoClickHouse,
   MOVED_PARTITION_FIXTURE,
+  mapPostgresIntoClickHouse,
   measureQuery,
   movedPartitionTraceId,
   recordSeedControl,
@@ -160,9 +160,10 @@ describe("given the governed views provisioned over the shipped fact tables", ()
       // governed database, not a migrated fact table, so where to look is
       // derived from the catalog rather than assumed to be one database.
       const sources = new Map(
-        governedSourceTables({ names: harness.names, sourceDatabase: facts }).map(
-          (source) => [source.table, source.database ?? database],
-        ),
+        governedSourceTables({
+          names: harness.names,
+          sourceDatabase: facts,
+        }).map((source) => [source.table, source.database ?? database]),
       );
 
       for (const view of GOVERNED_VIEW_CATALOG) {
@@ -708,7 +709,9 @@ describe("given the governed views provisioned over the shipped fact tables", ()
         );
       }
       const physical = new Set(
-        sources.map((source) => `${source.database ?? database}.${source.table}`),
+        sources.map(
+          (source) => `${source.database ?? database}.${source.table}`,
+        ),
       );
       for (const row of coverage.filter((entry) =>
         physical.has(`${entry.database}.${entry.table}`),

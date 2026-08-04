@@ -17,15 +17,15 @@
 import { describe, expect, it } from "vitest";
 
 import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
+import { governedAllowedTables } from "../catalog/types";
 import {
   GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING,
   GOVERNED_SQL_DIAGNOSTIC_CODES,
   type GovernedSqlDiagnostic,
   governedSqlDiagnostics,
 } from "../diagnostics";
-import { DEFAULT_GOVERNED_SQL_RESULT_LIMITS } from "../executor";
 import type { GovernedSqlColumn } from "../executor";
-import { governedAllowedTables } from "../catalog/types";
+import { DEFAULT_GOVERNED_SQL_RESULT_LIMITS } from "../executor";
 import { validateGovernedSql } from "../validation/validate";
 
 const DATABASE = "analytics";
@@ -238,9 +238,9 @@ describe("given a governed query that ran", () => {
 
       // Only one direction: evaluations repeat a trace, a trace never repeats
       // an evaluation.
-      expect(
-        diagnostics.map((diagnostic) => diagnostic.meta?.dataset),
-      ).toEqual(["analytics.traces"]);
+      expect(diagnostics.map((diagnostic) => diagnostic.meta?.dataset)).toEqual(
+        ["analytics.traces"],
+      );
     });
 
     it("stays quiet when the datasets are joined through a common table expression it cannot resolve", () => {

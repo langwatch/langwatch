@@ -83,8 +83,8 @@ import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML,
-  DEFAULT_POSTGRES_READER_LIMITS,
   clickHouseAccessManagementConfigXml,
+  DEFAULT_POSTGRES_READER_LIMITS,
   type GovernedSqlNames,
   type GovernedTable,
   governedClickHouseSetupStatements,
@@ -1270,8 +1270,6 @@ export interface GovernedPostgresHarness {
   stop(): Promise<void>;
 }
 
-
-
 /**
  * The application tables the mapped catalog reads, in the shape Prisma creates
  * them.
@@ -1543,7 +1541,8 @@ export async function startGovernedPostgres(): Promise<GovernedPostgresHarness> 
     `CREATE TYPE ${PG_SCHEMA}."ExperimentType" AS ENUM ` +
       `('DSPY', 'BATCH_EVALUATION', 'BATCH_EVALUATION_V2')`,
     ...baseRelations.map(
-      (table) => `CREATE TABLE ${PG_SCHEMA}."${table}" ${PG_BASE_TABLE_DDL[table]!}`,
+      (table) =>
+        `CREATE TABLE ${PG_SCHEMA}."${table}" ${PG_BASE_TABLE_DDL[table]!}`,
     ),
     ...[TENANT_A, TENANT_B].flatMap((tenant) =>
       postgresTenantSeedStatements({ tenantId: tenant.tenantId }),

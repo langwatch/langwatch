@@ -341,7 +341,9 @@ function joinedPairs({
   const pairs = new Map<string, JoinedPair>();
   const pairFor = (leftIndex: number, rightIndex: number): JoinedPair => {
     const [low, high] =
-      leftIndex < rightIndex ? [leftIndex, rightIndex] : [rightIndex, leftIndex];
+      leftIndex < rightIndex
+        ? [leftIndex, rightIndex]
+        : [rightIndex, leftIndex];
     const key = `${low}:${high}`;
     const existing = pairs.get(key);
     if (existing) return existing;
@@ -652,7 +654,9 @@ function missingBucketDiagnostics({
 /** Whether `value` is a whole number of `unit`s, within the calendar tolerance. */
 function isWholeMultiple(value: number, unit: number): boolean {
   const multiple = value / unit;
-  return Math.abs(multiple - Math.round(multiple)) <= BUCKET_ALIGNMENT_TOLERANCE;
+  return (
+    Math.abs(multiple - Math.round(multiple)) <= BUCKET_ALIGNMENT_TOLERANCE
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -33,6 +33,10 @@ import { createHash } from "node:crypto";
  * @param apiKey - the project's API key, in its raw form. Never logged, never
  *   sent to the database, and never returned to a caller.
  */
-export function governedTenantCapability({ apiKey }: { apiKey: string }): string {
+export function governedTenantCapability({
+  apiKey,
+}: {
+  apiKey: string;
+}): string {
   return createHash("sha256").update(apiKey).digest("hex");
 }

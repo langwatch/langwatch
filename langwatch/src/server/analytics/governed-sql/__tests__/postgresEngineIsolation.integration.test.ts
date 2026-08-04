@@ -35,9 +35,9 @@ import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
 import { governedPostgresViews } from "../catalog/types";
 import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../provisioning";
 import {
-  SHIPPED_GOVERNED_DEDUP,
   governedPostgresReaderConnectionLimit,
   governedViewSetupStatements,
+  SHIPPED_GOVERNED_DEDUP,
 } from "../views";
 import {
   CLICKHOUSE_ERROR_CODE,
@@ -47,9 +47,9 @@ import {
   expectRestrictedIdentity,
   expectTenantScopedRead,
   expectZeroRowsWithControl,
+  GOVERNED_TEST_POSTGRES_CONNECTION_LIMIT,
   type GovernedClickHouseHarness,
   type GovernedPostgresHarness,
-  GOVERNED_TEST_POSTGRES_CONNECTION_LIMIT,
   mapPostgresIntoClickHouse,
   PG_EXCLUDED_COLUMN,
   PG_MAPPED_TABLE,
@@ -572,38 +572,34 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
      * caller's, and an unknown key costs none.
      */
     /** @scenario "The governed view bounds what PostgreSQL reads to the caller's tenant" */
-    it(
-      "reads fewer rows off the primary through the view than through the engine table",
-      async () => {
-        const measure = async (relation: string, keyHash: string) => {
-          await postgres.resetStatistics();
-          const client = await harness.restrictedClient({ keyHash });
-          await selectRows(client, `SELECT count() FROM ${database}.${relation}`);
-          await postgres.flushStatistics();
-          return postgres.rowsRead(postgres.baseTable);
-        };
+    it("reads fewer rows off the primary through the view than through the engine table", async () => {
+      const measure = async (relation: string, keyHash: string) => {
+        await postgres.resetStatistics();
+        const client = await harness.restrictedClient({ keyHash });
+        await selectRows(client, `SELECT count() FROM ${database}.${relation}`);
+        await postgres.flushStatistics();
+        return postgres.rowsRead(postgres.baseTable);
+      };
 
-        const withoutPredicate = await measure(
-          PG_MAPPED_TABLE,
-          harness.tenantA.keyHash,
-        );
-        const withPredicate = await measure(
-          PG_MAPPED_VIEW,
-          harness.tenantA.keyHash,
-        );
-        const unknownKey = await measure(PG_MAPPED_VIEW, "not-a-real-key-hash");
+      const withoutPredicate = await measure(
+        PG_MAPPED_TABLE,
+        harness.tenantA.keyHash,
+      );
+      const withPredicate = await measure(
+        PG_MAPPED_VIEW,
+        harness.tenantA.keyHash,
+      );
+      const unknownKey = await measure(PG_MAPPED_VIEW, "not-a-real-key-hash");
 
-        // Control: the unpredicated read must actually have cost something, or
-        // "fewer" below is a comparison between two zeroes.
-        expect(
-          withoutPredicate,
-          "reading the engine table cost no rows on the primary — the comparison is vacuous",
-        ).toBeGreaterThan(0);
-        expect(withPredicate).toBeLessThan(withoutPredicate);
-        expect(unknownKey).toBe(0);
-      },
-      120_000,
-    );
+      // Control: the unpredicated read must actually have cost something, or
+      // "fewer" below is a comparison between two zeroes.
+      expect(
+        withoutPredicate,
+        "reading the engine table cost no rows on the primary — the comparison is vacuous",
+      ).toBeGreaterThan(0);
+      expect(withPredicate).toBeLessThan(withoutPredicate);
+      expect(unknownKey).toBe(0);
+    }, 120_000);
 
     /**
      * The safety property, proven rather than argued: the pushed-down predicate
@@ -616,60 +612,54 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
      * table underneath is what decides the answer.
      */
     /** @scenario "A wrong tenant predicate costs a wrong read and never a wrong answer" */
-    it(
-      "returns zero rows when the pushed-down predicate names a foreign tenant",
-      async () => {
-        const probe = `${PG_MAPPED_VIEW}_wrong_tenant_probe`;
-        await harness.applyAsAdmin([
-          `CREATE OR REPLACE VIEW ${database}.${probe}\n` +
-            `SQL SECURITY INVOKER\n` +
-            `AS SELECT src.${PG_MAPPED_TENANT_COLUMN} AS ${PG_MAPPED_TENANT_COLUMN}, ` +
-            `src.AnnotationId AS AnnotationId\n` +
-            `FROM ${database}.${PG_MAPPED_TABLE} AS src\n` +
-            `WHERE src.${PG_MAPPED_TENANT_COLUMN} = '${harness.tenantB.tenantId}'`,
-          `GRANT SELECT ON ${database}.${probe} TO ${harness.names.restrictedUser}`,
-        ]);
+    it("returns zero rows when the pushed-down predicate names a foreign tenant", async () => {
+      const probe = `${PG_MAPPED_VIEW}_wrong_tenant_probe`;
+      await harness.applyAsAdmin([
+        `CREATE OR REPLACE VIEW ${database}.${probe}\n` +
+          `SQL SECURITY INVOKER\n` +
+          `AS SELECT src.${PG_MAPPED_TENANT_COLUMN} AS ${PG_MAPPED_TENANT_COLUMN}, ` +
+          `src.AnnotationId AS AnnotationId\n` +
+          `FROM ${database}.${PG_MAPPED_TABLE} AS src\n` +
+          `WHERE src.${PG_MAPPED_TENANT_COLUMN} = '${harness.tenantB.tenantId}'`,
+        `GRANT SELECT ON ${database}.${probe} TO ${harness.names.restrictedUser}`,
+      ]);
 
-        const control = await recordSeedControl({
-          harness,
-          table: PG_MAPPED_TABLE,
-          tenantColumn: PG_MAPPED_TENANT_COLUMN,
-        });
-        await postgres.resetStatistics();
-        const before = await postgres.readLog();
+      const control = await recordSeedControl({
+        harness,
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+      });
+      await postgres.resetStatistics();
+      const before = await postgres.readLog();
 
-        const rows = await selectRows(
-          tenantA,
-          `SELECT * FROM ${database}.${probe}`,
-        );
+      const rows = await selectRows(
+        tenantA,
+        `SELECT * FROM ${database}.${probe}`,
+      );
 
-        const scans = statementsLoggedSince(
-          before,
-          await postgres.readLog(),
-        ).filter((statement) => statement.includes(postgres.approvedView));
-        await postgres.flushStatistics();
-        const rowsReadOnPrimary = await postgres.rowsRead(postgres.baseTable);
+      const scans = statementsLoggedSince(
+        before,
+        await postgres.readLog(),
+      ).filter((statement) => statement.includes(postgres.approvedView));
+      await postgres.flushStatistics();
+      const rowsReadOnPrimary = await postgres.rowsRead(postgres.baseTable);
 
-        // The foreign predicate really did reach PostgreSQL, and PostgreSQL
-        // really did read those rows: without both, "zero rows out" would prove
-        // nothing about what the predicate can and cannot do.
-        expect(
-          scans.some((scan) =>
-            scan.includes(`= '${harness.tenantB.tenantId}'`),
-          ),
-          `the foreign predicate never reached PostgreSQL:\n${scans.join("\n")}`,
-        ).toBe(true);
-        expect(
-          rowsReadOnPrimary,
-          "PostgreSQL read nothing, so the row policy was never the thing that filtered",
-        ).toBeGreaterThan(0);
+      // The foreign predicate really did reach PostgreSQL, and PostgreSQL
+      // really did read those rows: without both, "zero rows out" would prove
+      // nothing about what the predicate can and cannot do.
+      expect(
+        scans.some((scan) => scan.includes(`= '${harness.tenantB.tenantId}'`)),
+        `the foreign predicate never reached PostgreSQL:\n${scans.join("\n")}`,
+      ).toBe(true);
+      expect(
+        rowsReadOnPrimary,
+        "PostgreSQL read nothing, so the row policy was never the thing that filtered",
+      ).toBeGreaterThan(0);
 
-        expect(
-          rows,
-          `expected zero rows while ${control.tenantB} foreign rows were fetched`,
-        ).toHaveLength(0);
-      },
-      120_000,
-    );
+      expect(
+        rows,
+        `expected zero rows while ${control.tenantB} foreign rows were fetched`,
+      ).toHaveLength(0);
+    }, 120_000);
   });
 });

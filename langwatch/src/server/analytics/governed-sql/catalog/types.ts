@@ -357,7 +357,9 @@ export function governedGatedColumns({
  * `getUserProtectionsForProject` returns when the policy resolver is down
  * grants nothing.
  */
-function heldPermissions(protections: Protections): ReadonlySet<FieldProtection> {
+function heldPermissions(
+  protections: Protections,
+): ReadonlySet<FieldProtection> {
   const held = new Set<FieldProtection>();
   if (protections.canSeeCapturedInput === true) held.add("input");
   if (protections.canSeeCapturedOutput === true) held.add("output");
