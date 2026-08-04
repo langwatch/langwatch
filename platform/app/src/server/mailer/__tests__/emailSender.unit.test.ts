@@ -272,6 +272,65 @@ describe("buildRawMimeMessage", () => {
       });
     });
   });
+
+  describe("given an attachment whose filename is not plain ASCII", () => {
+    describe("when building the MIME message", () => {
+      /** @scenario "An attachment named in a non-English alphabet keeps its name" */
+      it("carries the name in the RFC 2231 extended form with an ASCII fallback", () => {
+        const msg = buildRawMimeMessage({
+          from: "LangWatch <contact@langwatch.ai>",
+          to: ["user@example.com"],
+          subject: "Test",
+          html: "<p>ok</p>",
+          attachments: [
+            {
+              filename: "relatório mensal.csv",
+              content: "a,b\n1,2\n",
+              contentType: "text/csv",
+            },
+          ],
+        });
+
+        const headerLines = msg
+          .split("\r\n")
+          .filter(
+            (l) =>
+              l.startsWith("Content-Type: text/csv") ||
+              l.startsWith("Content-Disposition:"),
+          );
+        expect(headerLines).toHaveLength(2);
+
+        for (const line of headerLines) {
+          // No raw 8-bit bytes, which strict receivers reject outright.
+          expect(line).not.toMatch(/[\x80-￿]/);
+          expect(line).toContain("*=UTF-8''relat%C3%B3rio%20mensal.csv");
+          // The fallback stays readable rather than being dropped.
+          expect(line).toContain('"relat_rio mensal.csv"');
+        }
+      });
+
+      it("leaves a plain-ASCII filename untouched", () => {
+        const msg = buildRawMimeMessage({
+          from: "LangWatch <contact@langwatch.ai>",
+          to: ["user@example.com"],
+          subject: "Test",
+          html: "<p>ok</p>",
+          attachments: [
+            {
+              filename: "report.csv",
+              content: "a,b\n1,2\n",
+              contentType: "text/csv",
+            },
+          ],
+        });
+
+        expect(msg).toContain(
+          'Content-Disposition: attachment; filename="report.csv"',
+        );
+        expect(msg).not.toContain("filename*=");
+      });
+    });
+  });
 });
 
 // ── sendEmail (SES raw path) ──────────────────────────────────────────────────

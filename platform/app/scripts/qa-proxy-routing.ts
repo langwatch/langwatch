@@ -1,17 +1,18 @@
 /**
- * Proves the corporate-proxy scenario: with only an HTTP proxy for egress, SES
- * traffic goes through the proxy instead of timing out.
+ * Proves the corporate-proxy scenario: with only an HTTP proxy for egress, a
+ * gateway's traffic goes through the proxy instead of timing out.
  *
- * Starts its own logging CONNECT proxy, sends through the real SES provider,
- * and reports which hosts were tunnelled. The send itself fails (probe
- * credentials); the proxy log is the evidence, so a connection attempt is all
- * this needs to observe.
+ * Starts its own logging CONNECT proxy, sends through the real provider named
+ * by EMAIL_PROVIDER, and reports which hosts were tunnelled. The send itself
+ * fails (probe credentials); the proxy log is the evidence, so a connection
+ * attempt is all this needs to observe.
  *
  *   EMAIL_PROVIDER=ses USE_AWS_SES=true AWS_REGION=eu-central-1 \
  *     AWS_ACCESS_KEY_ID=probe AWS_SECRET_ACCESS_KEY=probe \
  *     pnpm tsx --env-file=.env scripts/qa-proxy-routing.ts
  *
- * Pass NO_PROXY=.amazonaws.com to confirm the bypass path logs nothing.
+ * Works the same for `resend` and `sendgrid`. Pass NO_PROXY with the gateway's
+ * domain to confirm the bypass path logs nothing.
  */
 import { createServer } from "node:net";
 import { sendEmail } from "../src/server/mailer/emailSender";
@@ -72,13 +73,25 @@ async function main() {
   report(tunnelled);
 }
 
+/** The host each gateway dials, so NO_PROXY can be evaluated against it. */
+const egressHost = (): string => {
+  switch (process.env.EMAIL_PROVIDER) {
+    case "resend":
+      return "api.resend.com";
+    case "sendgrid":
+      return "api.sendgrid.com";
+    default:
+      return `email.${process.env.AWS_REGION ?? ""}.amazonaws.com`;
+  }
+};
+
 /** Whether the observed routing matches what the proxy settings asked for. */
 function report(tunnelled: string[]): never {
   // Ask the mailer's own matcher, not "is NO_PROXY set at all": NO_PROXY=localhost
-  // leaves the SES host proxied, and treating that as a bypass would invert the
-  // verdict.
-  const sesHost = `email.${process.env.AWS_REGION ?? ""}.amazonaws.com`;
-  const bypassing = isProxyBypassed(sesHost);
+  // leaves the gateway host proxied, and treating that as a bypass would invert
+  // the verdict.
+  const host = egressHost();
+  const bypassing = isProxyBypassed(host);
   console.log(
     tunnelled.length > 0
       ? `tunnelled through the proxy: ${tunnelled.join(", ")}`
@@ -88,8 +101,8 @@ function report(tunnelled: string[]): never {
   const ok = bypassing ? tunnelled.length === 0 : tunnelled.length > 0;
   const verdict = ok
     ? bypassing
-      ? "PASS: NO_PROXY kept the request off the proxy"
-      : "PASS: SES egress went through the proxy"
+      ? `PASS: NO_PROXY kept ${host} off the proxy`
+      : `PASS: ${host} egress went through the proxy`
     : "FAIL: routing did not match the configured proxy settings";
   console.log(verdict);
   process.exit(ok ? 0 : 1);

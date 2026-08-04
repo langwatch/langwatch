@@ -15,10 +15,10 @@ export const sendgridProvider: EmailProviderPort = {
     content: EmailContent;
     defaultFrom: string;
   }) {
-    // No proxy wiring: SendGrid's axios-based client does not reliably pick up
-    // HTTPS_PROXY, and it exposes no transport seam we can pass an agent
-    // through. Proxied deployments should use ses, resend, or the smtp gateway
-    // pointed at SendGrid's own SMTP relay.
+    // No proxy wiring here because none is needed: the client is axios-based,
+    // and axios reads HTTP_PROXY/HTTPS_PROXY/NO_PROXY itself. Verified against
+    // a logging CONNECT proxy, which saw api.sendgrid.com tunnelled through it
+    // and stopped seeing it once NO_PROXY covered the domain.
     sgMail.setApiKey(env.SENDGRID_API_KEY ?? "");
 
     const bccAddresses = toArray(content.bcc);

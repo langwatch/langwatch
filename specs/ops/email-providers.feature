@@ -87,6 +87,13 @@ Feature: Email gateway providers
       | resend   |
 
   @unit
+  Scenario: An attachment named in a non-English alphabet keeps its name
+    Given the email provider is set to "ses"
+    When the application sends an email with an attachment whose filename contains accented characters
+    Then the recipient sees the accented filename
+    And a plain-ASCII filename is also present for receivers that cannot read the accented form
+
+  @unit
   Scenario: Email egress follows the configured outbound proxy
     Given an outbound HTTP proxy is configured for the environment
     And the email provider is set to "ses"

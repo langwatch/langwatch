@@ -388,9 +388,9 @@ app:
     # Use 'smtp' for an internal relay, Azure Communication Services, Office 365,
     # Postmark, Mailgun or any other gateway that speaks SMTP.
     # Deployments whose only egress is a corporate proxy can set HTTPS_PROXY and
-    # NO_PROXY through app.extraEnvs; the ses and resend providers route their
-    # API calls through it. smtp ignores them on purpose (an internal relay is
-    # reached directly) and sendgrid's client cannot be given a proxy agent.
+    # NO_PROXY through app.extraEnvs; every gateway that calls a vendor API over
+    # HTTPS routes through it. Only smtp ignores them, on purpose, because an
+    # internal relay is reached directly.
     provider: sendgrid
 
     providers:

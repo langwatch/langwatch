@@ -53409,12 +53409,12 @@ Use this for an internal relay, Azure Communication Services, Office 365, Google
 
 ### Sending through an outbound proxy
 
-Deployments whose only egress is a corporate HTTP proxy can set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses` and `resend` gateways route their API calls through it; `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
+Deployments whose only egress is a corporate HTTP proxy can set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses`, `resend` and `sendgrid` gateways all route their API calls through it; `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
 
-The `smtp` gateway ignores these variables on purpose, because an SMTP relay is normally an internal host that must be reached directly. `sendgrid` is not proxy-aware either: its client offers no seam to attach a proxy agent, so behind a proxy use `ses`, `resend`, or point `smtp` at SendGrid's own SMTP relay.
+The `smtp` gateway ignores these variables on purpose, because an SMTP relay is normally an internal host that must be reached directly. Point it at your relay's real address, or use a vendor's SMTP endpoint if that is what the proxy allows out.
 
 <Note>
-Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so LangWatch attaches the proxy to the SES and Resend clients itself. Without that, a proxied deployment fails with a `read ETIMEDOUT` reaching the provider.
+Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so LangWatch attaches the proxy to the SES and Resend clients itself. SendGrid's client is axios-based and reads the variables directly. Without this wiring, a proxied deployment fails with a `read ETIMEDOUT` reaching the provider.
 </Note>
 
 
@@ -53440,7 +53440,6 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
-| `SENTRY_DSN` | Sentry DSN for error tracking | - |
 | `METRICS_API_KEY` | API key for metrics collection | - |
 
 ## Langy (optional)

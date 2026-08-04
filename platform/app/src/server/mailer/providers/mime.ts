@@ -7,6 +7,30 @@ export const sanitizeHeaderParam = (value: string): string =>
   sanitizeHeaderValue(value).replace(/(["\\])/g, "\\$1");
 
 /**
+ * A header parameter such as `filename`, emitted so that both strict and naive
+ * receivers get something usable.
+ *
+ * A quoted string may only hold ASCII (RFC 5322 §2.2), and RFC 2047
+ * encoded-words are not allowed inside one (RFC 2047 §5), so a name like
+ * `relatório.csv` can be carried only by the RFC 2231 extended form. That form
+ * is emitted alongside a transliterated plain parameter: receivers that
+ * understand `filename*` prefer it and the rest fall back to the ASCII name
+ * instead of a mangled or rejected header.
+ */
+export const encodeHeaderParam = (name: string, value: string): string => {
+  const clean = sanitizeHeaderValue(value);
+  const plain = `${name}="${sanitizeHeaderParam(clean)}"`;
+  if (!/[^\x20-\x7E]/.test(clean)) return plain;
+
+  const ascii = clean.replace(/[^\x20-\x7E]/g, "_");
+  const extended = encodeURIComponent(clean).replace(
+    /[!'()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `${name}="${sanitizeHeaderParam(ascii)}"; ${name}*=UTF-8''${extended}`;
+};
+
+/**
  * A header name is a token: no colon, whitespace or control characters (RFC
  * 5322 §3.6.8). Stripping them stops a crafted name from closing the field and
  * injecting another one, which sanitizing the value alone would not prevent.
@@ -136,8 +160,8 @@ export const buildRawMimeMessage = ({
     );
     lines.push(
       `--${boundary}`,
-      `Content-Type: ${sanitizeHeaderValue(attachment.contentType)}; name="${sanitizeHeaderParam(attachment.filename)}"`,
-      `Content-Disposition: attachment; filename="${sanitizeHeaderParam(attachment.filename)}"`,
+      `Content-Type: ${sanitizeHeaderValue(attachment.contentType)}; ${encodeHeaderParam("name", attachment.filename)}`,
+      `Content-Disposition: attachment; ${encodeHeaderParam("filename", attachment.filename)}`,
       `Content-Transfer-Encoding: base64`,
       ``,
       base64Content,
