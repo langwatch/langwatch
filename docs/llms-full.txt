@@ -61839,7 +61839,7 @@ A **billable event** is any of these:
 - **A step of an experiment run.** A sweep counts its start, each dataset row it ran, and each score it produced, so one experiment is many events rather than one.
 - **A step of a scenario simulation.** A run counts its start plus each turn of the conversation.
 
-Spans dominate the count for most customers, but testing is not free: an experiment over 100 rows with 2 evaluators is roughly 300 events. There are no separate charges per feature on top of this, and everything you create (prompts, evaluators, datasets, dashboards) is free.
+Spans dominate the count for most customers, but testing produces billable events: an experiment over 100 rows with 2 evaluators is roughly 300 events. There are no separate charges per feature on top of this, and everything you create (prompts, evaluators, datasets, dashboards) is free.
 
 For the exact arithmetic per family, what is never billed, and how retries are deduplicated, see [What counts as a billable event](/pricing/billable-events).
 
