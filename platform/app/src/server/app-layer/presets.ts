@@ -120,6 +120,7 @@ import { InviteService } from "../invites/invite.service";
 import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { getLicenseHandler } from "../subscriptionHandler";
+import { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
 import { TraceUsageService } from "../traces/trace-usage.service";
@@ -1440,6 +1441,7 @@ export function initializeDefaultApp(options?: {
     collection: traceCollection,
     logCollection,
     metricCollection,
+    editOverlay: TraceEditOverlayService.create(prisma),
   };
 
   // Collect closeables for graceful shutdown
@@ -1807,6 +1809,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           }),
           "MetricRequestCollectionService",
         ),
+        editOverlay: TraceEditOverlayService.create(testPrisma),
       };
     })(),
     evaluations: {

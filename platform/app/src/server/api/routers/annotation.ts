@@ -6,6 +6,7 @@ import { z } from "zod";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
+import { TraceEditOverlayService } from "~/server/traces/edit-overlay/traceEditOverlay.service";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { slugify } from "~/utils/slugify";
@@ -115,6 +116,37 @@ const annotatorReferenceSchema = z.string().transform((annotator, ctx) => {
 
 type AnnotatorReference = z.infer<typeof annotatorReferenceSchema>;
 
+/**
+ * A suggested expected output is the output-only case of a trace correction.
+ * The annotation row stays the record of who suggested what; the correction is
+ * the trace's current corrected truth and is what the dataset flow reads.
+ *
+ * Deliberately not best-effort: a suggestion the reviewer believes was saved
+ * but which never reached the correction would silently ship the uncorrected
+ * trace into a dataset.
+ */
+const mergeSuggestedOutputIntoOverlay = async ({
+  prisma,
+  projectId,
+  traceId,
+  expectedOutput,
+  userId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  traceId: string;
+  expectedOutput?: string | null;
+  userId: string;
+}) => {
+  if (typeof expectedOutput !== "string" || expectedOutput.length === 0) return;
+  await TraceEditOverlayService.create(prisma).mergeTraceOutputEdit({
+    projectId,
+    traceId,
+    output: expectedOutput,
+    userId,
+  });
+};
+
 const queueItemReferenceFilter = ({
   projectId,
   organizationId,
@@ -167,6 +199,14 @@ export const annotationRouter = createTRPCRouter({
         expectedOutput: input.expectedOutput ?? null,
       });
 
+      await mergeSuggestedOutputIntoOverlay({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        traceId: input.traceId,
+        expectedOutput: input.expectedOutput,
+        userId: ctx.session.user.id,
+      });
+
       // Best-effort ClickHouse sync: Prisma is the source of truth.
       // Failures are logged but don't fail the mutation — the backfill task
       // can reconcile any missed syncs.
@@ -203,7 +243,7 @@ export const annotationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
 
-      return service.update({
+      const updated = await service.update({
         id: input.id,
         projectId: input.projectId,
         traceId: input.traceId,
@@ -212,6 +252,16 @@ export const annotationRouter = createTRPCRouter({
         scoreOptions: input.scoreOptions ?? {},
         expectedOutput: input.expectedOutput ?? null,
       });
+
+      await mergeSuggestedOutputIntoOverlay({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        traceId: input.traceId,
+        expectedOutput: input.expectedOutput,
+        userId: ctx.session.user.id,
+      });
+
+      return updated;
     }),
   getByTraceId: protectedProcedure
     .input(
@@ -637,6 +687,49 @@ export const annotationRouter = createTRPCRouter({
           doneAt: new Date(),
         },
       });
+    }),
+  /**
+   * Flags a queue item for the dataset hand-off that runs once the annotator
+   * finishes the queue. Persisted rather than kept in the browser so the
+   * selection survives a refresh and the end-of-queue step can still find items
+   * that were already marked done.
+   */
+  markQueueItemForDataset: protectedProcedure
+    .input(
+      z.object({
+        queueItemId: z.string(),
+        projectId: z.string(),
+        marked: z.boolean(),
+      }),
+    )
+    .use(checkProjectPermission("annotations:update"))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.annotationQueueItem.update({
+        where: { id: input.queueItemId, projectId: input.projectId },
+        data: {
+          markedForDatasetAt: input.marked ? new Date() : null,
+        },
+      });
+    }),
+  /** Clears the marks after the hand-off, so the next queue walk starts clean. */
+  clearDatasetMarks: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        queueItemIds: z.array(z.string()),
+      }),
+    )
+    .use(checkProjectPermission("annotations:update"))
+    .mutation(async ({ ctx, input }) => {
+      if (input.queueItemIds.length === 0) return { cleared: 0 };
+      const result = await ctx.prisma.annotationQueueItem.updateMany({
+        where: {
+          projectId: input.projectId,
+          id: { in: input.queueItemIds },
+        },
+        data: { markedForDatasetAt: null },
+      });
+      return { cleared: result.count };
     }),
   getQueueBySlugOrId: protectedProcedure
     .input(

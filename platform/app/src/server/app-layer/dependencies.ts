@@ -30,6 +30,7 @@ import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import type { OpsExplainService } from "../ops/opsExplain.service";
+import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
 import type {
@@ -120,6 +121,8 @@ export interface AppDependencies {
     collection: TraceRequestCollectionService;
     logCollection: LogRequestCollectionService;
     metricCollection: MetricRequestCollectionService;
+    /** Reviewer corrections applied over a captured trace at read time. */
+    editOverlay: TraceEditOverlayService;
   };
   evaluations: {
     runs: EvaluationRunService;

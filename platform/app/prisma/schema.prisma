@@ -111,6 +111,8 @@ model User {
   ingestionSourcesCreated       IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated           AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   pinnedTraces                  PinnedTrace[]
+  traceEditOverlaysCreated      TraceEditOverlay[]       @relation("TraceEditOverlayCreatedBy")
+  traceEditOverlaysUpdated      TraceEditOverlay[]       @relation("TraceEditOverlayUpdatedBy")
 }
 
 model VerificationToken {
@@ -422,6 +424,7 @@ model Project {
   gatewayGuardrails   GatewayGuardrail[]        @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents GatewayChangeEvent[]
   pinnedTraces        PinnedTrace[]
+  traceEditOverlays   TraceEditOverlay[]
   emailSuppressions   EmailSuppression[]
 
   // Denormalised mirror of parent Team's personal flag for fast
@@ -1591,6 +1594,10 @@ model AnnotationQueueItem {
   traceId           String
   projectId         String
   doneAt            DateTime?
+  /// Set while the annotator wants this item's trace added to a dataset once
+  /// the queue walk is finished. Persisted rather than kept in the browser so
+  /// the selection survives a refresh and stays visible to teammates.
+  markedForDatasetAt DateTime?
   project           Project          @relation(fields: [projectId], references: [id])
 
   @@unique([traceId, userId, projectId])
@@ -1648,6 +1655,31 @@ model PinnedTrace {
   source    PinSource @default(manual)
   reason    String?
   createdAt DateTime  @default(now())
+
+  @@unique([projectId, traceId])
+  @@index([projectId])
+}
+
+// A reviewer's correction to one trace, stored beside the captured trace and
+// applied at read time. The captured data in ClickHouse is never rewritten.
+//
+// `patch` holds a version-1 correction shaped like the canonical trace model:
+// whole-field replacements per span plus the ids of the spans that were
+// removed (see traceEditOverlay.schemas.ts). It is validated on write and
+// re-validated on read, so a row this build cannot interpret degrades to "no
+// correction" instead of failing the trace read.
+model TraceEditOverlay {
+  id          String   @id
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  traceId     String
+  patch       Json
+  createdById String?
+  createdBy   User?    @relation("TraceEditOverlayCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?    @relation("TraceEditOverlayUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
   @@unique([projectId, traceId])
   @@index([projectId])

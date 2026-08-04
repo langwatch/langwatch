@@ -92,11 +92,13 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     [props.selectedTraceIds, props.traceId],
   );
 
-  // Fetch traces with spans data
+  // Fetch traces with spans data. Reviewer corrections apply here so a dataset
+  // record carries exactly what the reviewer corrected.
   const tracesWithSpans = api.traces.getTracesWithSpans.useQuery(
     {
       projectId: project?.id ?? "",
       traceIds: traceIds,
+      withEditOverlay: true,
     },
     {
       enabled: !!project,
