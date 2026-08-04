@@ -9,7 +9,7 @@
  *
  * Spec: specs/setup/test-teardown-safety.feature
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { scanTestSourceForUnsafeDeleteMany } from "../teardownScan";
@@ -18,11 +18,24 @@ function scan(sourceText: string) {
   return scanTestSourceForUnsafeDeleteMany("virtual.test.ts", sourceText);
 }
 
-/** langwatch/, from src/test-utils/__tests__/. */
-const LANGWATCH_ROOT = resolve(__dirname, "../../..");
+/** platform/app/, from src/test-utils/__tests__/. */
+const APP_ROOT = resolve(__dirname, "../../..");
 
-/** Same roots vitest collects test files from. */
-const TEST_ROOTS = ["src", "ee", "packages"];
+/** The workspace root, which is two levels above the app. */
+const REPO_ROOT = resolve(APP_ROOT, "../..");
+
+/**
+ * Every root holding test files this rule covers, as name -> directory.
+ *
+ * `packages/` is at the workspace root, not under the app: ADR-076 folded the
+ * six install roots into one workspace and moved it there. Resolving a bare
+ * "packages" against the app finds nothing.
+ */
+const TEST_ROOTS: Record<string, string> = {
+  src: resolve(APP_ROOT, "src"),
+  ee: resolve(APP_ROOT, "ee"),
+  packages: resolve(REPO_ROOT, "packages"),
+};
 
 const TEST_FILE_PATTERN = /\.(test|spec)\.(c|m)?[jt]sx?$/;
 
@@ -50,7 +63,7 @@ function offendersIn(file: string): string[] {
   if (!sourceText.includes("deleteMany")) return [];
   return scanTestSourceForUnsafeDeleteMany(file, sourceText).map(
     (violation) =>
-      `${relative(LANGWATCH_ROOT, file)}:${violation.line} ` +
+      `${relative(REPO_ROOT, file)}:${violation.line} ` +
       `${violation.model}.deleteMany filtered by "${violation.variable}": ` +
       violation.reason,
   );
@@ -67,8 +80,10 @@ function scanTestRoots(): {
 } {
   const filesPerRoot: Record<string, number> = {};
   const offenders: string[] = [];
-  for (const root of TEST_ROOTS) {
-    const files = collectTestFiles(resolve(LANGWATCH_ROOT, root));
+  for (const [root, directory] of Object.entries(TEST_ROOTS)) {
+    // A root that moved reads as empty here, so the count assertion below
+    // names it. Letting readdirSync throw buries that under an ENOENT stack.
+    const files = existsSync(directory) ? collectTestFiles(directory) : [];
     filesPerRoot[root] = files.length;
     offenders.push(...files.flatMap(offendersIn));
   }
@@ -256,7 +271,7 @@ describe("scanTestSourceForUnsafeDeleteMany", () => {
 
       // A root that yields nothing means the walk lost the tree and this
       // case would pass while checking zero files.
-      for (const root of TEST_ROOTS) {
+      for (const root of Object.keys(TEST_ROOTS)) {
         expect(
           filesPerRoot[root],
           `no test files found under ${root}/, so nothing was scanned`,
