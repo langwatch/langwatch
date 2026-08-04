@@ -25,10 +25,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Repo root containing both `langwatch/` and `charts/`. `process.cwd()` is the
-// langwatch/ package dir when vitest runs, so one level up lands on the repo
-// root reliably across worktrees and CI.
-const REPO_ROOT = path.resolve(process.cwd(), "..");
+// Repo root containing both `platform/app/` and `charts/`. `process.cwd()` is
+// the platform/app/ package dir when vitest runs, so two levels up lands on the
+// repo root reliably across worktrees and CI.
+const REPO_ROOT = path.resolve(process.cwd(), "..", "..");
 
 /** Resting footprint once the evaluator stack is imported: 543 MiB measured. */
 const RESTING_MIB = 543;
