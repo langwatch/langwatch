@@ -76,6 +76,46 @@ class TestClientSetup:
         finally:
             Client.reset_for_testing()
 
+    def test_an_equivalent_spelling_does_not_restart_the_exporter(self) -> None:
+        """Normalizing before the comparison makes the reconfiguration a no-op."""
+        Client.reset_for_testing()
+        with (
+            patch.object(Client, "_Client__setup_tracer_provider") as setup,
+            patch.object(Client, "_Client__shutdown_tracer_provider") as shutdown,
+        ):
+            try:
+                Client(api_key="test-key", endpoint_url="https://host.example.com")
+                setup.reset_mock()
+                shutdown.reset_mock()
+
+                reconfigured = Client(endpoint_url="  https://host.example.com///  ")
+
+                setup.assert_not_called()
+                shutdown.assert_not_called()
+                assert reconfigured.endpoint_url == "https://host.example.com"
+            finally:
+                Client.reset_for_testing()
+
+    def test_a_genuinely_different_endpoint_still_restarts_the_exporter(self) -> None:
+        """The no-restart assertion above would be vacuous without this."""
+        Client.reset_for_testing()
+        with (
+            patch.object(Client, "_Client__setup_tracer_provider") as setup,
+            patch.object(Client, "_Client__shutdown_tracer_provider") as shutdown,
+        ):
+            try:
+                Client(api_key="test-key", endpoint_url="https://host.example.com")
+                setup.reset_mock()
+                shutdown.reset_mock()
+
+                reconfigured = Client(endpoint_url="https://other.example.com/")
+
+                assert reconfigured.endpoint_url == "https://other.example.com"
+                setup.assert_called_once()
+                shutdown.assert_called_once()
+            finally:
+                Client.reset_for_testing()
+
     def test_keeps_the_endpoint_when_reconfigured_with_a_blank_value(self) -> None:
         """A blank argument must not move a self-hosted client to the cloud."""
         Client.reset_for_testing()
