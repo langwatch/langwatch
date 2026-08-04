@@ -165,7 +165,7 @@ export interface GovernedSqlQueryBlock {
    */
   readonly filteredColumns: readonly string[];
   /** Whether the block carries `GROUP BY`, in any of its spellings. */
-  readonly groupBy: boolean;
+  readonly hasGroupBy: boolean;
   /**
    * Names the block groups by, lowercased and stripped of any qualifier.
    *
@@ -181,10 +181,10 @@ export interface GovernedSqlQueryBlock {
    *
    * `false` for an aggregate used with `OVER`: a window function reads a frame
    * and returns one value per row, which is the opposite of collapsing. A block
-   * with a join, no `groupBy` and no `aggregated` is the bare `SELECT` over a
+   * with a join, no `hasGroupBy` and no `isAggregated` is the bare `SELECT` over a
    * fanout that a diagnostic wants to warn about.
    */
-  readonly aggregated: boolean;
+  readonly isAggregated: boolean;
 }
 
 /** A query that passed the gate, with the facts the walk established. */
@@ -256,8 +256,8 @@ interface BlockAccumulator {
   readonly joins: GovernedSqlJoinEdge[];
   readonly filteredColumns: Set<string>;
   readonly groupByColumns: Set<string>;
-  groupBy: boolean;
-  aggregated: boolean;
+  hasGroupBy: boolean;
+  isAggregated: boolean;
 }
 
 /** Where the walk currently is, and what it has learned on the way down. */
@@ -655,10 +655,10 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
     joins: [],
     filteredColumns: new Set<string>(),
     groupByColumns: new Set<string>(),
-    groupBy:
+    hasGroupBy:
       (Array.isArray(node.group_by) && node.group_by.length > 0) ||
       node.group_by_all === true,
-    aggregated: false,
+    isAggregated: false,
   };
   ctx.blocks.push(block);
 
@@ -918,7 +918,7 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     return frame;
   }
   if (frame.block && isGovernedAggregateFunction(name) && !isWindowCall(node)) {
-    frame.block.aggregated = true;
+    frame.block.isAggregated = true;
   }
   return frame;
 }
@@ -1393,8 +1393,8 @@ export function validateGovernedSql({
       joins: [...block.joins],
       filteredColumns: [...block.filteredColumns],
       groupByColumns: [...block.groupByColumns],
-      groupBy: block.groupBy,
-      aggregated: block.aggregated,
+      hasGroupBy: block.hasGroupBy,
+      isAggregated: block.isAggregated,
     })),
   };
 }

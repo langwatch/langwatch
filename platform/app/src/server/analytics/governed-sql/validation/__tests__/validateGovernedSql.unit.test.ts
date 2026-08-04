@@ -514,43 +514,43 @@ describe("validateGovernedSql", () => {
       expect(blocksOf(sql)[0]?.joins).toEqual([]);
     });
 
-    it.each<[string, string, { groupBy: boolean; aggregated: boolean }]>([
+    it.each<[string, string, { hasGroupBy: boolean; isAggregated: boolean }]>([
       [
         "a plain projection",
         "SELECT TraceId FROM traces",
-        { groupBy: false, aggregated: false },
+        { hasGroupBy: false, isAggregated: false },
       ],
       [
         "an explicit grouping",
         "SELECT Model, count() FROM traces GROUP BY Model",
-        { groupBy: true, aggregated: true },
+        { hasGroupBy: true, isAggregated: true },
       ],
       [
         "GROUP BY ALL",
         "SELECT Model, count() FROM traces GROUP BY ALL",
-        { groupBy: true, aggregated: true },
+        { hasGroupBy: true, isAggregated: true },
       ],
       [
         "an aggregate with no grouping",
         "SELECT count() FROM traces",
-        { groupBy: false, aggregated: true },
+        { hasGroupBy: false, isAggregated: true },
       ],
       [
         "a conditional aggregate",
         "SELECT countIf(Cost > 1) FROM traces",
-        { groupBy: false, aggregated: true },
+        { hasGroupBy: false, isAggregated: true },
       ],
       // A window function reads a frame and returns a value per row, so it
       // collapses nothing — the distinction a fanout rule turns on.
       [
         "an aggregate used as a window function",
         "SELECT sum(Cost) OVER (PARTITION BY Model) FROM traces",
-        { groupBy: false, aggregated: false },
+        { hasGroupBy: false, isAggregated: false },
       ],
       [
         "a named window over an aggregate",
         "SELECT sum(Cost) OVER w FROM traces WINDOW w AS (PARTITION BY Model)",
-        { groupBy: false, aggregated: false },
+        { hasGroupBy: false, isAggregated: false },
       ],
     ])("reports the shape of %s", (_case, sql, expected) => {
       expect(blocksOf(sql)[0]).toMatchObject(expected);
@@ -562,10 +562,10 @@ describe("validateGovernedSql", () => {
       );
 
       expect(blocks).toHaveLength(2);
-      expect(blocks[0]).toMatchObject({ tables: [], groupBy: false });
+      expect(blocks[0]).toMatchObject({ tables: [], hasGroupBy: false });
       expect(blocks[1]).toMatchObject({
         tables: [{ table: "analytics.traces" }],
-        groupBy: true,
+        hasGroupBy: true,
       });
     });
 
@@ -575,14 +575,14 @@ describe("validateGovernedSql", () => {
           "SELECT TraceId, spend FROM totals",
       );
 
-      expect(blocks.some((block) => block.groupBy && block.aggregated)).toBe(
-        true,
-      );
+      expect(
+        blocks.some((block) => block.hasGroupBy && block.isAggregated),
+      ).toBe(true);
       const outermost = blocks[0];
       expect(outermost).toMatchObject({
         tables: [],
-        groupBy: false,
-        aggregated: false,
+        hasGroupBy: false,
+        isAggregated: false,
       });
     });
 
@@ -591,7 +591,7 @@ describe("validateGovernedSql", () => {
         "SELECT TraceId FROM traces UNION ALL SELECT count() FROM spans",
       );
 
-      expect(blocks.map((block) => block.aggregated)).toEqual([false, true]);
+      expect(blocks.map((block) => block.isAggregated)).toEqual([false, true]);
     });
   });
 });

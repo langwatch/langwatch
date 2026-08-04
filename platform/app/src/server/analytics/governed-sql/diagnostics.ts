@@ -284,7 +284,7 @@ function fanoutDiagnostic({
   block: GovernedSqlQueryBlock;
   pair: JoinedPair;
 }): GovernedSqlDiagnostic {
-  const collapses = block.groupBy || block.aggregated;
+  const collapses = block.hasGroupBy || block.isAggregated;
   return {
     code: "POSSIBLE_FANOUT",
     message:

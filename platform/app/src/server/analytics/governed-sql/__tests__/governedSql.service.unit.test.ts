@@ -18,7 +18,6 @@ import { describe, expect, it } from "vitest";
 
 import type { Protections } from "../../../traces/protections";
 import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
-import type { GovernedViewDefinition } from "../catalog/types";
 import {
   applyGovernedResultLimits,
   type GovernedSqlExecutionRequest,
@@ -26,6 +25,10 @@ import {
   type GovernedSqlExecutor,
 } from "../executor";
 import { GovernedSqlService } from "../governedSql.service";
+import {
+  GATED_DATASET,
+  GATED_DATASET_QUALIFIED_NAME,
+} from "./gatedDatasetFixture";
 
 const DATABASE = "analytics";
 
@@ -340,45 +343,18 @@ describe("given the governed SQL service", () => {
   });
 
   describe("when a dataset the caller's permissions withhold is named", () => {
-    /**
-     * A dataset that *is* captured content end to end, which is the case the
-     * dataset-level gate exists for. The shipped catalog has none — every one
-     * of its datasets is readable in part by a caller with no content
-     * permission — so a case written against it would assert that nothing
-     * happens, which is not the claim.
-     */
-    const transcripts: GovernedViewDefinition = {
-      name: "transcripts",
-      sourceTable: "raw_transcripts",
-      description: "Everything said in a conversation, verbatim.",
-      gates: ["input"],
-      grain: "one row per (TenantId, TranscriptId)",
-      joinKeys: ["TenantId"],
-      timeColumn: "OccurredAt",
-      freshness: "seconds behind ingestion",
-      dedup: {
-        keyColumns: ["TenantId", "TranscriptId"],
-        versionColumn: "UpdatedAt",
-      },
-      columns: [
-        {
-          name: "TranscriptId",
-          type: "String",
-          description: "Transcript identifier.",
-          gates: [],
-          sourceColumns: ["TranscriptId"],
-        },
-      ],
-    };
-
+    // The shipped catalog has no dataset that is captured content end to end —
+    // every one of its entries is readable in part by a caller with no content
+    // permission — so this case needs a fixture, and it shares the one the
+    // schema and catalog suites use rather than keeping a fourth copy.
     const serviceWithTranscripts = (executor: GovernedSqlExecutor) =>
       new GovernedSqlService({
         executor,
         database: DATABASE,
-        views: [...GOVERNED_VIEW_CATALOG, transcripts],
+        views: [...GOVERNED_VIEW_CATALOG, GATED_DATASET],
       });
 
-    const sql = "SELECT count() FROM analytics.transcripts";
+    const sql = `SELECT count() FROM ${GATED_DATASET_QUALIFIED_NAME}`;
 
     it("refuses the query, rather than returning the dataset's row-policed rows", async () => {
       const executor = recordingExecutor();
