@@ -7,7 +7,7 @@ from typing import List, Optional, Sequence, ClassVar
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
 from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
-from langwatch.state import get_instance
+from langwatch.state import DEFAULT_ENDPOINT, get_instance, normalize_endpoint
 from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
@@ -147,8 +147,18 @@ class Client(LangWatchClientProtocol):
                 ):
                     self.__shutdown_tracer_provider()
                     self.__setup_tracer_provider()
-            if endpoint_url is not None and endpoint_url != Client._endpoint_url:
-                Client._endpoint_url = endpoint_url
+            # Normalized before the comparison, so reconfiguring with the same
+            # endpoint written differently ("https://host/" for "https://host")
+            # is recognized as unchanged and does not restart the exporter.
+            # A value that normalizes to nothing is treated as not supplied
+            # rather than as the cloud default: this instance already has an
+            # endpoint, and silently moving a self-hosted client to the cloud
+            # is worse than ignoring a blank argument.
+            normalized_endpoint = (
+                normalize_endpoint(endpoint_url) if endpoint_url is not None else None
+            )
+            if normalized_endpoint and normalized_endpoint != Client._endpoint_url:
+                Client._endpoint_url = normalized_endpoint
                 if (
                     not Client._skip_open_telemetry_setup
                     and not Client._disable_sending
@@ -232,7 +242,7 @@ class Client(LangWatchClientProtocol):
             Client._project_id = os.getenv("LANGWATCH_PROJECT_ID")
 
         if endpoint_url is not None:
-            Client._endpoint_url = endpoint_url
+            Client._endpoint_url = normalize_endpoint(endpoint_url) or DEFAULT_ENDPOINT
         else:
             # Always re-read LANGWATCH_ENDPOINT from env on every setup()
             # call. The previous "pin once on first init" behavior caused
@@ -243,11 +253,11 @@ class Client(LangWatchClientProtocol):
             # callback 401 against the cloud API. Re-reading per-call costs
             # one os.getenv lookup; the explicit endpoint_url path above
             # still wins.
-            env_endpoint = os.getenv("LANGWATCH_ENDPOINT")
+            env_endpoint = normalize_endpoint(os.getenv("LANGWATCH_ENDPOINT") or "")
             if env_endpoint:
                 Client._endpoint_url = env_endpoint
             elif not Client._endpoint_url:
-                Client._endpoint_url = "https://app.langwatch.ai"
+                Client._endpoint_url = DEFAULT_ENDPOINT
 
         if debug is not None:
             Client._debug = debug

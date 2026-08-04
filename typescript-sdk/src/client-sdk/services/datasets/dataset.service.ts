@@ -25,6 +25,7 @@ import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { tracer } from "./tracing";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { resolveEndpoint } from "@/internal/endpoint";
 
 type DatasetServiceConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -46,7 +47,7 @@ export class DatasetService {
   private readonly config: DatasetServiceConfig;
 
   constructor(config: DatasetServiceConfig) {
-    this.config = config;
+    this.config = { ...config, endpoint: resolveEndpoint(config.endpoint) };
 
     /**
      * Wraps the service in a tracing proxy that automatically creates
@@ -411,7 +412,7 @@ export class DatasetService {
     slugOrId?: string,
   ): Promise<T> {
     const { endpoint, apiKey } = this.config;
-    const url = `${endpoint.replace(/\/$/, "")}${path}`;
+    const url = `${endpoint}${path}`;
 
     const response = await fetch(url, {
       method: "POST",

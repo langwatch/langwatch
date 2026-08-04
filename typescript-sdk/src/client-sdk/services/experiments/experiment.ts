@@ -16,6 +16,7 @@ import type { LangWatchSpan } from "@/observability-sdk/span/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
 import type { Logger } from "@/logger";
 import { ensureSetup } from "@/observability-sdk/setup/node";
+import { resolveEndpoint } from "@/internal/endpoint";
 import { generateHumanReadableId } from "./humanReadableId";
 import {
   ExperimentInitError,
@@ -138,7 +139,7 @@ export class Experiment {
     this.experimentSlug = name;
     this.runId = options.runId ?? generateHumanReadableId();
     this.apiClient = options.apiClient;
-    this.endpoint = options.endpoint;
+    this.endpoint = resolveEndpoint(options.endpoint);
     this.apiKey = options.apiKey;
     this.logger = options.logger;
     this.concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
@@ -202,7 +203,7 @@ export class Experiment {
       (this as { experimentSlug: string }).experimentSlug = data.slug;
 
       const encodedRunId = encodeURIComponent(this.runId);
-      this.runUrl = `${this.endpoint.replace(/\/$/, "")}${data.path}?runId=${encodedRunId}`;
+      this.runUrl = `${this.endpoint}${data.path}?runId=${encodedRunId}`;
       console.log(`Follow results at: ${this.runUrl}`);
 
       this.initialized = true;

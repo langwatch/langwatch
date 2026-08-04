@@ -58,6 +58,39 @@ describe("config", () => {
     });
   });
 
+  describe("when the endpoint carries a trailing slash", () => {
+    it("strips it from a CLI endpoint", () => {
+      initConfig({ endpoint: "https://cli.example.com/" });
+      expect(getConfig().endpoint).toBe("https://cli.example.com");
+    });
+
+    it("trims whitespace around a CLI endpoint", () => {
+      initConfig({ endpoint: "  https://cli.example.com///  " });
+      expect(getConfig().endpoint).toBe("https://cli.example.com");
+    });
+
+    it("strips repeated slashes from the env var", () => {
+      process.env.LANGWATCH_ENDPOINT = "http://localhost:5560///";
+      initConfig({});
+      expect(getConfig().endpoint).toBe("http://localhost:5560");
+    });
+
+    it("keeps the built request path free of a double slash", () => {
+      initConfig({ endpoint: "https://app.langwatch.ai/" });
+      expect(`${getConfig().endpoint}/api/bug-reports`).toBe(
+        "https://app.langwatch.ai/api/bug-reports",
+      );
+    });
+  });
+
+  describe("when the endpoint is blank", () => {
+    it("falls back to the default rather than an empty base url", () => {
+      process.env.LANGWATCH_ENDPOINT = "   ";
+      initConfig({});
+      expect(getConfig().endpoint).toBe("https://app.langwatch.ai");
+    });
+  });
+
   describe("when no args or env vars are provided", () => {
     it("defaults endpoint to https://app.langwatch.ai", () => {
       initConfig({});

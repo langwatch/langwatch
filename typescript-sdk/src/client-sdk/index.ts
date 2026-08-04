@@ -81,7 +81,7 @@ import { type InternalConfig } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
 import { TracesFacade } from "./services/traces/facade";
-import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { resolveEndpoint } from "@/internal/endpoint";
 
 export interface LangWatchConstructorOptions {
   apiKey?: string;
@@ -150,7 +150,7 @@ export class LangWatch {
 
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-    const endpoint = options.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
+    const endpoint = resolveEndpoint(options.endpoint);
 
     this.config = this.#createInternalConfig({
       apiKey,

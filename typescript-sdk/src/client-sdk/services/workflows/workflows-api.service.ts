@@ -19,6 +19,7 @@ import type {
   RunWithResultsOptions,
   ExperimentRunWithResults,
 } from "@/client-sdk/services/experiments/platformTypes";
+import { resolveEndpoint } from "@/internal/endpoint";
 
 export type WorkflowResponse = NonNullable<
   paths["/api/workflows"]["get"]["responses"]["200"]["content"]["application/json"]
@@ -69,11 +70,13 @@ export class WorkflowsApiService {
   constructor(
     config?: Pick<InternalConfig, "langwatchApiClient"> & { endpoint?: string },
   ) {
-    this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
-    this.endpoint =
-      config?.endpoint ??
-      process.env.LANGWATCH_ENDPOINT ??
-      "https://app.langwatch.ai";
+    // The run URLs this service rebases and the requests it issues have to
+    // name the same host, so a caller that supplies only an endpoint gets a
+    // client built on that endpoint rather than on the environment.
+    this.endpoint = resolveEndpoint(config?.endpoint);
+    this.apiClient =
+      config?.langwatchApiClient ??
+      createLangWatchApiClient(undefined, this.endpoint);
     this.experimentsApiService = new ExperimentsApiService({
       langwatchApiClient: this.apiClient,
     });
