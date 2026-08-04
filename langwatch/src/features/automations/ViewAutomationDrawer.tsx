@@ -109,9 +109,21 @@ export function ViewAutomationDrawer({
   const destinationSummary = (): React.ReactNode => {
     if (!trigger) return null;
     switch (trigger.action) {
-      case "SEND_SLACK_MESSAGE":
-        // The webhook URL carries a secret token — mask it and surface the
-        // full URL only on hover, mirroring the list page's Slack cell.
+      case "SEND_SLACK_MESSAGE": {
+        // Distinguish the three ways a Slack automation can deliver:
+        // 1. Legacy webhook — `slackWebhook` holds the URL (mask it, surface
+        //    the full value only on hover to avoid leaking the token).
+        // 2. Slack app (bot) — `slackDelivery === "bot"` and the destination
+        //    is the picked channel (`slackChannelId`, e.g. "C0123" or "#name").
+        // 3. Fallback for untyped / legacy rows that carry neither flag.
+        if (actionParams.slackDelivery === "bot") {
+          const channel = actionParams.slackChannelId;
+          return (
+            <Text textStyle="sm" wordBreak="break-all">
+              {channel ? `Slack app · ${channel}` : "Slack app"}
+            </Text>
+          );
+        }
         return actionParams.slackWebhook ? (
           <Tooltip content={actionParams.slackWebhook}>
             <Text
@@ -126,6 +138,7 @@ export function ViewAutomationDrawer({
         ) : (
           <Text textStyle="sm">Slack webhook</Text>
         );
+      }
       case "SEND_EMAIL":
         return actionParams.members?.length ? (
           <Text textStyle="sm" wordBreak="break-all">

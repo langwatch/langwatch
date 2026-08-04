@@ -340,4 +340,77 @@ describe("ViewAutomationDrawer", () => {
       });
     });
   });
+
+  describe("given a Slack app (bot) automation", () => {
+    describe("when the picked channel is stored in slackChannelId", () => {
+      beforeEach(() => {
+        mockTriggerRow = {
+          id: "trigger_1",
+          name: "Errors to #alerts",
+          action: "SEND_SLACK_MESSAGE",
+          customGraphId: null,
+          filters: "{}",
+          actionParams: {
+            slackDelivery: "bot",
+            slackChannelId: "C012345",
+            slackBotTokenSet: true,
+          },
+        };
+        mockRecentFires = [];
+      });
+
+      it("labels the destination as a Slack app with the channel", () => {
+        renderDrawer();
+
+        expect(screen.getByText("Slack app · C012345")).toBeDefined();
+        expect(screen.queryByText("Slack webhook")).toBeNull();
+      });
+    });
+
+    describe("when no channel has been picked yet", () => {
+      beforeEach(() => {
+        mockTriggerRow = {
+          id: "trigger_1",
+          name: "Pending Slack app",
+          action: "SEND_SLACK_MESSAGE",
+          customGraphId: null,
+          filters: "{}",
+          actionParams: {
+            slackDelivery: "bot",
+            slackBotTokenSet: true,
+          },
+        };
+        mockRecentFires = [];
+      });
+
+      it("labels the destination as a Slack app without a channel", () => {
+        renderDrawer();
+
+        expect(screen.getByText("Slack app")).toBeDefined();
+        expect(screen.queryByText("Slack webhook")).toBeNull();
+      });
+    });
+  });
+
+  describe("given a legacy Slack automation with neither webhook nor bot flag", () => {
+    beforeEach(() => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Legacy Slack",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {},
+      };
+      mockRecentFires = [];
+    });
+
+    describe("when the drawer renders", () => {
+      it("falls back to the generic webhook label", () => {
+        renderDrawer();
+
+        expect(screen.getByText("Slack webhook")).toBeDefined();
+      });
+    });
+  });
 });
