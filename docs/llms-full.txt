@@ -2370,7 +2370,9 @@ Response:
       "window": "month",
       "on_breach": "block",
       "limit_usd": "25",
+      "limit_nano_usd": 25000000000,
       "spent_usd": "12.4531",
+      "spent_nano_usd": 12453100000,
       "timezone": null,
       "provider_key": null,
       "external_id": "acme-tenant-4171",
@@ -2386,7 +2388,8 @@ Response:
 }
 ```
 
-- `spend_available: false` means spend could not be totalled server-side; do not read `spent_usd` as real spend in that case.
+- **Money is an integer.** `limit_nano_usd` and `spent_nano_usd` are int64 billionths of a USD, and they are the source of truth; `limit_usd` and `spent_usd` are decimal strings rendered from them for display. Compare and sum the integers, and round exactly once at the end. Reading the strings back into a float is how a reconciliation drifts by a cent.
+- `spend_available: false` means spend could not be totalled server-side; do not read `spent_usd` or `spent_nano_usd` as real spend in that case.
 - `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers.
 - `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with at least one successful request this period, and `end_users_over` how many of those are at or over the cap. Read the pair rather than `spent_usd`, which has no single meaning when one row fans out into one bucket per person.
 - `provider_key` names the ModelProvider the budget is pinned to; `null` counts every provider.

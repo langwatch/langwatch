@@ -30,7 +30,7 @@ The AI Gateway's own inference endpoints (`/v1/chat/completions` and friends) au
 ## Conventions
 
 - Request and response fields are `lower_snake_case`.
-- Money is a decimal string plus an integer nano-USD field. Read the integer when you care about exactness.
+- Money is an integer number of nano-USD (billionths of a dollar), with a decimal string rendered from it for display. The integer is the source of truth: sum integers, round once.
 - Timestamps are ISO 8601, except spend and event filters, which take epoch milliseconds.
 - List endpoints are cursor-paged: follow `next_cursor` until it comes back `null`. A full page does not mean there is more, and a short page does not mean there is not.
 - Errors carry a stable `error.code` to branch on. See [Errors](/ai-gateway/api/errors).
