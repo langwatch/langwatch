@@ -1022,11 +1022,45 @@ function noteColumnPosition({
   else block.groupByColumns.add(leaf);
 }
 
-/** Records a bound parameter. Parameters are values, and always permitted. */
+/**
+ * Records a bound parameter. Parameters are *values*, and values are permitted
+ * — but an `Identifier`-typed one is not a value, and is refused.
+ *
+ * The rest of this file decides what a query may name by reading names out of
+ * the parse: {@link gateColumnReference} matches a column reference against the
+ * caller's withheld set, and {@link readTableReference} refuses a table whose
+ * name is not literal, "because a table chosen at bind time is a table the
+ * allowlist cannot see — which would mean the allowlist was not one."
+ *
+ * That argument is not specific to tables. A column chosen at bind time is a
+ * column the *gate* cannot see: `SELECT {c:Identifier}` carries no column
+ * reference through the walk at all, so ClickHouse substitutes the name after
+ * every check has already passed. Measured against a caller whose data-privacy
+ * policy withholds captured content, that returned the withheld value — the
+ * literal spelling of the same query is refused with `GATED_COLUMN`.
+ *
+ * So the refusal is total rather than a gate-check on the bound value: the
+ * substitution happens in the database, after this validator has finished, and
+ * a check here would be reasoning about a string that the parse does not
+ * commit to. Callers write column names literally; the schema endpoint is what
+ * tells them which names exist.
+ */
 function enterQueryParameter({ node, frame, ctx }: NodeArgs): Frame | null {
   const { name, param_type: paramType } = node;
   if (typeof name !== "string" || typeof paramType !== "string") {
     refuseUnrecognised({ node, frame, ctx });
+    return null;
+  }
+  if (paramType.trim().toLowerCase() === "identifier") {
+    report({
+      ctx,
+      frame,
+      code: "UNSUPPORTED_SYNTAX",
+      message:
+        `The parameter "${echoIdentifier(name)}" binds an identifier, which cannot be used here. ` +
+        "Write the table or column name directly in the query.",
+      node,
+    });
     return null;
   }
   if (!ctx.parameters.has(name)) ctx.parameters.set(name, paramType);

@@ -352,6 +352,44 @@ describe("validateGovernedSql", () => {
       ).toEqual(["GATED_COLUMN"]);
     });
 
+    /**
+     * The case above binds the *qualifier* and left the one that mattered
+     * uncovered: a parameter standing in for the column itself. Measured
+     * against a live instance, `SELECT {c:Identifier}` returned a withheld
+     * value that `SELECT <that column>` refuses — the reference never reaches
+     * the walk, so the gate has nothing to match and ClickHouse substitutes
+     * the name after every check has passed.
+     *
+     * Asserted per gated column rather than once, because the defect is not
+     * about a particular name: any withheld column is reachable by the same
+     * shape, so a single case would pass while the hole stayed open for the
+     * rest.
+     */
+    it.each(
+      POLICY.gatedColumns,
+    )("refuses a parameter standing in for the withheld column %s", (gated) => {
+      const bound = codesOf(validate("SELECT {c:Identifier} FROM traces"));
+      expect(
+        bound,
+        "a bound identifier reached the column position ungated",
+      ).not.toEqual([]);
+      // The literal spelling is the control: if this stopped being refused,
+      // the case above would pass for the wrong reason.
+      expect(codesOf(validate(`SELECT ${gated} FROM traces`))).toContain(
+        "GATED_COLUMN",
+      );
+    });
+
+    it.each([
+      ["a projection", "SELECT {c:Identifier} FROM traces"],
+      ["a filter", "SELECT TraceId FROM traces WHERE {c:Identifier} = 'x'"],
+      ["a grouping key", "SELECT count() FROM traces GROUP BY {c:Identifier}"],
+      ["an ordering key", "SELECT TraceId FROM traces ORDER BY {c:Identifier}"],
+      ["a table name", "SELECT count() FROM {t:Identifier}"],
+    ])("refuses an identifier-typed parameter used as %s", (_position, sql) => {
+      expect(codesOf(validate(sql)), sql).not.toEqual([]);
+    });
+
     it.each([
       ["a bare wildcard", "SELECT * FROM traces"],
       ["a qualified wildcard", "SELECT t.* FROM traces AS t"],
