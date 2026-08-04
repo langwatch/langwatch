@@ -34,10 +34,14 @@ jobs:
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
+      # Job-level permissions replace the workflow-level block rather than
+      # merging with it, so `contents: read` has to be restated here for the
+      # checkout below.
+      contents: read
       pull-requests: write
     steps:
       # The ssh-agent step below is a local action, so it has to be on disk
-      # first. Sparse: nothing else in this job reads the tree.
+      # first. Sparse because `.github` is all of the tree it needs.
       #
       # persist-credentials: false because nothing here talks to git after the
       # checkout, and the default would leave the workflow token in
@@ -179,10 +183,14 @@ jobs:
       && github.event.action == 'closed'
     runs-on: ubuntu-latest
     permissions:
+      # Job-level permissions replace the workflow-level block rather than
+      # merging with it, so `contents: read` has to be restated here for the
+      # checkout below.
+      contents: read
       pull-requests: write
     steps:
       # The ssh-agent step below is a local action, so it has to be on disk
-      # first. Sparse: nothing else in this job reads the tree.
+      # first. Sparse because `.github` is all of the tree it needs.
       #
       # persist-credentials: false because nothing here talks to git after the
       # checkout, and the default would leave the workflow token in
@@ -232,7 +240,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # The ssh-agent step below is a local action, so it has to be on disk
-      # first. Sparse: nothing else in this job reads the tree.
+      # first. Sparse because `.github` is all of the tree it needs.
       #
       # persist-credentials: false because nothing here talks to git after the
       # checkout, and the default would leave the workflow token in
@@ -294,7 +302,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # The ssh-agent step below is a local action, so it has to be on disk
-      # first. Sparse: nothing else in this job reads the tree.
+      # first. Sparse because `.github` is all of the tree it needs.
       #
       # persist-credentials: false because nothing here talks to git after the
       # checkout, and the default would leave the workflow token in
