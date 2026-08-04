@@ -65,7 +65,7 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
   @bdd @cli @endpoint @cleanup
   Scenario: undocumented `LANGWATCH_URL` legacy alias is dropped — `LANGWATCH_ENDPOINT` is the only env name
     Given the codebase previously had ONE site
-      (`typescript-sdk/src/cli/utils/governance/config.ts:defaults`)
+      (`sdks/typescript/src/cli/utils/governance/config.ts:defaults`)
       that read `LANGWATCH_URL` as a fallback for `LANGWATCH_ENDPOINT`
     And the alias was never documented in README, .env.example, docs, or CLI --help
     When grepping for `LANGWATCH_URL` across the codebase

@@ -1,5 +1,35 @@
 # Changelog
 
+## [3.9.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.8.0...langwatch@v3.9.0) (2026-08-03)
+
+
+### Features
+
+* **experiments-v3:** add a Bradley-Terry leaderboard chart for the Comparison evaluator ([#5103](https://github.com/langwatch/langwatch/issues/5103)) ([#6110](https://github.com/langwatch/langwatch/issues/6110)) ([3fdc675](https://github.com/langwatch/langwatch/commit/3fdc675322a71d9c0c25face6e3bd12baad6f243))
+* **experiments:** group comparison table by dataset-entry metadata ([#4638](https://github.com/langwatch/langwatch/issues/4638)) ([d992b08](https://github.com/langwatch/langwatch/commit/d992b088406df781adc827ab2647a40a08f8cbc5))
+* **licensing:** license-gated SSO — signature-only gate, decided at startup (ADR-027) ([#4830](https://github.com/langwatch/langwatch/issues/4830)) ([4093b55](https://github.com/langwatch/langwatch/commit/4093b55154a4af578b783c02af4449b3a483fb9e))
+* **licensing:** make experimentation resources & workspace structure OSS-aligned ([#4480](https://github.com/langwatch/langwatch/issues/4480)) ([e23c561](https://github.com/langwatch/langwatch/commit/e23c5611bb76d0f938ffece7a09541e0123937fb))
+* **scenarios:** export scenario run history as CSV ([#6273](https://github.com/langwatch/langwatch/issues/6273)) ([1fb5e8e](https://github.com/langwatch/langwatch/commit/1fb5e8ed8bf5d1f656b9cca69e82f06847f35a87))
+* **traces:** honest trace export (cursor paging, spans, token metrics) and coding-agent transcript over REST ([#6434](https://github.com/langwatch/langwatch/issues/6434)) ([9bdbe41](https://github.com/langwatch/langwatch/commit/9bdbe414c59a0c9ce9965d26eb3325dbe432ad81))
+
+
+### Bug Fixes
+
+* **automations:** serialize graph-trigger sweeps in one lane per tenant ([#6414](https://github.com/langwatch/langwatch/issues/6414)) ([05d3b74](https://github.com/langwatch/langwatch/commit/05d3b74f8c1e8146531986a950de4b72bfab6c88))
+* **clickhouse:** replicate the rollup tables a Replicated database was silently fragmenting ([#6418](https://github.com/langwatch/langwatch/issues/6418)) ([3a98a7c](https://github.com/langwatch/langwatch/commit/3a98a7ccb606f2c7ecc7d07c93750c51d1750de2))
+* **coding-agent:** restore codex terminal and claude session context, capture reasoning effort, cache TTL and context size ([#6429](https://github.com/langwatch/langwatch/issues/6429)) ([72ea2ad](https://github.com/langwatch/langwatch/commit/72ea2adcbaa3ba13854a948585d5b5456b2f1f37))
+* **event-sourcing:** decline governance reactors before enqueue, not after ([#6461](https://github.com/langwatch/langwatch/issues/6461)) ([acd2148](https://github.com/langwatch/langwatch/commit/acd2148e016c95e30d4ccc0d186d7ed38bbbbe9b))
+* **event-sourcing:** give per-project reactors a per-project queue lane ([#6460](https://github.com/langwatch/langwatch/issues/6460)) ([8a2e373](https://github.com/langwatch/langwatch/commit/8a2e373861127f70051004ee1c62d0a74ce44858))
+* **event-sourcing:** restore traceSummary to the 500-event fold coalesce default ([#6408](https://github.com/langwatch/langwatch/issues/6408)) ([f754fe1](https://github.com/langwatch/langwatch/commit/f754fe1700800c030d12fcc7e4e6fcb5f6c4dd0f))
+* **ops:** stop the pending reconcile and blob sweep scaling with the keyspace ([#6457](https://github.com/langwatch/langwatch/issues/6457)) ([5928d5b](https://github.com/langwatch/langwatch/commit/5928d5b8629553ecee543c186a9b08a3d4eefc50))
+* **personal-workspace:** guard the write paths that hand an organization uncounted resources and brick provisioning ([#6227](https://github.com/langwatch/langwatch/issues/6227)) ([7e74a53](https://github.com/langwatch/langwatch/commit/7e74a53dd50c76956a18666f46bf8101b37ce4dc))
+* surface structured AI SDK output in trace spans ([#6422](https://github.com/langwatch/langwatch/issues/6422)) ([9f8edf7](https://github.com/langwatch/langwatch/commit/9f8edf75c1ddbed6b5f31a3505113a1760e476f9))
+
+
+### Documentation
+
+* move the Langy group to the bottom of the Self Hosting nav ([#6456](https://github.com/langwatch/langwatch/issues/6456)) ([f9a8f30](https://github.com/langwatch/langwatch/commit/f9a8f305f236d5c6c4bfe2102d2642a85fed5d8c))
+
 ## [3.8.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.7.0...langwatch@v3.8.0) (2026-07-31)
 
 

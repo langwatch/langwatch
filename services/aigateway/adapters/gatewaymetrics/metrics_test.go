@@ -38,6 +38,7 @@ func TestRecorder_NilIsSafe(t *testing.T) {
 		r.StreamClosed("openai", "gpt-5-mini", domain.Usage{})
 		r.TrackDraining(func() bool { return true })
 		r.TrackAuthCacheSize(func() int { return 1 })
+		r.TrackSpendSpool(func() SpoolStats { return SpoolStats{} })
 	})
 	assert.Nil(t, r.Registry())
 	assert.Nil(t, r.DeclaredMetrics())
@@ -159,6 +160,30 @@ func TestRecorder_GaugeSourcesDefaultToZeroUntilAttached(t *testing.T) {
 	body = scrape(t, r)
 	assert.Contains(t, body, "gateway_draining 1")
 	assert.Contains(t, body, `gateway_auth_cache_size{tier="l1"} 42`)
+}
+
+func TestRecorder_SpendSpoolCountersDefaultToZeroUntilAttached(t *testing.T) {
+	r := New()
+
+	// A pod whose spool failed to open serves without spend emission. Its
+	// drop counters have to read zero rather than vanish: an alert on a
+	// missing series cannot tell that pod apart from a broken scrape.
+	body := scrape(t, r)
+	assert.Contains(t, body, "gateway_spend_spool_appended_total 0")
+	assert.Contains(t, body, `gateway_spend_spool_dropped_total{reason="intake"} 0`)
+	assert.Contains(t, body, `gateway_spend_spool_dropped_total{reason="overflow"} 0`)
+
+	stats := SpoolStats{Appended: 120, DroppedIntake: 3, DroppedOverflow: 7}
+	r.TrackSpendSpool(func() SpoolStats { return stats })
+
+	body = scrape(t, r)
+	assert.Contains(t, body, "gateway_spend_spool_appended_total 120")
+	assert.Contains(t, body, `gateway_spend_spool_dropped_total{reason="intake"} 3`)
+	assert.Contains(t, body, `gateway_spend_spool_dropped_total{reason="overflow"} 7`)
+
+	// Read at scrape time, not at wiring time.
+	stats.DroppedOverflow = 8
+	assert.Contains(t, scrape(t, r), `gateway_spend_spool_dropped_total{reason="overflow"} 8`)
 }
 
 func TestRecorder_HandlerServesRuntimeMetrics(t *testing.T) {

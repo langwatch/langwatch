@@ -12,7 +12,7 @@ Feature: AI Gateway — Virtual Keys
   # (3) Integration-level VK-config persistence (fallback chain,
   #     trigger conditions, model aliases, ModelProvider linkage) —
   #     could bind once a tRPC router integration test is added under
-  #     langwatch/src/server/api/routers/__tests__/.
+  #     platform/app/src/server/api/routers/__tests__/.
   # All aspirational pending those harnesses.
 
   As a LangWatch user with gateway permissions

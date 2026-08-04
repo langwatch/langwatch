@@ -98,7 +98,7 @@ type deps struct {
 func wire(logger *zap.Logger, isAgent bool) deps {
 	cwd, _ := os.Getwd()
 	worktree := gitTopLevel(cwd)
-	lwDir := filepath.Join(worktree, "langwatch")
+	lwDir := filepath.Join(worktree, "platform", "app")
 
 	naming := domain.DefaultNaming(devEnv("LANGWATCH_LOCAL_TLD"))
 	proxy := portlessproxy.New(naming, lwDir)
@@ -620,7 +620,7 @@ func stdoutIsTTY() bool {
 // the background stack plus the attached log view on top, so quitting the view
 // detaches and leaves the stack running.
 //
-// A pipe (`pnpm dev:haven | tee`) or an agent gets neither: the alt-screen
+// A pipe (`make haven up | tee`) or an agent gets neither: the alt-screen
 // viewer would render escape codes into the pipe, so up streams plainly in the
 // foreground instead — and because that path never backgrounds the launcher,
 // the stack is this process's own children and Ctrl-C takes it down with them.
@@ -678,7 +678,7 @@ func runUpgrade(ctx context.Context, d deps, _ invocation) error {
 }
 
 // devEnv reads one of haven's own knobs: the process environment first, then
-// the merged dotenv layers (langwatch/.env, then langwatch/.env.portless).
+// the merged dotenv layers (platform/app/.env, then platform/app/.env.portless).
 //
 // The same precedence Prisma and tsx give the app's settings, and for the same
 // reason: a preference like "never manage ClickHouse, this machine runs a
@@ -718,12 +718,12 @@ func resolveKnob(
 	return v, ok
 }
 
-// dotenvKnobs loads the dotenv layers once per process, from the langwatch/
-// directory of the checkout haven was invoked in.
+// dotenvKnobs loads the dotenv layers once per process, from the
+// platform/app directory of the checkout haven was invoked in.
 func dotenvKnobs() map[string]string {
 	dotenvOnce.Do(func() {
 		cwd, _ := os.Getwd()
-		dotenvVars = domain.LoadDotenv(filepath.Join(gitTopLevel(cwd), "langwatch"))
+		dotenvVars = domain.LoadDotenv(filepath.Join(gitTopLevel(cwd), "platform", "app"))
 	})
 	return dotenvVars
 }

@@ -23,12 +23,14 @@
               "cli": [
                 "trace search",
                 "trace get",
-                "trace export"
+                "trace export",
+                "trace transcript"
               ],
               "hints": {
                 "trace search": "langwatch trace search -q \"timeout\" --limit 10 -o json",
                 "trace get": "langwatch trace get <traceId> -o json",
-                "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl"
+                "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl",
+                "trace transcript": "langwatch trace transcript <traceId> -o json"
               },
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
@@ -850,6 +852,8 @@
                 "virtual-keys update",
                 "virtual-keys rotate",
                 "virtual-keys revoke",
+                "virtual-keys disable",
+                "virtual-keys enable",
                 "virtual-keys spend"
               ],
               "skill": null,
@@ -884,6 +888,7 @@
                 "gateway-budgets list",
                 "gateway-budgets create",
                 "gateway-budgets update",
+                "gateway-budgets reset",
                 "gateway-budgets archive"
               ],
               "skill": null,
@@ -901,6 +906,85 @@
           "sync": null,
           "produces": [
             "budgets"
+          ],
+          "consumes": [
+            "virtual-keys"
+          ]
+        },
+        {
+          "id": "ai-gateway.webhooks",
+          "name": "Webhook endpoints",
+          "description": "Stripe-shaped outbound webhooks: subscribed event families, signed batched deliveries, retry ladder, delivery log, replay (enterprise)",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "webhooks list",
+                "webhooks get",
+                "webhooks create",
+                "webhooks update",
+                "webhooks enable",
+                "webhooks disable",
+                "webhooks delete",
+                "webhooks roll-secret",
+                "webhooks test",
+                "webhooks deliveries",
+                "webhooks health",
+                "webhooks event-types",
+                "webhooks events"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/gateway/webhooks",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/webhooks/v1/endpoints",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [],
+          "consumes": [
+            "spend-events"
+          ]
+        },
+        {
+          "id": "ai-gateway.spend-events",
+          "name": "Spend events",
+          "description": "Per-request billing record: unconditional metering rows with token classes, cost, attribution; cursor pull and end-user rollups (enterprise)",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "spend-events list",
+                "spend-events by-user",
+                "spend-events summary",
+                "spend-events replay"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": null,
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/gateway/v1/spend-events",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "spend-events"
           ],
           "consumes": [
             "virtual-keys"
