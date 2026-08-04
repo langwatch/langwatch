@@ -12,6 +12,9 @@ import {
 } from "~/app/api/shared/canonical-error";
 import type { Permission } from "~/server/api/rbac";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
+import { connection } from "~/server/redis";
+import { recordActiveUser } from "~/server/active-user/recordActiveUser";
+import { parseClientSource } from "~/server/active-user/parseClientSource";
 import { getTokenType } from "./api-key-token.utils";
 import { ApiKeyPermissionDeniedError } from "./errors";
 import {
@@ -153,6 +156,24 @@ export function createUnifiedAuthMiddleware({
       c.res.status < 300
     ) {
       resolver.markUsed({ apiKeyId: resolved.apiKeyId });
+
+      // Heartbeat for the api_active_user PostHog metric. Same trigger as
+      // markUsed (API key + 2xx) so a "user is active today" follows the same
+      // truth as "this token was successfully used today". Fire-and-forget;
+      // errors are swallowed inside recordActiveUser.
+      //
+      // Ingestion keys (and any other apiKey without a userId) are skipped —
+      // the metric is user-scoped and these tokens cannot resolve to a
+      // single user, same as legacy project keys.
+      if (resolved.userId) {
+        const { source, version } = parseClientSource(
+          c.req.header("user-agent"),
+        );
+        void recordActiveUser(
+          { userId: resolved.userId, source, version },
+          { redis: connection },
+        );
+      }
     }
   };
 }

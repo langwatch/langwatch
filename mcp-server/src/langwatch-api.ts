@@ -2,8 +2,11 @@ import type {
   HandledErrorFault,
   SerializedReason,
 } from "@langwatch/handled-error";
+import packageJson from "../package.json" with { type: "json" };
 import { getConfig, requireApiKey } from "./config.js";
 import type { EvaluationSummary } from "./utils/format-evaluations.js";
+
+const USER_AGENT = `langwatch-mcp/${packageJson.version}`;
 
 // --- Response types ---
 
@@ -241,6 +244,7 @@ export async function makeRequest(
   const url = config.endpoint + path;
   const headers: Record<string, string> = {
     "X-Auth-Token": requireApiKey(),
+    "User-Agent": USER_AGENT,
   };
   if (config.projectId) {
     headers["X-Project-Id"] = config.projectId;
