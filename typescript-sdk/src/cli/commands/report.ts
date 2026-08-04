@@ -10,6 +10,7 @@ import {
   redactSessionJsonl,
   truncateJsonlToByteBudget,
 } from "../../internal/generated/redaction/sessionReport";
+import { trimTrailingSlashes } from "../../internal/url";
 
 declare const __CLI_VERSION__: string;
 
@@ -180,7 +181,7 @@ export const reportCommand = async (
     };
   }
 
-  const endpoint = (options.endpoint ?? getEndpoint()).replace(/\/+$/, "");
+  const endpoint = trimTrailingSlashes(options.endpoint ?? getEndpoint());
   const apiKey = process.env.LANGWATCH_API_KEY?.trim();
 
   let response: Response;

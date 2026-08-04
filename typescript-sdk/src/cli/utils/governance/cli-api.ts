@@ -13,6 +13,7 @@
  *      rows land with `metadata.surface = 'cli'` per @audit-uniform.
  */
 
+import { trimTrailingSlashes } from "../../../internal/url";
 import { type GovernanceConfig } from "./config";
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 import {
@@ -137,7 +138,7 @@ async function getJSON<T>(
       "Not logged in. Run `langwatch login --device` first.",
     );
   }
-  const url = cfg.control_plane_url.replace(/\/+$/, "") + path;
+  const url = trimTrailingSlashes(cfg.control_plane_url) + path;
   const res = await authorizedFetch(
     cfg,
     url,
@@ -383,7 +384,7 @@ async function requestREST<T>(
       "Not logged in. Run `langwatch login --device` first.",
     );
   }
-  const url = cfg.control_plane_url.replace(/\/+$/, "") + path;
+  const url = trimTrailingSlashes(cfg.control_plane_url) + path;
   const buildInit = (token: string): RequestInit => {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,

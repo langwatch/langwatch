@@ -7,6 +7,7 @@ import type {
   VirtualKeyScopeType,
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { trimTrailingSlashes } from "@/internal/url";
 
 /**
  * Colour a key's status. `disabled` is the reversible stop and reads amber, so
@@ -27,7 +28,7 @@ export function formatStatus(status: VirtualKey["status"]): string {
  */
 export function virtualKeyDetailUrl(vkId: string): string {
   const uiOverride = process.env.LANGWATCH_UI_ENDPOINT;
-  const base = (uiOverride ?? resolveControlPlaneUrl()).replace(/\/+$/, "");
+  const base = trimTrailingSlashes(uiOverride ?? resolveControlPlaneUrl());
   if (!base) return "";
   return `${base}/settings/gateway/virtual-keys/${encodeURIComponent(vkId)}`;
 }
