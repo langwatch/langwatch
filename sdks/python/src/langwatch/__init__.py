@@ -10,6 +10,19 @@ from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
 from .prompts.types import FetchPolicy
 
+# Imported eagerly rather than lazily like the facades: a webhook receiver
+# verifies a delivery inside a request handler and never calls setup(), and
+# the module costs nothing to import, being standard library only.
+from .webhook_signature import (
+    WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS,
+    WEBHOOK_SIGNATURE_HEADER,
+    WebhookSignatureExpiredError,
+    WebhookSignatureHeaderError,
+    WebhookSignatureMismatchError,
+    WebhookSignatureVerificationError,
+    verify_webhook_signature,
+)
+
 
 # Type hints for IntelliSense (only imported for typing)
 from typing import TYPE_CHECKING
@@ -241,4 +254,11 @@ __all__ = [
     "webhooks",
     "secrets",
     "monitors",
+    "verify_webhook_signature",
+    "WebhookSignatureVerificationError",
+    "WebhookSignatureHeaderError",
+    "WebhookSignatureExpiredError",
+    "WebhookSignatureMismatchError",
+    "WEBHOOK_SIGNATURE_HEADER",
+    "WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS",
 ]

@@ -200,6 +200,31 @@ print("LangWatch SDK fully configured.")
 *   **`span_exclude_rules`** (`List[SpanProcessingExcludeRule] | None`): If provided, the SDK will exclude spans from being exported to LangWatch based on the rules defined in the list (e.g., matching span names).
 *   **`ignore_global_tracer_provider_override_warning`** (`bool`, default: `False`): If `True`, suppresses the warning message logged when an existing global `TracerProvider` is detected and LangWatch attaches its exporter to it instead of overriding it.
 
+## Receiving Webhooks
+
+Verify a delivery before acting on it. Pass the RAW body, before any JSON
+parsing, and every secret you currently accept.
+
+```python
+from langwatch import verify_webhook_signature, WebhookSignatureVerificationError
+
+try:
+    verify_webhook_signature(
+        body=await request.body(),  # bytes, exactly as received
+        header=request.headers.get("X-LangWatch-Signature", ""),
+        secret=[WEBHOOK_SECRET, WEBHOOK_SECRET_PREVIOUS],
+    )
+except WebhookSignatureVerificationError as error:
+    # error.code is "malformed_header", "stale_timestamp" or "invalid_signature",
+    # and the three have their own exception classes if you prefer to catch them.
+    raise HTTPException(status_code=400, detail=error.code)
+```
+
+Passing both secrets is what makes a rotation free: the header carries one
+signature per valid secret, and the delivery verifies against whichever one
+you hold. Freshness defaults to a five minute window, overridable with
+`tolerance_seconds`.
+
 ## Python SDK Integrations
 
 Our Python SDK supports the following auto-instrumentors.

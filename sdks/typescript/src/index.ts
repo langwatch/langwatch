@@ -154,6 +154,18 @@ export {
   type CreateWebhookEndpointInput,
   type UpdateWebhookEndpointInput,
 } from "./client-sdk/services/webhooks/webhooks-api.service";
+/**
+ * Receiving webhooks, which needs no API client at all: a receiver holds a
+ * signing secret and the raw request, and has to decide whether to trust it.
+ */
+export {
+  verifyWebhookSignature,
+  WebhookSignatureVerificationError,
+  WEBHOOK_SIGNATURE_HEADER,
+  WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS,
+  type WebhookSignatureFailureCode,
+  type VerifyWebhookSignatureOptions,
+} from "./client-sdk/services/webhooks/verify-signature";
 export {
   SpendEventsApiService,
   SpendEventsApiError,
