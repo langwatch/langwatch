@@ -605,7 +605,6 @@ function rowHighlight({
   return {};
 }
 
-/** The attribute name column, with the full key on hover. */
 function RowLabelCell({
   attrKey,
   labelWidth,

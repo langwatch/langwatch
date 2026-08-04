@@ -163,7 +163,7 @@ describe("TraceEditOverlayService", () => {
   describe("given a correction that also carries a corrected trace input", () => {
     describe("when the corrected output is taken back off", () => {
       it("keeps the input and leaves the correction in place", async () => {
-        const { service, deleteRow } = buildService({
+        const { service, deleteRow, upsert } = buildService({
           version: 1,
           spans: [],
           deletedSpanIds: [],
@@ -179,6 +179,17 @@ describe("TraceEditOverlayService", () => {
           input: { value: "the real question" },
         });
         expect(deleteRow).not.toHaveBeenCalled();
+        expect(upsert).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceId: "trace-1",
+          patch: {
+            version: 1,
+            spans: [],
+            deletedSpanIds: [],
+            trace: { input: { value: "the real question" } },
+          },
+          userId: "user-2",
+        });
       });
     });
   });
@@ -187,7 +198,7 @@ describe("TraceEditOverlayService", () => {
     describe("when the corrected output is taken back off", () => {
       /** @scenario "Clearing the suggestion takes the corrected output back off" */
       it("keeps the span edits and drops only the trace output", async () => {
-        const { service, deleteRow } = buildService({
+        const { service, deleteRow, upsert } = buildService({
           version: 1,
           spans: [{ spanId: "span-1", name: "cleaned up" }],
           deletedSpanIds: ["span-noise"],
@@ -202,6 +213,16 @@ describe("TraceEditOverlayService", () => {
         ]);
         expect(remaining?.patch.deletedSpanIds).toEqual(["span-noise"]);
         expect(deleteRow).not.toHaveBeenCalled();
+        expect(upsert).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceId: "trace-1",
+          patch: {
+            version: 1,
+            spans: [{ spanId: "span-1", name: "cleaned up" }],
+            deletedSpanIds: ["span-noise"],
+          },
+          userId: "user-2",
+        });
       });
     });
   });
