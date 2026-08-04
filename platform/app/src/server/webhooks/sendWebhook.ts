@@ -1,19 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { isIP } from "node:net";
 import {
   sanitizeWebhookHeaders,
-  validateWebhookUrlShape,
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
 } from "@langwatch/automations/providers/webhook";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { rateLimit } from "~/server/rateLimit";
-import {
-  createSSRFValidator,
-  isPrivateOrLocalhostIP,
-} from "~/utils/ssrfProtection";
 import { sendHttpDestination } from "./httpDestination";
 import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "./signature";
+import { assertWebhookUrlAllowed, webhookUrlValidator } from "./urlPolicy";
 
 /**
  * The outbound webhook sender both webhook channels run on: the automations
@@ -23,85 +18,6 @@ import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "./signature";
  * Retry-After parsing, the signature, and the dispatch-identity header, whose
  * NAME is the single parameter the two channels differ on.
  */
-
-/**
- * The webhook channel's SSRF policy (ADR-040 §4): private-IP / localhost
- * blocking is FORCED ON regardless of the global BLOCK_LOCAL_HTTP_CALLS
- * toggle — a customer-supplied URL fired from our workers must never reach
- * `10.x` / `localhost`, even in deployments that relax the toggle for their
- * own internal integrations.
- */
-const validateWebhookUrl = createSSRFValidator({
-  blockLocal: true,
-  allowedHosts: [],
-});
-
-/**
- * The deliberate escape hatch for local development and self-hosted
- * installs whose receivers live on internal hosts: relaxes ONLY the
- * local/private blocking, keeping every other SSRF property (no
- * redirects, size caps, timeouts). Callers may pass allowInsecureLocal
- * only when the operator set WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1; the
- * automations channel never does.
- */
-const validateWebhookUrlRelaxed = createSSRFValidator({
-  blockLocal: false,
-  allowedHosts: [],
-});
-
-/**
- * If the URL's host is an IP literal that is private / loopback / link-local,
- * return it (brackets stripped); else null. `new URL(...).hostname` keeps IPv6
- * in brackets, which `isIP` rejects — so a bracketed `[::1]` would otherwise
- * slip past the validator's IP-literal check and fail as an unresolvable
- * hostname (a *retryable* error) rather than a terminal block. This closes
- * that gap terminally at the webhook layer without forking `ssrfProtection`.
- */
-function privateIpLiteral(url: string): string | null {
-  let host: string;
-  try {
-    host = new URL(url).hostname;
-  } catch {
-    return null;
-  }
-  const bare =
-    host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
-  return isIP(bare) !== 0 && isPrivateOrLocalhostIP(bare) ? bare : null;
-}
-
-/**
- * Terminally blocks the two destinations the webhook channel refuses before it
- * opens a connection: a URL that fails the shape check (scheme, port), and a
- * host that is a private / loopback IP literal, including bracketed IPv6. The
- * SSRF validator on the send itself fails both closed as well, but as a
- * retryable "unresolvable host" instead of the permanent block they are.
- * `allowInsecureLocal` skips both, matching the relaxed validator the same flag
- * selects for the send.
- */
-function assertWebhookUrlAllowed({
-  url,
-  label,
-  allowInsecureLocal,
-}: {
-  url: string;
-  label: string;
-  allowInsecureLocal: boolean;
-}): void {
-  const shapeProblem = allowInsecureLocal ? null : validateWebhookUrlShape(url);
-  if (shapeProblem) {
-    throw new DispatchError({
-      message: `${label}: ${shapeProblem}`,
-      retryable: false,
-    });
-  }
-  const privateLiteral = allowInsecureLocal ? null : privateIpLiteral(url);
-  if (privateLiteral) {
-    throw new DispatchError({
-      message: `${label}: the destination "${privateLiteral}" is a private or loopback address, which is not allowed.`,
-      retryable: false,
-    });
-  }
-}
 
 /**
  * The outbound header set: the customer's static headers, sanitized again here
@@ -295,9 +211,7 @@ export async function sendWebhook({
     }),
     body,
     contextLabel: label,
-    validateUrl: allowInsecureLocal
-      ? validateWebhookUrlRelaxed
-      : validateWebhookUrl,
+    validateUrl: webhookUrlValidator(allowInsecureLocal),
   });
   return { ...response, eventId: resolvedEventId };
 }

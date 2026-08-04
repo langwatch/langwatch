@@ -1,3 +1,4 @@
+import { createServer, type Server } from "node:http";
 import { generate } from "@langwatch/ksuid";
 import {
   type Organization,
@@ -290,6 +291,129 @@ describe("Feature: Webhook endpoints REST API", () => {
       type: "bad_request",
     });
     expect(JSON.stringify(error)).toContain("between 1 and 100");
+  });
+
+  describe("the URL admission policy is the one the sender enforces", () => {
+    // The endpoints platform used to ask only for https, so a URL the
+    // automations trigger drawer refused saved fine as an endpoint. Both now
+    // run the shared policy, which is the union of the two.
+    it("rejects a non-default port, which used to save and then probe it", async () => {
+      planHasWebhookEndpoints = true;
+      const res = await app.request("/api/webhooks/v1/endpoints", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          url: "https://example.com:6379/hooks",
+          enabled_events: ["gateway.request.completed"],
+        }),
+      });
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        type: "bad_request",
+      });
+      expect(JSON.stringify(error)).toContain("443");
+    });
+
+    it("rejects credentials in the URL", async () => {
+      planHasWebhookEndpoints = true;
+      const res = await app.request("/api/webhooks/v1/endpoints", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          url: "https://user:pass@example.com/hooks",
+          enabled_events: ["gateway.request.completed"],
+        }),
+      });
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        type: "bad_request",
+      });
+      expect(JSON.stringify(error)).toContain("credentials");
+    });
+
+    it("still rejects plain http when the escape hatch is off", async () => {
+      planHasWebhookEndpoints = true;
+      const res = await app.request("/api/webhooks/v1/endpoints", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          url: "http://example.com/hooks",
+          enabled_events: ["gateway.request.completed"],
+        }),
+      });
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        type: "bad_request",
+      });
+      expect(JSON.stringify(error)).toContain("https");
+    });
+  });
+
+  describe("the test button reaches what real delivery reaches", () => {
+    // Real delivery passed allowInsecureLocal and the test send did not, so on
+    // an install running the escape hatch a local endpoint delivered fine while
+    // its own test button reported the address blocked. This fires the REAL
+    // route at a REAL loopback receiver with the hatch on.
+    let receiver: Server;
+    let receiverUrl: string;
+    let hits: string[] = [];
+    const originalHatch = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+
+    beforeAll(async () => {
+      receiver = createServer((req, res) => {
+        hits.push(req.url ?? "");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end("{}");
+      });
+      await new Promise<void>((resolve) =>
+        receiver.listen(0, "127.0.0.1", resolve),
+      );
+      const address = receiver.address();
+      if (typeof address === "string" || address === null) {
+        throw new Error("expected an AddressInfo");
+      }
+      receiverUrl = `http://127.0.0.1:${address.port}/hook`;
+    });
+
+    afterAll(async () => {
+      if (originalHatch === undefined) {
+        delete process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+      } else {
+        process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = originalHatch;
+      }
+      await new Promise<void>((resolve, reject) =>
+        receiver.close((err) => (err ? reject(err) : resolve())),
+      );
+    });
+
+    it("delivers a test fire to a loopback endpoint when the operator opted in", async () => {
+      planHasWebhookEndpoints = true;
+      process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
+      hits = [];
+
+      const createRes = await app.request("/api/webhooks/v1/endpoints", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          url: receiverUrl,
+          enabled_events: ["gateway.request.completed"],
+        }),
+      });
+      expect(createRes.status).toBe(201);
+      const { data } = (await createRes.json()) as { data: { id: string } };
+
+      const testRes = await app.request(
+        `/api/webhooks/v1/endpoints/${data.id}/test`,
+        { method: "POST", headers: headers() },
+      );
+      expect(testRes.status).toBe(200);
+      const testBody = (await testRes.json()) as {
+        data: { delivered: boolean; response_status: number | null };
+      };
+      expect(testBody.data.delivered).toBe(true);
+      expect(testBody.data.response_status).toBe(200);
+      expect(hits).toEqual(["/hook"]);
+    });
   });
 
   it("rejects unknown event selectors with a 400", async () => {

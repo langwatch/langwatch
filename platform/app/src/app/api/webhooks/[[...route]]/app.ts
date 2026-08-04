@@ -32,6 +32,7 @@ import {
   sendWebhook,
   WEBHOOK_DELIVERY_ID_HEADER,
 } from "~/server/webhooks/sendWebhook";
+import { allowsInsecureLocalUrls } from "~/server/webhooks/urlPolicy";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
   canonicalBaseResponses,
@@ -557,6 +558,11 @@ secured.access(requires("webhookEndpoints:manage")).post(
         dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
         signingSecrets: secrets,
         attempt: 1,
+        // The test button has to reach exactly what real delivery reaches. It
+        // did not: real delivery passes this flag and the test send did not,
+        // so on an install running the escape hatch a local endpoint delivered
+        // fine and its own test said the address was blocked.
+        allowInsecureLocal: allowsInsecureLocalUrls(),
       });
       const delivered = result.status >= 200 && result.status < 300;
       await recordTestFire({

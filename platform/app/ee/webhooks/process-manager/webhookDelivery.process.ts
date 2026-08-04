@@ -32,6 +32,7 @@ import {
   WEBHOOK_DELIVERY_ID_HEADER,
   type WebhookSendResult,
 } from "~/server/webhooks/sendWebhook";
+import { allowsInsecureLocalUrls } from "~/server/webhooks/urlPolicy";
 import type { PlanInfo } from "../../licensing/planInfo";
 import { spendRowToEnvelope } from "../envelope";
 import { eventMatches } from "../eventRegistry";
@@ -39,7 +40,6 @@ import type {
   WebhookEndpointService,
   WebhookEndpointView,
 } from "../webhookEndpoint.service";
-import { allowsInsecureLocalUrls } from "../webhookEndpoint.service";
 
 const logger = createLogger("langwatch:webhooks:delivery-process");
 

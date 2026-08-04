@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { randomBytes } from "node:crypto";
+import type { WebhookUrlProblemCode } from "@langwatch/automations/providers/webhook";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type {
@@ -9,6 +10,10 @@ import type {
   WebhookEndpoint,
 } from "@prisma/client";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
+import {
+  allowsInsecureLocalUrls,
+  inspectWebhookUrl,
+} from "~/server/webhooks/urlPolicy";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { isValidEventSelector } from "./eventRegistry";
@@ -126,25 +131,34 @@ function toView(endpoint: WebhookEndpoint): WebhookEndpointView {
   };
 }
 
-function assertValidUrl(url: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new WebhookEndpointValidationError("url must be a valid URL");
-  }
-  if (parsed.protocol === "https:") return;
-  // Operator opt-in for local development and internal receivers: plain
-  // http is accepted only when the deployment explicitly set the unsafe
-  // flag. The delivery path relaxes its local-address fence on the same
-  // flag; everything else about the sender stays strict.
-  if (parsed.protocol === "http:" && allowsInsecureLocalUrls()) return;
-  throw new WebhookEndpointValidationError("url must use https");
-}
+/**
+ * This surface's wording for each admission rule. The rule itself lives in the
+ * shared `urlPolicy`, which both webhook channels run; only the sentence is
+ * local, because a REST integrator reading `url must use https` and a trigger
+ * author reading "The webhook URL must use https." want different registers.
+ */
+const URL_PROBLEM_MESSAGES: Record<WebhookUrlProblemCode, string> = {
+  invalid_url: "url must be a valid URL",
+  scheme: "url must use https",
+  host: "url must have a host",
+  port: "url must use the default https port (443)",
+  credentials: "url must not carry credentials",
+};
 
-/** True only when the operator set WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1. */
-export function allowsInsecureLocalUrls(): boolean {
-  return process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS === "1";
+function assertValidUrl(url: string): void {
+  // Same policy the sender enforces at dispatch, so an endpoint that saves is
+  // an endpoint that can deliver. Operator opt-in for local development and
+  // internal receivers relaxes the origin here exactly as it relaxes the
+  // local-address fence on the send.
+  const problem = inspectWebhookUrl({
+    url,
+    allowInsecureLocal: allowsInsecureLocalUrls(),
+  });
+  if (problem) {
+    throw new WebhookEndpointValidationError(
+      URL_PROBLEM_MESSAGES[problem.code],
+    );
+  }
 }
 
 function assertValidEvents(enabledEvents: string[]): void {

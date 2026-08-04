@@ -2,11 +2,25 @@ import type { SlackPayload } from "@langwatch/automations/templating/renderSlack
 import { createLogger } from "@langwatch/observability";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { sendHttpDestination } from "~/server/webhooks/httpDestination";
+import { webhookUrlValidator } from "~/server/webhooks/urlPolicy";
 
 const logger = createLogger("langwatch:triggers:slackWebApi");
 
 const CHAT_POST_MESSAGE_URL = "https://slack.com/api/chat.postMessage";
 const CONVERSATIONS_LIST_URL = "https://slack.com/api/conversations.list";
+
+/**
+ * The Slack Web API calls are the last outbound sends that ran without a
+ * pinned validator, which left them on the default env-gated policy and
+ * following up to ten redirects — the weakest of the three callers of the
+ * shared transport, and the one carrying a customer's bot token.
+ *
+ * Both destinations are constants under `slack.com`, and both answer a POST
+ * with 200 directly, so refusing redirects costs nothing: a 3xx here would
+ * mean the host is not the Slack we compiled in, which is precisely the case
+ * where the token must not be re-sent.
+ */
+const validateSlackApiUrl = webhookUrlValidator(false);
 
 /**
  * Slack Web API errors that clear on their own — a retry is worth taking. Rate
@@ -99,6 +113,7 @@ export async function postSlackChatMessage({
     },
     body: JSON.stringify({ channel, ...payload }),
     contextLabel: label,
+    validateUrl: validateSlackApiUrl,
   });
 
   // Transport 429 / 5xx (before Slack parsed a body) — transient.
@@ -247,6 +262,7 @@ async function listChannelsForTypes(
         body: params.toString(),
         maxResponseBytes: CHANNEL_LIST_MAX_RESPONSE_BYTES,
         contextLabel: "Slack conversations.list",
+        validateUrl: validateSlackApiUrl,
       });
     } catch {
       return done("request_failed");
