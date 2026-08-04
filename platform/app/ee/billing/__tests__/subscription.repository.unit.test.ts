@@ -54,6 +54,22 @@ describe("PrismaSubscriptionRepository", () => {
       expect(call.data.endDate).toBeNull();
       expect(call.data.lastPaymentFailedDate).toBeNull();
     });
+
+    /** @scenario Updating an already active subscription preserves its original start date */
+    it("clears endDate without resetting startDate for an active subscription", async () => {
+      await repo.activate({ id: "sub_789", previousStatus: SubscriptionStatus.ACTIVE });
+
+      expect(prisma.subscription.update).toHaveBeenCalledTimes(1);
+      const call = prisma.subscription.update.mock.calls[0]?.[0] as {
+        where: { id: string };
+        data: Record<string, unknown>;
+      };
+
+      expect(call.where).toEqual({ id: "sub_789" });
+      expect(call.data.status).toBe(SubscriptionStatus.ACTIVE);
+      expect(call.data.endDate).toBeNull();
+      expect(call.data).not.toHaveProperty("startDate");
+    });
   });
 
   describe("when updating subscription quantities", () => {
