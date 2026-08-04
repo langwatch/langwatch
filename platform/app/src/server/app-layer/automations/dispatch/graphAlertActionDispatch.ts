@@ -14,7 +14,6 @@ import {
   type WebhookDeliveryRecorder,
 } from "~/server/app-layer/automations/delivery/deliverWebhook";
 import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import type { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
 import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
   decryptWebhookHeaders,
@@ -22,6 +21,7 @@ import {
 } from "~/server/app-layer/automations/providers/webhook/server";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
+import type { sendWebhook } from "~/server/webhooks/sendWebhook";
 
 const logger = createLogger("langwatch:graph-alert-action-dispatch");
 

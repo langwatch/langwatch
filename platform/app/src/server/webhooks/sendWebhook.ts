@@ -9,14 +9,20 @@ import {
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { rateLimit } from "~/server/rateLimit";
 import {
-  signWebhookPayload,
-  WEBHOOK_SIGNATURE_HEADER,
-} from "~/server/webhooks/signature";
-import {
   createSSRFValidator,
   isPrivateOrLocalhostIP,
 } from "~/utils/ssrfProtection";
 import { sendHttpDestination } from "./httpDestination";
+import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "./signature";
+
+/**
+ * The outbound webhook sender both webhook channels run on: the automations
+ * channel (one trigger fire, Liquid-rendered body) and the webhook endpoints
+ * platform (a batch envelope, org-scoped). Everything about the wire is
+ * decided here for both — the SSRF fence, the timeout, redirect refusal,
+ * Retry-After parsing, the signature, and the dispatch-identity header, whose
+ * NAME is the single parameter the two channels differ on.
+ */
 
 /**
  * The webhook channel's SSRF policy (ADR-040 §4): private-IP / localhost

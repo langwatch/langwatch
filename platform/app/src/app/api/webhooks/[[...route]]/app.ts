@@ -24,14 +24,14 @@ import {
 } from "~/server/api/idempotency";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import {
-  sendWebhook,
-  WEBHOOK_DELIVERY_ID_HEADER,
-} from "~/server/app-layer/automations/delivery/sendWebhook";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
+import {
+  sendWebhook,
+  WEBHOOK_DELIVERY_ID_HEADER,
+} from "~/server/webhooks/sendWebhook";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
   canonicalBaseResponses,

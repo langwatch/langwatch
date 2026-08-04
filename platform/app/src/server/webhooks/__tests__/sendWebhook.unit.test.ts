@@ -8,6 +8,7 @@ async function captureDispatchError(
   try {
     await fn();
   } catch (err) {
+    // biome-ignore lint/suspicious/noMisplacedAssertion: this helper narrows the caught value for every caller, so the type check belongs with the narrowing
     expect(err).toBeInstanceOf(DispatchError);
     return err as DispatchError;
   }

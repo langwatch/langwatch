@@ -3,12 +3,6 @@
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import {
-  assertWebhookDelivered,
-  sendWebhook,
-  WEBHOOK_DELIVERY_ID_HEADER,
-  type WebhookSendResult,
-} from "~/server/app-layer/automations/delivery/sendWebhook";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type {
@@ -32,6 +26,12 @@ import type {
 } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
+import {
+  assertWebhookDelivered,
+  sendWebhook,
+  WEBHOOK_DELIVERY_ID_HEADER,
+  type WebhookSendResult,
+} from "~/server/webhooks/sendWebhook";
 import type { PlanInfo } from "../../licensing/planInfo";
 import { spendRowToEnvelope } from "../envelope";
 import { eventMatches } from "../eventRegistry";

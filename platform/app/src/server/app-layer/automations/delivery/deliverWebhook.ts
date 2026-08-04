@@ -9,7 +9,7 @@ import {
   assertWebhookDelivered,
   sendWebhook,
   type WebhookSendResult,
-} from "./sendWebhook";
+} from "~/server/webhooks/sendWebhook";
 
 const logger = createLogger("langwatch:webhook-delivery");
 

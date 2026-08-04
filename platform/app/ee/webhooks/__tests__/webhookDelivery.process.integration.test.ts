@@ -48,18 +48,13 @@ import {
 import { WebhookEndpointService } from "../webhookEndpoint.service";
 import { WebhookHealthService } from "../webhookHealth.service";
 
-vi.mock(
-  "~/server/app-layer/automations/delivery/sendWebhook",
-  async (importOriginal) => {
-    const original =
-      await importOriginal<
-        typeof import("~/server/app-layer/automations/delivery/sendWebhook")
-      >();
-    return { ...original, sendWebhook: vi.fn() };
-  },
-);
+vi.mock("~/server/webhooks/sendWebhook", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("~/server/webhooks/sendWebhook")>();
+  return { ...original, sendWebhook: vi.fn() };
+});
 
-import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
+import { sendWebhook } from "~/server/webhooks/sendWebhook";
 
 const sendWebhookMock = vi.mocked(sendWebhook);
 
