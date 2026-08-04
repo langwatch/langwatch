@@ -165,6 +165,8 @@ The **second** is the anchor a *rebuild from `event_log`* derives if the committ
 
 Migration 00067 gives `trace_summaries` the same split: `OccurredAt` is the frozen storage/TTL anchor and `EarliestSpanStartMs` is the span timing baseline. Pre-split rows decode their existing `OccurredAt` as both values, avoiding a population refold. The fold also opts into `refoldOnStoreMiss`: losing accumulated totals is not acceptable, and absence is not authoritative while the store deliberately declines dimension-only rows.
 
+That recovery is deliberately forward-only rather than a deployment-time sweep. A summary already removed by the epoch-anchored TTL before migration 00067 is rebuilt when a later event reaches the trace and `refoldOnStoreMiss` replays its event log; a completed trace that receives no later event is not proactively rediscovered. Those missing derived rows are bounded by the normal trace-retention window and age out with their source events. Reconstructing them eagerly would require a separate, bounded operational replay keyed from `event_log`; migration 00067 does not create that population-scale job.
+
 `trace_analytics` knew about consequence 1 and priced only that one, exactly as ADR-056 did — its fold docblock said, before the amendment above replaced it, *"OccurredAt can shift when an earlier-starting span arrives late, so superseded rows may persist until TTL"*. The partition, TTL and dedup-scope consequences went unpriced there too.
 
 Two honest differences, rather than flattening this into "same bug three times":

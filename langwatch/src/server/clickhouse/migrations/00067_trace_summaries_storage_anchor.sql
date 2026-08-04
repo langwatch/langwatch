@@ -9,7 +9,12 @@
 -- an earlier-starting span arrived late. The projection now freezes OccurredAt
 -- on the first usable contribution time and stores the running span minimum in
 -- this additive column. Existing rows decode their pre-split OccurredAt as both
--- values and heal on their next ordinary write; no population refold is needed.
+-- values and heal on their next ordinary write without forcing a population
+-- refold. This migration is intentionally forward-only: summaries already
+-- removed by the old epoch-anchored TTL are not batch-replayed. If another
+-- event arrives, refoldOnStoreMiss rebuilds that trace from the event log;
+-- completed traces with no later event remain absent and age out with the
+-- normal trace-retention window.
 --
 -- No ON CLUSTER: the Replicated database propagates DDL itself.
 
