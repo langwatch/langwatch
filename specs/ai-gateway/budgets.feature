@@ -621,6 +621,37 @@ Feature: AI Gateway — Budgets
     And an anchored budget reports its own anchored bounds
     And "total" and "manual" budgets keep their stored pair and far-future sentinel
 
+  @integration
+  Scenario: An anchored budget counts spend across a calendar boundary until its own period rolls
+    Given a budget with window "month" anchored at 2026-06-17T09:00Z
+    And a debit occurred at 2026-06-20T00:00Z, inside the anchored period but in the previous calendar month
+    When spend is read at 2026-07-15T18:00Z
+    Then the debit counts, because the anchored period is still open
+    But when spend is read at 2026-07-20T00:00Z it does not, because the anchored period rolled on the 17th
+
+  @integration
+  Scenario: Anchored and calendar siblings on one key total their own periods
+    Given a virtual key carries an anchored month budget and a calendar month budget
+    And a debit was backdated into the anchored period but before the calendar month started
+    When spend is read for both
+    Then the backdated debit counts on the anchored budget only
+    And a fresh debit counts once on each, never twice on either
+
+  @integration
+  Scenario: Resetting an anchored budget rejoins the anchor schedule
+    Given an anchored budget with spend in its current period
+    When I reset it
+    Then its spend reads zero
+    And its reported reset instant is the next anchored boundary, not one window from now
+    And after that boundary passes the floor is back on the anchor's schedule
+
+  @unit
+  Scenario: A breach fires once per anchored period
+    Given an anchored budget that crosses its limit
+    Then the crossing is stamped with the anchored period start, not the calendar one
+    And a second crossing inside the same anchored period is the same event
+    And the first crossing after the anchored rollover is a new one
+
   # ============================================================================
   # Dashboard and spend visibility
   # ============================================================================

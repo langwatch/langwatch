@@ -139,9 +139,17 @@ export type BudgetSpendTarget = {
 /**
  * Read targets for a plain list of budgets, with no request context. A
  * GROUP budget has no single member here, so it sums every member bucket.
+ *
+ * `now` is the instant the periods are resolved at, and it is the same one
+ * the rollup read uses. Passing it here rather than letting each floor read
+ * the wall clock is what makes an injected clock mean one thing across both
+ * halves of the read; an anchored budget in particular has a floor that
+ * moves with the clock, so the two halves would otherwise disagree about
+ * which period they are totalling.
  */
 export function spendTargetsForBudgets(
   budgets: GatewayBudget[],
+  now: Date = new Date(),
 ): BudgetSpendTarget[] {
   return budgets.map((b) =>
     b.scopeType === "GROUP"
@@ -158,9 +166,10 @@ export function spendTargetsForBudgets(
           bucketSuffix: b.providerKey
             ? `${PROVIDER_BUCKET_SEPARATOR}${b.providerKey}`
             : null,
-          // MANUAL windows and mid-period resets move the boundary; the
-          // list must total the CURRENT period, same as enforcement does.
-          periodFloorMs: budgetPeriodFloorMs(b),
+          // MANUAL windows, anchored cycles and mid-period resets all move
+          // the boundary; the list must total the CURRENT period, same as
+          // enforcement does.
+          periodFloorMs: budgetPeriodFloorMs(b, now),
         }
       : {
           budgetId: b.id,
@@ -168,7 +177,7 @@ export function spendTargetsForBudgets(
           scopeId: bucketScopeIdFor(b, b.scopeId),
           window: b.window,
           match: "exact" as const,
-          periodFloorMs: budgetPeriodFloorMs(b),
+          periodFloorMs: budgetPeriodFloorMs(b, now),
         },
   );
 }
@@ -629,7 +638,7 @@ export class GatewayBudgetClickHouseRepository {
   ): Promise<ScopeSpend[]> {
     return this.getSpendForTargetsAcrossTenants(
       [tenantId],
-      toSpendTargets(budgets),
+      toSpendTargets(budgets, now),
       now,
     );
   }
@@ -655,7 +664,7 @@ export class GatewayBudgetClickHouseRepository {
   ): Promise<ScopeSpend[]> {
     return this.getSpendForTargetsAcrossTenants(
       tenantIds,
-      toSpendTargets(budgets),
+      toSpendTargets(budgets, now),
       now,
     );
   }
@@ -708,9 +717,11 @@ export class GatewayBudgetClickHouseRepository {
 
   /**
    * Spend for the targets whose period floor has moved off the calendar:
-   * MANUAL windows, and calendar windows reset mid-period. The floor sits
-   * inside the rollup's calendar bucket, which cannot answer it, so the
-   * total is summed straight off the ledger, successful requests only.
+   * MANUAL windows, anchored windows, and calendar windows reset
+   * mid-period. The floor sits inside the rollup's calendar bucket, which
+   * cannot answer it, so the total is summed straight off the ledger,
+   * successful requests only. An anchored budget lives here permanently:
+   * its periods never coincide with the calendar ones the rollup keys on.
    */
   private async readFlooredTargetSpend(
     tenantIds: string[],
@@ -1093,12 +1104,13 @@ function ledgerStatusFromCH(raw: string): GatewayBudgetLedgerStatus {
  */
 function toSpendTargets(
   input: GatewayBudget[] | BudgetSpendTarget[],
+  now: Date,
 ): BudgetSpendTarget[] {
   if (input.length === 0) return [];
   const first = input[0]!;
   return "budgetId" in first
     ? (input as BudgetSpendTarget[])
-    : spendTargetsForBudgets(input as GatewayBudget[]);
+    : spendTargetsForBudgets(input as GatewayBudget[], now);
 }
 
 function scopeToClickHouse(scope: GatewayBudgetScopeType): string {

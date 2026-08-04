@@ -16,6 +16,9 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
+import { currentPeriodStart } from "~/server/gateway/budget.clickhouse.repository";
+import { anchoredPeriodStart } from "~/server/gateway/budgetWindow";
+
 import { detectBudgetCrossings } from "../services/governanceSignals.service";
 
 function deps(spentByBudget: Record<string, string>, budgets: unknown[]) {
@@ -99,6 +102,32 @@ describe("budget crossing detection", () => {
     expect(breach.limit_usd).toBe("100.000000");
     expect(breach.spent_usd).toBe("120.000000");
     expect(breach.on_breach).toBe("block");
+  });
+
+  /** @scenario "A breach fires once per anchored period" */
+  it("stamps an anchored budget's crossing with its anchored period start", async () => {
+    // Phased to the 17th, so its period start is never a calendar month
+    // start and the two are always distinguishable.
+    const cycleAnchorAt = new Date("2026-06-17T09:00:00.000Z");
+    const at = new Date();
+    await detectBudgetCrossings(
+      deps({ b_anchored: "120.000000" }, [
+        budget("b_anchored", { cycleAnchorAt }),
+      ]),
+      [row("b_anchored", "vk_anchor:u1")],
+    );
+
+    const crossing = sendCrossing.mock.calls[0]![0];
+    expect(crossing.kind).toBe("breached");
+    // The stamp is the anchored period start, which is what makes the
+    // crossing fire once per billed period rather than once per calendar
+    // month. Without it the fallback would stamp the calendar start.
+    expect(crossing.period_started_at_ms).toBe(
+      anchoredPeriodStart("MONTH", cycleAnchorAt, at).getTime(),
+    );
+    expect(crossing.period_started_at_ms).not.toBe(
+      currentPeriodStart("MONTH", at).getTime(),
+    );
   });
 
   it("swallows detection failures so debits never depend on notifications", async () => {
