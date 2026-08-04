@@ -749,11 +749,14 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
+
+      - name: Prepare files
+        working-directory: platform/app
+        run: pnpm start:prepare:files
 
       - name: Check OpenAPI completeness
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm check:openapi-completeness
 
       - name: Notify Slack on failure
