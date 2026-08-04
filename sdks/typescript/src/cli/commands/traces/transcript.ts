@@ -17,18 +17,16 @@ import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /** Bound the request so a quiet socket cannot hold the CLI open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;
 
-const transcriptEntrySchema = z
-  .object({
-    kind: z.string(),
-    atMs: z.number(),
-    text: z.string().nullable().optional(),
-    chars: z.number().optional(),
-    model: z.string().nullable().optional(),
-    tokens: z.number().optional(),
-    costUsd: z.number().optional(),
-    name: z.string().nullable().optional(),
-  })
-  .passthrough();
+const transcriptEntrySchema = z.looseObject({
+  kind: z.string(),
+  atMs: z.number(),
+  text: z.string().nullable().optional(),
+  chars: z.number().optional(),
+  model: z.string().nullable().optional(),
+  tokens: z.number().optional(),
+  costUsd: z.number().optional(),
+  name: z.string().nullable().optional(),
+});
 
 const transcriptDocumentSchema = z.object({
   agent: z.string(),
@@ -41,7 +39,7 @@ const transcriptDocumentSchema = z.object({
     costUsd: z.number(),
   }),
   subAgents: z.array(
-    z.object({ agentId: z.string(), toolCalls: z.number() }).passthrough(),
+    z.looseObject({ agentId: z.string(), toolCalls: z.number() }),
   ),
 });
 

@@ -20,29 +20,27 @@ const SERVER_PAGE_CAP = 1000;
 /** Events returned when `--limit` is not given. */
 const DEFAULT_LIMIT = 500;
 
-const sessionEventSchema = z
-  .object({
-    timeUnixMs: z.number(),
-    recordId: z.string(),
-    eventKind: z.string(),
-    promptId: z.string().optional(),
-    querySource: z.string().optional(),
-    agentType: z.string().optional(),
-    model: z.string().optional(),
-    inputTokens: z.number().optional(),
-    outputTokens: z.number().optional(),
-    cacheReadTokens: z.number().optional(),
-    cacheCreationTokens: z.number().optional(),
-    costUsd: z.number().optional(),
-    durationMs: z.number().optional(),
-    preTokens: z.number().optional(),
-    postTokens: z.number().optional(),
-    compactionTrigger: z.string().optional(),
-    toolName: z.string().optional(),
-    rateLimitCarrier: z.string().optional(),
-    totalTokens: z.number().optional(),
-  })
-  .passthrough();
+const sessionEventSchema = z.looseObject({
+  timeUnixMs: z.number(),
+  recordId: z.string(),
+  eventKind: z.string(),
+  promptId: z.string().optional(),
+  querySource: z.string().optional(),
+  agentType: z.string().optional(),
+  model: z.string().optional(),
+  inputTokens: z.number().optional(),
+  outputTokens: z.number().optional(),
+  cacheReadTokens: z.number().optional(),
+  cacheCreationTokens: z.number().optional(),
+  costUsd: z.number().optional(),
+  durationMs: z.number().optional(),
+  preTokens: z.number().optional(),
+  postTokens: z.number().optional(),
+  compactionTrigger: z.string().optional(),
+  toolName: z.string().optional(),
+  rateLimitCarrier: z.string().optional(),
+  totalTokens: z.number().optional(),
+});
 
 const sessionEventsPageSchema = z.object({
   events: z.array(sessionEventSchema),
