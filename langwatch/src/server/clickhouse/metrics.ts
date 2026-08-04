@@ -36,7 +36,11 @@ const clickhouseQueryTotal = new Counter({
 
 export const incrementClickHouseQueryCount = (
   queryType: "SELECT" | "INSERT" | "OTHER",
-  status: "success" | "error",
+  // "inband_error": the transport succeeded (already counted as "success")
+  // but the streamed body carried a ClickHouse exception row. A dedicated
+  // outcome keeps success/error ratios honest — the same query is never
+  // counted under both terminal outcomes.
+  status: "success" | "error" | "inband_error",
 ) => clickhouseQueryTotal.labels(queryType, status).inc();
 
 // Counter for windowed reads: the partition-pruning-window-with-fallback read

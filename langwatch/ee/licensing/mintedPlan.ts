@@ -9,6 +9,7 @@ interface BuildMintedPlanParams {
   maxMembersLite?: number;
   maxMessagesPerMonth: number;
   canPublish: boolean;
+  webhookEndpointsEnabled?: boolean;
   usageUnit?: string;
 }
 
@@ -33,6 +34,12 @@ interface BuildMintedPlanParams {
  *    what the fields now mean everywhere.
  *
  * A field may only be dropped from here once no supported version requires it.
+ *
+ * `webhookEndpointsEnabled` is minted because it is an entitlement the license
+ * sells, not a resource cap the OSS baseline uncapped. It is the only thing
+ * that switches on webhook endpoints and the gateway spend pull APIs on a
+ * self-hosted deployment, so a license that omits it leaves a paying customer
+ * with the surfaces answering 403.
  */
 export function buildMintedPlan({
   type,
@@ -41,6 +48,7 @@ export function buildMintedPlan({
   maxMembersLite,
   maxMessagesPerMonth,
   canPublish,
+  webhookEndpointsEnabled,
   usageUnit,
 }: BuildMintedPlanParams): LicensePlanLimits {
   return {
@@ -52,6 +60,7 @@ export function buildMintedPlan({
     maxMessagesPerMonth,
     maxWorkflows: DEFAULT_LIMIT,
     canPublish,
+    webhookEndpointsEnabled,
     usageUnit,
   };
 }

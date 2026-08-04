@@ -146,10 +146,13 @@ describe("createMonitorCommand()", () => {
   it("creates a monitor", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => makeMonitor(),
+      json: async () => makeMonitor({ evaluatorId: "eval_abc" }),
     });
 
-    await createMonitorCommand("Toxicity Check", { checkType: "ragas/toxicity" });
+    await createMonitorCommand("Toxicity Check", {
+      checkType: "ragas/toxicity",
+      evaluatorId: "eval_abc",
+    });
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("/api/monitors"),
       expect.objectContaining({
@@ -161,8 +164,31 @@ describe("createMonitorCommand()", () => {
 
   it("rejects invalid execution mode", async () => {
     await expect(
-      createMonitorCommand("Test", { checkType: "ragas/toxicity", executionMode: "INVALID" })
+      createMonitorCommand("Test", {
+        checkType: "ragas/toxicity",
+        evaluatorId: "eval_abc",
+        executionMode: "INVALID",
+      })
     ).rejects.toThrow(ProcessExitError);
+  });
+
+  describe("when --evaluator-id is missing", () => {
+    /** @scenario The CLI refuses to create a monitor without --evaluator-id */
+    it("fails before calling the API and points at evaluator create and list", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
+
+      await expect(
+        createMonitorCommand("Test", { checkType: "ragas/toxicity" })
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      const output = errorSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+      // The stable machine contract is the code; the prose is supplementary.
+      expect(output).toContain("validation_error");
+      expect(output).toContain("--evaluator-id is required");
+      expect(output).toContain("langwatch evaluator create");
+      expect(output).toContain("langwatch evaluator list");
+    });
   });
 });
 

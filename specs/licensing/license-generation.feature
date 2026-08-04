@@ -97,3 +97,16 @@ Feature: License Generation
 
   # API-level validation
 
+  Rule: Entitlement flags survive generation and mapping
+
+    @unit
+    Scenario: A generated enterprise license carries the webhook entitlement
+      Given the ENTERPRISE plan template enables webhook endpoints
+      When a license is generated and validated
+      Then the validated plan still carries the entitlement
+
+    @unit
+    Scenario: A licensed webhook entitlement survives the PlanInfo mapping
+      Given a validated license whose plan enables webhook endpoints
+      When the license is mapped to the active PlanInfo
+      Then the entitlement is present, and absent means false

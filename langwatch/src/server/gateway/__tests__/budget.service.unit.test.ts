@@ -132,9 +132,9 @@ describe("GatewayBudgetService.check", () => {
     });
   });
 
-  // Regression for iter-111 Sergey finding: after the outbox/debit
-  // replacement by the trace-fold pipeline, `GatewayBudget.spentUsd` is
-  // a dormant PG column. `/budget/check` correctly reads live spend
+  // Regression for iter-111 finding: after the outbox/debit
+  // replacement by the ClickHouse ledger, `GatewayBudget.spentUsd` is
+  // a dormant PG column. `check()` correctly reads live spend
   // from CH into `scopes[]`, but `blockedBy[]` used to also read from
   // the stale PG column — so the block decision was right, but the
   // reported spent_usd was wrong by any amount accumulated since

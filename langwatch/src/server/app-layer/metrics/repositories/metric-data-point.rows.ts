@@ -1,3 +1,4 @@
+import type { MetricSequencePoint } from "~/server/event-sourcing/pipelines/metric-processing/rollup/sequence";
 import type {
   AggregationTemporality,
   CanonicalMetricDataPoint,
@@ -235,11 +236,99 @@ export function rollupRow({
   };
 }
 
+/**
+ * One of the three `Array(UInt64)` count columns, refusing to decode a row that
+ * does not carry it.
+ *
+ * These are the only fields `fromRaw` dereferences without a null check, so a
+ * row arriving without them used to surface as a bare
+ * `Cannot read properties of undefined (reading 'map')` — no column, no series,
+ * no query, and a stack the queue drops in favour of the message alone. Naming
+ * the column and the row turns the next occurrence into evidence instead of a
+ * guess. It stays a plain `Error`: nothing here is customer-actionable, so it
+ * degrades to a generic failure with a trace id at the boundary and the queue
+ * retries it on the normal backoff (dev/docs/best_practices/error-handling.md).
+ */
+function countsColumn({
+  row,
+  column,
+}: {
+  row: Pick<
+    RawMetricRow,
+    | "SeriesId"
+    | "PointId"
+    | "BucketCounts"
+    | "PositiveBucketCounts"
+    | "NegativeBucketCounts"
+  >;
+  column: "BucketCounts" | "PositiveBucketCounts" | "NegativeBucketCounts";
+}): string[] {
+  const counts = row[column];
+  if (!Array.isArray(counts)) {
+    const problem =
+      counts === undefined
+        ? `is missing the ${column} column`
+        : `carries a non-array ${typeof counts} in the ${column} column`;
+    throw new Error(
+      `metric_data_points row ${problem} (series ${row.SeriesId ?? "unknown"}, point ${row.PointId ?? "unknown"}); a read returned a row this decoder cannot trust`,
+    );
+  }
+  return counts.map(String);
+}
+
+/**
+ * The columns the rollup fold actually reads. Identical to {@link RAW_SELECT}
+ * minus CanonicalPayload: the fold never touches the payload, and it is the
+ * one megabyte-scale column, so fetching it through `FINAL` was what pushed
+ * the folded seek queries past the server's per-query memory cap
+ * (MEMORY_LIMIT_EXCEEDED while executing ReplacingSorted).
+ */
+export const AUTHORITATIVE_SELECT = RAW_SELECT.replace(
+  "SummaryQuantilesJson, CanonicalPayload, _size_bytes,",
+  "SummaryQuantilesJson, _size_bytes,",
+);
+
+/**
+ * The columns a successor seek needs: just enough to order points
+ * (TimeUnixNano, PointId), locate their buckets (TimeUnixMs) and decide
+ * predecessor dependency (MetricKind, AggregationTemporality). Everything else
+ * — attributes, values, buckets, payload — is dead weight the seek used to
+ * materialise through `FINAL` for every one of its folded branches.
+ */
+export const SEEK_SELECT = `
+  SeriesId, PointId,
+  toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs, TimeUnixNano,
+  MetricKind, AggregationTemporality
+`;
+
+export interface SeekMetricRow {
+  SeriesId: string;
+  PointId: string;
+  TimeUnixMs: string | number;
+  TimeUnixNano: string;
+  MetricKind: MetricKind;
+  AggregationTemporality: AggregationTemporality;
+}
+
+export function fromSeekRow(row: SeekMetricRow): MetricSequencePoint {
+  return {
+    seriesId: row.SeriesId,
+    pointId: row.PointId,
+    timeUnixMs: Number(row.TimeUnixMs),
+    timeUnixNano: String(row.TimeUnixNano),
+    metricKind: row.MetricKind,
+    aggregationTemporality: row.AggregationTemporality,
+  };
+}
+
 export function fromRaw({
   row,
   organizationId,
 }: {
-  row: RawMetricRow;
+  // CanonicalPayload is optional on purpose: the authoritative bucket reads
+  // deliberately do not select it (see AUTHORITATIVE_SELECT), and the fold
+  // never reads the decoded field.
+  row: Omit<RawMetricRow, "CanonicalPayload"> & { CanonicalPayload?: string };
   organizationId: string;
 }): CanonicalMetricDataPoint {
   return {
@@ -277,16 +366,16 @@ export function fromRaw({
     min: row.Min,
     max: row.Max,
     explicitBounds: row.ExplicitBounds,
-    bucketCounts: row.BucketCounts.map(String),
+    bucketCounts: countsColumn({ row, column: "BucketCounts" }),
     exponentialScale: row.ExponentialScale,
     exponentialZeroThreshold: row.ExponentialZeroThreshold,
     zeroCount: row.ZeroCount === null ? null : String(row.ZeroCount),
     positiveOffset: row.PositiveOffset,
-    positiveBucketCounts: row.PositiveBucketCounts.map(String),
+    positiveBucketCounts: countsColumn({ row, column: "PositiveBucketCounts" }),
     negativeOffset: row.NegativeOffset,
-    negativeBucketCounts: row.NegativeBucketCounts.map(String),
+    negativeBucketCounts: countsColumn({ row, column: "NegativeBucketCounts" }),
     summaryQuantilesJson: row.SummaryQuantilesJson,
-    canonicalPayload: row.CanonicalPayload,
+    canonicalPayload: row.CanonicalPayload ?? "",
     canonicalSizeBytes: Number(row._size_bytes),
     occurredAt: Number(row.OccurredAt),
     acceptedAt: Number(row.AcceptedAt),

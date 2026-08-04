@@ -117,7 +117,7 @@ export const createVirtualKeyCommand = async (
         if (budget) {
           console.log(
             chalk.gray("Budget:         ") +
-              `$${budget.limit_usd} / ${String(budget.window).toLowerCase()} (${(budget.on_breach ?? "BLOCK").toLowerCase()})`,
+              `$${budget.limit_usd} / ${budget.window} (${budget.on_breach ?? "block"})`,
           );
         }
         const detailUrl = virtualKeyDetailUrl(virtual_key.id);

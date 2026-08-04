@@ -13,9 +13,10 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
-import type {
-  BudgetSpendTarget,
-  GatewayBudgetClickHouseRepository,
+import {
+  type BudgetSpendTarget,
+  budgetPeriodFloorMs,
+  type GatewayBudgetClickHouseRepository,
 } from "./budget.clickhouse.repository";
 import { resolveApplicableBudgets } from "./budgetResolution.service";
 import { resolveProviderLabels } from "./providerLabels";
@@ -139,6 +140,7 @@ async function loadSpend(
     scopeId: r.bucketScopeId,
     window: r.budget.window,
     match: "exact",
+    periodFloorMs: budgetPeriodFloorMs(r.budget),
   }));
   try {
     const spends = await chRepo.getSpendForTargetsAcrossTenants(

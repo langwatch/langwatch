@@ -42,7 +42,13 @@ export const updateEvaluatorCommand = async (
     const body: UpdateEvaluatorBody = {};
     if (options.name !== undefined) body.name = options.name;
     if (options.settings !== undefined) {
-      body.config = JSON.parse(options.settings) as Record<string, unknown>;
+      // The canonical config shape is { evaluatorType, settings }: the parsed
+      // JSON must land under config.settings, not at the top level of config,
+      // or the server merges it as dead top-level keys while config.settings
+      // keeps the old values and the update silently does nothing effective.
+      body.config = {
+        settings: JSON.parse(options.settings) as Record<string, unknown>,
+      };
     }
 
     updated = await service.update(evaluatorId, body);

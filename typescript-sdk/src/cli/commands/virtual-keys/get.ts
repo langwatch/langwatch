@@ -3,7 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import { formatScope, virtualKeyDetailUrl } from "./_shared";
+import { formatScope, formatStatus, virtualKeyDetailUrl } from "./_shared";
 import type { CommandResult } from "../../utils/output";
 
 /**
@@ -34,7 +34,7 @@ export const getVirtualKeyCommand = async (
         if (vk.description) {
           console.log(`${chalk.bold("Description:")}  ${vk.description}`);
         }
-        console.log(`${chalk.bold("Status:")}       ${vk.status === "active" ? chalk.green("active") : chalk.red("revoked")}`);
+        console.log(`${chalk.bold("Status:")}       ${formatStatus(vk.status)}`);
         console.log(`${chalk.bold("Purpose:")}      ${vk.purpose}`);
         console.log(`${chalk.bold("Prefix:")}       ${vk.display_prefix}...`);
         console.log(`${chalk.bold("Principal:")}    ${vk.principal_user_id ?? chalk.gray("—")}`);
@@ -42,7 +42,7 @@ export const getVirtualKeyCommand = async (
         if (vk.trace_project_id) {
           console.log(`${chalk.bold("Trace proj.:")}  ${vk.trace_project_id}`);
         }
-        console.log(`${chalk.bold("Routing mode:")} ${vk.routing_mode.toLowerCase()}`);
+        console.log(`${chalk.bold("Routing mode:")} ${vk.routing_mode}`);
         console.log(`${chalk.bold("Routing pol.:")} ${vk.routing_policy_id ?? chalk.gray("(none)")}`);
         console.log(`${chalk.bold("Created:")}      ${new Date(vk.created_at).toLocaleString()}`);
         if (vk.last_used_at) {

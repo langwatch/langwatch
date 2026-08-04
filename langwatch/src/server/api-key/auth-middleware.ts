@@ -4,6 +4,12 @@ import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
+import {
+  type ApiErrorEnvelope,
+  authRefusalBody,
+  canonicalErrorFor,
+  requestTraceIds,
+} from "~/app/api/shared/canonical-error";
 import type { Permission } from "~/server/api/rbac";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";
@@ -97,77 +103,38 @@ function extractCredentials(
  */
 export function createUnifiedAuthMiddleware({
   prisma,
+  errorEnvelope = "legacy",
 }: {
   prisma: PrismaClient;
+  /**
+   * The shape refusals answer with. Authentication runs beneath the family's
+   * own error handler, so a family publishing the canonical envelope must not
+   * answer a flat body when the request fails one layer earlier.
+   */
+  errorEnvelope?: ApiErrorEnvelope;
 }): MiddlewareHandler {
   const resolver = TokenResolver.create(prisma);
+  const refusal = authRefusalBody(errorEnvelope);
 
   return async (c, next) => {
-    const credentials = extractCredentials((name) => c.req.header(name));
-    // Diagnostic context for auth failures — lets on-call attribute a 401 to
-    // a specific customer/SDK without needing the customer to reproduce with
-    // debug logs. Read once and reuse across both failure paths so values
-    // are consistent. No raw token / body content is included.
-    const diag = collectAuthDiagnostics(c);
+    const outcome = await resolveProjectPrincipal({
+      resolver,
+      // Diagnostic context for auth failures — lets on-call attribute a 401 to
+      // a specific customer/SDK without needing the customer to reproduce with
+      // debug logs. Read once and reused across every failure path so values
+      // are consistent. No raw token / body content is included.
+      diag: collectAuthDiagnostics(c),
+      credentials: extractCredentials((name) => c.req.header(name)),
+    });
 
-    if (!credentials) {
-      logger.warn(
-        diag,
-        diag.hasEmptyAuthToken
-          ? "Authentication failed: X-Auth-Token sent but empty"
-          : "Authentication failed: no auth header present",
-      );
+    if (!outcome.ok) {
       return c.json(
-        {
-          error: "Unauthorized",
-          message:
-            "Authentication required. Use Authorization: Basic base64(projectId:token), Authorization: Bearer <token>, or X-Auth-Token header.",
-        },
-        401,
+        refusal(outcome.refusal),
+        outcome.refusal.status as 401 | 500,
       );
     }
 
-    let resolved: ResolvedToken | null;
-    try {
-      resolved = await resolver.resolve({
-        token: credentials.token,
-        projectId: credentials.projectId,
-      });
-    } catch (error) {
-      logger.error(
-        {
-          ...diag,
-          error,
-        },
-        "Database error during authentication",
-      );
-
-      return c.json(
-        {
-          error: "Internal Server Error",
-          message: "Authentication service error",
-        },
-        500,
-      );
-    }
-
-    if (!resolved) {
-      const tokenType = getTokenType(credentials.token);
-      logger.warn(
-        {
-          ...diag,
-          hasToken: true,
-          tokenType,
-          hasProjectId: !!credentials.projectId,
-        },
-        "Authentication failed: invalid credentials",
-      );
-      return c.json(
-        { error: "Unauthorized", message: "Invalid credentials" },
-        401,
-      );
-    }
-
+    const { resolved } = outcome;
     c.set("project", resolved.project);
     c.set("resolvedToken", resolved);
 
@@ -188,6 +155,89 @@ export function createUnifiedAuthMiddleware({
       resolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
   };
+}
+
+/**
+ * The project credential behind a request, or the reason there isn't one.
+ *
+ * Split out so the middleware above reads as "resolve, then set context",
+ * mirroring {@link resolveOrgPrincipal}: every refusal is described here as
+ * data and rendered into the family's envelope by its one caller, so no branch
+ * can answer in the wrong shape. The codes match the org path's, because both
+ * families serve the same URL prefixes and a caller branching on
+ * `error.code` must not have to learn which one answered.
+ */
+async function resolveProjectPrincipal({
+  resolver,
+  credentials,
+  diag,
+}: {
+  resolver: TokenResolver;
+  credentials: { token: string; projectId: string | null } | null;
+  diag: AuthDiagnostics;
+}): Promise<
+  { ok: true; resolved: ResolvedToken } | { ok: false; refusal: AuthRefusal }
+> {
+  if (!credentials) {
+    logger.warn(
+      diag,
+      diag.hasEmptyAuthToken
+        ? "Authentication failed: X-Auth-Token sent but empty"
+        : "Authentication failed: no auth header present",
+    );
+    return {
+      ok: false,
+      refusal: {
+        status: 401,
+        code: "missing_credentials",
+        legacyError: "Unauthorized",
+        message:
+          "Authentication required. Use Authorization: Basic base64(projectId:token), Authorization: Bearer <token>, or X-Auth-Token header.",
+      },
+    };
+  }
+
+  let resolved: ResolvedToken | null;
+  try {
+    resolved = await resolver.resolve({
+      token: credentials.token,
+      projectId: credentials.projectId,
+    });
+  } catch (error) {
+    logger.error({ ...diag, error }, "Database error during authentication");
+    return {
+      ok: false,
+      refusal: {
+        status: 500,
+        code: "internal_error",
+        legacyError: "Internal Server Error",
+        message: "Authentication service error",
+      },
+    };
+  }
+
+  if (!resolved) {
+    logger.warn(
+      {
+        ...diag,
+        hasToken: true,
+        tokenType: getTokenType(credentials.token),
+        hasProjectId: !!credentials.projectId,
+      },
+      "Authentication failed: invalid credentials",
+    );
+    return {
+      ok: false,
+      refusal: {
+        status: 401,
+        code: "invalid_credentials",
+        legacyError: "Unauthorized",
+        message: "Invalid credentials",
+      },
+    };
+  }
+
+  return { ok: true, resolved };
 }
 
 export { extractCredentials };
@@ -211,75 +261,38 @@ export type OrgAuthVariables = {
  * Sets `organization`, `apiKeyId`, `apiKeyUserId`, `apiKeyOrganizationId` on context.
  * Does NOT set `project` — callers that need project context should use
  * the standard project-scoped auth middleware instead.
+ *
+ * `errorEnvelope` picks the shape refusals answer with, because that shape is
+ * a property of the route family's published contract, not of the auth check:
+ * a family that emits the canonical envelope from its handlers must not
+ * answer a flat body when the same request fails one layer earlier. Families
+ * predating the envelope stay on `legacy` until they migrate deliberately.
  */
 export function createOrgAuthMiddleware({
   prisma,
+  errorEnvelope = "legacy",
 }: {
   prisma: PrismaClient;
+  errorEnvelope?: ApiErrorEnvelope;
 }): MiddlewareHandler {
   const resolver = TokenResolver.create(prisma);
   const orgLogger = createLogger("langwatch:api:org-auth");
+  const refusal = authRefusalBody(errorEnvelope);
 
   return async (c, next) => {
-    const credentials = extractCredentials((name) => c.req.header(name));
-    const diag = collectAuthDiagnostics(c);
-
-    if (!credentials) {
-      orgLogger.warn(diag, "Org auth failed: no credentials");
-      return c.json(
-        {
-          error: "Unauthorized",
-          message:
-            "Authentication required. Use Authorization: Bearer <api-key>.",
-        },
-        401,
-      );
-    }
-
-    let resolved: OrgResolvedToken | null;
-    try {
-      resolved = await resolver.resolveOrgOnly({ token: credentials.token });
-    } catch (error) {
-      orgLogger.error({ ...diag, error }, "Database error during org auth");
-      return c.json(
-        {
-          error: "Internal Server Error",
-          message: "Authentication service error",
-        },
-        500,
-      );
-    }
-
-    if (!resolved) {
-      orgLogger.warn(
-        { ...diag, hasToken: true },
-        "Org auth failed: invalid credentials",
-      );
-      return c.json(
-        {
-          error: "Unauthorized",
-          message:
-            "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
-        },
-        401,
-      );
-    }
-
-    const organization = await prisma.organization.findUnique({
-      where: { id: resolved.organizationId },
+    const outcome = await resolveOrgPrincipal({
+      prisma,
+      resolver,
+      orgLogger,
+      credentials: extractCredentials((name) => c.req.header(name)),
+      diag: collectAuthDiagnostics(c),
     });
 
-    if (!organization) {
-      orgLogger.warn(
-        { ...diag, organizationId: resolved.organizationId },
-        "Org auth failed: organization not found",
-      );
-      return c.json(
-        { error: "Unauthorized", message: "Organization not found" },
-        401,
-      );
+    if (!outcome.ok) {
+      return c.json(refusal(outcome.refusal), outcome.refusal.status as 401);
     }
 
+    const { organization, resolved } = outcome;
     c.set("organization", organization);
     c.set("apiKeyId", resolved.apiKeyId);
     c.set("apiKeyUserId", resolved.userId);
@@ -292,6 +305,112 @@ export function createOrgAuthMiddleware({
       resolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
   };
+}
+
+/**
+ * A refusal an auth check answers with, before it has an envelope.
+ *
+ * Shared by the project- and org-scoped resolvers so the two cannot describe
+ * the same failure differently.
+ */
+type AuthRefusal = {
+  status: number;
+  code: string;
+  legacyError: string;
+  message: string;
+};
+
+/**
+ * The organization behind a credential, or the reason there isn't one.
+ *
+ * Split out so the middleware above reads as "resolve, then set context":
+ * every refusal is described here as data and rendered into the family's
+ * envelope by its one caller, so no branch can answer in the wrong shape.
+ */
+async function resolveOrgPrincipal({
+  prisma,
+  resolver,
+  orgLogger,
+  credentials,
+  diag,
+}: {
+  prisma: PrismaClient;
+  resolver: TokenResolver;
+  orgLogger: ReturnType<typeof createLogger>;
+  credentials: { token: string; projectId: string | null } | null;
+  diag: AuthDiagnostics;
+}): Promise<
+  | { ok: true; organization: Organization; resolved: OrgResolvedToken }
+  | { ok: false; refusal: AuthRefusal }
+> {
+  if (!credentials) {
+    orgLogger.warn(diag, "Org auth failed: no credentials");
+    return {
+      ok: false,
+      refusal: {
+        status: 401,
+        code: "missing_credentials",
+        legacyError: "Unauthorized",
+        message:
+          "Authentication required. Use Authorization: Bearer <api-key>.",
+      },
+    };
+  }
+
+  let resolved: OrgResolvedToken | null;
+  try {
+    resolved = await resolver.resolveOrgOnly({ token: credentials.token });
+  } catch (error) {
+    orgLogger.error({ ...diag, error }, "Database error during org auth");
+    return {
+      ok: false,
+      refusal: {
+        status: 500,
+        code: "internal_error",
+        legacyError: "Internal Server Error",
+        message: "Authentication service error",
+      },
+    };
+  }
+
+  if (!resolved) {
+    orgLogger.warn(
+      { ...diag, hasToken: true },
+      "Org auth failed: invalid credentials",
+    );
+    return {
+      ok: false,
+      refusal: {
+        status: 401,
+        code: "invalid_credentials",
+        legacyError: "Unauthorized",
+        message:
+          "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
+      },
+    };
+  }
+
+  const organization = await prisma.organization.findUnique({
+    where: { id: resolved.organizationId },
+  });
+
+  if (!organization) {
+    orgLogger.warn(
+      { ...diag, organizationId: resolved.organizationId },
+      "Org auth failed: organization not found",
+    );
+    return {
+      ok: false,
+      refusal: {
+        status: 401,
+        code: "organization_not_found",
+        legacyError: "Unauthorized",
+        message: "Organization not found",
+      },
+    };
+  }
+
+  return { ok: true, organization, resolved };
 }
 
 /**
@@ -428,9 +547,11 @@ export function apiKeyCeilingDenialResponse(error: unknown): {
 export function requireApiKeyPermission({
   prisma,
   permission,
+  errorEnvelope = "legacy",
 }: {
   prisma: PrismaClient;
   permission: Permission;
+  errorEnvelope?: ApiErrorEnvelope;
 }): MiddlewareHandler {
   return async (c, next) => {
     const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
@@ -443,12 +564,21 @@ export function requireApiKeyPermission({
       await enforceApiKeyCeiling({ prisma, resolved, permission });
     } catch (error) {
       if (!HandledError.isHandled(error)) throw error;
-      // The SAME body `onError → handleError` would have produced. Answering
-      // here with a hand-built `{ error: "Forbidden", message }` threw away
-      // everything a caller can act on: the `api_key_permission_denied` code,
-      // the permission in `meta`, and the tips/docsUrl the remediation channel
-      // exists to deliver (ADR-045). A CLI then had a sentence and no code, and
-      // the panel had nothing to put on the card but "this didn't work".
+      // The ceiling refuses BENEATH the family's own error handler, so it has
+      // to render whichever shape the family publishes. On `canonical` that is
+      // the same envelope `canonicalErrorResponse` would have produced; on
+      // `legacy` it is the SAME body `onError -> handleError` produces.
+      //
+      // Either way the refusal keeps everything a caller can act on: the
+      // `api_key_permission_denied` code, the permission in `meta`, and the
+      // tips/docsUrl the remediation channel exists to deliver (ADR-045). A
+      // hand-built `{ error: "Forbidden", message }` left a CLI with a
+      // sentence and no code, and the panel with nothing to put on the card
+      // but "this didn't work".
+      if (errorEnvelope === "canonical") {
+        const { status, body } = canonicalErrorFor(error, requestTraceIds(c));
+        return c.json(body, status);
+      }
       const { statusCode, body } = handledErrorResponseBody(error);
       return c.json(body, statusCode);
     }

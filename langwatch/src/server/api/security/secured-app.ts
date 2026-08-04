@@ -4,17 +4,23 @@ import { mergePath } from "hono/utils/url";
 import {
   type AuthMiddlewareVariables,
   authMiddleware,
+  canonicalAuthMiddleware,
   requirePermission,
 } from "~/app/api/middleware/auth";
 import { handleError } from "~/app/api/middleware/error-handler";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
 import {
+  canonicalOrgAuthMiddleware,
   type OrgAuthMiddlewareVariables,
   orgAuthMiddleware,
   requireOrgPermission,
   requireProjectPermission,
 } from "~/app/api/middleware/org-auth";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import {
+  type ApiErrorEnvelope,
+  canonicalErrorResponse,
+} from "~/app/api/shared/canonical-error";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 import { prisma } from "~/server/db";
 
@@ -33,8 +39,15 @@ interface AuthStrategy {
   /**
    * Build the middleware chain for a policy. `public` policies short-circuit to
    * an empty chain in {@link SecuredApp} before this is ever called.
+   *
+   * `errorEnvelope` is the family's published error shape: the chain refuses
+   * requests itself, so it has to answer in the same shape the family's
+   * handlers do.
    */
-  chainFor(policy: AccessPolicy): MiddlewareHandler[];
+  chainFor(
+    policy: AccessPolicy,
+    errorEnvelope: ApiErrorEnvelope,
+  ): MiddlewareHandler[];
 }
 
 const HTTP_VERBS = ["get", "post", "put", "patch", "delete"] as const;
@@ -99,15 +112,27 @@ export class SecuredApp<E extends Env> {
   private readonly basePath: string;
   private readonly family: string;
   private readonly strategy: AuthStrategy;
+  private readonly errorEnvelope: ApiErrorEnvelope;
 
-  constructor(args: { basePath: string; strategy: AuthStrategy }) {
+  constructor(args: {
+    basePath: string;
+    strategy: AuthStrategy;
+    errorEnvelope?: ApiErrorEnvelope;
+  }) {
     this.basePath = args.basePath;
     this.family = familyFromBasePath(args.basePath);
     this.strategy = args.strategy;
+    this.errorEnvelope = args.errorEnvelope ?? "legacy";
     this.hono = new Hono<E>().basePath(args.basePath);
     this.hono.use(tracerMiddleware({ name: this.family }));
     this.hono.use(loggerMiddleware());
-    this.hono.onError(handleError);
+    // One shape per family, whichever layer refuses. A family can still
+    // install its own onError to name its domain errors more precisely.
+    this.hono.onError(
+      this.errorEnvelope === "canonical"
+        ? (error, c) => canonicalErrorResponse(error, c)
+        : handleError,
+    );
   }
 
   /**
@@ -121,7 +146,7 @@ export class SecuredApp<E extends Env> {
     const chain =
       policy.kind === "public" || policy.kind === "handlerManaged"
         ? []
-        : this.strategy.chainFor(policy);
+        : this.strategy.chainFor(policy, this.errorEnvelope);
 
     const bind = (method: HttpVerb | "head" | "all") => {
       return ((path: string, ...handlers: MiddlewareHandler[]) => {
@@ -193,20 +218,26 @@ function unsupported(scope: string, policy: AccessPolicy): never {
 
 const projectStrategy: AuthStrategy = {
   scope: "project",
-  chainFor(policy) {
+  chainFor(policy, errorEnvelope) {
+    const auth =
+      errorEnvelope === "canonical" ? canonicalAuthMiddleware : authMiddleware;
     switch (policy.kind) {
       case "permission":
-        return [authMiddleware, requirePermission(policy.permission)];
+        return [auth, requirePermission(policy.permission, errorEnvelope)];
       case "apiKeyPermission":
         // API-key ceiling: legacy project keys keep full access, scoped API
         // keys must hold the permission. `requireApiKeyPermission` reads the
-        // resolved token `authMiddleware` set, so it runs after it.
+        // resolved token the auth middleware set, so it runs after it.
         return [
-          authMiddleware,
-          requireApiKeyPermission({ prisma, permission: policy.permission }),
+          auth,
+          requireApiKeyPermission({
+            prisma,
+            permission: policy.permission,
+            errorEnvelope,
+          }),
         ];
       case "anyAuthenticated":
-        return [authMiddleware];
+        return [auth];
       default:
         return unsupported("project", policy);
     }
@@ -215,20 +246,25 @@ const projectStrategy: AuthStrategy = {
 
 const orgStrategy: AuthStrategy = {
   scope: "organization",
-  chainFor(policy) {
+  chainFor(policy, errorEnvelope) {
+    const auth =
+      errorEnvelope === "canonical"
+        ? canonicalOrgAuthMiddleware
+        : orgAuthMiddleware;
     switch (policy.kind) {
       case "permission":
-        return [orgAuthMiddleware, requireOrgPermission(policy.permission)];
+        return [auth, requireOrgPermission(policy.permission, errorEnvelope)];
       case "projectPermission":
         return [
-          orgAuthMiddleware,
+          auth,
           requireProjectPermission({
             permission: policy.permission,
             param: policy.param,
+            errorEnvelope,
           }),
         ];
       case "anyAuthenticated":
-        return [orgAuthMiddleware];
+        return [auth];
       default:
         return unsupported("organization", policy);
     }
@@ -253,6 +289,12 @@ export function createProjectApp<
   Extra extends object = Record<never, never>,
 >(args: {
   basePath: string;
+  /**
+   * The error shape this family publishes. New families pass `canonical`;
+   * the default keeps the families that predate the envelope answering
+   * exactly what their consumers already parse.
+   */
+  errorEnvelope?: ApiErrorEnvelope;
 }): SecuredApp<{ Variables: AuthMiddlewareVariables & Extra }> {
   return new SecuredApp({ ...args, strategy: projectStrategy });
 }
@@ -266,6 +308,12 @@ export function createOrgApp<
   Extra extends object = Record<never, never>,
 >(args: {
   basePath: string;
+  /**
+   * The error shape this family publishes. New families pass `canonical`;
+   * the default keeps the families that predate the envelope answering
+   * exactly what their consumers already parse.
+   */
+  errorEnvelope?: ApiErrorEnvelope;
 }): SecuredApp<{ Variables: OrgAuthMiddlewareVariables & Extra }> {
   return new SecuredApp({ ...args, strategy: orgStrategy });
 }

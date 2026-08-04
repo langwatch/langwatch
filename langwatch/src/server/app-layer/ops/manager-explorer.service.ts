@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { getProcessManagerMetadata } from "~/server/event-sourcing/pipelineRegistry";
 import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
 import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
@@ -52,6 +53,8 @@ export interface AggregateProcessManager {
  * "state machine" shown is the definition surface plus the instance's current
  * position — its state JSON, revision, and next wake.
  */
+const logger = createLogger("langwatch:ops:manager-explorer");
+
 export class ManagerExplorerService {
   constructor(private readonly store: ProcessStore) {}
 
@@ -106,5 +109,33 @@ export class ManagerExplorerService {
         };
       }),
     );
+  }
+
+  /**
+   * Dead-letter recovery for one process instance's outbox: dead rows go
+   * back to pending with a fresh attempt budget, due immediately. Narrow
+   * with `messageKeyPrefix` to requeue one target's messages (e.g. a single
+   * webhook endpoint's batches) without resurrecting unrelated failures.
+   */
+  async requeueDeadMessages(params: {
+    processName: string;
+    projectId: string;
+    processKey: string;
+    messageKeyPrefix?: string;
+    /** Actor id for the audit trail; the operation re-emits customer-bound
+     *  deliveries, so who pressed the button matters. */
+    requestedBy: string;
+  }): Promise<{ requeued: number }> {
+    const { requestedBy, ...rest } = params;
+    const requeued = await this.store.requeueDeadMessages({
+      ...rest,
+      now: Date.now(),
+    });
+    // Intentionally retain these opaque operational IDs for the audit trail.
+    logger.info(
+      { ...rest, requestedBy, requeued },
+      "ops requeue of dead outbox messages",
+    );
+    return { requeued };
   }
 }

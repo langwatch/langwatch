@@ -58,59 +58,59 @@ model Session {
 }
 
 model User {
-  id                       String                   @id @default(nanoid())
-  name                     String?
-  email                    String?                  @unique
-  emailVerified            Boolean                  @default(false)
-  image                    String?                  @db.Text
-  pendingSsoSetup          Boolean                  @default(false)
-  accounts                 Account[]
-  sessions                 Session[]
-  teamMemberships          TeamUser[]
-  orgMemberships           OrganizationUser[]
-  createdAt                DateTime                 @default(now())
-  updatedAt                DateTime                 @default(now()) @updatedAt
-  lastLoginAt              DateTime?
-  deactivatedAt            DateTime?
+  id                            String                   @id @default(nanoid())
+  name                          String?
+  email                         String?                  @unique
+  emailVerified                 Boolean                  @default(false)
+  image                         String?                  @db.Text
+  pendingSsoSetup               Boolean                  @default(false)
+  accounts                      Account[]
+  sessions                      Session[]
+  teamMemberships               TeamUser[]
+  orgMemberships                OrganizationUser[]
+  createdAt                     DateTime                 @default(now())
+  updatedAt                     DateTime                 @default(now()) @updatedAt
+  lastLoginAt                   DateTime?
+  deactivatedAt                 DateTime?
   // User-level pin for the persona-resolver redirect target. NULL = use
   // auto-detection. When set, wins over auto-detected persona destination.
   // Spec: specs/ai-gateway/governance/persona-home-content.feature
-  lastHomePath             String?
+  lastHomePath                  String?
   // User-level dismissal for automatic Traces Explorer tours. A single
   // dismissal applies across projects, browsers, and devices.
   // Spec: specs/traces-v2/tour-visibility-and-persistence.feature
   tracesExplorerTourDismissedAt DateTime?
-  Annotation               Annotation[]
-  shareLinks               ShareLink[]
-  Workflow                 Workflow[]
-  WorkflowVersion          WorkflowVersion[]
-  annotationQueues         AnnotationQueueMembers[]
-  assignedQueueItems       AnnotationQueueItem[]    @relation("AssignedTo")
-  createdQueueItems        AnnotationQueueItem[]    @relation("CreatedBy")
-  llmPromptConfigVersions  LlmPromptConfigVersion[]
-  scenarios                Scenario[]
-  inviteRequests           OrganizationInvite[]
-  secretsCreated           ProjectSecret[]          @relation("secretCreatedBy")
-  secretsUpdated           ProjectSecret[]          @relation("secretUpdatedBy")
-  savedViews               SavedView[]
-  versionTagsCreated       PromptTagAssignment[]    @relation("versionTagCreatedBy")
-  versionTagsUpdated       PromptTagAssignment[]    @relation("versionTagUpdatedBy")
-  promptTagsCreated        PromptTag[]              @relation("promptTagCreatedBy")
-  promptTagsUpdated        PromptTag[]              @relation("promptTagUpdatedBy")
-  groupMemberships         GroupMembership[]
-  roleBindings             RoleBinding[]
-  apiKeys                  ApiKey[]
-  gatewayBudgetsCreated    GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
-  principalVirtualKeys     VirtualKey[]             @relation("PrincipalScopedVirtualKeys")
-  personalTeams            Team[]                   @relation("PersonalTeamOwner")
-  personalProjects         Project[]                @relation("PersonalProjectOwner")
-  routingPoliciesCreated   RoutingPolicy[]          @relation("RoutingPolicyCreatedBy")
-  routingPoliciesUpdated   RoutingPolicy[]          @relation("RoutingPolicyUpdatedBy")
-  gatewayGuardrailsCreated GatewayGuardrail[]       @relation("GatewayGuardrailCreatedBy")
-  gatewayGuardrailsUpdated GatewayGuardrail[]       @relation("GatewayGuardrailUpdatedBy")
-  ingestionSourcesCreated  IngestionSource[]        @relation("IngestionSourceCreatedBy")
-  anomalyRulesCreated      AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
-  pinnedTraces             PinnedTrace[]
+  Annotation                    Annotation[]
+  shareLinks                    ShareLink[]
+  Workflow                      Workflow[]
+  WorkflowVersion               WorkflowVersion[]
+  annotationQueues              AnnotationQueueMembers[]
+  assignedQueueItems            AnnotationQueueItem[]    @relation("AssignedTo")
+  createdQueueItems             AnnotationQueueItem[]    @relation("CreatedBy")
+  llmPromptConfigVersions       LlmPromptConfigVersion[]
+  scenarios                     Scenario[]
+  inviteRequests                OrganizationInvite[]
+  secretsCreated                ProjectSecret[]          @relation("secretCreatedBy")
+  secretsUpdated                ProjectSecret[]          @relation("secretUpdatedBy")
+  savedViews                    SavedView[]
+  versionTagsCreated            PromptTagAssignment[]    @relation("versionTagCreatedBy")
+  versionTagsUpdated            PromptTagAssignment[]    @relation("versionTagUpdatedBy")
+  promptTagsCreated             PromptTag[]              @relation("promptTagCreatedBy")
+  promptTagsUpdated             PromptTag[]              @relation("promptTagUpdatedBy")
+  groupMemberships              GroupMembership[]
+  roleBindings                  RoleBinding[]
+  apiKeys                       ApiKey[]
+  gatewayBudgetsCreated         GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
+  principalVirtualKeys          VirtualKey[]             @relation("PrincipalScopedVirtualKeys")
+  personalTeams                 Team[]                   @relation("PersonalTeamOwner")
+  personalProjects              Project[]                @relation("PersonalProjectOwner")
+  routingPoliciesCreated        RoutingPolicy[]          @relation("RoutingPolicyCreatedBy")
+  routingPoliciesUpdated        RoutingPolicy[]          @relation("RoutingPolicyUpdatedBy")
+  gatewayGuardrailsCreated      GatewayGuardrail[]       @relation("GatewayGuardrailCreatedBy")
+  gatewayGuardrailsUpdated      GatewayGuardrail[]       @relation("GatewayGuardrailUpdatedBy")
+  ingestionSourcesCreated       IngestionSource[]        @relation("IngestionSourceCreatedBy")
+  anomalyRulesCreated           AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
+  pinnedTraces                  PinnedTrace[]
 }
 
 model VerificationToken {
@@ -228,6 +228,7 @@ model Organization {
   slug                   String               @unique
   members                OrganizationUser[]
   teams                  Team[]
+  webhookEndpoints       WebhookEndpoint[]
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @default(now()) @updatedAt
   OrganizationInvite     OrganizationInvite[]
@@ -274,29 +275,29 @@ model Organization {
   /// ADR-038.
   primaryIntent          OrganizationIntent?
 
-  promoCode              String?
-  stripeCustomerId       String?                @unique
-  currency               Currency               @default(EUR)
-  pricingModel           PricingModel           @default(TIERED)
-  CustomRoles            CustomRole[]
-  notifications          Notification[]
-  subscriptions          Subscription[]
-  scimTokens             ScimToken[]
-  promptTags             PromptTag[]
-  groups                 Group[]
-  roleBindings           RoleBinding[]
-  apiKeys                ApiKey[]
+  promoCode                String?
+  stripeCustomerId         String?                   @unique
+  currency                 Currency                  @default(EUR)
+  pricingModel             PricingModel              @default(TIERED)
+  CustomRoles              CustomRole[]
+  notifications            Notification[]
+  subscriptions            Subscription[]
+  scimTokens               ScimToken[]
+  promptTags               PromptTag[]
+  groups                   Group[]
+  roleBindings             RoleBinding[]
+  apiKeys                  ApiKey[]
   // License enforcement fields (COSS-0226)
-  license                String?                @db.Text
-  licenseExpiresAt       DateTime?
-  licenseLastValidatedAt DateTime?
-  gatewayChangeEvents    GatewayChangeEvent[]
-  routingPolicies        RoutingPolicy[]
-  ingestionSources       IngestionSource[]
-  anomalyRules           AnomalyRule[]
-  anomalyAlerts          AnomalyAlert[]
-  aiToolEntries          AiToolEntry[]
-  ingestionTemplates     IngestionTemplate[]
+  license                  String?                   @db.Text
+  licenseExpiresAt         DateTime?
+  licenseLastValidatedAt   DateTime?
+  gatewayChangeEvents      GatewayChangeEvent[]
+  routingPolicies          RoutingPolicy[]
+  ingestionSources         IngestionSource[]
+  anomalyRules             AnomalyRule[]
+  anomalyAlerts            AnomalyAlert[]
+  aiToolEntries            AiToolEntry[]
+  ingestionTemplates       IngestionTemplate[]
   langyGithubInstallations LangyGithubInstallation[]
 
   @@index([ssoProvider])
@@ -375,51 +376,51 @@ model Project {
   ///     specs/ai-gateway/governance/ui-contract.feature codifies this.
   /// Stored as a free-form string (matching IngestionSource.sourceType
   /// pattern) so future routing kinds can ship without schema migrations.
-  kind                     String                              @default("application")
-  firstMessage             Boolean                             @default(false)
-  integrated               Boolean                             @default(false)
-  createdAt                DateTime                            @default(now())
-  updatedAt                DateTime                            @default(now()) @updatedAt
-  userLinkTemplate         String?
-  checks                   Monitor[]
-  costs                    Cost[]
-  topics                   Topic[]
-  datasets                 Dataset[]
-  datasetRecords           DatasetRecord[]
-  customGraphs             CustomGraph[]
-  dashboards               Dashboard[]
-  batchEvaluations         BatchEvaluation[]
-  traceSharingEnabled      Boolean                             @default(true)
-  presenceEnabled          Boolean                             @default(true)
-  triggers                 Trigger[]
-  experiments              Experiment[]
-  annotations              Annotation[]
-  projectSecrets           ProjectSecret[]
-  TriggerSent              TriggerSent[]
-  WebhookDelivery          WebhookDelivery[]
-  annotationScores         AnnotationScore[]
-  shareLinks               ShareLink[]
-  workflows                Workflow[]
-  WorkflowVersion          WorkflowVersion[]
-  AnnotationQueue          AnnotationQueue[]
-  AnnotationQueueItem      AnnotationQueueItem[]
-  s3Endpoint               String?
-  s3AccessKeyId            String?
-  s3SecretAccessKey        String?
-  s3Bucket                 String?
-  llmPromptConfigs         LlmPromptConfig[]
-  analytics                Analytics[]
-  archivedAt               DateTime?
-  notifications            Notification[]
-  agents                   Agent[]
-  evaluators               Evaluator[]
-  scenarios                Scenario[]
-  suiteConfigurations      SimulationSuite[]
-  savedViews               SavedView[]
-  gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
-  gatewayChangeEvents      GatewayChangeEvent[]
-  pinnedTraces             PinnedTrace[]
-  emailSuppressions        EmailSuppression[]
+  kind                String                @default("application")
+  firstMessage        Boolean               @default(false)
+  integrated          Boolean               @default(false)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @default(now()) @updatedAt
+  userLinkTemplate    String?
+  checks              Monitor[]
+  costs               Cost[]
+  topics              Topic[]
+  datasets            Dataset[]
+  datasetRecords      DatasetRecord[]
+  customGraphs        CustomGraph[]
+  dashboards          Dashboard[]
+  batchEvaluations    BatchEvaluation[]
+  traceSharingEnabled Boolean               @default(true)
+  presenceEnabled     Boolean               @default(true)
+  triggers            Trigger[]
+  experiments         Experiment[]
+  annotations         Annotation[]
+  projectSecrets      ProjectSecret[]
+  TriggerSent         TriggerSent[]
+  WebhookDelivery     WebhookDelivery[]
+  annotationScores    AnnotationScore[]
+  shareLinks          ShareLink[]
+  workflows           Workflow[]
+  WorkflowVersion     WorkflowVersion[]
+  AnnotationQueue     AnnotationQueue[]
+  AnnotationQueueItem AnnotationQueueItem[]
+  s3Endpoint          String?
+  s3AccessKeyId       String?
+  s3SecretAccessKey   String?
+  s3Bucket            String?
+  llmPromptConfigs    LlmPromptConfig[]
+  analytics           Analytics[]
+  archivedAt          DateTime?
+  notifications       Notification[]
+  agents              Agent[]
+  evaluators          Evaluator[]
+  scenarios           Scenario[]
+  suiteConfigurations SimulationSuite[]
+  savedViews          SavedView[]
+  gatewayGuardrails   GatewayGuardrail[]    @relation("ProjectGatewayGuardrails")
+  gatewayChangeEvents GatewayChangeEvent[]
+  pinnedTraces        PinnedTrace[]
+  emailSuppressions   EmailSuppression[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -795,31 +796,31 @@ enum AlertType {
 }
 
 model Trigger {
-  id            String        @id @default(nanoid())
-  name          String
-  projectId     String
-  project       Project       @relation(fields: [projectId], references: [id])
-  action        TriggerAction
+  id                   String            @id @default(nanoid())
+  name                 String
+  projectId            String
+  project              Project           @relation(fields: [projectId], references: [id])
+  action               TriggerAction
   // ADR-042: the automation kind. Backfilled AUTOMATION/ALERT from
   // customGraphId; REPORT is set by the scheduled-report upsert path.
-  triggerKind   TriggerKind   @default(AUTOMATION)
-  actionParams  Json
+  triggerKind          TriggerKind       @default(AUTOMATION)
+  actionParams         Json
   // Legacy structured filter object (FilterField -> values). Retained for
   // back-compat; new trace-subject automations author `filterQuery` instead
   // and persist `filters` as an empty `{}`.
-  filters       Json
+  filters              Json
   // ADR-043 Subject facet: the Traces-V2 liqe query string that defines which
   // traces this automation is about. NULL = legacy `filters`-driven trigger.
   // Evaluated in-memory against fold state at dispatch (never per-trace CH),
   // fail-closed on any unevaluable field.
-  filterQuery   String?
-  lastRunAt     Float         @default(0)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @default(now()) @updatedAt
-  active        Boolean       @default(true)
-  message       String?
-  deleted       Boolean       @default(false)
-  alertType     AlertType?
+  filterQuery          String?
+  lastRunAt            Float             @default(0)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @default(now()) @updatedAt
+  active               Boolean           @default(true)
+  message              String?
+  deleted              Boolean           @default(false)
+  alertType            AlertType?
   // Customer-authored Liquid notification templates (see ADR-036). NULL on any
   // column means "render with the framework default", so existing triggers are
   // unchanged. slackTemplateType discriminates 'string' | 'block_kit'.
@@ -829,7 +830,7 @@ model Trigger {
   emailBodyTemplate    String?
   // Per-trigger digest cadence (ADR-026). Ignored for persist actions.
   // Values: 'immediate' | '5min_digest' | '15min_digest' | 'hourly_digest'.
-  notificationCadence  String        @default("immediate")
+  notificationCadence  String            @default("immediate")
   // Per-trigger trace-readiness debounce in ms (ADR-026). The column
   // applies to every action class — a persist row captured before the
   // trace settles diverges from the trace UI permanently. Today only
@@ -838,11 +839,11 @@ model Trigger {
   // until the persist-side debounce wiring lands. The column default
   // is set so a future code change can enable persist-side debounce
   // without a schema migration.
-  traceDebounceMs      Int           @default(30000)
-  TriggerSent   TriggerSent[]
-  webhookDeliveries WebhookDelivery[]
-  customGraphId String?       @unique
-  customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
+  traceDebounceMs      Int               @default(30000)
+  TriggerSent          TriggerSent[]
+  webhookDeliveries    WebhookDelivery[]
+  customGraphId        String?           @unique
+  customGraph          CustomGraph?      @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
@@ -854,11 +855,11 @@ model Trigger {
 // truncated copy of a failure response for debugging. Our request content
 // (URL, headers, body) is never stored. Pruned after 30 days.
 model WebhookDelivery {
-  id             String                @id @default(nanoid())
+  id             String                 @id @default(nanoid())
   projectId      String
-  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   triggerId      String
-  trigger        Trigger               @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  trigger        Trigger                @relation(fields: [triggerId], references: [id], onDelete: Cascade)
   // Groups every attempt of one logical fire (== X-LangWatch-Event-Id).
   dispatchId     String
   // Null when no HTTP response arrived (transport/SSRF/timeout).
@@ -873,8 +874,8 @@ model WebhookDelivery {
   // the row by the 30-day prune. Null on success and no-response failures.
   response       Json?
   outcome        WebhookDeliveryOutcome
-  firedAt        DateTime              @default(now())
-  createdAt      DateTime              @default(now())
+  firedAt        DateTime               @default(now())
+  createdAt      DateTime               @default(now())
 
   @@index([projectId, triggerId, dispatchId])
   @@index([projectId, triggerId, firedAt])
@@ -885,6 +886,82 @@ enum WebhookDeliveryOutcome {
   retryable
   terminal
   pending
+}
+
+/// Org-anchored outbound webhook endpoint (the webhook platform, enterprise
+/// only). The signing secret is AES-256-GCM encrypted at rest (shared
+/// encrypt/decrypt, CREDENTIALS_SECRET) and returned in plaintext exactly
+/// once, at create or roll time. `enabledEvents` holds registry event types
+/// or family wildcards ("gateway.*", "*"). Failure-streak columns drive the
+/// 72h auto-disable. Spec: specs/webhooks/webhook-endpoints.feature.
+model WebhookEndpoint {
+  id                      String                @id
+  organizationId          String
+  organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  url                     String
+  secretEncrypted         String
+  /// The secret this endpoint signed with before the last roll. Deliveries
+  /// carry a second `v1=` computed from it until it expires, so a receiver
+  /// swaps secrets on its own schedule instead of dropping deliveries in the
+  /// gap. Null once the window closes or if the secret was never rolled.
+  previousSecretEncrypted String?
+  /// When the previous secret stops being signed with and accepted.
+  previousSecretExpiresAt DateTime?
+  enabledEvents           String[]              @default([])
+  status                  WebhookEndpointStatus @default(ACTIVE)
+  /// Why the endpoint is disabled: "auto_failures_72h" or "manual".
+  disabledReason          String?
+  disabledAt              DateTime?
+  /// Start of the current consecutive-failure streak; cleared on any 2xx.
+  /// 72 hours of unbroken failures from this instant auto-disables.
+  failingSince            DateTime?
+  /// Delivery controls, each server-bounded (see webhookDeliveryControls
+  /// constants): envelopes per POST, coalescing window before a partial
+  /// batch ships, and concurrent POSTs to this receiver.
+  maxBatchSize            Int                   @default(100)
+  maxBatchDelayMs         Int                   @default(250)
+  maxInFlight             Int                   @default(4)
+  lastSuccessAt           DateTime?
+  lastFailureAt           DateTime?
+  archivedAt              DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @default(now()) @updatedAt
+
+  deliveries WebhookEndpointDelivery[]
+
+  @@index([organizationId, status])
+}
+
+enum WebhookEndpointStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// Per-attempt delivery log for webhook-endpoint batches, mirroring the
+/// automations WebhookDelivery shape. `dispatchId` groups every attempt of
+/// one batch (== the X-LangWatch-Event-Id header); the receiver's HTTP
+/// status, latency, and truncated response are stored per attempt so their
+/// error codes are visible. Pruned after 30 days.
+model WebhookEndpointDelivery {
+  id             String                 @id @default(nanoid())
+  organizationId String
+  endpointId     String
+  endpoint       WebhookEndpoint        @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  dispatchId     String
+  attempt        Int
+  eventCount     Int
+  responseStatus Int?
+  latencyMs      Int?
+  error          String?
+  response       Json?
+  outcome        WebhookDeliveryOutcome
+  firedAt        DateTime               @default(now())
+  createdAt      DateTime               @default(now())
+
+  @@index([endpointId, firedAt])
+  @@index([organizationId, firedAt])
+  @@index([firedAt])
+  @@index([endpointId, dispatchId])
 }
 
 enum ExperimentType {
@@ -1219,34 +1296,34 @@ model LangyActiveTurn {
 
 /// Rebuildable per-turn operational render document.
 model LangyConversationTurnProjection {
-  id                String                    @id @default(nanoid())
+  id                String  @id @default(nanoid())
   projectId         String
-  ConversationId    String                    @map("conversationId")
-  TurnId            String                    @map("turnId")
+  ConversationId    String  @map("conversationId")
+  TurnId            String  @map("turnId")
   /// LangyConversationTurnStatus. Deliberately TEXT, not a Postgres enum: this
   /// is a PROJECTION — one writer (the fold), rebuildable from the event log,
   /// and nothing queries or indexes on it. An enum bought no selectivity here,
   /// only typo protection, and charged a migration for every new status that
   /// Postgres then could not remove. The one definition lives in
   /// `LANGY_CONVERSATION_TURN_STATUS`; the repository validates against it.
-  Status            String                    @map("status")
+  Status            String  @map("status")
   /// LangyMessagePart[] — the user question that opened the turn.
-  QuestionParts     Json                      @map("questionParts")
+  QuestionParts     Json    @map("questionParts")
   /// LangyMessagePart[] — the agent's whole final answer.
-  AnswerParts       Json                      @map("answerParts")
+  AnswerParts       Json    @map("answerParts")
   /// LangyTurnToolCall[] — tool-call lifecycle audit in initiation order.
-  ToolCalls         Json                      @map("toolCalls")
+  ToolCalls         Json    @map("toolCalls")
   /// LangyPlanItemData[] | null — null means the turn never kept a plan.
-  Plan              Json?                     @map("plan")
-  Error             String?                   @map("error")
-  StartedAt         Float?                    @map("startedAt")
-  EndedAt           Float?                    @map("endedAt")
-  CreatedAt         Float                     @map("createdAt")
-  UpdatedAt         Float                     @map("updatedAt")
-  OccurredAt        Float                     @map("occurredAt")
-  AcceptedAt        Float                     @map("acceptedAt")
-  LastEventId       String                    @map("lastEventId")
-  ProjectionVersion String                    @map("projectionVersion")
+  Plan              Json?   @map("plan")
+  Error             String? @map("error")
+  StartedAt         Float?  @map("startedAt")
+  EndedAt           Float?  @map("endedAt")
+  CreatedAt         Float   @map("createdAt")
+  UpdatedAt         Float   @map("updatedAt")
+  OccurredAt        Float   @map("occurredAt")
+  AcceptedAt        Float   @map("acceptedAt")
+  LastEventId       String  @map("lastEventId")
+  ProjectionVersion String  @map("projectionVersion")
 
   @@unique([projectId, ConversationId, TurnId])
   @@index([projectId, ConversationId, UpdatedAt])
@@ -1295,15 +1372,15 @@ model ProjectSecret {
 }
 
 model TriggerSent {
-  id            String       @id @default(nanoid())
-  triggerId     String
-  traceId       String? // Set for trace-based triggers, null for custom graph alerts
-  customGraphId String? // Set for custom graph alerts, null for trace-based triggers
-  customGraph   CustomGraph? @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
-  projectId     String
-  project       Project      @relation(fields: [projectId], references: [id])
-  trigger       Trigger      @relation(fields: [triggerId], references: [id])
-  resolvedAt    DateTime? // For custom graph alerts: null = still firing, set = resolved
+  id              String       @id @default(nanoid())
+  triggerId       String
+  traceId         String? // Set for trace-based triggers, null for custom graph alerts
+  customGraphId   String? // Set for custom graph alerts, null for trace-based triggers
+  customGraph     CustomGraph? @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
+  projectId       String
+  project         Project      @relation(fields: [projectId], references: [id])
+  trigger         Trigger      @relation(fields: [triggerId], references: [id])
+  resolvedAt      DateTime? // For custom graph alerts: null = still firing, set = resolved
   // Identity of the open incident this row represents, set while firing and
   // cleared (NULL) on resolve. A single-column unique on it means at most one
   // OPEN incident can exist per identity — Postgres treats NULLs as distinct,
@@ -1311,9 +1388,9 @@ model TriggerSent {
   // graph alert: `@@unique([triggerId, traceId])` can't guard it because
   // `traceId` is NULL for graph alerts, so without this two evaluators could
   // both open an incident and both dispatch.
-  openIncidentKey String? @unique
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @default(now()) @updatedAt
+  openIncidentKey String?      @unique
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @default(now()) @updatedAt
 
   @@unique([triggerId, traceId])
   @@index([triggerId])
@@ -2123,12 +2200,6 @@ model ApiKey {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
-
-  @@index([userId])
-  @@index([organizationId])
-  @@index([lookupId])
-  @@index([ingestSourceType])
-  @@index([ingestionTemplateId])
   // DELIBERATELY UNINDEXED: the Langy session-key reaper sweeps on
   // (name = <reserved> AND revokedAt IS NULL AND expiresAt <= now), which no
   // index above serves, so the hourly tick is a sequential scan.
@@ -2154,6 +2225,12 @@ model ApiKey {
   // never deleted, so the un-revoked working set stays small while the table
   // grows without bound. Declaring an `@@index` would make every migrate diff
   // want to recreate it as a non-partial index.
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([lookupId])
+  @@index([ingestSourceType])
+  @@index([ingestionTemplateId])
 }
 
 model BillingMeterCheckpoint {
@@ -2192,6 +2269,11 @@ model BillingMeterCheckpoint {
 
 enum VirtualKeyStatus {
   ACTIVE
+  // Reversibly stopped: requests are rejected with a distinct error, but
+  // the key material, scopes, budgets, and any rotation-grace state stay
+  // intact so enable restores service without re-provisioning. REVOKED
+  // stays terminal.
+  DISABLED
   REVOKED
 }
 
@@ -2236,6 +2318,12 @@ enum GatewayBudgetScopeType {
   VIRTUAL_KEY
   PRINCIPAL
   GROUP
+  // A TEMPLATE scope: scopeId is the ANCHOR (a virtual key or project id),
+  // and the budget applies to each distinct external end-user id seen on
+  // that anchor ("every end user: $limit per window"). Spend accrues into
+  // lazy buckets keyed "<anchorId>:<endUserId>"; the bundle carries the one
+  // template entry, never per-user rows (cardinality is unbounded).
+  ATTRIBUTED_USER
 }
 
 enum GatewayBudgetWindow {
@@ -2245,6 +2333,11 @@ enum GatewayBudgetWindow {
   WEEK
   MONTH
   TOTAL
+  // Accrues until an explicit reset moves the period boundary; the period
+  // is owned by the customer's billing cycle, not our calendar. Debit rows
+  // bucket under the epoch sentinel (like TOTAL); reads bound by the
+  // budget's currentPeriodStartedAt instead of a calendar period start.
+  MANUAL
 }
 
 enum GatewayBudgetBreachAction {
@@ -2264,6 +2357,8 @@ enum GatewayChangeEventKind {
   VK_CONFIG_UPDATED
   VK_REVOKED
   VK_ROTATED
+  VK_DISABLED
+  VK_ENABLED
   BUDGET_CREATED
   BUDGET_UPDATED
   BUDGET_DELETED
@@ -2316,6 +2411,24 @@ model VirtualKey {
   description String?
   status      VirtualKeyStatus  @default(ACTIVE)
   purpose     VirtualKeyPurpose @default(USER)
+
+  // The id the customer's own system knows this key by, unique per
+  // organization so a provisioning run can address a key it created without
+  // storing our id. Stored NULL rather than "" when absent: Postgres treats
+  // NULLs as distinct in a unique index, which is what lets any number of
+  // keys carry no external id at all.
+  externalId String?
+
+  // Customer-owned key/value map, echoed back verbatim on every read and
+  // REPLACED wholesale on patch. Never read by the gateway, never used for
+  // routing or authorization: it exists so a caller can carry its own
+  // bookkeeping on our row.
+  metadata Json @default("{}")
+
+  // Set while status is DISABLED; cleared on enable. Revoke does not touch
+  // these: DISABLED and REVOKED are independent lifecycle exits.
+  disabledAt     DateTime?
+  disabledReason String?
 
   // Credential material. Full secret format:
   //   vk-lw-<26-char-crockford-ulid>  (32 chars total)
@@ -2382,6 +2495,7 @@ model VirtualKey {
   routingMode VirtualKeyRoutingMode @default(NONE)
 
   @@unique([hashedSecret])
+  @@unique([organizationId, externalId])
   @@index([organizationId])
   @@index([displayPrefix])
   @@index([status])
@@ -3035,6 +3149,12 @@ model GatewayBudget {
   onBreach    GatewayBudgetBreachAction @default(BLOCK)
   timezone    String? // org-level default if null
 
+  // See the matching fields on VirtualKey: the customer's own id for this
+  // budget, unique per organization and stored NULL when absent, plus a
+  // customer-owned map this platform only ever echoes back.
+  externalId String?
+  metadata   Json    @default("{}")
+
   // Mutated by the ledger, read by the gateway as part of the config payload.
   spentUsd               Decimal   @default(0) @db.Decimal(18, 6)
   currentPeriodStartedAt DateTime  @default(now())
@@ -3048,7 +3168,8 @@ model GatewayBudget {
   createdById String
   createdBy   User     @relation("GatewayBudgetCreatedBy", fields: [createdById], references: [id])
 
-  ledgerEntries GatewayBudgetLedger[]
+  ledgerEntries    GatewayBudgetLedger[]
+  bucketBoundaries GatewayBudgetBucketBoundary[]
 
   // Set when this budget row is the one the virtual-key drawer's budget
   // field manages (created with the key or through its edit drawer).
@@ -3057,10 +3178,33 @@ model GatewayBudget {
   // own delete permission.
   managedByVirtualKeyId String?
 
+  @@unique([organizationId, externalId])
   @@index([organizationId])
   @@index([scopeType, scopeId, providerKey])
   @@index([managedByVirtualKeyId])
   @@index([resetsAt])
+}
+
+// Per-bucket period boundary for ATTRIBUTED_USER template budgets. The
+// template's own currentPeriodStartedAt is the anchor-wide boundary; a
+// single end-user bucket reset (POST budgets/:id/reset?end_user_id=) writes
+// a row here instead of moving the whole template. Spend reads for a bucket
+// bound by max(template boundary, bucket boundary). Rows are boundaries,
+// not counters: recorded spend is never mutated.
+model GatewayBudgetBucketBoundary {
+  id             String        @id @default(nanoid())
+  organizationId String
+  budgetId       String
+  budget         GatewayBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  // The ledger bucket key: "<anchorId>:<endUserId>".
+  bucketScopeId  String
+
+  periodStartedAt DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  @@unique([budgetId, bucketScopeId])
+  @@index([organizationId])
 }
 
 model GatewayBudgetLedger {
@@ -3206,7 +3350,7 @@ model FeatureFlag {
 
 /// Durable state for a long-running event-sourced process.
 model ProcessManagerInstance {
-  id          String   @id @default(nanoid())
+  id          String    @id @default(nanoid())
   processName String
   projectId   String
   processKey  String
@@ -3295,27 +3439,27 @@ model TopicClusteringRunProjection {
   id        String @id
   projectId String
 
-  LastRequestedAt        Float?  @map("lastRequestedAt")
-  LastRequestTrigger     String? @map("lastRequestTrigger")
-  LastRunAt              Float?  @map("lastRunAt")
+  LastRequestedAt            Float?  @map("lastRequestedAt")
+  LastRequestTrigger         String? @map("lastRequestTrigger")
+  LastRunAt                  Float?  @map("lastRunAt")
   /// completed | skipped | failed
-  LastRunOutcome         String? @map("lastRunOutcome")
-  LastRunMode            String? @map("lastRunMode")
+  LastRunOutcome             String? @map("lastRunOutcome")
+  LastRunMode                String? @map("lastRunMode")
   LastRunSkippedReason       String? @map("lastRunSkippedReason")
   LastRunError               String? @map("lastRunError")
   LastRunErrorCode           String? @map("lastRunErrorCode")
   /// True when the customer can resolve the failure (credentials, quota).
   LastRunErrorUserActionable Boolean @default(false) @map("lastRunErrorUserActionable")
-  LastRunTracesProcessed Int     @default(0) @map("lastRunTracesProcessed")
-  LastRunTopicsCount     Int     @default(0) @map("lastRunTopicsCount")
-  LastRunSubtopicsCount  Int     @default(0) @map("lastRunSubtopicsCount")
-  LastRunPages           Int     @default(0) @map("lastRunPages")
-  InProgressRunId        String? @map("inProgressRunId")
-  InProgressTraces       Int     @default(0) @map("inProgressTraces")
-  InProgressPages        Int     @default(0) @map("inProgressPages")
+  LastRunTracesProcessed     Int     @default(0) @map("lastRunTracesProcessed")
+  LastRunTopicsCount         Int     @default(0) @map("lastRunTopicsCount")
+  LastRunSubtopicsCount      Int     @default(0) @map("lastRunSubtopicsCount")
+  LastRunPages               Int     @default(0) @map("lastRunPages")
+  InProgressRunId            String? @map("inProgressRunId")
+  InProgressTraces           Int     @default(0) @map("inProgressTraces")
+  InProgressPages            Int     @default(0) @map("inProgressPages")
   /// Business time the in-progress run opened; bounds how long the read
   /// model may report it as running (mirrors the process's stale-run guard).
-  InProgressStartedAt    Float?  @map("inProgressStartedAt")
+  InProgressStartedAt        Float?  @map("inProgressStartedAt")
 
   CreatedAt         Float  @map("createdAt")
   UpdatedAt         Float  @map("updatedAt")
@@ -3424,19 +3568,19 @@ model IngestionPullRunProjection {
 // every worker can run the loop and share firing load (no leader-lock). See
 // src/server/app-layer/scheduler/ and dev/docs/adr/044-scheduled-reports-automation-kind.md.
 model ScheduledJob {
-  id         String    @id @default(nanoid())
-  projectId  String // multitenancy + per-tenant fairness
-  targetType String // the consumer key, e.g. "reportTrigger"
-  targetId   String // what to fire, e.g. the Trigger.id
-  cron       String // e.g. "0 9 * * 1"
-  timezone   String // IANA, e.g. "America/New_York"
+  id          String    @id @default(nanoid())
+  projectId   String // multitenancy + per-tenant fairness
+  targetType  String // the consumer key, e.g. "reportTrigger"
+  targetId    String // what to fire, e.g. the Trigger.id
+  cron        String // e.g. "0 9 * * 1"
+  timezone    String // IANA, e.g. "America/New_York"
   // Forward marker: the resolved UTC instant of the next fire. Indexed so
   // the loop's due-scan and MIN(nextRunAt) sleep target are cheap.
-  nextRunAt  DateTime
+  nextRunAt   DateTime
   // Last calendar instant fired (the "slot"). NULL until the first fire.
   // Only advanced once a fire is DELIVERED, so a failed slot is retried, not
   // silently skipped.
-  lastSlot   DateTime?
+  lastSlot    DateTime?
   // The calendar instant of the slot currently in flight (claimed, retrying,
   // or crash-recovering). Stamped by the FIRST claim of a slot and preserved
   // across retry/lease re-claims, because `nextRunAt` mutates into a backoff
@@ -3451,19 +3595,19 @@ model ScheduledJob {
   // bumps `attempts`, so the slot is retried instead of lost. Once `attempts`
   // reaches the cap the slot is abandoned to the next cron instant with
   // `lastError` kept for the operator. Reset to (0, NULL) on a delivered fire.
-  attempts   Int       @default(0)
-  lastError  String?
-  active     Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @default(now()) @updatedAt
+  attempts    Int       @default(0)
+  lastError   String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
 
+  // One schedule per target — makes upsertForTarget / claim a clean
+  // conditional update keyed on the target identity.
+  @@unique([targetType, targetId])
   // The due-scan: `WHERE active AND nextRunAt <= now` and MIN(nextRunAt).
   @@index([active, nextRunAt])
   // Per-project lookup.
   @@index([projectId])
-  // One schedule per target — makes upsertForTarget / claim a clean
-  // conditional update keyed on the target identity.
-  @@unique([targetType, targetId])
 }
 
 // Issue reports sent by customers' coding agents through `langwatch report`

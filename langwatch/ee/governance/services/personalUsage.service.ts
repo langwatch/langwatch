@@ -129,15 +129,53 @@ export interface PersonalUsageQueryInput {
  *
  * Personal-usage queries pin TenantId=<org's hidden Governance Project>
  * AND Scope='principal' (lowercase, matching `scopeToClickHouse` in
- * budget.clickhouse.repository.ts:539) AND ScopeId=userId so we get
- * exactly the per-user ledger rows for THIS org. The TenantId pin both
- * prunes partitions (it is the leading ORDER BY key) and scopes a
- * multi-org user to the current org — without it the query would sum the
- * user's principal spend across every org they belong to. Multi-budget
- * events show up multiple times across scope rows (one row per applicable
- * budget), but the Scope/ScopeId pair narrows to the user's principal
- * slice cleanly.
+ * budget.clickhouse.repository.ts) AND ScopeId=userId so we get exactly
+ * the per-user ledger rows for THIS org. The TenantId pin both prunes
+ * partitions (it is the leading ORDER BY key) and scopes a multi-org user
+ * to the current org — without it the query would sum the user's principal
+ * spend across every org they belong to.
+ *
+ * The Scope/ScopeId pair does NOT narrow to one row per request. A user
+ * carrying two PRINCIPAL budgets — a hard cap and a soft cap, the standard
+ * pairing — gets one principal-scope row per budget per request, each
+ * carrying the request's full cost. Summing them reports the user spending
+ * twice what they spent. Every query below therefore collapses to one row
+ * per GatewayRequestId first; see `PRINCIPAL_REQUESTS_SUBQUERY`.
  */
+
+/**
+ * The user's principal-scope ledger rows, collapsed to one row per gateway
+ * request.
+ *
+ * Two things make this exact rather than approximate. Every row a single
+ * request writes carries that request's own cost, tokens and model, so
+ * `any()` over the group returns the request's values whichever row it
+ * picks. And the group key is the request id, so N budgets contributing N
+ * identical rows collapse to the one row the request actually is. It also
+ * absorbs an un-merged ReplacingMergeTree replay, which a bare `sum` over
+ * the raw table would have counted twice.
+ *
+ * The aliases are deliberately not the column names they aggregate:
+ * ClickHouse resolves an alias back into the same SELECT's WHERE, so
+ * `any(OccurredAt) AS OccurredAt` puts an aggregate in the WHERE clause and
+ * the whole read fails.
+ */
+const PRINCIPAL_REQUESTS_SUBQUERY = `
+  SELECT
+    GatewayRequestId,
+    any(AmountUSD)    AS RequestAmountUSD,
+    any(TokensInput)  AS RequestTokensInput,
+    any(TokensOutput) AS RequestTokensOutput,
+    any(Model)        AS RequestModel,
+    any(OccurredAt)   AS RequestOccurredAt
+  FROM gateway_budget_ledger_events
+  WHERE TenantId = {tenantId:String}
+    AND Scope = 'principal'
+    AND ScopeId = {userId:String}
+    AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+    AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+  GROUP BY GatewayRequestId
+`;
 
 export class PersonalUsageService {
   /**
@@ -316,15 +354,10 @@ export class PersonalUsageService {
       const result = await client.query({
         query: `
           SELECT
-            toDate(OccurredAt) AS Day,
-            sum(AmountUSD)     AS SpentUsd,
-            countDistinct(GatewayRequestId) AS Requests
-          FROM gateway_budget_ledger_events
-          WHERE TenantId = {tenantId:String}
-            AND Scope = 'principal'
-            AND ScopeId = {userId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+            toDate(RequestOccurredAt) AS Day,
+            sum(RequestAmountUSD)     AS SpentUsd,
+            count()                   AS Requests
+          FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
           GROUP BY Day
           ORDER BY Day
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
@@ -469,15 +502,10 @@ export class PersonalUsageService {
       const result = await client.query({
         query: `
           SELECT
-            Model AS Label,
-            sum(AmountUSD)             AS SpentUsd,
-            countDistinct(GatewayRequestId) AS Requests
-          FROM gateway_budget_ledger_events
-          WHERE TenantId = {tenantId:String}
-            AND Scope = 'principal'
-            AND ScopeId = {userId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+            RequestModel          AS Label,
+            sum(RequestAmountUSD) AS SpentUsd,
+            count()               AS Requests
+          FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
           GROUP BY Label
           ORDER BY SpentUsd DESC
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
@@ -589,12 +617,11 @@ export class PersonalUsageService {
    *     scope (or pivot the receiver to write to user's personal
    *     project tenant directly so the existing trace_summaries query
    *     captures them).
-   *   - `request_id` is the dedup key on the underlying
-   *     ReplacingMergeTree. We sum `AmountUSD` directly — duplicates
-   *     across (Scope, BudgetId) for the same request are deduped at
-   *     the (TenantId, BudgetId, GatewayRequestId) ORDER BY level.
-   *     Filtering Scope='PRINCIPAL' already isolates to one row per
-   *     request per user.
+   *   - Scope='principal' narrows to the user, not to one row per
+   *     request: a user with two PRINCIPAL budgets writes two rows per
+   *     request, each carrying the full cost. The read collapses on
+   *     GatewayRequestId before it sums; see
+   *     `PRINCIPAL_REQUESTS_SUBQUERY`.
    */
   private async queryIngestionPrincipalSummary(
     client: ClickHouseClient,
@@ -611,16 +638,11 @@ export class PersonalUsageService {
       const result = await client.query({
         query: `
           SELECT
-            sum(AmountUSD)            AS TotalCost,
-            countDistinct(GatewayRequestId) AS RequestCount,
-            sum(TokensInput)          AS PromptTokens,
-            sum(TokensOutput)         AS CompletionTokens
-          FROM gateway_budget_ledger_events
-          WHERE TenantId = {tenantId:String}
-            AND Scope = 'principal'
-            AND ScopeId = {userId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+            sum(RequestAmountUSD)    AS TotalCost,
+            count()                  AS RequestCount,
+            sum(RequestTokensInput)  AS PromptTokens,
+            sum(RequestTokensOutput) AS CompletionTokens
+          FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
         query_params: {
@@ -644,15 +666,10 @@ export class PersonalUsageService {
       const topModelResult = await client.query({
         query: `
           SELECT
-            Model AS Name,
-            countDistinct(GatewayRequestId) AS Requests
-          FROM gateway_budget_ledger_events
-          WHERE TenantId = {tenantId:String}
-            AND Scope = 'principal'
-            AND ScopeId = {userId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
-          GROUP BY Model
+            RequestModel AS Name,
+            count()       AS Requests
+          FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
+          GROUP BY RequestModel
           ORDER BY Requests DESC
           LIMIT 1
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}

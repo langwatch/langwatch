@@ -547,6 +547,62 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // Org-anchored webhook platform (no projectId column): every query must be
+  // bounded by the organization or a row id; the cross-org delivery sweep and
+  // the retention prune use the raw-SQL tenancy opt-out instead.
+  WebhookEndpoint: {
+    validateWhere: (where) => {
+      const reason = "requires a row id or organizationId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          (c.organizationId && Array.isArray(c.organizationId.in)),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an organizationId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  WebhookEndpointDelivery: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, organizationId, or endpointId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          typeof c.endpointId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (
+          typeof d.organizationId !== "string" ||
+          typeof d.endpointId !== "string"
+        ) {
+          return "create requires organizationId and endpointId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
 };
 
 /**

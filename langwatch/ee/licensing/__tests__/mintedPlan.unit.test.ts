@@ -67,6 +67,7 @@ describe("buildMintedPlan", () => {
         maxMembersLite: 5,
         maxMessagesPerMonth: 100_000,
         canPublish: true,
+        webhookEndpointsEnabled: false,
         usageUnit: "traces",
       });
 
@@ -79,8 +80,24 @@ describe("buildMintedPlan", () => {
         "maxMessagesPerMonth",
         "maxWorkflows",
         "canPublish",
+        "webhookEndpointsEnabled",
         "usageUnit",
       ]);
+    });
+
+    it("mints the webhook entitlement the license sells", () => {
+      const plan = buildMintedPlan({
+        type: "ENTERPRISE",
+        name: "Enterprise",
+        maxMembers: 100,
+        maxMembersLite: 50,
+        maxMessagesPerMonth: 10_000_000,
+        canPublish: true,
+        webhookEndpointsEnabled: true,
+        usageUnit: "traces",
+      });
+
+      expect(plan.webhookEndpointsEnabled).toBe(true);
     });
   });
 });

@@ -1348,9 +1348,9 @@ describe.skipIf(!hasTestcontainers)(
           const routing = {
             __pipelineName: "billing",
             __jobType: "fold",
-            __jobName: "gatewayBudgetSync",
+            __jobName: "governanceOcsfEventsSync",
           };
-          const dispatchedId = "event_bare/fold/gatewayBudgetSync";
+          const dispatchedId = "event_bare/fold/governanceOcsfEventsSync";
           const bareJson = JSON.stringify({
             id: dispatchedId,
             groupId,
@@ -1376,7 +1376,7 @@ describe.skipIf(!hasTestcontainers)(
           await stageOffloadedUnder({
             name,
             groupId,
-            stagedJobId: "event_sibling/fold/gatewayBudgetSync",
+            stagedJobId: "event_sibling/fold/governanceOcsfEventsSync",
             objectStore,
             routing,
           });

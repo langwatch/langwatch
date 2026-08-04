@@ -1,5 +1,6 @@
 import type { Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
+import type { ApiErrorEnvelope } from "~/app/api/shared/canonical-error";
 import type { Permission } from "~/server/api/rbac";
 import {
   requireApiKeyPermission as createRequireApiKeyPermission,
@@ -38,9 +39,22 @@ export const authMiddleware: MiddlewareHandler = createUnifiedAuthMiddleware({
 });
 
 /**
+ * The same authentication, refusing in the canonical error envelope.
+ *
+ * Route families publish one error shape, and authentication runs beneath the
+ * family's own error handler, so a canonical family needs its 401s rendered
+ * canonically here rather than as the flat legacy body.
+ */
+export const canonicalAuthMiddleware: MiddlewareHandler =
+  createUnifiedAuthMiddleware({ prisma, errorEnvelope: "canonical" });
+
+/**
  * Per-endpoint RBAC middleware. Legacy project keys always pass through;
  * service/user API keys are checked against their role bindings.
  */
-export function requirePermission(permission: Permission): MiddlewareHandler {
-  return createRequireApiKeyPermission({ prisma, permission });
+export function requirePermission(
+  permission: Permission,
+  errorEnvelope: ApiErrorEnvelope = "legacy",
+): MiddlewareHandler {
+  return createRequireApiKeyPermission({ prisma, permission, errorEnvelope });
 }

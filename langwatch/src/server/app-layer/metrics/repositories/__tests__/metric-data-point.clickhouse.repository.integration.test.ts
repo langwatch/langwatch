@@ -4,15 +4,18 @@
  *
  * Runs the canonical metric repository's real INSERT/SELECT SQL against
  * ClickHouse (migration 00049). The rollup unit tests exercise the pure fold;
- * the immediateNeighbors / pointsForBuckets queries and the rollup INSERT they
- * feed are only ever mocked. This file is what proves:
+ * the successor / affected-bucket seek queries and the rollup INSERT they feed
+ * are only ever mocked. This file is what proves:
  * - ensureDataPoints lands raw points plus their usage-estimate ledger rows;
  * - recomputeAffectedRollupsMany converts a cumulative monotonic sum series
  *   spanning two 30s buckets into per-bucket deltas using rows it fetched back
  *   from ClickHouse, not the in-memory chunk;
  * - a late point ensured between existing samples converges the affected
  *   buckets on re-recompute (ReplacingMergeTree(UpdatedAt), read via FINAL —
- *   the dedup pattern migration 00049 mandates for metric_time_rollups).
+ *   the dedup pattern migration 00049 mandates for metric_time_rollups);
+ * - folding a chunk in one pass lands on exactly the rollups the per-point
+ *   path produces, using a number of reads set by the affected buckets rather
+ *   than by how many points the chunk carries.
  *
  * Fixtures come from the shared metric-point builder the rollup unit tests
  * use, so expectations here mirror rollupScalar.unit.test.ts semantics: the
@@ -258,6 +261,107 @@ describe("given a cumulative monotonic sum series spanning two rollup buckets", 
           sourcePointCount: 1,
         },
       ]);
+    });
+  });
+});
+
+describe("given a cumulative series long enough to span several rollup buckets", () => {
+  // Twelve samples every ten seconds cover four 30s buckets, and the drop to 4
+  // is a counter reset, so the fold's dependency on each sample's predecessor
+  // is live rather than incidental.
+  const values = [10, 15, 18, 26, 31, 4, 9, 14, 22, 27, 33, 40];
+  // Shared, because the read-counting block below compares its own rollups
+  // against this series rather than writing a second copy of them. Seeded in
+  // THIS describe's beforeAll so a filtered run of either child block still
+  // finds the rollups it compares against.
+  const chunkSeriesId = "d".repeat(64);
+
+  function samples(seriesId: string): CanonicalMetricDataPoint[] {
+    return values.map((value, index) =>
+      point({
+        tenantId,
+        organizationId,
+        seriesId,
+        timeUnixMs: bucket0 + index * 10_000,
+        metricKind: "sum",
+        aggregationTemporality: "cumulative",
+        isMonotonic: true,
+        valueDouble: value,
+        acceptedAt,
+      }),
+    );
+  }
+
+  beforeAll(async () => {
+    await repo.recomputeAffectedRollupsMany({
+      points: samples(chunkSeriesId),
+    });
+  }, 60_000);
+
+  describe("when one series folds as a chunk and an identical one folds a point at a time", () => {
+    // Both series use the same timestamps, so the fixture derives the same
+    // point ids for both. That is deliberate: a point id is only unique within
+    // its series, and the chunk path reads many series in one query.
+    const perPointSeriesId = "e".repeat(64);
+
+    beforeAll(async () => {
+      // Reverse order on purpose: every sample is late relative to the one
+      // before it, which is the arrival pattern a chunk collapses.
+      for (const single of [...samples(perPointSeriesId)].reverse()) {
+        await repo.recomputeAffectedRollups({ point: single });
+      }
+    }, 60_000);
+
+    it("folds the chunk to exactly the rollups the per-point path produces", async () => {
+      const chunked = await readRollups(chunkSeriesId);
+      const perPoint = await readRollups(perPointSeriesId);
+
+      expect(chunked).toEqual(perPoint);
+      expect(chunked).toHaveLength(4);
+    });
+
+    it("counts every sample exactly once across the buckets", async () => {
+      const chunked = await readRollups(chunkSeriesId);
+
+      expect(
+        chunked.reduce((total, row) => total + row.sourcePointCount, 0),
+      ).toBe(values.length);
+    });
+  });
+
+  describe("when the chunk is folded through a client that counts its reads", () => {
+    const countedSeriesId = "f".repeat(64);
+    let reads: number;
+
+    beforeAll(async () => {
+      reads = 0;
+      const counting = {
+        query: async (args: Parameters<ClickHouseClient["query"]>[0]) => {
+          reads += 1;
+          return await ch.query(args);
+        },
+        insert: async (args: Parameters<ClickHouseClient["insert"]>[0]) =>
+          await ch.insert(args),
+      } as unknown as ClickHouseClient;
+
+      await new MetricDataPointClickHouseRepository({
+        resolveClient: async () => counting,
+        resolveOrganizationClient: async () => counting,
+      }).recomputeAffectedRollupsMany({ points: samples(countedSeriesId) });
+    }, 60_000);
+
+    it("reads once for the successors and once for the affected buckets", async () => {
+      // The seek budget folds all twelve successor seeks into one statement
+      // and every affected bucket into a second. Reading per point would make
+      // this grow with the chunk instead.
+      expect(reads).toBe(2);
+    });
+
+    it("still produces the same rollups as the uncounted chunk", async () => {
+      const counted = await readRollups(countedSeriesId);
+
+      expect(counted).toHaveLength(4);
+      expect(counted).toEqual(await readRollups(chunkSeriesId));
     });
   });
 });

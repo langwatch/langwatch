@@ -808,4 +808,108 @@ describe("PrismaProcessStore", () => {
       });
     });
   });
+
+  describe("given dead outbox messages", () => {
+    async function commitAndKill(messageKey: string): Promise<void> {
+      await store.commit(
+        commit({
+          sourceEventId: `event-${messageKey}`,
+          expectedRevision: 0,
+          messages: [message(messageKey)],
+        }),
+      );
+      const [leased] = await store.leaseDueMessages({
+        now: 2_000,
+        limit: 10,
+        leaseDurationMs: 30_000,
+        processNames: [processName],
+      });
+      await store.markFailed({
+        identity: {
+          processName,
+          projectId: "project-1",
+          messageKey,
+        },
+        leaseToken: leased!.leaseToken,
+        now: 2_000,
+        nextAttemptAt: 3_000,
+        dead: true,
+      });
+    }
+
+    /** @scenario Dead lettered batches can be requeued */
+    it("requeues them as pending with a fresh attempt budget, due now", async () => {
+      await commitAndKill("send:endpoint-a:deadbeef");
+
+      const requeued = await store.requeueDeadMessages({
+        processName,
+        projectId: "project-1",
+        processKey: "conversation-1",
+        now: 5_000,
+      });
+      expect(requeued).toBe(1);
+
+      const leased = await store.leaseDueMessages({
+        now: 5_001,
+        limit: 10,
+        leaseDurationMs: 30_000,
+        processNames: [processName],
+      });
+      expect(leased).toHaveLength(1);
+      expect(leased[0]).toMatchObject({
+        messageKey: "send:endpoint-a:deadbeef",
+        status: "pending",
+        attempts: 0,
+      });
+    });
+
+    it("a message key prefix narrows the requeue to one target's messages", async () => {
+      await commitAndKill("send:endpoint-a:111111");
+      const second = await store.commit(
+        commit({
+          sourceEventId: "event-second",
+          expectedRevision: 1,
+          state: { step: 2 },
+          messages: [message("send:endpoint-b:222222")],
+        }),
+      );
+      expect(second.outcome).toBe("committed");
+      const [leasedB] = await store.leaseDueMessages({
+        now: 2_500,
+        limit: 10,
+        leaseDurationMs: 30_000,
+        processNames: [processName],
+      });
+      await store.markFailed({
+        identity: {
+          processName,
+          projectId: "project-1",
+          messageKey: "send:endpoint-b:222222",
+        },
+        leaseToken: leasedB!.leaseToken,
+        now: 2_500,
+        nextAttemptAt: 3_000,
+        dead: true,
+      });
+
+      const requeued = await store.requeueDeadMessages({
+        processName,
+        projectId: "project-1",
+        processKey: "conversation-1",
+        messageKeyPrefix: "send:endpoint-b:",
+        now: 6_000,
+      });
+      expect(requeued).toBe(1);
+
+      const leased = await store.leaseDueMessages({
+        now: 6_001,
+        limit: 10,
+        leaseDurationMs: 30_000,
+        processNames: [processName],
+      });
+      expect(leased.map((m) => m.messageKey)).toEqual([
+        "send:endpoint-b:222222",
+      ]);
+    });
+  });
 });

@@ -27,7 +27,7 @@ export interface CreateGatewayBudgetOptions {
   providerKey?: string;
 }
 
-const ALLOWED_WINDOWS: BudgetWindow[] = ["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL"];
+const ALLOWED_WINDOWS: BudgetWindow[] = ["minute", "hour", "day", "week", "month", "total"];
 
 function buildScope(options: CreateGatewayBudgetOptions): CreateGatewayBudgetScope {
   switch (options.scope) {
@@ -35,24 +35,24 @@ function buildScope(options: CreateGatewayBudgetOptions): CreateGatewayBudgetSco
       if (!options.organization) {
         throw new Error("--organization <id> required for scope=organization");
       }
-      return { kind: "ORGANIZATION", organization_id: options.organization };
+      return { kind: "organization", organization_id: options.organization };
     case "team":
       if (!options.team) throw new Error("--team <id> required for scope=team");
-      return { kind: "TEAM", team_id: options.team };
+      return { kind: "team", team_id: options.team };
     case "project":
       if (!options.project) throw new Error("--project <id> required for scope=project");
-      return { kind: "PROJECT", project_id: options.project };
+      return { kind: "project", project_id: options.project };
     case "virtual-key":
       if (!options.virtualKey) throw new Error("--virtual-key <id> required for scope=virtual-key");
-      return { kind: "VIRTUAL_KEY", virtual_key_id: options.virtualKey };
+      return { kind: "virtual_key", virtual_key_id: options.virtualKey };
     case "principal":
       if (!options.principal) throw new Error("--principal <id> required for scope=principal");
-      return { kind: "PRINCIPAL", principal_user_id: options.principal };
+      return { kind: "principal", principal_user_id: options.principal };
     case "group":
       // Per-member allowance: --limit is what EACH member may spend.
       // Requires a deployment with the ClickHouse spend ledger.
       if (!options.group) throw new Error("--group <id> required for scope=group");
-      return { kind: "GROUP", group_id: options.group };
+      return { kind: "group", group_id: options.group };
   }
 }
 
@@ -65,10 +65,12 @@ export const createGatewayBudgetCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const upperWindow = options.window.toUpperCase() as BudgetWindow;
-  if (!ALLOWED_WINDOWS.includes(upperWindow)) {
+  // The flag stays case-insensitive for the human typing it; the wire value
+  // is always lowercase.
+  const window = options.window.toLowerCase() as BudgetWindow;
+  if (!ALLOWED_WINDOWS.includes(window)) {
     console.error(
-      chalk.red(`Error: --window must be one of ${ALLOWED_WINDOWS.join(", ").toLowerCase()}`),
+      chalk.red(`Error: --window must be one of ${ALLOWED_WINDOWS.join(", ")}`),
     );
     process.exit(1);
   }
@@ -82,7 +84,7 @@ export const createGatewayBudgetCommand = async (
   }
 
   const onBreach: BudgetOnBreach | undefined = options.onBreach
-    ? (options.onBreach.toUpperCase() as BudgetOnBreach)
+    ? (options.onBreach.toLowerCase() as BudgetOnBreach)
     : undefined;
 
   const service = new GatewayBudgetsApiService();
@@ -93,7 +95,7 @@ export const createGatewayBudgetCommand = async (
       name: options.name,
       description: options.description,
       scope,
-      window: upperWindow,
+      window,
       limit_usd: options.limit,
       on_breach: onBreach,
       timezone: options.timezone ?? null,
@@ -105,15 +107,15 @@ export const createGatewayBudgetCommand = async (
     return {
       data: budget,
       table: () => {
-        const perMember = budget.scope_type === "GROUP";
+        const perMember = budget.scope_type === "group";
         console.log();
         console.log(`${chalk.bold("ID:")}       ${budget.id}`);
-        console.log(`${chalk.bold("Scope:")}    ${budget.scope_type.toLowerCase()}:${budget.scope_id}`);
-        console.log(`${chalk.bold("Window:")}   ${budget.window.toLowerCase()}`);
+        console.log(`${chalk.bold("Scope:")}    ${budget.scope_type}:${budget.scope_id}`);
+        console.log(`${chalk.bold("Window:")}   ${budget.window}`);
         console.log(
           `${chalk.bold("Limit:")}    $${budget.limit_usd}${perMember ? chalk.gray(` per member (${budget.member_count ?? 0} members)`) : ""}`,
         );
-        console.log(`${chalk.bold("Breach:")}   ${budget.on_breach.toLowerCase()}`);
+        console.log(`${chalk.bold("Breach:")}   ${budget.on_breach}`);
         if (budget.provider_key) {
           console.log(`${chalk.bold("Provider:")} ${budget.provider_key}`);
         }

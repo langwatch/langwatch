@@ -6,10 +6,11 @@ import type { LicensePlanLimits } from "../types";
 /**
  * Tests for resolvePlanDefaults.
  *
- * Only the enforced levers (member seats, messages volume) + plan identity are
- * resolved onto the active plan. Workspace structure (projects, teams) and
- * experimentation resources are OSS/uncapped, so their license fields — even
- * when present in an older signed payload — are ignored and never resolved.
+ * Only the enforced levers (member seats, messages volume, webhook endpoints) +
+ * plan identity are resolved onto the active plan. Workspace structure
+ * (projects, teams) and experimentation resources are OSS/uncapped, so their
+ * license fields — even when present in an older signed payload — are ignored
+ * and never resolved.
  */
 
 describe("resolvePlanDefaults", () => {
@@ -133,6 +134,7 @@ describe("resolvePlanDefaults", () => {
       maxMembersLite: 3,
       maxMessagesPerMonth: 50_000,
       canPublish: false,
+      webhookEndpointsEnabled: false,
       usageUnit: "traces",
     });
     expect("maxProjects" in resolved).toBe(false);
@@ -157,10 +159,37 @@ describe("resolvePlanDefaults", () => {
       maxMembers: resolved.maxMembers,
       maxMembersLite: resolved.maxMembersLite,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
+      webhookEndpointsEnabled: resolved.webhookEndpointsEnabled,
       canPublish: resolved.canPublish,
       usageUnit: resolved.usageUnit,
     };
 
     expect(allFields).toEqual(resolved);
+  });
+
+  it("defaults the webhook entitlement to false and honors an explicit true", () => {
+    const withoutFlag = resolvePlanDefaults({
+      type: "TEST",
+      name: "Test",
+      maxMembers: 1,
+      maxProjects: 1,
+      maxMessagesPerMonth: 1000,
+      maxWorkflows: 10,
+      canPublish: false,
+    });
+    // A paid feature must never leak by default.
+    expect(withoutFlag.webhookEndpointsEnabled).toBe(false);
+
+    const withFlag = resolvePlanDefaults({
+      type: "TEST",
+      name: "Test",
+      maxMembers: 1,
+      maxProjects: 1,
+      maxMessagesPerMonth: 1000,
+      maxWorkflows: 10,
+      canPublish: false,
+      webhookEndpointsEnabled: true,
+    });
+    expect(withFlag.webhookEndpointsEnabled).toBe(true);
   });
 });

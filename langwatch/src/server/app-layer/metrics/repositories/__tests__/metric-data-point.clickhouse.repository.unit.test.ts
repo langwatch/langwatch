@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing/pipelines/metric-processing/schemas/constants";
 import type { CanonicalMetricDataPoint } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
 import { MetricDataPointClickHouseRepository } from "../metric-data-point.clickhouse.repository";
 
@@ -219,5 +220,257 @@ describe("MetricDataPointClickHouseRepository", () => {
         projectedEventEquivalentUsage: 3,
       },
     ]);
+  });
+
+  describe("when a coalesced chunk is folded into rollups", () => {
+    // A bucket-aligned base keeps every generated point inside one 30s bucket,
+    // so the affected-bucket read stays at a single seek and the successor
+    // seeks are the only thing the chunk size moves.
+    const base =
+      Math.floor(1_700_000_000_000 / METRIC_ROLLUP_INTERVAL_MS) *
+      METRIC_ROLLUP_INTERVAL_MS;
+
+    function chunkOf(count: number): CanonicalMetricDataPoint[] {
+      return Array.from({ length: count }, (_, index) => {
+        const timeUnixMs = base + index;
+        return {
+          ...dataPoint(),
+          pointId: String(index).padStart(64, "0"),
+          timeUnixMs,
+          timeUnixNano: String(BigInt(timeUnixMs) * 1_000_000n),
+        };
+      });
+    }
+
+    function reader() {
+      const query = vi.fn<
+        (args: { query: string }) => Promise<{ json: () => Promise<unknown[]> }>
+      >(async () => ({ json: async () => [] }));
+      const insert = vi.fn(async () => {});
+      return { query, client: { query, insert } as never };
+    }
+
+    it("reads once for the successors and once for the affected bucket", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(12) });
+
+      expect(query).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the reads flat as the chunk grows within the seek budget", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(64) });
+
+      expect(query).toHaveBeenCalledTimes(2);
+    });
+
+    it("splits the successor seeks once the chunk outgrows the budget", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      // 130 points need three statements of successor seeks; the single
+      // affected bucket still needs one. Reading per point would be 131.
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(130) });
+
+      expect(query).toHaveBeenCalledTimes(4);
+    });
+
+    it("asks for each point's own successor rather than its predecessor", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(2) });
+
+      const successorSeeks = query.mock.calls[0]![0].query;
+      // The bound is what encodes "successor" — an ascending order with a `<`
+      // bound would still read backwards, so pin the direction of both.
+      expect(successorSeeks).toContain(
+        "metric_data_points.TimeUnixMs > {time0:DateTime64(3)}",
+      );
+      expect(successorSeeks).toContain(
+        "ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC",
+      );
+    });
+
+    it("never fetches the payload column on either read", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(2) });
+
+      // The fold never reads CanonicalPayload, and it is the one
+      // megabyte-scale column: fetching it through FINAL across the folded
+      // seek branches can push a single query past the server's per-query
+      // memory cap (MEMORY_LIMIT_EXCEEDED in ReplacingSorted). Both reads
+      // must stay payload-free.
+      const successorSeeks = query.mock.calls[0]![0].query;
+      const bucketReads = query.mock.calls[1]![0].query;
+      expect(successorSeeks).not.toContain("CanonicalPayload");
+      expect(bucketReads).not.toContain("CanonicalPayload");
+      // The seek stays minimal: sequence fields only.
+      expect(successorSeeks).not.toContain("ResourceAttributesJson");
+      expect(bucketReads).toContain("BucketCounts");
+    });
+
+    it("folds rows that arrive without the payload column all the way to a rollup write", async () => {
+      // Runtime counterpart to the SQL-text assertions above: the mock
+      // REJECTS any read that asks for the payload column and answers with
+      // rows that omit it, so this executes fromSeekRow and the
+      // payload-free fromRaw end to end instead of only inspecting strings.
+      const point = { ...dataPoint(), timeUnixMs: base + 1_000 };
+      const seekRow = {
+        SeriesId: point.seriesId,
+        PointId: "f".repeat(64),
+        TimeUnixMs: base + 2_000,
+        TimeUnixNano: String(BigInt(base + 2_000) * 1_000_000n),
+        MetricKind: "gauge",
+        AggregationTemporality: "unspecified",
+      };
+      const authoritativeRow = {
+        TenantId: point.tenantId,
+        PointId: point.pointId,
+        SeriesId: point.seriesId,
+        ResourceSchemaUrl: "",
+        ResourceAttributesJson: "[]",
+        ResourceAttributeKeys: [],
+        ScopeSchemaUrl: "",
+        ScopeName: "scope",
+        ScopeVersion: "",
+        ScopeAttributesJson: "[]",
+        ScopeAttributeKeys: [],
+        MetricName: "requests",
+        MetricDescription: "",
+        MetricUnit: "1",
+        MetricKind: "gauge",
+        AggregationTemporality: "unspecified",
+        IsMonotonic: null,
+        PointAttributesJson: "[]",
+        PointAttributeKeys: [],
+        StartTimeUnixNano: "0",
+        TimeUnixNano: point.timeUnixNano,
+        TimeUnixMs: point.timeUnixMs,
+        Flags: 0,
+        ValueType: "double",
+        ValueInt: null,
+        ValueDouble: 1.5,
+        Count: null,
+        Sum: null,
+        Min: null,
+        Max: null,
+        ExplicitBounds: [],
+        BucketCounts: [],
+        ExponentialScale: null,
+        ExponentialZeroThreshold: null,
+        ZeroCount: null,
+        PositiveOffset: null,
+        PositiveBucketCounts: [],
+        NegativeOffset: null,
+        NegativeBucketCounts: [],
+        SummaryQuantilesJson: "[]",
+        _size_bytes: 23,
+        OccurredAt: point.timeUnixMs,
+        AcceptedAt: point.timeUnixMs,
+      };
+      const query = vi.fn<
+        (args: { query: string }) => Promise<{ json: () => Promise<unknown[]> }>
+      >(async ({ query: sql }) => {
+        if (sql.includes("CanonicalPayload")) {
+          throw new Error("read selected the payload column");
+        }
+        return sql.includes("{from0:")
+          ? { json: async () => [authoritativeRow] }
+          : { json: async () => [seekRow] };
+      });
+      const insert = vi.fn<
+        (args: { table: string; values: unknown[] }) => Promise<void>
+      >(async () => {});
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => ({ query, insert }) as never,
+        resolveOrganizationClient: async () => ({ query, insert }) as never,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: [point] });
+
+      const rollupInsert = insert.mock.calls.find(
+        (call) => call[0].table === "metric_time_rollups",
+      );
+      expect(rollupInsert).toBeDefined();
+      expect(rollupInsert![0].values.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when a folded read answers with a row it cannot decode", () => {
+    const base =
+      Math.floor(1_700_000_000_000 / METRIC_ROLLUP_INTERVAL_MS) *
+      METRIC_ROLLUP_INTERVAL_MS;
+
+    /**
+     * The shape the rollup lane actually failed on: a row that parses as JSON
+     * and carries its identifiers, but is missing one of the `Array(UInt64)`
+     * count columns the decoder dereferences unguarded. Walking straight into
+     * `undefined.map` costs the whole diagnosis — the queue logs an error's
+     * message and nothing else, so the failure names no column, no series and
+     * no query.
+     */
+    function rowMissingBucketCounts() {
+      const point = dataPoint();
+      return {
+        TenantId: point.tenantId,
+        PointId: point.pointId,
+        SeriesId: point.seriesId,
+        TimeUnixMs: base,
+        TimeUnixNano: String(BigInt(base) * 1_000_000n),
+        StartTimeUnixNano: "1",
+        MetricKind: "gauge",
+        AggregationTemporality: "unspecified",
+        PositiveBucketCounts: [],
+        NegativeBucketCounts: [],
+      };
+    }
+
+    it("names the missing column, the series and the point instead of dereferencing it", async () => {
+      const query = vi.fn(async () => ({
+        json: async () => [rowMissingBucketCounts()],
+      }));
+      const client = { query, insert: vi.fn(async () => {}) } as never;
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      const point = dataPoint();
+      // One rejection, three identifiers: the column that was absent, and the
+      // series + point that locate the untrustworthy row. That is the whole
+      // contract this guard exists for — a bare undefined-property error named
+      // none of them.
+      await expect(
+        repository.recomputeAffectedRollupsMany({
+          points: [{ ...point, timeUnixMs: base }],
+        }),
+      ).rejects.toThrow(
+        new RegExp(
+          `missing the BucketCounts column \\(series ${point.seriesId}, point ${point.pointId}\\)`,
+        ),
+      );
+    });
   });
 });

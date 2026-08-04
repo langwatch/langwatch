@@ -22,6 +22,7 @@ import { app as exportScenarioRunsApp } from "../app/api/export/scenario-runs/[[
 import { app as exportTracesApp } from "../app/api/export/traces/[[...route]]/app";
 import { app as filesApp } from "../app/api/files/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
+import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
@@ -39,6 +40,7 @@ import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
+import { app as webhookPlatformApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 import { app as annotationsApp } from "./routes/annotations";
 import { app as authApp } from "./routes/auth";
@@ -53,6 +55,7 @@ import {
   legacyAliasApp as experimentsV3LegacyAliasApp,
 } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
+import { app as gatewayOpenApiApp } from "./routes/gateway-openapi";
 import { app as githubLangyApp } from "./routes/github-langy";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
@@ -129,6 +132,11 @@ export function createApiRouter() {
   api.route("/", filesApp);
   api.route("/", exportTracesApp);
   api.route("/", exportScenarioRunsApp);
+  // ORDERING: the unauthenticated spec document shares the /api/gateway/v1
+  // namespace with the credentialed resource routes, so it is mounted first
+  // and cannot be shadowed by a sibling that later grows a parameterised
+  // segment at the root of that namespace.
+  api.route("/", gatewayOpenApiApp); // /api/gateway/v1/openapi.json
   api.route("/", gatewayPlatformApp);
   api.route("/", governanceApp);
   api.route("/", graphsApp);
@@ -145,6 +153,8 @@ export function createApiRouter() {
   api.route("/", simulationRunsApp);
   api.route("/", suitesApp);
   api.route("/", teamsApp);
+  api.route("/", webhookPlatformApp);
+  api.route("/", gatewaySpendApp);
   api.route("/", tracesApp);
   api.route("/", triggersApp);
   api.route("/", userAvatarApp); // /api/user-avatar/:projectId/:id — user avatars

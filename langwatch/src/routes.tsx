@@ -356,6 +356,14 @@ const routes: RouteObject[] = [
         path: "/settings/gateway/guardrails",
         ...page(() => import("./pages/settings/gateway/guardrails")),
       },
+      {
+        path: "/settings/gateway/billing-events",
+        ...page(() => import("./pages/settings/gateway/billing-events")),
+      },
+      {
+        path: "/settings/gateway/webhooks",
+        ...page(() => import("./pages/settings/gateway/webhooks")),
+      },
     ],
   },
 

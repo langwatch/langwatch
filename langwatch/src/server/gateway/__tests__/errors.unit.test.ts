@@ -47,7 +47,7 @@ describe("gateway handled errors", () => {
 
       expect(error.code).toBe("gateway_scope_org_mismatch");
       expect(error.fault).toBe("customer");
-      expect(error.meta).toEqual({ scopeKind: "team" });
+      expect(error.meta).toEqual({ scope_type: "team" });
 
       // The id is the whole point: it belongs to a record in an organization
       // this caller has no part in, and the message it used to sit inside

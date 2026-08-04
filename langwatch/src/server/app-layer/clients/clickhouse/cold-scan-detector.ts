@@ -64,6 +64,10 @@ export const TIME_PARTITIONED_TABLES = {
 
   // Gateway / governance / misc.
   gateway_budget_ledger_events: ["OccurredAt"],
+  // The spend record: month-partitioned on OccurredAt with a fixed
+  // 13-month TTL; the pull surface is ranged by contract, and any
+  // unwindowed read here walks all 13 months under FINAL.
+  gateway_spend: ["OccurredAt"],
   gateway_budget_scope_totals: ["PeriodStart"],
   governance_kpis: ["HourBucket"],
   automation_audit: ["OccurredAt"],

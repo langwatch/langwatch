@@ -1,5 +1,9 @@
 import { PromptScope } from "@prisma/client";
 import { z } from "zod";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+
+patchZodOpenapi();
+
 import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 import { SchemaVersion } from "~/server/prompt-config/enums";
 import { LlmConfigInputTypes, LlmConfigOutputTypes } from "~/types";
@@ -133,16 +137,22 @@ export function deriveResponseFormatFromOutputs(
   };
 }
 
-const jsonValue: z.ZodType<unknown> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.null(),
-    z.array(jsonValue),
-    z.record(z.string(), jsonValue),
-  ]),
-);
+// Registered under a stable component ref: the schema is recursive (arrays
+// and records of itself), and the OpenAPI generator can only express a
+// recursive schema as a named $ref; unregistered recursion is a hard error
+// at spec build time.
+const jsonValue: z.ZodType<unknown> = z
+  .lazy(() =>
+    z.union([
+      z.string(),
+      z.number(),
+      z.boolean(),
+      z.null(),
+      z.array(jsonValue),
+      z.record(z.string(), jsonValue),
+    ]),
+  )
+  .openapi({ ref: "JsonValue" });
 
 export const runtimeParametersSchema = z
   .record(z.string(), jsonValue)

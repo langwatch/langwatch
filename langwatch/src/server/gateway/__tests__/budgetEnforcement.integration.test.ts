@@ -3,32 +3,35 @@
  *
  * A blocking budget must actually block, and must warn before it does.
  *
- * Real Postgres + real ClickHouse, no mocks. Spend is folded by the real
- * trace-fold reactor and read back through the real service, so this covers
- * the whole control-plane path the gateway enforces from: fold -> ledger ->
- * rollup -> decision.
+ * Real Postgres + real ClickHouse, no mocks. Spend is written by the real
+ * debits process manager, exactly as its outbox executes it, and read back
+ * through the real service, so this covers the whole control-plane path the
+ * gateway enforces from: debit -> ledger -> rollup -> decision.
  *
  * Regression guard for issue #6141, where budgets accrued nothing on four of
  * six windows and so never warned and never blocked however much traffic ran.
  * A budget that silently never enforces is worse than no budget, so this fails
  * if the ladder from allow to warn to block ever stops working.
  */
-import { createGatewayBudgetSyncReactor } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
+import {
+  runWriteGatewayDebits,
+  type WriteGatewayDebitsPayload,
+} from "@ee/governance/process-manager/gatewayDebits.process";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
+import {
+  CURRENT_ROLLUP_REBUILD_MIGRATION,
+  replayGooseMigrationUp,
+} from "~/server/clickhouse/__tests__/migrationReplay";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
-import { GatewayBudgetRepository } from "../budget.repository";
 import { GatewayBudgetService } from "../budget.service";
 
 const suffix = nanoid(8);
@@ -48,57 +51,41 @@ const PRE_BUDGET_ID = `bdg-preutc-${suffix}`;
 const LIMIT_USD = "0.005";
 const COST_PER_REQUEST = 0.001;
 
-function foldState(attrs: Record<string, string>): TraceSummaryData {
-  const now = Date.now();
+/** One served request's debit, as the spend pipeline mints it. */
+function servedRequest(options: {
+  projectId: string;
+  virtualKeyId: string;
+}): WriteGatewayDebitsPayload {
   return {
-    traceId: `trace-${nanoid()}`,
-    spanCount: 1,
-    totalDurationMs: 120,
-    computedIOSchemaVersion: "2025-12-18",
-    computedInput: "ping",
-    computedOutput: "pong",
-    timeToFirstTokenMs: null,
-    timeToLastTokenMs: null,
-    tokensPerSecond: null,
-    containsErrorStatus: false,
-    containsOKStatus: true,
-    errorMessage: null,
-    models: ["gpt-5-mini"],
-    totalCost: COST_PER_REQUEST,
-    nonBilledCost: null,
-    tokensEstimated: false,
-    totalPromptTokenCount: 300,
-    totalCompletionTokenCount: 150,
-    outputFromRootSpan: false,
-    outputSpanEndTimeMs: 0,
-    blockedByGuardrail: false,
-    rootSpanType: null,
-    containsAi: false,
-    containsPrompt: false,
-    selectedPromptId: null,
-    selectedPromptSpanId: null,
-    selectedPromptStartTimeMs: null,
-    lastUsedPromptId: null,
-    lastUsedPromptVersionNumber: null,
-    lastUsedPromptVersionId: null,
-    lastUsedPromptSpanId: null,
-    lastUsedPromptStartTimeMs: null,
-    topicId: null,
-    subTopicId: null,
-    traceName: "",
-    annotationIds: [],
-    attributes: attrs,
-    occurredAt: now,
-    createdAt: now,
-    updatedAt: now,
-    LastEventOccurredAt: now,
-  } as unknown as TraceSummaryData;
+    gateway_request_id: `grq_${nanoid()}`,
+    project_id: options.projectId,
+    organization_id: ORG_ID,
+    team_id: TEAM_ID,
+    virtual_key_id: options.virtualKeyId,
+    principal_user_id: USER_ID,
+    end_user_id: "",
+    model: "gpt-5-mini",
+    model_provider_id: "",
+    usage: {
+      input_tokens: 300,
+      output_tokens: 150,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      reasoning_tokens: 0,
+    },
+    cost_nano_usd: COST_PER_REQUEST * NANO_USD_PER_USD,
+    rate_version: "catalog@test",
+    status: "confirmed",
+    error_type: "",
+    duration_ms: 120,
+    occurred_at: Date.now(),
+  };
 }
 
 describe("given a blocking budget on traffic the gateway is serving", () => {
   let service: GatewayBudgetService;
   let recordOneRequest: () => Promise<void>;
-  let reactor: ReturnType<typeof createGatewayBudgetSyncReactor>;
+  let writeDebits: (payload: WriteGatewayDebitsPayload) => Promise<void>;
 
   const decide = async () =>
     await service.check({
@@ -190,25 +177,14 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     const chRepo = new GatewayBudgetClickHouseRepository(resolveClient);
     service = GatewayBudgetService.create(prisma, chRepo);
 
-    reactor = createGatewayBudgetSyncReactor({
+    writeDebits = runWriteGatewayDebits({
       prisma,
-      budgetRepository: new GatewayBudgetRepository(prisma),
       budgetCHRepository: chRepo,
     });
 
     recordOneRequest = async () => {
-      const gatewayRequestId = `grq_${nanoid()}`;
-      const state = foldState({
-        "langwatch.virtual_key_id": VK_ID,
-        "langwatch.gateway_request_id": gatewayRequestId,
-      });
-      await reactor.handle(
-        {} as TraceProcessingEvent,
-        {
-          tenantId: PROJECT_ID,
-          aggregateId: state.traceId,
-          foldState: state,
-        } as ReactorContext<TraceSummaryData>,
+      await writeDebits(
+        servedRequest({ projectId: PROJECT_ID, virtualKeyId: VK_ID }),
       );
     };
   }, 120_000);
@@ -318,7 +294,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
   describe("given spend recorded before the UTC rollup rebuild", () => {
     // The upgrade path migration 00058 protects: a deployment whose
     // ClickHouse ran outside UTC folded its history at local midnight, a
-    // bucket /budget/check never reads. The migration rebuilds the rollup
+    // bucket enforcement never reads. The migration rebuilds the rollup
     // from the ledger under UTC boundaries, so that history must count
     // toward warning and blocking together with spend recorded after it.
     //
@@ -344,18 +320,11 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       });
 
     const recordOnePreProjectRequest = async () => {
-      const gatewayRequestId = `grq_${nanoid()}`;
-      const state = foldState({
-        "langwatch.virtual_key_id": PRE_VK_ID,
-        "langwatch.gateway_request_id": gatewayRequestId,
-      });
-      await reactor.handle(
-        {} as TraceProcessingEvent,
-        {
-          tenantId: PRE_PROJECT_ID,
-          aggregateId: state.traceId,
-          foldState: state,
-        } as ReactorContext<TraceSummaryData>,
+      await writeDebits(
+        servedRequest({
+          projectId: PRE_PROJECT_ID,
+          virtualKeyId: PRE_VK_ID,
+        }),
       );
     };
 
@@ -447,12 +416,16 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       });
 
       // The decision as a pre-upgrade deployment would compute it, then
-      // the upgrade under test: pin the truncation to UTC and rebuild the
-      // rollup from the ledger.
+      // the upgrade under test: the CURRENT rollup rebuild, which pins the
+      // truncation to UTC, keys the aggregate by budget, and re-derives
+      // every row from the ledger. Replaying the newest rebuild rather than
+      // the one that first fixed the timezone is what keeps this scenario
+      // honest as the rollup evolves: the claim is that spend folded by any
+      // older view still enforces after the upgrade a deployment runs.
       preRebuildDecision = await decidePreProject();
       await replayGooseMigrationUp({
         client,
-        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
       });
     }, 120_000);
 
@@ -464,7 +437,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
       await replayGooseMigrationUp({
         client: client!,
-        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
       });
     }, 120_000);
 

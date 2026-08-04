@@ -2,10 +2,7 @@ import {
   type EnterprisePipelineSetConfig,
   registerEnterprisePipelineSet,
 } from "@ee/event-sourcing/pipelineSet";
-import {
-  createGatewayBudgetSyncReactor,
-  type GatewayBudgetSyncReactorDeps,
-} from "@ee/governance/reactors/gatewayBudgetSync.reactor";
+import type { GatewayDebitsProcessDeps } from "@ee/governance/process-manager/gatewayDebits.process";
 import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,
@@ -15,6 +12,7 @@ import {
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
+import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
   LangyConversationStateData,
   LangyConversationTurnData,
@@ -33,6 +31,7 @@ import {
 import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { featureFlagService } from "~/server/featureFlag";
+import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
@@ -123,6 +122,11 @@ import type { ExperimentRunStateData } from "./pipelines/experiment-run-processi
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
+import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-processing/pipeline";
+import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
+import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
+import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
+import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
@@ -327,7 +331,9 @@ export interface PipelineRegistryDeps {
   costRecorder: EvaluationCostRecorder;
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
-  gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
+  gatewaySpend?: { repository: GatewaySpendEventsRepository };
+  webhookDelivery?: WebhookDeliveryProcessDeps;
+  gatewayDebits?: GatewayDebitsProcessDeps;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -447,6 +453,10 @@ export class PipelineRegistry {
     // coding-agent dispatch subscribers close over this pipeline's
     // contribution commands.
     const codingAgentPipeline = this.registerCodingAgentPipeline();
+    if (this.deps.gatewaySpend) {
+      this.registerGatewaySpendPipeline(this.deps.gatewaySpend);
+      this.registerGovernanceEventsPipeline();
+    }
     const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
     const metricPipeline = this.registerMetricPipeline({
       subscribers: [
@@ -747,6 +757,50 @@ export class PipelineRegistry {
    * pipelines and close over this pipeline's commands, so this registers
    * first.
    */
+  /**
+   * The spend-command spine: gateway requests as aggregates, spend records
+   * as a fold projection over gateway_spend, rating in the pipeline. Only
+   * registered when ClickHouse is on (the spend table has no PG fallback).
+   */
+  private registerGovernanceEventsPipeline() {
+    return this.deps.eventSourcing.register(
+      createGovernanceEventsPipeline({
+        webhookDelivery: this.deps.webhookDelivery,
+      }),
+    );
+  }
+
+  private registerGatewaySpendPipeline(deps: {
+    repository: GatewaySpendEventsRepository;
+  }) {
+    return this.deps.eventSourcing.register(
+      createGatewaySpendProcessingPipeline({
+        gatewaySpendStore: this.cached<GatewaySpendState>(
+          new GatewaySpendStore(deps.repository),
+          "gateway_spend",
+        ),
+        // The ADR-073 delivery process manager consumes this pipeline's
+        // committed events through its transactional inbox.
+        webhookDelivery: this.deps.webhookDelivery,
+        gatewayDebits: this.deps.gatewayDebits,
+        settlement: {
+          // Lazy: the pipeline is being built by this very call, so the
+          // sweeper resolves the command sender at execution time.
+          sendSettleSpend: async (data) => {
+            const pipeline = this.deps.eventSourcing.getPipeline(
+              GATEWAY_SPEND_PIPELINE_NAME as never,
+            ) as unknown as {
+              commands: {
+                settleSpend: { send: (d: unknown) => Promise<unknown> };
+              };
+            };
+            await pipeline.commands.settleSpend.send(data);
+          },
+        },
+      }),
+    );
+  }
+
   private registerCodingAgentPipeline() {
     return this.deps.eventSourcing.register(
       createCodingAgentProcessingPipeline({
@@ -961,10 +1015,6 @@ export class PipelineRegistry {
       },
     });
 
-    const gatewayBudgetSyncReactor = this.deps.gatewayBudgetSync
-      ? createGatewayBudgetSyncReactor(this.deps.gatewayBudgetSync)
-      : undefined;
-
     const governanceKpisSyncReactor = this.deps.governanceKpisSync
       ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
       : undefined;
@@ -999,7 +1049,6 @@ export class PipelineRegistry {
         simulationMetricsSyncReactor,
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
-        gatewayBudgetSyncReactor,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,

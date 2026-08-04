@@ -2,7 +2,12 @@ import { buildHistogramRow } from "./rollup/explicitHistogram";
 import { buildExponentialHistogramRow } from "./rollup/exponentialHistogram";
 import { type BucketEntry, baseRow } from "./rollup/row";
 import { buildGaugeRow, buildSumRow } from "./rollup/scalar";
-import { comparePoints, floorBucket, usesPredecessor } from "./rollup/sequence";
+import {
+  comparePoints,
+  floorBucket,
+  type MetricSequencePoint,
+  usesPredecessor,
+} from "./rollup/sequence";
 import { buildSummaryRow } from "./rollup/summary";
 import type {
   CanonicalMetricDataPoint,
@@ -63,8 +68,8 @@ export function affectedRollupBuckets({
   points,
   insertedPoint,
 }: {
-  points: CanonicalMetricDataPoint[];
-  insertedPoint: CanonicalMetricDataPoint;
+  points: MetricSequencePoint[];
+  insertedPoint: MetricSequencePoint;
 }): Set<number> {
   const affected = new Set([floorBucket(insertedPoint.timeUnixMs)]);
   const next = [...points]

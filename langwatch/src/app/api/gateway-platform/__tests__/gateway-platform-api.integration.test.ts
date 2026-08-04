@@ -149,6 +149,51 @@ async function createVk(
   return { status: res.status, body: await res.json() };
 }
 
+type Page = { data: Array<{ id: string }>; next_cursor: string | null };
+
+function pageUrl(path: string, limit: number, cursor: string | null): string {
+  const sep = path.includes("?") ? "&" : "?";
+  const at = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+  return `${path}${sep}limit=${limit}${at}`;
+}
+
+async function fetchPage(url: string): Promise<Page> {
+  const res = await app.request(url, { headers: legacyAuth() });
+  if (res.status !== 200) {
+    throw new Error(`${url} answered ${res.status}`);
+  }
+  return (await res.json()) as Page;
+}
+
+/**
+ * Every page of `path`, walked to exhaustion at `limit` rows a page.
+ *
+ * Throws rather than asserts, so the assertions all live in the `it` that
+ * called it and a failure names the walk that produced it. The page cap means
+ * a cursor that fails to advance fails the test instead of hanging the suite.
+ */
+async function pagesOf(path: string, limit: number): Promise<Page[]> {
+  const pages: Page[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = await fetchPage(pageUrl(path, limit, cursor));
+    pages.push(page);
+    cursor = page.next_cursor;
+  } while (cursor !== null && pages.length < 50);
+  if (cursor !== null) {
+    throw new Error(`walk of ${path} never exhausted its cursor`);
+  }
+  return pages;
+}
+
+function idsOf(pages: Page[]): string[] {
+  return pages.flatMap((page) => page.data.map((row) => row.id));
+}
+
+async function walkAll(path: string, limit: number): Promise<string[]> {
+  return idsOf(await pagesOf(path, limit));
+}
+
 async function insertGatewayTrace(args: {
   tenantId: string;
   traceId: string;
@@ -478,6 +523,27 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("returns 401 without credentials", async () => {
       const res = await app.request("/api/gateway/v1/virtual-keys");
       expect(res.status).toBe(401);
+      // A refusal one layer beneath the handlers still answers the shape this
+      // family publishes, with the SAME code the org-scoped families under
+      // this prefix answer, so a caller writes exactly one error reader.
+      expect(await res.json()).toMatchObject({
+        error: { type: "unauthenticated", code: "missing_credentials" },
+      });
+    });
+
+    /** @scenario Every gateway platform refusal is the canonical envelope */
+    it("refuses at the API key ceiling in the canonical envelope", async () => {
+      const res = await createVk(
+        { name: "denied-by-ceiling" },
+        apiKeyAuth(viewerToken),
+      );
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({
+        error: {
+          type: "permission_denied",
+          code: "api_key_permission_denied",
+        },
+      });
     });
 
     /** @scenario Provider binding routes are gone since the ModelProvider fold */
@@ -486,8 +552,12 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         headers: legacyAuth(),
       });
       expect(res.status).toBe(410);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        error: { type: "gone", code: "gateway_provider_bindings_gone" },
+      });
       // A 410 without a forwarding address is a dead end for SDK authors.
-      expect((await res.json()).message).toContain("model-providers");
+      expect(body.error.message).toContain("model-providers");
     });
 
     /** @scenario A viewer-scoped API key can list but not create virtual keys */
@@ -515,9 +585,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(body.secret).toMatch(/^vk-lw-/);
       expect(body.virtual_key.name).toBe(`sdk-min-${suffix}`);
       expect(body.virtual_key.scopes).toEqual([
-        { scope_type: "PROJECT", scope_id: PROJECT_ID },
+        { scope_type: "project", scope_id: PROJECT_ID },
       ]);
-      expect(body.virtual_key.routing_mode).toBe("NONE");
+      expect(body.virtual_key.routing_mode).toBe("none");
       expect(body.virtual_key.purpose).toBe("user");
       expect(body.virtual_key.status).toBe("active");
       // The ghost of the deleted GatewayProviderCredential entity must be
@@ -550,12 +620,12 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("accepts explicit scopes, config, and routing_mode", async () => {
       const { status, body } = await createVk({
         name: `explicit-${suffix}`,
-        scopes: [{ scope_type: "PROJECT", scope_id: PROJECT_ID }],
-        routing_mode: "FALLBACK_ALL",
+        scopes: [{ scope_type: "project", scope_id: PROJECT_ID }],
+        routing_mode: "fallback_all",
         config: { modelsAllowed: ["gpt-5-mini"] },
       });
       expect(status).toBe(201);
-      expect(body.virtual_key.routing_mode).toBe("FALLBACK_ALL");
+      expect(body.virtual_key.routing_mode).toBe("fallback_all");
       expect(body.virtual_key.config.modelsAllowed).toEqual(["gpt-5-mini"]);
     });
 
@@ -563,7 +633,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("refuses org-scoped creation for a legacy project key", async () => {
       const { status, body } = await createVk({
         name: `legacy-org-${suffix}`,
-        scopes: [{ scope_type: "ORGANIZATION", scope_id: ORG_ID }],
+        scopes: [{ scope_type: "organization", scope_id: ORG_ID }],
       });
       expect(status).toBe(403);
       expect(body.error.type).toBe("permission_denied");
@@ -575,13 +645,13 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const { status, body } = await createVk(
         {
           name: `org-scoped-${suffix}`,
-          scopes: [{ scope_type: "ORGANIZATION", scope_id: ORG_ID }],
+          scopes: [{ scope_type: "organization", scope_id: ORG_ID }],
         },
         apiKeyAuth(adminToken),
       );
       expect(status).toBe(201);
       expect(body.virtual_key.scopes).toEqual([
-        { scope_type: "ORGANIZATION", scope_id: ORG_ID },
+        { scope_type: "organization", scope_id: ORG_ID },
       ]);
     });
 
@@ -604,7 +674,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const { status, body } = await createVk(
         {
           name: `nogov-${suffix}`,
-          scopes: [{ scope_type: "ORGANIZATION", scope_id: NOGOV_ORG_ID }],
+          scopes: [{ scope_type: "organization", scope_id: NOGOV_ORG_ID }],
         },
         apiKeyAuth(nogovAdminToken, NOGOV_PROJECT_ID),
       );
@@ -619,7 +689,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const { status, body } = await createVk(
         {
           name: `nogov-explicit-${suffix}`,
-          scopes: [{ scope_type: "ORGANIZATION", scope_id: NOGOV_ORG_ID }],
+          scopes: [{ scope_type: "organization", scope_id: NOGOV_ORG_ID }],
           trace_project_id: NOGOV_PROJECT_ID,
         },
         apiKeyAuth(nogovAdminToken, NOGOV_PROJECT_ID),
@@ -645,7 +715,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const { status, body } = await createVk(
         {
           name: `cross-org-${suffix}`,
-          scopes: [{ scope_type: "PROJECT", scope_id: FOREIGN_PROJECT_ID }],
+          scopes: [{ scope_type: "project", scope_id: FOREIGN_PROJECT_ID }],
         },
         apiKeyAuth(adminToken),
       );
@@ -661,7 +731,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("refuses POLICY routing without a policy id", async () => {
       const { status, body } = await createVk({
         name: `policy-less-${suffix}`,
-        routing_mode: "POLICY",
+        routing_mode: "policy",
       });
       expect(status).toBe(400);
       expect(body.error.code).toBe("routing_policy_required");
@@ -681,7 +751,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("creates the key's own budget alongside it", async () => {
       const { status, body } = await createVk({
         name: `capped-${suffix}`,
-        budget: { limit_usd: "12.50", window: "MONTH" },
+        budget: { limit_usd: "12.50", window: "month" },
       });
       expect(status).toBe(201);
       const budget = await prisma.gatewayBudget.findFirst({
@@ -701,11 +771,14 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("refuses a malformed budget via the same schema tRPC uses", async () => {
       const { status, body } = await createVk({
         name: `bad-cap-${suffix}`,
-        budget: { limit_usd: "10abs", window: "MONTH" },
+        budget: { limit_usd: "10abs", window: "month" },
       });
       expect(status).toBe(400);
       expect(body.error.code).toBe("validation_error");
-      expect(body.error.message).toContain("limit_usd");
+      // The offending field is structured, in meta, rather than something a
+      // caller has to scrape out of the sentence.
+      expect(body.error.meta.target).toBe("json");
+      expect(JSON.stringify(body.error.meta)).toContain("limit_usd");
     });
   });
 
@@ -775,7 +848,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         `/api/gateway/v1/virtual-keys/${created.body.virtual_key.id}`,
         {
           name: `updated-${suffix}`,
-          budget: { limit_usd: "3", window: "DAY" },
+          budget: { limit_usd: "3", window: "day" },
         },
         legacyAuth(),
       );
@@ -799,7 +872,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const created = await createVk({ name: `rescope-${suffix}` });
       const res = await patch(
         `/api/gateway/v1/virtual-keys/${created.body.virtual_key.id}`,
-        { scopes: [{ scope_type: "ORGANIZATION", scope_id: ORG_ID }] },
+        { scopes: [{ scope_type: "organization", scope_id: ORG_ID }] },
         legacyAuth(),
       );
       expect(res.status).toBe(403);
@@ -823,7 +896,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("revokes idempotently and retires the key's budget", async () => {
       const created = await createVk({
         name: `revocable-${suffix}`,
-        budget: { limit_usd: "5", window: "MONTH" },
+        budget: { limit_usd: "5", window: "month" },
       });
       const id = created.body.virtual_key.id;
       const first = await post(
@@ -892,25 +965,25 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         "/api/gateway/v1/budgets",
         {
           scope: {
-            kind: "VIRTUAL_KEY",
+            kind: "virtual_key",
             virtual_key_id: vk.body.virtual_key.id,
           },
           name: `vk-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 25,
         },
         legacyAuth(),
       );
       expect(createRes.status).toBe(201);
       const created = await createRes.json();
-      expect(created.budget.scope_type).toBe("VIRTUAL_KEY");
+      expect(created.budget.scope_type).toBe("virtual_key");
 
       const principalRes = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PRINCIPAL", principal_user_id: MEMBER_USER_ID },
+          scope: { kind: "principal", principal_user_id: MEMBER_USER_ID },
           name: `principal-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 10,
         },
         legacyAuth(),
@@ -928,27 +1001,77 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const scopeTypes = new Set(
         listBody.data.map((b: any) => b.scope_type as string),
       );
-      expect(scopeTypes.has("VIRTUAL_KEY")).toBe(true);
-      expect(scopeTypes.has("PRINCIPAL")).toBe(true);
+      expect(scopeTypes.has("virtual_key")).toBe(true);
+      expect(scopeTypes.has("principal")).toBe(true);
 
       const filtered = await app.request(
-        "/api/gateway/v1/budgets?scope_type=VIRTUAL_KEY",
+        "/api/gateway/v1/budgets?scope_type=virtual_key",
         { headers: legacyAuth() },
       );
       const filteredBody = await filtered.json();
       expect(filteredBody.data.length).toBeGreaterThan(0);
       expect(
-        filteredBody.data.every((b: any) => b.scope_type === "VIRTUAL_KEY"),
+        filteredBody.data.every((b: any) => b.scope_type === "virtual_key"),
       ).toBe(true);
 
       const excluded = await app.request(
-        "/api/gateway/v1/budgets?scope_type=ORGANIZATION,TEAM",
+        "/api/gateway/v1/budgets?scope_type=organization,team",
         { headers: legacyAuth() },
       );
       const excludedBody = await excluded.json();
       expect(
-        excludedBody.data.some((b: any) => b.scope_type === "VIRTUAL_KEY"),
+        excludedBody.data.some((b: any) => b.scope_type === "virtual_key"),
       ).toBe(false);
+    });
+
+    /** @scenario One budget can be read on its own */
+    it("serves a single budget in the list row shape", async () => {
+      const created = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `single-read-${suffix}`,
+          window: "month",
+          limit_usd: "25.5",
+        },
+        legacyAuth(),
+      );
+      expect(created.status).toBe(201);
+      const id = (await created.json()).budget.id;
+
+      const res = await app.request(`/api/gateway/v1/budgets/${id}`, {
+        headers: legacyAuth(),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.spend_available).toBe(true);
+      expect(body.budget).toMatchObject({
+        id,
+        scope_type: "project",
+        window: "month",
+        on_breach: "block",
+        limit_usd: "25.5",
+        limit_nano_usd: 25_500_000_000,
+      });
+
+      // The single read must be the SAME row the list serves, field for
+      // field, or a caller has to learn two budget shapes.
+      const list = await app.request("/api/gateway/v1/budgets", {
+        headers: legacyAuth(),
+      });
+      const listed = (await list.json()).data.find((b: any) => b.id === id);
+      expect(body.budget).toEqual(listed);
+    });
+
+    /** @scenario An absent budget answers a canonical 404 */
+    it("answers 404 for a budget that does not exist", async () => {
+      const res = await app.request("/api/gateway/v1/budgets/bgt_missing", {
+        headers: legacyAuth(),
+      });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toMatchObject({
+        error: { type: "not_found", code: "budget_not_found" },
+      });
     });
 
     /** @scenario An invalid scope_type filter is refused */
@@ -960,14 +1083,66 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(res.status).toBe(400);
     });
 
+    /** @scenario The wire enums are lowercase only, with no casing tolerance */
+    it("refuses the stored casing of an enum on input", async () => {
+      // The surface used to accept `scope_type=Group` on this filter (it
+      // uppercased whatever arrived) while the create body's `kind` refused
+      // the same spelling. One casing, both directions, no tolerance.
+      const filter = await app.request(
+        "/api/gateway/v1/budgets?scope_type=VIRTUAL_KEY",
+        { headers: legacyAuth() },
+      );
+      expect(filter.status).toBe(400);
+
+      const create = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "PROJECT", project_id: PROJECT_ID },
+          name: `stored-casing-${suffix}`,
+          window: "MONTH",
+          limit_usd: 5,
+        },
+        legacyAuth(),
+      );
+      expect(create.status).toBe(400);
+
+      const vk = await createVk({
+        name: `stored-casing-vk-${suffix}`,
+        scopes: [{ scope_type: "PROJECT", scope_id: PROJECT_ID }],
+      });
+      expect(vk.status).toBe(400);
+    });
+
+    /** @scenario Every enum a budget read returns is lowercase */
+    it("returns lowercase enums on every budget field", async () => {
+      const created = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `lowercase-read-${suffix}`,
+          window: "month",
+          limit_usd: 9,
+          on_breach: "warn",
+        },
+        legacyAuth(),
+      );
+      expect(created.status).toBe(201);
+      const body = await created.json();
+      expect(body.budget).toMatchObject({
+        scope_type: "project",
+        window: "month",
+        on_breach: "warn",
+      });
+    });
+
     /** @scenario A PRINCIPAL budget must target a member of the org */
     it("refuses a PRINCIPAL budget for a non-member", async () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PRINCIPAL", principal_user_id: OUTSIDE_USER_ID },
+          scope: { kind: "principal", principal_user_id: OUTSIDE_USER_ID },
           name: `outsider-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 5,
         },
         legacyAuth(),
@@ -980,9 +1155,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "TEAM", team_id: FOREIGN_TEAM_ID },
+          scope: { kind: "team", team_id: FOREIGN_TEAM_ID },
           name: `foreign-team-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 5,
         },
         legacyAuth(),
@@ -995,20 +1170,20 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "GROUP", group_id: GROUP_ID },
+          scope: { kind: "group", group_id: GROUP_ID },
           name: `group-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: "40",
         },
         legacyAuth(),
       );
       expect(res.status).toBe(201);
       const body = await res.json();
-      expect(body.budget.scope_type).toBe("GROUP");
+      expect(body.budget.scope_type).toBe("group");
       expect(body.budget.member_count).toBe(2);
 
       const list = await app.request(
-        "/api/gateway/v1/budgets?scope_type=GROUP",
+        "/api/gateway/v1/budgets?scope_type=group",
         { headers: legacyAuth() },
       );
       const listBody = await list.json();
@@ -1018,14 +1193,102 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(row.limit_usd).toBe("40");
     });
 
+    /** @scenario An ATTRIBUTED_USER budget over REST carries the per-person standing */
+    it("labels a per-person template with end_users_seen and end_users_over", async () => {
+      const vk = await createVk({ name: `seat-vk-${suffix}` });
+      const anchorId = vk.body.virtual_key.id;
+      const createRes = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: {
+            kind: "attributed_user",
+            anchor_virtual_key_id: anchorId,
+          },
+          name: `seat-budget-${suffix}`,
+          window: "month",
+          limit_usd: "1",
+        },
+        legacyAuth(),
+      );
+      expect(createRes.status).toBe(201);
+      const budgetId = (await createRes.json()).budget.id;
+
+      // Two people on the anchor, one of them at the cap. The per-user
+      // buckets are the only place this spend exists; the template's own
+      // scope id never accrues a row.
+      const chRepo = new GatewayBudgetClickHouseRepository(async () => ch());
+      for (const [endUserId, amountUsd] of [
+        ["seat-over", "1.500000"],
+        ["seat-under", "0.250000"],
+      ]) {
+        await chRepo.insertDebit([
+          {
+            tenantId: PROJECT_ID,
+            budgetId,
+            scope: "ATTRIBUTED_USER",
+            scopeId: `${anchorId}:${endUserId}`,
+            window: "MONTH",
+            virtualKeyId: anchorId,
+            gatewayRequestId: `req-seat-${endUserId}-${suffix}`,
+            amountUsd: amountUsd!,
+            tokensInput: 10,
+            tokensOutput: 5,
+            tokensCacheRead: 0,
+            tokensCacheWrite: 0,
+            model: "gpt-5-mini",
+            status: "SUCCESS",
+            occurredAt: new Date(),
+          },
+        ]);
+      }
+
+      const list = await app.request(
+        "/api/gateway/v1/budgets?scope_type=attributed_user",
+        { headers: legacyAuth() },
+      );
+      const listBody = await list.json();
+      const row = listBody.data.find((b: any) => b.id === budgetId);
+      expect(row).toBeDefined();
+      // limit_usd is the PER-PERSON cap; the standing is the pair.
+      expect(row.limit_usd).toBe("1");
+      expect(row.end_users_seen).toBe(2);
+      expect(row.end_users_over).toBe(1);
+    });
+
+    /** @scenario An ATTRIBUTED_USER budget over REST carries the per-person standing */
+    it("leaves both per-person fields off every other scope", async () => {
+      const createRes = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `no-seats-budget-${suffix}`,
+          window: "month",
+          limit_usd: 30,
+        },
+        legacyAuth(),
+      );
+      expect(createRes.status).toBe(201);
+
+      const list = await app.request(
+        "/api/gateway/v1/budgets?scope_type=project",
+        { headers: legacyAuth() },
+      );
+      const listBody = await list.json();
+      expect(listBody.data.length).toBeGreaterThan(0);
+      for (const row of listBody.data) {
+        expect(row.end_users_seen).toBeUndefined();
+        expect(row.end_users_over).toBeUndefined();
+      }
+    });
+
     /** @scenario A GROUP budget cannot target another org's group */
     it("refuses a foreign tenant naming this org's group", async () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "GROUP", group_id: GROUP_ID },
+          scope: { kind: "group", group_id: GROUP_ID },
           name: `foreign-group-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 5,
         },
         legacyAuth(FOREIGN_LEGACY_KEY),
@@ -1038,9 +1301,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PROJECT", project_id: PROJECT_ID },
+          scope: { kind: "project", project_id: PROJECT_ID },
           name: `provider-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 15,
           provider_key: MP_OPENAI_ID,
         },
@@ -1052,9 +1315,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const foreign = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PROJECT", project_id: FOREIGN_PROJECT_ID },
+          scope: { kind: "project", project_id: FOREIGN_PROJECT_ID },
           name: `foreign-provider-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 15,
           provider_key: MP_OPENAI_ID,
         },
@@ -1067,7 +1330,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(foreign.status).toBe(400);
       const foreignBody = await foreign.json();
       expect(foreignBody.error.code).toBe("gateway_scope_org_mismatch");
-      expect(foreignBody.error.meta.scopeKind).toBe("model provider");
+      expect(foreignBody.error.meta.scope_type).toBe("model provider");
     });
 
     /** @scenario REST budget spend is the live ClickHouse ledger, not the stale PG column */
@@ -1077,9 +1340,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const createRes = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "VIRTUAL_KEY", virtual_key_id: vkId },
+          scope: { kind: "virtual_key", virtual_key_id: vkId },
           name: `ledger-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 100,
         },
         legacyAuth(),
@@ -1116,13 +1379,15 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(pgRow!.spentUsd.toString()).toBe("0");
 
       const list = await app.request(
-        "/api/gateway/v1/budgets?scope_type=VIRTUAL_KEY",
+        "/api/gateway/v1/budgets?scope_type=virtual_key",
         { headers: legacyAuth() },
       );
       const listBody = await list.json();
       const row = listBody.data.find((b: any) => b.id === budgetId);
       expect(row).toBeDefined();
-      expect(Number(row.spent_usd)).toBeCloseTo(1.25, 4);
+      expect(row.spent_usd).toBe("1.25");
+      // The display string and the integer beside it are one number.
+      expect(row.spent_nano_usd).toBe(1_250_000_000);
     });
 
     /** @scenario Budget update and archive over REST */
@@ -1130,9 +1395,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const createRes = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PROJECT", project_id: PROJECT_ID },
+          scope: { kind: "project", project_id: PROJECT_ID },
           name: `mutable-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 30,
         },
         legacyAuth(),
@@ -1141,13 +1406,13 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
       const updateRes = await patch(
         `/api/gateway/v1/budgets/${id}`,
-        { limit_usd: 45, on_breach: "WARN" },
+        { limit_usd: 45, on_breach: "warn" },
         legacyAuth(),
       );
       expect(updateRes.status).toBe(200);
       const updated = await updateRes.json();
       expect(updated.budget.limit_usd).toBe("45");
-      expect(updated.budget.on_breach).toBe("WARN");
+      expect(updated.budget.on_breach).toBe("warn");
 
       const deleteRes = await app.request(`/api/gateway/v1/budgets/${id}`, {
         method: "DELETE",
@@ -1155,6 +1420,101 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       });
       expect(deleteRes.status).toBe(200);
       expect((await deleteRes.json()).budget.archived_at).not.toBeNull();
+    });
+  });
+
+  // ── Pagination ────────────────────────────────────────────────────────
+
+  describe("cursor pagination on the unbounded lists", () => {
+    /** @scenario An unbounded list is walked by cursor without loss or repeats */
+    it("pages budgets without skipping or repeating a row", async () => {
+      for (let i = 0; i < 5; i++) {
+        const res = await post(
+          "/api/gateway/v1/budgets",
+          {
+            scope: { kind: "project", project_id: PROJECT_ID },
+            name: `paged-${i}-${suffix}`,
+            window: "month",
+            limit_usd: 5,
+          },
+          legacyAuth(),
+        );
+        expect(res.status).toBe(201);
+      }
+
+      const oneShot = await app.request("/api/gateway/v1/budgets?limit=200", {
+        headers: legacyAuth(),
+      });
+      const all = (await oneShot.json()).data.map((b: any) => b.id);
+      expect(all.length).toBeGreaterThanOrEqual(5);
+
+      // Two rows at a time must reconstruct the single-page list exactly.
+      const walked = await walkAll("/api/gateway/v1/budgets", 2);
+      expect(walked).toEqual(all);
+      expect(new Set(walked).size).toBe(walked.length);
+    });
+
+    /** @scenario A filtered list pages on rows returned, not rows examined */
+    it("applies the scope_type filter in the query, not to the page", async () => {
+      const walked = await walkAll(
+        "/api/gateway/v1/budgets?scope_type=project",
+        2,
+      );
+      expect(walked.length).toBeGreaterThan(0);
+      expect(new Set(walked).size).toBe(walked.length);
+    });
+
+    /** @scenario Every unbounded list takes the same page controls */
+    it("pages virtual keys and cache rules the same way", async () => {
+      const created = await post(
+        "/api/gateway/v1/cache-rules",
+        {
+          name: `paged-rule-${suffix}`,
+          matchers: { model: "gpt-5-mini" },
+          action: { mode: "force", ttl: 60 },
+        },
+        legacyAuth(),
+      );
+      expect(created.status).toBe(201);
+
+      for (const path of [
+        "/api/gateway/v1/virtual-keys",
+        "/api/gateway/v1/cache-rules",
+      ]) {
+        const walked = await walkAll(path, 2);
+        expect(new Set(walked).size).toBe(walked.length);
+        const oneShot = await app.request(`${path}?limit=200`, {
+          headers: legacyAuth(),
+        });
+        const body = await oneShot.json();
+        expect(body.next_cursor).toBeNull();
+        expect(walked).toEqual(body.data.map((r: any) => r.id));
+      }
+    });
+
+    /** @scenario A cursor this surface did not issue is refused */
+    it("refuses a garbled cursor instead of restarting the walk", async () => {
+      for (const path of [
+        "/api/gateway/v1/budgets",
+        "/api/gateway/v1/virtual-keys",
+        "/api/gateway/v1/cache-rules",
+      ]) {
+        const res = await app.request(`${path}?cursor=not-a-real-cursor`, {
+          headers: legacyAuth(),
+        });
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({
+          error: { type: "bad_request", code: "invalid_cursor" },
+        });
+      }
+    });
+
+    /** @scenario The page size is capped */
+    it("refuses a limit above the cap", async () => {
+      const res = await app.request("/api/gateway/v1/budgets?limit=500", {
+        headers: legacyAuth(),
+      });
+      expect(res.status).toBe(400);
     });
   });
 
@@ -1172,6 +1532,8 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const body = await res.json();
       expect(body.spent_usd).toBe("0");
       expect(body.requests).toBe(0);
+      // Epoch milliseconds, the unit every other spend endpoint speaks.
+      expect(typeof body.window.from).toBe("number");
       expect(new Date(body.window.from).getUTCDate()).toBe(1);
     });
 
@@ -1200,18 +1562,72 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       );
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(Number(body.spent_usd)).toBeCloseTo(1.25, 4);
+      // Exact, not `toBeCloseTo`: the field is a display STRING, and a
+      // tolerance-based assertion is what let float noise onto the wire
+      // unnoticed in the first place.
+      expect(body.spent_usd).toBe("1.25");
       expect(body.requests).toBe(2);
+    });
+
+    /** @scenario Per-key spend publishes a clean decimal string, whatever the sum drifted to */
+    it("publishes a sub-cent total without the Float64 sum's drift", async () => {
+      const vk = await createVk({ name: `dust-${suffix}` });
+      const vkId = vk.body.virtual_key.id;
+      // 24 x 0.000001875 is 0.000045 exactly, but the Float64 sum of it lands
+      // one ULP low and stringifies as "0.000044999999999999996". Any other
+      // summation order drifts differently, so the assertion is the amount.
+      for (let i = 0; i < 24; i++) {
+        await insertGatewayTrace({
+          tenantId: PROJECT_ID,
+          traceId: `trace-gwrest-dust-${i}-${suffix}`,
+          virtualKeyId: vkId,
+          occurredAt: new Date(Date.now() - 60_000),
+          totalCost: 0.000001875,
+        });
+      }
+
+      const res = await app.request(
+        `/api/gateway/v1/virtual-keys/${vkId}/spend`,
+        { headers: legacyAuth() },
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.spent_usd).toBe("0.000045");
+      expect(body.requests).toBe(24);
     });
 
     /** @scenario The spend read validates its window */
     it("refuses an inverted window", async () => {
       const vk = await createVk({ name: `windowed-${suffix}` });
+      const id = vk.body.virtual_key.id;
+      const from = Date.UTC(2026, 1, 1);
+      const to = Date.UTC(2026, 0, 1);
       const res = await app.request(
-        `/api/gateway/v1/virtual-keys/${vk.body.virtual_key.id}/spend?from=2026-02-01T00:00:00Z&to=2026-01-01T00:00:00Z`,
+        `/api/gateway/v1/virtual-keys/${id}/spend?from=${from}&to=${to}`,
         { headers: legacyAuth() },
       );
       expect(res.status).toBe(400);
+    });
+
+    /** @scenario The spend window is epoch milliseconds, like every spend endpoint */
+    it("takes epoch-ms and echoes a window it would accept back", async () => {
+      const vk = await createVk({ name: `epoch-window-${suffix}` });
+      const id = vk.body.virtual_key.id;
+      const from = Date.UTC(2026, 6, 1);
+      const to = Date.UTC(2026, 6, 15);
+      const res = await app.request(
+        `/api/gateway/v1/virtual-keys/${id}/spend?from=${from}&to=${to}`,
+        { headers: legacyAuth() },
+      );
+      expect(res.status).toBe(200);
+      expect((await res.json()).window).toEqual({ from, to });
+
+      // The ISO strings this route used to take are no longer a window.
+      const iso = await app.request(
+        `/api/gateway/v1/virtual-keys/${id}/spend?from=2026-07-01T00:00:00Z`,
+        { headers: legacyAuth() },
+      );
+      expect(iso.status).toBe(400);
     });
 
     /** @scenario Spend for an unknown key is a 404, not a zero */
@@ -1221,6 +1637,192 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         { headers: legacyAuth() },
       );
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe("external_id and metadata", () => {
+    /** @scenario A virtual key carries the caller's own id and bookkeeping */
+    it("round-trips external_id and metadata on a virtual key", async () => {
+      const externalId = `vk-ext-${suffix}`;
+      const { status, body } = await createVk({
+        name: `ext-vk-${suffix}`,
+        external_id: externalId,
+        metadata: { team: "platform", cost_center: "cc-42" },
+      });
+      expect(status).toBe(201);
+      expect(body.virtual_key.external_id).toBe(externalId);
+      expect(body.virtual_key.metadata).toEqual({
+        team: "platform",
+        cost_center: "cc-42",
+      });
+
+      // Both fields must survive every read shape, not just the create echo.
+      const get = await app.request(
+        `/api/gateway/v1/virtual-keys/${body.virtual_key.id}`,
+        { headers: legacyAuth() },
+      );
+      const fetched = await get.json();
+      expect(fetched.virtual_key.external_id).toBe(externalId);
+      expect(fetched.virtual_key.metadata).toEqual({
+        team: "platform",
+        cost_center: "cc-42",
+      });
+
+      const list = await app.request(
+        `/api/gateway/v1/virtual-keys?external_id=${externalId}`,
+        { headers: legacyAuth() },
+      );
+      expect(list.status).toBe(200);
+      const listed = await list.json();
+      expect(listed.data).toHaveLength(1);
+      expect(listed.data[0].id).toBe(body.virtual_key.id);
+      expect(listed.data[0].metadata).toEqual({
+        team: "platform",
+        cost_center: "cc-42",
+      });
+    });
+
+    /** @scenario A key with no external id reads as null, not as an empty string */
+    it("defaults external_id to null and metadata to an empty map", async () => {
+      const { body } = await createVk({ name: `ext-absent-${suffix}` });
+      expect(body.virtual_key.external_id).toBeNull();
+      expect(body.virtual_key.metadata).toEqual({});
+    });
+
+    /** @scenario Patching metadata replaces the stored map rather than merging */
+    it("replaces metadata on patch and clears external_id with null", async () => {
+      const { body } = await createVk({
+        name: `ext-patch-${suffix}`,
+        external_id: `vk-patch-${suffix}`,
+        metadata: { keep: "no", drop: "yes" },
+      });
+      const id = body.virtual_key.id;
+
+      const replaced = await patch(
+        `/api/gateway/v1/virtual-keys/${id}`,
+        { metadata: { keep: "yes" } },
+        legacyAuth(),
+      );
+      expect(replaced.status).toBe(200);
+      // A merge would have left `drop` behind; replacement is the contract.
+      expect((await replaced.json()).virtual_key.metadata).toEqual({
+        keep: "yes",
+      });
+
+      const cleared = await patch(
+        `/api/gateway/v1/virtual-keys/${id}`,
+        { external_id: null },
+        legacyAuth(),
+      );
+      expect(cleared.status).toBe(200);
+      expect((await cleared.json()).virtual_key.external_id).toBeNull();
+
+      // Clearing must free the id for another key, which is only true if the
+      // column went to SQL NULL rather than to an empty string.
+      const reuse = await createVk({
+        name: `ext-reuse-${suffix}`,
+        external_id: `vk-patch-${suffix}`,
+      });
+      expect(reuse.status).toBe(201);
+    });
+
+    /** @scenario A second resource cannot claim an external id already in use */
+    it("409s with external_id_conflict on a duplicate virtual key id", async () => {
+      const externalId = `vk-dupe-${suffix}`;
+      const first = await createVk({
+        name: `ext-dupe-a-${suffix}`,
+        external_id: externalId,
+      });
+      expect(first.status).toBe(201);
+
+      const second = await createVk({
+        name: `ext-dupe-b-${suffix}`,
+        external_id: externalId,
+      });
+      expect(second.status).toBe(409);
+      expect(second.body.error.code).toBe("external_id_conflict");
+      expect(second.body.error.meta.resource).toBe("virtual_key");
+      expect(second.body.error.meta.external_id).toBe(externalId);
+    });
+
+    /** @scenario A budget carries the caller's own id and bookkeeping */
+    it("round-trips external_id and metadata on a budget, and conflicts", async () => {
+      const externalId = `bg-ext-${suffix}`;
+      const created = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `ext-budget-${suffix}`,
+          window: "month",
+          limit_usd: 5,
+          external_id: externalId,
+          metadata: { owner: "finance" },
+        },
+        legacyAuth(),
+      );
+      expect(created.status).toBe(201);
+      const createdBody = await created.json();
+      expect(createdBody.budget.external_id).toBe(externalId);
+      expect(createdBody.budget.metadata).toEqual({ owner: "finance" });
+
+      const byId = await app.request(
+        `/api/gateway/v1/budgets/${createdBody.budget.id}`,
+        { headers: legacyAuth() },
+      );
+      expect((await byId.json()).budget.external_id).toBe(externalId);
+
+      const filtered = await app.request(
+        `/api/gateway/v1/budgets?external_id=${externalId}`,
+        { headers: legacyAuth() },
+      );
+      expect(filtered.status).toBe(200);
+      const filteredBody = await filtered.json();
+      expect(filteredBody.data).toHaveLength(1);
+      expect(filteredBody.data[0].id).toBe(createdBody.budget.id);
+
+      const duplicate = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `ext-budget-dupe-${suffix}`,
+          window: "month",
+          limit_usd: 5,
+          external_id: externalId,
+        },
+        legacyAuth(),
+      );
+      expect(duplicate.status).toBe(409);
+      expect((await duplicate.json()).error.code).toBe("external_id_conflict");
+    });
+
+    /** @scenario Metadata beyond the documented caps is refused, naming the key */
+    it("refuses metadata past the value and key-count caps", async () => {
+      const tooLong = await createVk({
+        name: `ext-cap-value-${suffix}`,
+        metadata: { note: "x".repeat(501) },
+      });
+      expect(tooLong.status).toBe(400);
+      expect(tooLong.body.error.code).toBe("validation_error");
+      expect(tooLong.body.error.meta.fields).toContain("metadata.note");
+
+      const tooMany = await createVk({
+        name: `ext-cap-keys-${suffix}`,
+        metadata: Object.fromEntries(
+          Array.from({ length: 41 }, (_, i) => [`k${i}`, "v"]),
+        ),
+      });
+      expect(tooMany.status).toBe(400);
+      expect(tooMany.body.error.code).toBe("validation_error");
+    });
+
+    /** @scenario Two keys may both carry no external id */
+    it("lets any number of keys carry no external id", async () => {
+      // The unique index is on (organizationId, externalId); if the column
+      // defaulted to "" instead of NULL this would be the second collision.
+      const a = await createVk({ name: `ext-null-a-${suffix}` });
+      const b = await createVk({ name: `ext-null-b-${suffix}` });
+      expect(a.status).toBe(201);
+      expect(b.status).toBe(201);
     });
   });
 });

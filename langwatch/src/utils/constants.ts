@@ -67,5 +67,6 @@ export const KSUID_RESOURCES = {
   PROCESS_MANAGER_INSTANCE: "pminstance",
   PROCESS_MANAGER_INBOX: "pminbox",
   PROCESS_MANAGER_OUTBOX: "pmoutbox",
+  WEBHOOK_ENDPOINT: "webhookendpoint",
   EXPORT: "export",
 } as const;

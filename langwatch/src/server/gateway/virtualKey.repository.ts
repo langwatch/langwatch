@@ -15,6 +15,7 @@ import type {
   VirtualKeyScope,
   VirtualKeyScopeType,
 } from "@prisma/client";
+import { keysetAfter } from "./wirePagination";
 
 export type VirtualKeyWithScopes = VirtualKey & {
   scopes: VirtualKeyScope[];
@@ -44,6 +45,10 @@ export type CreateVirtualKeyData = {
   displayPrefix: string;
   principalUserId?: string | null;
   config: Prisma.InputJsonValue;
+  /** The caller's own id for the key. Null when it named none. */
+  externalId?: string | null;
+  /** Customer-owned bookkeeping, stored verbatim. */
+  metadata?: Prisma.InputJsonValue;
   createdById: string;
   /**
    * Scope set the VK is reachable from. Empty array is rejected by the
@@ -66,6 +71,15 @@ export type CreateVirtualKeyData = {
    * the gateway/virtual-keys page.
    */
   purpose?: "USER" | "LANGY";
+};
+
+export type SetVirtualKeyDisabledData = {
+  id: string;
+  organizationId: string;
+  /** True parks the key as DISABLED; false returns it to ACTIVE. */
+  disabled: boolean;
+  /** Operator note kept on the row while disabled; cleared on re-enable. */
+  reason: string | null;
 };
 
 export class VirtualKeyRepository {
@@ -140,6 +154,52 @@ export class VirtualKeyRepository {
    * `findByHashedSecret`, which stay unfiltered. Same posture as
    * HIDDEN_SYSTEM_KEY_NAMES on the API-key listings.
    */
+  /**
+   * One page of an organization's keys, newest first, keyed on (createdAt, id).
+   *
+   * The ROUTE still filters the page by the caller's visibility, so a page can
+   * come back shorter than `limit`; `next_cursor` is computed from the rows
+   * this query returned, so nothing is skipped, only unevenly distributed.
+   */
+  async findPageInOrganization(args: {
+    organizationId: string;
+    limit: number;
+    cursor: { createdAt: Date; id: string } | null;
+    /** Exact match, not a prefix: this is an id, not a search box. */
+    externalId?: string;
+  }): Promise<VirtualKeyWithScopes[]> {
+    return this.prisma.virtualKey.findMany({
+      where: {
+        organizationId: args.organizationId,
+        purpose: "USER",
+        ...(args.externalId !== undefined
+          ? { externalId: args.externalId }
+          : {}),
+        ...(args.cursor
+          ? {
+              OR: keysetAfter([
+                {
+                  name: "createdAt",
+                  value: args.cursor.createdAt,
+                  direction: "desc",
+                },
+                { name: "id", value: args.cursor.id, direction: "desc" },
+              ]),
+            }
+          : {}),
+      },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: args.limit,
+    });
+  }
+
   async findAllInOrganization(
     organizationId: string,
     tx?: Prisma.TransactionClient,
@@ -203,6 +263,8 @@ export class VirtualKeyRepository {
         principalUserId: data.principalUserId ?? null,
         traceProjectId: data.traceProjectId ?? null,
         config: data.config,
+        externalId: data.externalId ?? null,
+        ...(data.metadata !== undefined ? { metadata: data.metadata } : {}),
         createdById: data.createdById,
         routingPolicyId: data.routingPolicyId ?? null,
         ...(data.routingMode ? { routingMode: data.routingMode } : {}),
@@ -333,6 +395,39 @@ export class VirtualKeyRepository {
         previousSecretValidUntil: null,
         revision: { increment: 1n },
       },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
+    });
+  }
+
+  async setDisabled(
+    data: SetVirtualKeyDisabledData,
+    tx?: Prisma.TransactionClient,
+  ): Promise<VirtualKeyWithScopes> {
+    const client = tx ?? this.prisma;
+    return client.virtualKey.update({
+      where: { id: data.id, organizationId: data.organizationId },
+      data: data.disabled
+        ? {
+            status: "DISABLED",
+            disabledAt: new Date(),
+            disabledReason: data.reason,
+            revision: { increment: 1n },
+          }
+        : {
+            // Rotation-grace fields are deliberately untouched in BOTH
+            // directions: disable is reversible, and a key re-enabled
+            // mid-grace must keep honoring its previous secret.
+            status: "ACTIVE",
+            disabledAt: null,
+            disabledReason: null,
+            revision: { increment: 1n },
+          },
       include: {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },

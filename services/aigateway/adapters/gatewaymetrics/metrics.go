@@ -59,6 +59,16 @@ const (
 	CacheOutcomeMiss = "miss"
 )
 
+// Drop reasons on gateway_spend_spool_dropped_total. Intake is a record the
+// spool's writer could not accept (queue full, or the spool already closed);
+// overflow is a sealed segment deleted to keep the spool inside its size
+// bound. They separate a pod producing faster than it can write from a pod
+// producing faster than it can ship.
+const (
+	SpoolDropIntake   = "intake"
+	SpoolDropOverflow = "overflow"
+)
+
 // unknownLabel is the placeholder for a dimension that is genuinely not
 // known at record time (a request rejected before model resolution has a
 // provider, for instance). A fixed placeholder keeps the series countable
@@ -107,6 +117,7 @@ type Recorder struct {
 
 	draining      gaugeSource
 	authCacheSize gaugeSource
+	spendSpool    spoolStatsSource
 
 	// models bounds how many distinct caller-supplied model names may
 	// become labels. See modelLabel.
@@ -234,6 +245,20 @@ func New() *Recorder {
 			Help:        "Virtual keys currently held in the in-memory key cache.",
 			ConstLabels: prometheus.Labels{"tier": TierL1},
 		}, r.authCacheSize.value),
+		prometheus.NewCounterFunc(prometheus.CounterOpts{
+			Name: "gateway_spend_spool_appended_total",
+			Help: "Spend records written to the on-disk spool. The denominator for the drop counters.",
+		}, func() float64 { return float64(r.spendSpool.stats().Appended) }),
+		prometheus.NewCounterFunc(prometheus.CounterOpts{
+			Name:        "gateway_spend_spool_dropped_total",
+			Help:        "Spend records lost before they could ship, by reason (intake, overflow). Gateway budget debits come from these records, so every drop is spend that is never billed and never enforced against.",
+			ConstLabels: prometheus.Labels{"reason": SpoolDropIntake},
+		}, func() float64 { return float64(r.spendSpool.stats().DroppedIntake) }),
+		prometheus.NewCounterFunc(prometheus.CounterOpts{
+			Name:        "gateway_spend_spool_dropped_total",
+			Help:        "Spend records lost before they could ship, by reason (intake, overflow). Gateway budget debits come from these records, so every drop is spend that is never billed and never enforced against.",
+			ConstLabels: prometheus.Labels{"reason": SpoolDropOverflow},
+		}, func() float64 { return float64(r.spendSpool.stats().DroppedOverflow) }),
 		r.httpRequests, r.httpDuration, r.inFlight,
 		r.streamingOpen, r.streamNoUsage,
 		r.providerTime, r.providerTries, r.fallbackEvents, r.circuitState,
@@ -350,6 +375,49 @@ func (r *Recorder) TrackAuthCacheSize(size func() int) {
 		return
 	}
 	r.authCacheSize.set(func() float64 { return float64(size()) })
+}
+
+// SpoolStats is the spend spool's counter snapshot. Declared here rather
+// than imported from the emitter so the collector set stays independent of
+// how the spool is built.
+type SpoolStats struct {
+	Appended        uint64
+	DroppedIntake   uint64
+	DroppedOverflow uint64
+}
+
+// TrackSpendSpool points the spend-spool counters at the live spool.
+// Registered up front for the same reason as TrackDraining, and left
+// unattached when the spool failed to open: that pod serves without spend
+// emission, and a flat zero series says so where a missing series would
+// just look like a scrape problem.
+func (r *Recorder) TrackSpendSpool(stats func() SpoolStats) {
+	if r == nil || stats == nil {
+		return
+	}
+	r.spendSpool.set(stats)
+}
+
+// spoolStatsSource is gaugeSource's counter equivalent: the spool is built
+// after the registry, and may never be built at all.
+type spoolStatsSource struct {
+	mu sync.RWMutex
+	fn func() SpoolStats
+}
+
+func (s *spoolStatsSource) set(fn func() SpoolStats) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fn = fn
+}
+
+func (s *spoolStatsSource) stats() SpoolStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.fn == nil {
+		return SpoolStats{}
+	}
+	return s.fn()
 }
 
 // gaugeSource lets a gauge be registered before the thing it measures

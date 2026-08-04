@@ -173,4 +173,19 @@ export interface ProcessStore {
     processName: string;
     before: number;
   }): Promise<number>;
+
+  /**
+   * Dead-letter recovery: flip DEAD rows of one process back to pending
+   * with a fresh attempt budget, due immediately. Scoped by processKey
+   * (one process instance's rows) and optionally narrowed by messageKey
+   * prefix so an operator can requeue one endpoint's batches without
+   * resurrecting every failure in the domain. Returns the requeued count.
+   */
+  requeueDeadMessages(params: {
+    processName: string;
+    projectId: string;
+    processKey: string;
+    messageKeyPrefix?: string;
+    now: number;
+  }): Promise<number>;
 }

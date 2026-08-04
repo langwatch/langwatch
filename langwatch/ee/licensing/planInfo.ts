@@ -23,6 +23,12 @@ export type PlanInfo = {
   maxMembersLite: number;
   maxMessagesPerMonth: number;
   canPublish: boolean;
+  /**
+   * Webhook endpoints platform (signed outbound event delivery). Enterprise
+   * feature: absent/false on free, PRO, and GROWTH plans; enterprise
+   * licenses and subscriptions carry true.
+   */
+  webhookEndpointsEnabled?: boolean;
   usageUnit?: string;
   userPrice?: {
     USD: number;

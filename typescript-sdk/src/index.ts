@@ -134,10 +134,33 @@ export {
   type VirtualKeyRoutingMode,
   type VirtualKeyBudgetInput,
   type VirtualKeyWithSecret,
+  type VirtualKeyPage,
   type VirtualKeySpendSummary,
   type CreateVirtualKeyInput,
   type UpdateVirtualKeyInput,
 } from "./client-sdk/services/virtual-keys/virtual-keys-api.service";
+export {
+  WebhooksApiService,
+  WebhooksApiError,
+  type WebhookEndpointSummary,
+  type WebhookEndpointWithSecret,
+  type WebhookDeliveryRecord,
+  type WebhookTestResult,
+  type WebhookEndpointHealth,
+  type WebhookEventType,
+  type EmittedEvent,
+} from "./client-sdk/services/webhooks/webhooks-api.service";
+export {
+  SpendEventsApiService,
+  SpendEventsApiError,
+  type SpendEvent,
+  type SpendEventsPage,
+  type SpendSummaryRow,
+  type SpendSummariesResponse,
+  type SpendReplayResult,
+  type EndUserSpend,
+  type EndUserCap,
+} from "./client-sdk/services/spend-events/spend-events-api.service";
 export {
   GatewayBudgetsApiService,
   GatewayBudgetsApiError,

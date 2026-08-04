@@ -188,12 +188,11 @@ describe("applySpanToSummary attribute forwarding", () => {
     });
   });
 
-  // Regression for iter-110 Sergey finding: `gateway_budget_ledger_events`
-  // CH table count=0 despite the gatewayBudgetSync reactor firing. Root
-  // cause: the attribute accumulator's SPAN_ATTR_MAPPINGS allowlist didn't
-  // include the two AI Gateway markers that the reactor reads, so they
-  // never reached foldState.attributes and the reactor early-returned on
-  // `!virtualKeyId || !gatewayRequestId` for every trace.
+  // Regression for iter-110: a gateway trace that reached the fold carrying
+  // neither of its markers. Root cause: the attribute accumulator's
+  // SPAN_ATTR_MAPPINGS allowlist didn't include the two AI Gateway markers,
+  // so they never reached foldState.attributes and nothing downstream could
+  // tell which key or request the trace belonged to.
   describe("when span has AI Gateway markers", () => {
     it("forwards langwatch.virtual_key_id to trace attributes", () => {
       const span = createTestSpan({
@@ -223,7 +222,7 @@ describe("applySpanToSummary attribute forwarding", () => {
       );
     });
 
-    it("forwards both markers together so the gatewayBudgetSync reactor can fold", () => {
+    it("forwards both markers together so a trace can be joined to its request", () => {
       const span = createTestSpan({
         spanAttributes: {
           "langwatch.virtual_key_id": "vk_live_matrix_openai",

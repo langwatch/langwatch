@@ -21,6 +21,7 @@
     "lint:plugins": "pnpm exec biome lint --only=plugin --max-diagnostics=none ./src ./ee",
     "lint:fix": "pnpm exec biome check --write ./src ./ee ./scripts ./e2e ./prisma ./vite ./packages --max-diagnostics=1000",
     "check:feature-parity": "tsx scripts/check-feature-parity.ts",
+    "check:openapi-completeness": "tsx scripts/check-openapi-completeness.ts",
     "format": "pnpm exec biome format src/ ee/ --write",
     "postinstall": "make -C .. setup-hooks 2>/dev/null || true",
     "dev": "NODE_ENV=development START_WORKERS=true ./scripts/check-ports.sh && pnpm run start:prepare:files && NODE_ENV=development START_WORKERS=true FORCE_COLOR=1 pnpm start 2>&1 | tee server.log",

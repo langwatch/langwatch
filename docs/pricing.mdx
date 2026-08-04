@@ -81,6 +81,10 @@ Self-hosted deployments are different: the data sits in your own database, so th
     On LangWatch Cloud each plan includes a default retention window (see the table above), and extending it, a longer window or a higher volume of stored events, is available on **Enterprise plans**. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set this up. Self-hosted, the data is in your own database: retention is yours to configure with or without a license, and a license adds multi-class retention policies per data category.
   </Accordion>
 
+  <Accordion title="Are webhooks and the billing events API included in my plan?">
+    The [webhook endpoints platform](/features/webhooks) (signed event delivery to your systems) and the [billing events surface](/ai-gateway/billing-events) (per-request spend events, reconciliation pulls, replay) are **Enterprise** capabilities, on Cloud and on self-hosted licenses alike. They exist for platforms that rebill their own customers and need billing-grade delivery guarantees. Spend records are retained for a fixed 13 months independent of your data-retention settings. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to enable them.
+  </Accordion>
+
   <Accordion title="Can I self-host or run a hybrid setup?">
     Yes. LangWatch is available both [self-hosted](/self-hosting/overview) and [hybrid](/hybrid-setup/overview). With the hybrid option you get the convenience of running on our Cloud while your data stays on your side. See the self-hosting docs or reach out for more information. You can run the self-hosted version for free, with unlimited users, projects, and events on your own hardware. If you require enterprise features such as SSO, RBAC, SCIM, gateway webhooks, or a support SLA, [reach out to us](mailto:enterprise@langwatch.ai). See [Editions and licensing](/self-hosting/licensing) for what a license unlocks.
   </Accordion>

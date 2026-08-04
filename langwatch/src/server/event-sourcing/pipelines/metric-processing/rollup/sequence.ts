@@ -26,10 +26,26 @@ export function floorBucket(timeUnixMs: number): number {
   );
 }
 
+/**
+ * The fields sequence decisions actually read. Successor seeks fetch only
+ * these — never the megabyte-scale payload columns — so the type names the
+ * contract: anything with these fields can participate in ordering and
+ * predecessor-dependency checks.
+ */
+export type MetricSequencePoint = Pick<
+  CanonicalMetricDataPoint,
+  | "seriesId"
+  | "pointId"
+  | "timeUnixMs"
+  | "timeUnixNano"
+  | "metricKind"
+  | "aggregationTemporality"
+>;
+
 /** Mirrors the ClickHouse ORDER BY, which collates PointId by bytes. */
 export function comparePoints(
-  left: CanonicalMetricDataPoint,
-  right: CanonicalMetricDataPoint,
+  left: MetricSequencePoint,
+  right: MetricSequencePoint,
 ): number {
   const leftNano = bigint(left.timeUnixNano);
   const rightNano = bigint(right.timeUnixNano);
@@ -66,7 +82,7 @@ export function startsNewSequence(
  * carry no temporality field yet are always cumulative, so temporality alone
  * cannot answer this.
  */
-export function usesPredecessor(point: CanonicalMetricDataPoint): boolean {
+export function usesPredecessor(point: MetricSequencePoint): boolean {
   return (
     point.metricKind === "summary" ||
     point.aggregationTemporality === "cumulative"

@@ -156,6 +156,56 @@ describe("OutboxDispatcherService", () => {
       });
     });
 
+    describe("when the handler throws a terminal error", () => {
+      /** @scenario A permanent receiver error retires the batch immediately */
+      it("dead-letters on that attempt instead of burning the remaining ladder", async () => {
+        const terminal = Object.assign(new Error("HTTP 404"), {
+          retryable: false,
+        });
+        const handler = vi.fn().mockRejectedValue(terminal);
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.dead).toEqual(["dispatch:turn_1:1"]);
+        expect(first.retried).toEqual([]);
+
+        const second = await dispatcher.runOnce({ now: T0 + 60_000 });
+        expect(second.dispatched).toEqual([]);
+        expect(second.retried).toEqual([]);
+        expect(handler).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the handler throws a retryable-true error", () => {
+      it("classifies it as retried and re-dispatches after the delay", async () => {
+        const transient = Object.assign(new Error("HTTP 503"), {
+          retryable: true,
+        });
+        const handler = vi.fn().mockRejectedValue(transient);
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.retried).toEqual(["dispatch:turn_1:1"]);
+        expect(first.dead).toEqual([]);
+
+        // The ladder is real: past the delay the same message dispatches
+        // again as attempt two.
+        const second = await dispatcher.runOnce({ now: T0 + 1_100 });
+        expect(second.retried).toEqual(["dispatch:turn_1:1"]);
+        expect(handler).toHaveBeenCalledTimes(2);
+      });
+    });
+
     describe("when no handler is registered for the intent type", () => {
       it("schedules a retry instead of crashing", async () => {
         const dispatcher = new OutboxDispatcherService({
