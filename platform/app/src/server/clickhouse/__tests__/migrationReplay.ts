@@ -156,7 +156,7 @@ const LOCK_WAIT_TIMEOUT_MS = 90_000;
  */
 const LOCK_STALE_MS = 30_000;
 
-async function withReplayLock<T>(
+export async function withReplayLock<T>(
   database: string,
   run: () => Promise<T>,
 ): Promise<T> {
