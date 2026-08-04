@@ -61,17 +61,15 @@ interface QueryEvaluationDiagnostic {
   unsupportedFields: string[];
 }
 
-function evaluateQueryInMemoryDetailed(
-  {
-    queryText,
-    trace,
-    shouldLogUnsupported,
-  }: {
-    queryText: string;
-    trace: InMemoryTrace;
-    shouldLogUnsupported: boolean;
-  },
-): QueryEvaluationDiagnostic {
+function evaluateQueryInMemoryDetailed({
+  queryText,
+  trace,
+  shouldLogUnsupported,
+}: {
+  queryText: string;
+  trace: InMemoryTrace;
+  shouldLogUnsupported: boolean;
+}): QueryEvaluationDiagnostic {
   // Reuse the compiler as the validation gate — it enforces the exact
   // MAX_NODE_COUNT / MAX_PARAM_COUNT caps, rejects invalid syntax, and throws
   // FilterFieldUnknownError for unknown fields. User input errors fail closed;
@@ -147,13 +145,47 @@ export function diagnoseFilterQueryReachability(queryText: string): {
   const needs = queryNeeds(queryText);
   const summary = {
     traceId: "__reachability__",
-    attributes: {},
-    models: [],
-    annotationIds: [],
     spanCount: 0,
-    traceName: "",
+    totalDurationMs: 0,
+    computedIOSchemaVersion: "1",
+    computedInput: null,
+    computedOutput: null,
+    timeToFirstTokenMs: null,
+    timeToLastTokenMs: null,
+    tokensPerSecond: null,
     containsErrorStatus: false,
-  } as unknown as TraceSummaryData;
+    containsOKStatus: false,
+    errorMessage: null,
+    models: [],
+    totalCost: null,
+    nonBilledCost: null,
+    tokensEstimated: false,
+    totalPromptTokenCount: null,
+    totalCompletionTokenCount: null,
+    outputFromRootSpan: false,
+    outputSpanEndTimeMs: 0,
+    blockedByGuardrail: false,
+    rootSpanType: null,
+    containsAi: false,
+    containsPrompt: false,
+    selectedPromptId: null,
+    selectedPromptSpanId: null,
+    selectedPromptStartTimeMs: null,
+    lastUsedPromptId: null,
+    lastUsedPromptVersionNumber: null,
+    lastUsedPromptVersionId: null,
+    lastUsedPromptSpanId: null,
+    lastUsedPromptStartTimeMs: null,
+    topicId: null,
+    subTopicId: null,
+    annotationIds: [],
+    attributes: {},
+    traceName: "",
+    occurredAt: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    LastEventOccurredAt: 0,
+  } satisfies TraceSummaryData;
   const result = evaluateQueryInMemoryDetailed({
     queryText,
     trace: {

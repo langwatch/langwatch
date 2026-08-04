@@ -11,18 +11,18 @@ function diagnosticDescription(
   ];
 
   if (diagnostic.reasons.some(({ code }) => code === "invalid_filter_query")) {
-    return "The saved filter query is invalid, so this automation cannot match a trace.";
+    return "Fix the saved filter query so this automation can match traces.";
   }
   const invalidEvaluationState = diagnostic.reasons.find(
     ({ code }) => code === "invalid_evaluation_state",
   );
   if (invalidEvaluationState) {
     const field = invalidEvaluationState.fields[0] ?? "evaluation state";
-    return `The configured ${field} is outside the states an evaluation can have, so this automation cannot match.`;
+    return `Update ${field} to a supported evaluation state so this automation can match traces.`;
   }
 
   const fieldCopy = fields.length > 0 ? `: ${fields.join(", ")}` : "";
-  return `These condition fields cannot be evaluated when the automation fires${fieldCopy}.`;
+  return `Update or remove these condition fields so this automation can match traces${fieldCopy}.`;
 }
 
 export function AutomationReachabilityWarning({

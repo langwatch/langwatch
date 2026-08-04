@@ -31,54 +31,68 @@ function renderWarning(compact = false) {
 describe("AutomationReachabilityWarning", () => {
   afterEach(cleanup);
 
-  it("shows a field-only operator warning", () => {
-    renderWarning();
+  describe("given an unreachable automation diagnostic", () => {
+    describe("when the full warning renders", () => {
+      it("shows a field-only operator warning", () => {
+        renderWarning();
 
-    const alert = screen.getByRole("alert");
-    expect(alert.textContent).toContain("Conditions cannot match");
-    expect(alert.textContent).toContain("spanType, size");
+        const alert = screen.getByRole("alert");
+        expect(alert.textContent).toContain("Conditions cannot match");
+        expect(alert.textContent).toContain("spanType, size");
+      });
+    });
+
+    describe("when the compact warning renders", () => {
+      it("shows a compact cannot-fire badge in table rows", () => {
+        renderWarning(true);
+
+        expect(screen.getByText("Cannot fire")).toBeDefined();
+        expect(screen.queryByRole("alert")).toBeNull();
+      });
+    });
   });
 
-  it("shows a compact cannot-fire badge in table rows", () => {
-    renderWarning(true);
+  describe("given mixed diagnostic reasons", () => {
+    describe("when the full warning renders", () => {
+      it("describes the matching reason when diagnostics contain multiple fields", () => {
+        const mixedDiagnostic: AutomationReachabilityDiagnostic = {
+          status: "unreachable",
+          reasons: [
+            {
+              code: "unsupported_structured_fields",
+              fields: ["metadata.key"],
+            },
+            {
+              code: "invalid_evaluation_state",
+              fields: ["evaluations.state"],
+            },
+          ],
+        };
 
-    expect(screen.getByText("Cannot fire")).toBeDefined();
-    expect(screen.queryByRole("alert")).toBeNull();
+        render(
+          <ChakraProvider value={defaultSystem}>
+            <AutomationReachabilityWarning diagnostic={mixedDiagnostic} />
+          </ChakraProvider>,
+        );
+
+        const alert = screen.getByRole("alert");
+        expect(alert.textContent).toContain("evaluations.state");
+        expect(alert.textContent).not.toContain("metadata.key");
+      });
+    });
   });
 
-  it("describes the matching reason when diagnostics contain multiple fields", () => {
-    const mixedDiagnostic: AutomationReachabilityDiagnostic = {
-      status: "unreachable",
-      reasons: [
-        {
-          code: "unsupported_structured_fields",
-          fields: ["metadata.key"],
-        },
-        {
-          code: "invalid_evaluation_state",
-          fields: ["evaluations.state"],
-        },
-      ],
-    };
+  describe("given a reachable automation", () => {
+    describe("when the warning renders", () => {
+      it("renders nothing", () => {
+        const { container } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AutomationReachabilityWarning diagnostic={null} />
+          </ChakraProvider>,
+        );
 
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <AutomationReachabilityWarning diagnostic={mixedDiagnostic} />
-      </ChakraProvider>,
-    );
-
-    const alert = screen.getByRole("alert");
-    expect(alert.textContent).toContain("configured evaluations.state");
-    expect(alert.textContent).not.toContain("configured metadata.key");
-  });
-
-  it("renders nothing for a reachable automation", () => {
-    const { container } = render(
-      <ChakraProvider value={defaultSystem}>
-        <AutomationReachabilityWarning diagnostic={null} />
-      </ChakraProvider>,
-    );
-
-    expect(container.textContent).toBe("");
+        expect(container.textContent).toBe("");
+      });
+    });
   });
 });

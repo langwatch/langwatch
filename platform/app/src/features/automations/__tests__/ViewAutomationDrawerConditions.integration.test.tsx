@@ -178,12 +178,14 @@ describe("ViewAutomationDrawer conditions section", () => {
       };
     });
 
-    it("shows an explicit warning next to the displayed conditions", () => {
-      renderDrawer();
+    describe("when the drawer is opened", () => {
+      it("shows an explicit warning next to the displayed conditions", () => {
+        renderDrawer();
 
-      expect(screen.getByText("Conditions cannot match")).toBeDefined();
-      expect(screen.getByText(/evaluations\.state/)).toBeDefined();
-      expect(screen.getByRole("alert").textContent).not.toContain("finished");
+        expect(screen.getByText("Conditions cannot match")).toBeDefined();
+        expect(screen.getByText(/evaluations\.state/)).toBeDefined();
+        expect(screen.getByRole("alert").textContent).not.toContain("finished");
+      });
     });
   });
 });
