@@ -138,12 +138,8 @@ function evaluateQueryInMemoryDetailed({
  * `confirmSettledMatch`. Only field names leave this function; filter values
  * are never returned or logged.
  */
-export function diagnoseFilterQueryReachability(queryText: string): {
-  invalid: boolean;
-  unsupportedFields: string[];
-} {
-  const needs = queryNeeds(queryText);
-  const summary = {
+function buildReachabilitySummary(): TraceSummaryData {
+  return {
     traceId: "__reachability__",
     spanCount: 0,
     totalDurationMs: 0,
@@ -185,11 +181,18 @@ export function diagnoseFilterQueryReachability(queryText: string): {
     createdAt: 0,
     updatedAt: 0,
     LastEventOccurredAt: 0,
-  } satisfies TraceSummaryData;
+  };
+}
+
+export function diagnoseFilterQueryReachability(queryText: string): {
+  invalid: boolean;
+  unsupportedFields: string[];
+} {
+  const needs = queryNeeds(queryText);
   const result = evaluateQueryInMemoryDetailed({
     queryText,
     trace: {
-      summary,
+      summary: buildReachabilitySummary(),
       evaluations: needs.has("evaluations") ? [] : null,
       events: needs.has("events") ? [] : null,
       // Production dispatch deliberately does not derive span rows yet.

@@ -88,15 +88,18 @@ function redactTriggerForRead<
   };
 }
 
-function reachabilityForRead(
+function reachabilityForRead({
+  trigger,
+  parsedFilters,
+}: {
   trigger: {
     triggerKind?: TriggerKind;
     customGraphId?: string | null;
     filters: unknown;
     filterQuery?: string | null;
-  },
-  parsedFilters?: TriggerFilters,
-) {
+  };
+  parsedFilters?: TriggerFilters;
+}) {
   // Reports fire from the scheduler and graph alerts use threshold rules; the
   // trace matcher diagnostics do not apply to either surface.
   if (
@@ -111,8 +114,8 @@ function reachabilityForRead(
     try {
       filters = JSON.parse(trigger.filters) as TriggerFilters;
     } catch {
-      // Single-trigger reads tolerate legacy rows. A malformed
-      // structured payload has no field-only diagnostic to expose here.
+      // getTriggerById has no earlier parse, so it tolerates malformed legacy
+      // rows. There is no field-only diagnostic to expose for that payload.
     }
   } else if (
     !parsedFilters &&
@@ -490,7 +493,10 @@ export const automationRouter = createTRPCRouter({
           ...redactTriggerForRead(trigger),
           checks,
           customGraph,
-          reachability: reachabilityForRead(trigger, triggerFilters),
+          reachability: reachabilityForRead({
+            trigger,
+            parsedFilters: triggerFilters,
+          }),
         };
       });
 
@@ -649,7 +655,7 @@ export const automationRouter = createTRPCRouter({
       return trigger
         ? {
             ...redactTriggerForRead(trigger),
-            reachability: reachabilityForRead(trigger),
+            reachability: reachabilityForRead({ trigger }),
           }
         : trigger;
     }),
