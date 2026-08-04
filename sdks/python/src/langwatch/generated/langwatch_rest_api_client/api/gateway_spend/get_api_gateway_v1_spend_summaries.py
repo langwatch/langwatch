@@ -130,7 +130,9 @@ def sync_detailed(
     | GetApiGatewayV1SpendSummariesResponse403
     | GetApiGatewayV1SpendSummariesResponse500
 ]:
-    """Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with
+    """List spend summaries
+
+     Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with
     token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as
     settled_count and never included in cost sums. Diff individual items via /spend-events only when a
     checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null,
@@ -188,7 +190,9 @@ def sync(
     | GetApiGatewayV1SpendSummariesResponse500
     | None
 ):
-    """Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with
+    """List spend summaries
+
+     Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with
     token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as
     settled_count and never included in cost sums. Diff individual items via /spend-events only when a
     checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null,
@@ -240,7 +244,9 @@ async def asyncio_detailed(
     | GetApiGatewayV1SpendSummariesResponse403
     | GetApiGatewayV1SpendSummariesResponse500
 ]:
-    """Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with
+    """List spend summaries
+
+     Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with
     token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as
     settled_count and never included in cost sums. Diff individual items via /spend-events only when a
     checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null,
@@ -296,7 +302,9 @@ async def asyncio(
     | GetApiGatewayV1SpendSummariesResponse500
     | None
 ):
-    """Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with
+    """List spend summaries
+
+     Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with
     token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as
     settled_count and never included in cost sums. Diff individual items via /spend-events only when a
     checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null,

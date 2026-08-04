@@ -185,6 +185,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage teams within your organization. Teams group members and control access to projects.",
   },
   {
+    name: "Groups",
+    dirName: "groups",
+    pathPrefixes: ["/api/groups"],
+    overviewDescription:
+      "Manage groups: named sets of members that carry role bindings and can hold a per-member spend allowance.",
+  },
+  {
     name: "API Keys",
     dirName: "api-keys",
     pathPrefixes: ["/api/api-keys"],
@@ -199,13 +206,6 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage virtual keys for the AI Gateway. Virtual keys abstract provider credentials and enable usage tracking, rate limiting, and access control.",
   },
   {
-    name: "Gateway: Provider Bindings",
-    dirName: "gateway-providers",
-    pathPrefixes: ["/api/gateway/v1/providers"],
-    overviewDescription:
-      "Manage provider credential bindings for the AI Gateway. Bind model providers (OpenAI, Anthropic, etc.) to enable routing through the gateway.",
-  },
-  {
     name: "Gateway: Budgets",
     dirName: "gateway-budgets",
     pathPrefixes: ["/api/gateway/v1/budgets"],
@@ -218,6 +218,24 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/gateway/v1/cache-rules"],
     overviewDescription:
       "Manage cache-control rules for the AI Gateway. Configure semantic caching to reduce latency and costs for repeated queries.",
+  },
+  {
+    name: "Gateway: Spend",
+    dirName: "gateway-spend",
+    pathPrefixes: [
+      "/api/gateway/v1/spend-events",
+      "/api/gateway/v1/spend-summaries",
+      "/api/gateway/v1/end-users",
+    ],
+    overviewDescription:
+      "Pull the per-request spend record for billing reconciliation: cursor-paged spend events, aggregate checksums, per-end-user rollups, and replay to a webhook endpoint.",
+  },
+  {
+    name: "Webhooks",
+    dirName: "webhooks",
+    pathPrefixes: ["/api/webhooks/v1"],
+    overviewDescription:
+      "Register endpoints that receive signed, retried batches of LangWatch events, and inspect their delivery log, health, and the events the organization emitted.",
   },
 ];
 
@@ -301,21 +319,43 @@ function generateFileName(
   return base;
 }
 
-function matchesGroup(apiPath: string, group: EndpointGroup): boolean {
+/**
+ * How much of `apiPath` this group's best prefix covers, or 0 when none match.
+ * Ownership goes to the longest match, so `/api/gateway/v1/spend-events` beats
+ * a shorter sibling prefix and a sub-path like `/spend-events/replay` lands in
+ * the same group as its parent instead of nowhere.
+ */
+function matchStrength(apiPath: string, group: EndpointGroup): number {
+  let best = 0;
   for (const prefix of group.pathPrefixes) {
     if (
       apiPath === prefix ||
       apiPath.startsWith(prefix + "/") ||
       apiPath.startsWith(prefix + "?")
     ) {
-      if (prefix.includes("gateway/v1/")) {
-        const remainder = apiPath.substring(prefix.length).replace(/^\//, "");
-        if (remainder && !remainder.startsWith("{")) continue;
-      }
-      return true;
+      best = Math.max(best, prefix.length);
     }
   }
-  return false;
+  return best;
+}
+
+/** The group that owns each spec path, by longest matching prefix. */
+function resolveOwners(specPaths: string[]): Map<string, EndpointGroup> {
+  const owners = new Map<string, EndpointGroup>();
+  for (const apiPath of specPaths) {
+    if (SKIP_PATHS.has(apiPath)) continue;
+    let winner: EndpointGroup | undefined;
+    let winningStrength = 0;
+    for (const group of ENDPOINT_GROUPS) {
+      const strength = matchStrength(apiPath, group);
+      if (strength > winningStrength) {
+        winner = group;
+        winningStrength = strength;
+      }
+    }
+    if (winner) owners.set(apiPath, winner);
+  }
+  return owners;
 }
 
 function findExistingMdxFiles(dirPath: string): Map<string, string> {
@@ -358,7 +398,17 @@ function main() {
   let totalCreated = 0;
   let totalExisting = 0;
 
-  const claimedPaths = new Set<string>();
+  const owners = resolveOwners(Object.keys(spec.paths));
+
+  const unowned = Object.keys(spec.paths).filter(
+    (apiPath) => !SKIP_PATHS.has(apiPath) && !owners.has(apiPath)
+  );
+  if (unowned.length > 0) {
+    console.log(
+      `${unowned.length} spec paths have no ENDPOINT_GROUPS entry and are not documented:`
+    );
+    for (const apiPath of unowned.sort()) console.log(`  ${apiPath}`);
+  }
 
   for (const group of ENDPOINT_GROUPS) {
     const dirPath = path.join(API_REF_DIR, group.dirName);
@@ -373,10 +423,7 @@ function main() {
     }> = [];
 
     for (const [apiPath, methods] of Object.entries(spec.paths)) {
-      if (SKIP_PATHS.has(apiPath)) continue;
-      if (!matchesGroup(apiPath, group)) continue;
-      if (claimedPaths.has(apiPath)) continue;
-      claimedPaths.add(apiPath);
+      if (owners.get(apiPath) !== group) continue;
 
       for (const [method, op] of Object.entries(methods)) {
         if (!METHOD_ORDER.includes(method)) continue;

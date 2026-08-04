@@ -126,7 +126,9 @@ def sync_detailed(
     | GetApiGatewayV1EndUsersByIdSpendResponse403
     | GetApiGatewayV1EndUsersByIdSpendResponse500
 ]:
-    """Windowed spend rollup for one external end user across the organization (the /customer/info-style
+    """Read one end user's spend
+
+     Windowed spend rollup for one external end user across the organization (the /customer/info-style
     read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its
     remaining headroom once such a budget template applies; null until then.
 
@@ -177,7 +179,9 @@ def sync(
     | GetApiGatewayV1EndUsersByIdSpendResponse500
     | None
 ):
-    """Windowed spend rollup for one external end user across the organization (the /customer/info-style
+    """Read one end user's spend
+
+     Windowed spend rollup for one external end user across the organization (the /customer/info-style
     read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its
     remaining headroom once such a budget template applies; null until then.
 
@@ -222,7 +226,9 @@ async def asyncio_detailed(
     | GetApiGatewayV1EndUsersByIdSpendResponse403
     | GetApiGatewayV1EndUsersByIdSpendResponse500
 ]:
-    """Windowed spend rollup for one external end user across the organization (the /customer/info-style
+    """Read one end user's spend
+
+     Windowed spend rollup for one external end user across the organization (the /customer/info-style
     read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its
     remaining headroom once such a budget template applies; null until then.
 
@@ -271,7 +277,9 @@ async def asyncio(
     | GetApiGatewayV1EndUsersByIdSpendResponse500
     | None
 ):
-    """Windowed spend rollup for one external end user across the organization (the /customer/info-style
+    """Read one end user's spend
+
+     Windowed spend rollup for one external end user across the organization (the /customer/info-style
     read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its
     remaining headroom once such a budget template applies; null until then.
 

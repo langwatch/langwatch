@@ -120,7 +120,9 @@ def sync_detailed(
     | GetApiWebhooksV1EndpointsByIdHealthResponse404
     | GetApiWebhooksV1EndpointsByIdHealthResponse500
 ]:
-    """Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the
+    """Read an endpoint's delivery health
+
+     Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the
     oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success
     rate, and p95 latency over the last hour.
 
@@ -159,7 +161,9 @@ def sync(
     | GetApiWebhooksV1EndpointsByIdHealthResponse500
     | None
 ):
-    """Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the
+    """Read an endpoint's delivery health
+
+     Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the
     oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success
     rate, and p95 latency over the last hour.
 
@@ -192,7 +196,9 @@ async def asyncio_detailed(
     | GetApiWebhooksV1EndpointsByIdHealthResponse404
     | GetApiWebhooksV1EndpointsByIdHealthResponse500
 ]:
-    """Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the
+    """Read an endpoint's delivery health
+
+     Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the
     oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success
     rate, and p95 latency over the last hour.
 
@@ -229,7 +235,9 @@ async def asyncio(
     | GetApiWebhooksV1EndpointsByIdHealthResponse500
     | None
 ):
-    """Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the
+    """Read an endpoint's delivery health
+
+     Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the
     oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success
     rate, and p95 latency over the last hour.
 

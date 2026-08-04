@@ -33354,6 +33354,558 @@
         }
       }
     },
+    "/api/teams": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiTeams",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          }
+        ],
+        "description": "List all non-archived teams for the organization (paginated)"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiTeams",
+        "parameters": [],
+        "description": "Create a new team that can group projects and members",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/teams/{id}": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiTeamsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Get a team by its id"
+      },
+      "patch": {
+        "responses": {},
+        "operationId": "patchApiTeamsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Update a team by its id",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiTeamsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Archive a team (soft-delete)"
+      }
+    },
+    "/api/teams/{id}/members": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiTeamsByIdMembers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "List members of a team"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiTeamsByIdMembers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Add a member to a team",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "ADMIN",
+                      "MEMBER",
+                      "VIEWER",
+                      "CUSTOM"
+                    ],
+                    "default": "MEMBER"
+                  }
+                },
+                "required": [
+                  "userId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/teams/{id}/members/{userId}": {
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiTeamsByIdMembersByUserId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "userId",
+            "required": true
+          }
+        ],
+        "description": "Remove a member from a team"
+      }
+    },
+    "/api/teams/{id}/projects": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiTeamsByIdProjects",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "List projects in a team"
+      }
+    },
+    "/api/groups": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiGroups",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          }
+        ],
+        "description": "List all groups for the organization"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiGroups",
+        "parameters": [],
+        "description": "Create a new group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "bindings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "ADMIN",
+                            "MEMBER",
+                            "VIEWER",
+                            "CUSTOM"
+                          ]
+                        },
+                        "customRoleId": {
+                          "type": "string"
+                        },
+                        "scopeType": {
+                          "type": "string",
+                          "enum": [
+                            "ORGANIZATION",
+                            "TEAM",
+                            "PROJECT"
+                          ]
+                        },
+                        "scopeId": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "scopeType",
+                        "scopeId"
+                      ]
+                    }
+                  },
+                  "memberIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups/{id}": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiGroupsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Get a group with members and bindings"
+      },
+      "patch": {
+        "responses": {},
+        "operationId": "patchApiGroupsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Rename a group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiGroupsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Delete a group"
+      }
+    },
+    "/api/groups/{id}/members": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiGroupsByIdMembers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "List members of a group"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiGroupsByIdMembers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Add a member to a group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "userId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups/{id}/members/{userId}": {
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiGroupsByIdMembersByUserId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "userId",
+            "required": true
+          }
+        ],
+        "description": "Remove a member from a group"
+      }
+    },
+    "/api/groups/{id}/bindings": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiGroupsByIdBindings",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "List role bindings for a group"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiGroupsByIdBindings",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Add a role binding to a group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "ADMIN",
+                      "MEMBER",
+                      "VIEWER",
+                      "CUSTOM"
+                    ]
+                  },
+                  "customRoleId": {
+                    "type": "string"
+                  },
+                  "scopeType": {
+                    "type": "string",
+                    "enum": [
+                      "ORGANIZATION",
+                      "TEAM",
+                      "PROJECT"
+                    ]
+                  },
+                  "scopeId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "role",
+                  "scopeType",
+                  "scopeId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups/{id}/bindings/{bindingId}": {
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiGroupsByIdBindingsByBindingId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "bindingId",
+            "required": true
+          }
+        ],
+        "description": "Remove a role binding from a group"
+      }
+    },
     "/api/traces/search": {
       "post": {
         "responses": {
@@ -36409,6 +36961,7 @@
             }
           }
         ],
+        "summary": "Create a webhook endpoint",
         "description": "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
         "requestBody": {
           "content": {
@@ -36737,6 +37290,7 @@
           "Webhooks"
         ],
         "parameters": [],
+        "summary": "List webhook endpoints",
         "description": "List the organization's webhook endpoints"
       }
     },
@@ -37078,6 +37632,7 @@
             "required": true
           }
         ],
+        "summary": "Get a webhook endpoint",
         "description": "Get one webhook endpoint"
       },
       "patch": {
@@ -37417,6 +37972,7 @@
             "required": true
           }
         ],
+        "summary": "Update a webhook endpoint",
         "description": "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
         "requestBody": {
           "content": {
@@ -37725,6 +38281,7 @@
             "required": true
           }
         ],
+        "summary": "Archive a webhook endpoint",
         "description": "Archive a webhook endpoint"
       }
     },
@@ -38070,6 +38627,7 @@
             "required": true
           }
         ],
+        "summary": "Roll an endpoint's signing secret",
         "description": "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately."
       }
     },
@@ -38350,6 +38908,7 @@
             "required": true
           }
         ],
+        "summary": "Send a test event to an endpoint",
         "description": "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code."
       }
     },
@@ -38693,6 +39252,7 @@
             "required": true
           }
         ],
+        "summary": "List an endpoint's delivery attempts",
         "description": "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error"
       }
     },
@@ -39021,6 +39581,7 @@
             "required": true
           }
         ],
+        "summary": "Read an endpoint's delivery health",
         "description": "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour."
       }
     },
@@ -39254,6 +39815,7 @@
           "Webhooks"
         ],
         "parameters": [],
+        "summary": "List subscribable event types",
         "description": "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet"
       }
     },
@@ -39540,6 +40102,7 @@
             }
           }
         ],
+        "summary": "List emitted events",
         "description": "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly."
       }
     },
@@ -39824,6 +40387,7 @@
             "required": true
           }
         ],
+        "summary": "Get one emitted event",
         "description": "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids."
       }
     },
@@ -40098,6 +40662,9 @@
           }
         },
         "operationId": "getApiGatewayV1Spend-summaries",
+        "tags": [
+          "Gateway Spend"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -40170,6 +40737,7 @@
             "required": false
           }
         ],
+        "summary": "List spend summaries",
         "description": "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more."
       }
     },
@@ -40538,6 +41106,9 @@
           }
         },
         "operationId": "getApiGatewayV1Spend-events",
+        "tags": [
+          "Gateway Spend"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -40636,6 +41207,7 @@
             "required": false
           }
         ],
+        "summary": "List spend events",
         "description": "Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill."
       }
     },
@@ -40953,6 +41525,9 @@
           }
         },
         "operationId": "getApiGatewayV1End-usersByIdSpend",
+        "tags": [
+          "Gateway Spend"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -41001,6 +41576,7 @@
             "required": true
           }
         ],
+        "summary": "Read one end user's spend",
         "description": "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then."
       }
     },
@@ -41235,7 +41811,11 @@
           }
         },
         "operationId": "postApiGatewayV1Spend-eventsReplay",
+        "tags": [
+          "Gateway Spend"
+        ],
         "parameters": [],
+        "summary": "Replay spend events to an endpoint",
         "description": "Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.",
         "requestBody": {
           "content": {

@@ -2268,10 +2268,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List the organization's webhook endpoints */
+        /**
+         * List webhook endpoints
+         * @description List the organization's webhook endpoints
+         */
         get: operations["getApiWebhooksV1Endpoints"];
         put?: never;
-        /** @description Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit. */
+        /**
+         * Create a webhook endpoint
+         * @description Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         */
         post: operations["postApiWebhooksV1Endpoints"];
         delete?: never;
         options?: never;
@@ -2286,15 +2292,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Get one webhook endpoint */
+        /**
+         * Get a webhook endpoint
+         * @description Get one webhook endpoint
+         */
         get: operations["getApiWebhooksV1EndpointsById"];
         put?: never;
         post?: never;
-        /** @description Archive a webhook endpoint */
+        /**
+         * Archive a webhook endpoint
+         * @description Archive a webhook endpoint
+         */
         delete: operations["deleteApiWebhooksV1EndpointsById"];
         options?: never;
         head?: never;
-        /** @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it) */
+        /**
+         * Update a webhook endpoint
+         * @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)
+         */
         patch: operations["patchApiWebhooksV1EndpointsById"];
         trace?: never;
     };
@@ -2307,7 +2322,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately. */
+        /**
+         * Roll an endpoint's signing secret
+         * @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.
+         */
         post: operations["postApiWebhooksV1EndpointsByIdRoll-secret"];
         delete?: never;
         options?: never;
@@ -2324,7 +2342,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code. */
+        /**
+         * Send a test event to an endpoint
+         * @description Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.
+         */
         post: operations["postApiWebhooksV1EndpointsByIdTest"];
         delete?: never;
         options?: never;
@@ -2339,7 +2360,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error */
+        /**
+         * List an endpoint's delivery attempts
+         * @description The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
+         */
         get: operations["getApiWebhooksV1EndpointsByIdDeliveries"];
         put?: never;
         post?: never;
@@ -2356,7 +2380,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour. */
+        /**
+         * Read an endpoint's delivery health
+         * @description Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.
+         */
         get: operations["getApiWebhooksV1EndpointsByIdHealth"];
         put?: never;
         post?: never;
@@ -2373,7 +2400,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet */
+        /**
+         * List subscribable event types
+         * @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet
+         */
         get: operations["getApiWebhooksV1Event-types"];
         put?: never;
         post?: never;
@@ -2390,7 +2420,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly. */
+        /**
+         * List emitted events
+         * @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.
+         */
         get: operations["getApiWebhooksV1Events"];
         put?: never;
         post?: never;
@@ -2407,7 +2440,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids. */
+        /**
+         * Get one emitted event
+         * @description One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.
+         */
         get: operations["getApiWebhooksV1EventsById"];
         put?: never;
         post?: never;
@@ -2424,7 +2460,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. */
+        /**
+         * List spend summaries
+         * @description Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.
+         */
         get: operations["getApiGatewayV1Spend-summaries"];
         put?: never;
         post?: never;
@@ -2441,7 +2480,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill. */
+        /**
+         * List spend events
+         * @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill.
+         */
         get: operations["getApiGatewayV1Spend-events"];
         put?: never;
         post?: never;
@@ -2458,7 +2500,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then. */
+        /**
+         * Read one end user's spend
+         * @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then.
+         */
         get: operations["getApiGatewayV1End-usersByIdSpend"];
         put?: never;
         post?: never;
@@ -2477,7 +2522,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing. */
+        /**
+         * Replay spend events to an endpoint
+         * @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.
+         */
         post: operations["postApiGatewayV1Spend-eventsReplay"];
         delete?: never;
         options?: never;

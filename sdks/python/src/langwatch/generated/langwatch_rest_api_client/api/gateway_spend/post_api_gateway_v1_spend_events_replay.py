@@ -105,7 +105,9 @@ def sync_detailed(
     | PostApiGatewayV1SpendEventsReplayResponse403
     | PostApiGatewayV1SpendEventsReplayResponse500
 ]:
-    """Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-
+    """Replay spend events to an endpoint
+
+     Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-
     endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope
     ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your
     downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older
@@ -147,7 +149,9 @@ def sync(
     | PostApiGatewayV1SpendEventsReplayResponse500
     | None
 ):
-    """Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-
+    """Replay spend events to an endpoint
+
+     Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-
     endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope
     ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your
     downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older
@@ -183,7 +187,9 @@ async def asyncio_detailed(
     | PostApiGatewayV1SpendEventsReplayResponse403
     | PostApiGatewayV1SpendEventsReplayResponse500
 ]:
-    """Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-
+    """Replay spend events to an endpoint
+
+     Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-
     endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope
     ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your
     downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older
@@ -223,7 +229,9 @@ async def asyncio(
     | PostApiGatewayV1SpendEventsReplayResponse500
     | None
 ):
-    """Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-
+    """Replay spend events to an endpoint
+
+     Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-
     endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope
     ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your
     downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older

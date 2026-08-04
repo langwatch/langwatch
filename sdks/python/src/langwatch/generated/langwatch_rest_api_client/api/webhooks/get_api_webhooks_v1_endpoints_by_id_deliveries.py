@@ -134,7 +134,9 @@ def sync_detailed(
     | GetApiWebhooksV1EndpointsByIdDeliveriesResponse404
     | GetApiWebhooksV1EndpointsByIdDeliveriesResponse500
 ]:
-    """The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
+    """List an endpoint's delivery attempts
+
+     The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
 
     Args:
         id (str):
@@ -177,7 +179,9 @@ def sync(
     | GetApiWebhooksV1EndpointsByIdDeliveriesResponse500
     | None
 ):
-    """The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
+    """List an endpoint's delivery attempts
+
+     The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
 
     Args:
         id (str):
@@ -214,7 +218,9 @@ async def asyncio_detailed(
     | GetApiWebhooksV1EndpointsByIdDeliveriesResponse404
     | GetApiWebhooksV1EndpointsByIdDeliveriesResponse500
 ]:
-    """The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
+    """List an endpoint's delivery attempts
+
+     The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
 
     Args:
         id (str):
@@ -255,7 +261,9 @@ async def asyncio(
     | GetApiWebhooksV1EndpointsByIdDeliveriesResponse500
     | None
 ):
-    """The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
+    """List an endpoint's delivery attempts
+
+     The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
 
     Args:
         id (str):

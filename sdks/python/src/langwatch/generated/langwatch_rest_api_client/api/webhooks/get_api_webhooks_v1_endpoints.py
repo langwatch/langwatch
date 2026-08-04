@@ -93,7 +93,9 @@ def sync_detailed(
     | GetApiWebhooksV1EndpointsResponse403
     | GetApiWebhooksV1EndpointsResponse500
 ]:
-    """List the organization's webhook endpoints
+    """List webhook endpoints
+
+     List the organization's webhook endpoints
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,7 +125,9 @@ def sync(
     | GetApiWebhooksV1EndpointsResponse500
     | None
 ):
-    """List the organization's webhook endpoints
+    """List webhook endpoints
+
+     List the organization's webhook endpoints
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -148,7 +152,9 @@ async def asyncio_detailed(
     | GetApiWebhooksV1EndpointsResponse403
     | GetApiWebhooksV1EndpointsResponse500
 ]:
-    """List the organization's webhook endpoints
+    """List webhook endpoints
+
+     List the organization's webhook endpoints
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -176,7 +182,9 @@ async def asyncio(
     | GetApiWebhooksV1EndpointsResponse500
     | None
 ):
-    """List the organization's webhook endpoints
+    """List webhook endpoints
+
+     List the organization's webhook endpoints
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

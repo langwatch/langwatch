@@ -120,7 +120,9 @@ def sync_detailed(
     | PostApiWebhooksV1EndpointsByIdRollSecretResponse404
     | PostApiWebhooksV1EndpointsByIdRollSecretResponse500
 ]:
-    """Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it
+    """Roll an endpoint's signing secret
+
+     Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it
     immediately.
 
     Args:
@@ -158,7 +160,9 @@ def sync(
     | PostApiWebhooksV1EndpointsByIdRollSecretResponse500
     | None
 ):
-    """Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it
+    """Roll an endpoint's signing secret
+
+     Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it
     immediately.
 
     Args:
@@ -190,7 +194,9 @@ async def asyncio_detailed(
     | PostApiWebhooksV1EndpointsByIdRollSecretResponse404
     | PostApiWebhooksV1EndpointsByIdRollSecretResponse500
 ]:
-    """Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it
+    """Roll an endpoint's signing secret
+
+     Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it
     immediately.
 
     Args:
@@ -226,7 +232,9 @@ async def asyncio(
     | PostApiWebhooksV1EndpointsByIdRollSecretResponse500
     | None
 ):
-    """Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it
+    """Roll an endpoint's signing secret
+
+     Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it
     immediately.
 
     Args:

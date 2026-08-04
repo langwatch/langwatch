@@ -108,7 +108,9 @@ def sync_detailed(
     | GetApiWebhooksV1EndpointsByIdResponse404
     | GetApiWebhooksV1EndpointsByIdResponse500
 ]:
-    """Get one webhook endpoint
+    """Get a webhook endpoint
+
+     Get one webhook endpoint
 
     Args:
         id (str):
@@ -145,7 +147,9 @@ def sync(
     | GetApiWebhooksV1EndpointsByIdResponse500
     | None
 ):
-    """Get one webhook endpoint
+    """Get a webhook endpoint
+
+     Get one webhook endpoint
 
     Args:
         id (str):
@@ -176,7 +180,9 @@ async def asyncio_detailed(
     | GetApiWebhooksV1EndpointsByIdResponse404
     | GetApiWebhooksV1EndpointsByIdResponse500
 ]:
-    """Get one webhook endpoint
+    """Get a webhook endpoint
+
+     Get one webhook endpoint
 
     Args:
         id (str):
@@ -211,7 +217,9 @@ async def asyncio(
     | GetApiWebhooksV1EndpointsByIdResponse500
     | None
 ):
-    """Get one webhook endpoint
+    """Get a webhook endpoint
+
+     Get one webhook endpoint
 
     Args:
         id (str):

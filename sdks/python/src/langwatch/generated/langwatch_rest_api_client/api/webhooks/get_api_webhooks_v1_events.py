@@ -120,7 +120,9 @@ def sync_detailed(
     | GetApiWebhooksV1EventsResponse403
     | GetApiWebhooksV1EventsResponse500
 ]:
-    """The organization's emitted-events log for the request families: cursor-paged, newest first, filter
+    """List emitted events
+
+     The organization's emitted-events log for the request families: cursor-paged, newest first, filter
     by type and created range. Webhooks are push over this log, never the only copy of it. SERVES
     `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families
     (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a
@@ -173,7 +175,9 @@ def sync(
     | GetApiWebhooksV1EventsResponse500
     | None
 ):
-    """The organization's emitted-events log for the request families: cursor-paged, newest first, filter
+    """List emitted events
+
+     The organization's emitted-events log for the request families: cursor-paged, newest first, filter
     by type and created range. Webhooks are push over this log, never the only copy of it. SERVES
     `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families
     (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a
@@ -220,7 +224,9 @@ async def asyncio_detailed(
     | GetApiWebhooksV1EventsResponse403
     | GetApiWebhooksV1EventsResponse500
 ]:
-    """The organization's emitted-events log for the request families: cursor-paged, newest first, filter
+    """List emitted events
+
+     The organization's emitted-events log for the request families: cursor-paged, newest first, filter
     by type and created range. Webhooks are push over this log, never the only copy of it. SERVES
     `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families
     (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a
@@ -271,7 +277,9 @@ async def asyncio(
     | GetApiWebhooksV1EventsResponse500
     | None
 ):
-    """The organization's emitted-events log for the request families: cursor-paged, newest first, filter
+    """List emitted events
+
+     The organization's emitted-events log for the request families: cursor-paged, newest first, filter
     by type and created range. Webhooks are push over this log, never the only copy of it. SERVES
     `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families
     (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a

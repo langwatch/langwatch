@@ -110,6 +110,8 @@ def sync_detailed(
 ]:
     """Archive a webhook endpoint
 
+     Archive a webhook endpoint
+
     Args:
         id (str):
 
@@ -147,6 +149,8 @@ def sync(
 ):
     """Archive a webhook endpoint
 
+     Archive a webhook endpoint
+
     Args:
         id (str):
 
@@ -177,6 +181,8 @@ async def asyncio_detailed(
     | DeleteApiWebhooksV1EndpointsByIdResponse500
 ]:
     """Archive a webhook endpoint
+
+     Archive a webhook endpoint
 
     Args:
         id (str):
@@ -212,6 +218,8 @@ async def asyncio(
     | None
 ):
     """Archive a webhook endpoint
+
+     Archive a webhook endpoint
 
     Args:
         id (str):

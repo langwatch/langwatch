@@ -59140,11 +59140,29 @@ openapi: "PUT /api/dashboards/reorder"
 
 ---
 
+# FILE: ./api-reference/datasets/action-finalize.mdx
+
+---
+title: "Create Finalize"
+openapi: "POST /api/dataset/direct-upload/{datasetId}/finalize"
+---
+
+---
+
 # FILE: ./api-reference/datasets/action-records.mdx
 
 ---
 title: "Create records in a dataset in batch"
 openapi: "POST /api/dataset/{slugOrId}/records"
+---
+
+---
+
+# FILE: ./api-reference/datasets/action-retry.mdx
+
+---
+title: "Retry normalization of a failed or stuck dataset"
+openapi: "POST /api/dataset/direct-upload/{datasetId}/retry"
 ---
 
 ---
@@ -59167,6 +59185,15 @@ openapi: "POST /api/dataset"
 
 ---
 
+# FILE: ./api-reference/datasets/create-direct-upload.mdx
+
+---
+title: "Start a direct browser→S3 dataset upload"
+openapi: "POST /api/dataset/direct-upload"
+---
+
+---
+
 # FILE: ./api-reference/datasets/create-upload.mdx
 
 ---
@@ -59181,6 +59208,15 @@ openapi: "POST /api/dataset/upload"
 ---
 title: "Archive a dataset"
 openapi: "DELETE /api/dataset/{slugOrId}"
+---
+
+---
+
+# FILE: ./api-reference/datasets/delete-direct-upload.mdx
+
+---
+title: "Delete Direct Upload"
+openapi: "DELETE /api/dataset/direct-upload/{datasetId}"
 ---
 
 ---
@@ -59261,20 +59297,11 @@ openapi: "PATCH /api/dataset/{slugOrId}/records/{recordId}"
 
 ---
 
-# FILE: ./api-reference/endpoint/create.mdx
+# FILE: ./api-reference/datasets/update-staging.mdx
 
 ---
-title: 'Create Plant'
-openapi: 'POST /plants'
----
-
----
-
-# FILE: ./api-reference/endpoint/delete.mdx
-
----
-title: 'Delete Plant'
-openapi: 'DELETE /plants/{id}'
+title: "Update Staging"
+openapi: "PUT /api/dataset/direct-upload/staging/{uploadId}"
 ---
 
 ---
@@ -59865,6 +59892,15 @@ openapi: "POST /api/gateway/v1/budgets"
 
 ---
 
+# FILE: ./api-reference/gateway-budgets/get-budget.mdx
+
+---
+title: "Get budget"
+openapi: "GET /api/gateway/v1/budgets/{id}"
+---
+
+---
+
 # FILE: ./api-reference/gateway-budgets/list-budgets-applicable-to-the-project.mdx
 
 ---
@@ -59884,6 +59920,15 @@ description: "Manage spending budgets for the AI Gateway. Set cost limits per pr
 ## Intro
 
 Manage spending budgets for the AI Gateway. Set cost limits per project, team, or virtual key with configurable time windows.
+
+---
+
+# FILE: ./api-reference/gateway-budgets/reset-budget-period.mdx
+
+---
+title: "Reset budget period"
+openapi: "POST /api/gateway/v1/budgets/{id}/reset"
+---
 
 ---
 
@@ -59954,51 +59999,51 @@ openapi: "PATCH /api/gateway/v1/cache-rules/{id}"
 
 ---
 
-# FILE: ./api-reference/gateway-providers/bind-a-model-provider-to-the-gateway.mdx
+# FILE: ./api-reference/gateway-spend/list-spend-events.mdx
 
 ---
-title: "Bind a model provider to the gateway"
-openapi: "POST /api/gateway/v1/providers"
----
-
----
-
-# FILE: ./api-reference/gateway-providers/disable-provider-binding.mdx
-
----
-title: "Disable provider binding"
-openapi: "DELETE /api/gateway/v1/providers/{id}"
+title: "List spend events"
+openapi: "GET /api/gateway/v1/spend-events"
 ---
 
 ---
 
-# FILE: ./api-reference/gateway-providers/list-provider-bindings.mdx
+# FILE: ./api-reference/gateway-spend/list-spend-summaries.mdx
 
 ---
-title: "List provider bindings"
-openapi: "GET /api/gateway/v1/providers"
+title: "List spend summaries"
+openapi: "GET /api/gateway/v1/spend-summaries"
 ---
 
 ---
 
-# FILE: ./api-reference/gateway-providers/overview.mdx
+# FILE: ./api-reference/gateway-spend/overview.mdx
 
 ---
 title: "Overview"
-description: "Manage provider credential bindings for the AI Gateway. Bind model providers (OpenAI, Anthropic, etc.) to enable routing through the gateway."
+description: "Pull the per-request spend record for billing reconciliation: cursor-paged spend events, aggregate checksums, per-end-user rollups, and replay to a webhook endpoint."
 ---
 
 ## Intro
 
-Manage provider credential bindings for the AI Gateway. Bind model providers (OpenAI, Anthropic, etc.) to enable routing through the gateway.
+Pull the per-request spend record for billing reconciliation: cursor-paged spend events, aggregate checksums, per-end-user rollups, and replay to a webhook endpoint.
 
 ---
 
-# FILE: ./api-reference/gateway-providers/update-provider-binding.mdx
+# FILE: ./api-reference/gateway-spend/read-one-end-user-s-spend.mdx
 
 ---
-title: "Update provider binding"
-openapi: "PATCH /api/gateway/v1/providers/{id}"
+title: "Read one end user's spend"
+openapi: "GET /api/gateway/v1/end-users/{id}/spend"
+---
+
+---
+
+# FILE: ./api-reference/gateway-spend/replay-spend-events-to-an-endpoint.mdx
+
+---
+title: "Replay spend events to an endpoint"
+openapi: "POST /api/gateway/v1/spend-events/replay"
 ---
 
 ---
@@ -60008,6 +60053,24 @@ openapi: "PATCH /api/gateway/v1/providers/{id}"
 ---
 title: "Create virtual key"
 openapi: "POST /api/gateway/v1/virtual-keys"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/disable-virtual-key.mdx
+
+---
+title: "Disable virtual key"
+openapi: "POST /api/gateway/v1/virtual-keys/{id}/disable"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/enable-virtual-key.mdx
+
+---
+title: "Enable virtual key"
+openapi: "POST /api/gateway/v1/virtual-keys/{id}/enable"
 ---
 
 ---
@@ -60040,6 +60103,15 @@ description: "Manage virtual keys for the AI Gateway. Virtual keys abstract prov
 ## Intro
 
 Manage virtual keys for the AI Gateway. Virtual keys abstract provider credentials and enable usage tracking, rate limiting, and access control.
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/read-a-virtual-key-s-spend.mdx
+
+---
+title: "Read a virtual key's spend"
+openapi: "GET /api/gateway/v1/virtual-keys/{id}/spend"
+---
 
 ---
 
@@ -60767,6 +60839,15 @@ To make a call to the Saved Evaluators API, you will need to pass through your L
 
 ---
 
+# FILE: ./api-reference/scenario-events/create-browser-tab.mdx
+
+---
+title: "Create Browser Tab"
+openapi: "POST /api/scenario-events/browser-tab"
+---
+
+---
+
 # FILE: ./api-reference/scenario-events/create-scenario-events.mdx
 
 ---
@@ -61260,6 +61341,15 @@ openapi: 'GET /api/traces/{traceId}'
 
 ---
 
+# FILE: ./api-reference/traces/get-transcript.mdx
+
+---
+title: "Get Transcript"
+openapi: "GET /api/traces/{traceId}/transcript"
+---
+
+---
+
 # FILE: ./api-reference/traces/overview.mdx
 
 ---
@@ -61693,6 +61783,15 @@ Custom metadata keys share the same namespace as metadata set via the SDK during
 
 ---
 
+# FILE: ./api-reference/traces/update-trace-metadata.mdx
+
+---
+title: "Update trace metadata"
+openapi: "PATCH /api/traces/{traceId}/metadata"
+---
+
+---
+
 # FILE: ./api-reference/triggers/create-triggers.mdx
 
 ---
@@ -61747,6 +61846,136 @@ Manage automation triggers that fire actions based on trace events. Create Slack
 ---
 title: "Update a trigger"
 openapi: "PATCH /api/triggers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/archive-a-webhook-endpoint.mdx
+
+---
+title: "Archive a webhook endpoint"
+openapi: "DELETE /api/webhooks/v1/endpoints/{id}"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/create-a-webhook-endpoint.mdx
+
+---
+title: "Create a webhook endpoint"
+openapi: "POST /api/webhooks/v1/endpoints"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/get-a-webhook-endpoint.mdx
+
+---
+title: "Get a webhook endpoint"
+openapi: "GET /api/webhooks/v1/endpoints/{id}"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/get-one-emitted-event.mdx
+
+---
+title: "Get one emitted event"
+openapi: "GET /api/webhooks/v1/events/{id}"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/list-an-endpoint-s-delivery-attempts.mdx
+
+---
+title: "List an endpoint's delivery attempts"
+openapi: "GET /api/webhooks/v1/endpoints/{id}/deliveries"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/list-emitted-events.mdx
+
+---
+title: "List emitted events"
+openapi: "GET /api/webhooks/v1/events"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/list-subscribable-event-types.mdx
+
+---
+title: "List subscribable event types"
+openapi: "GET /api/webhooks/v1/event-types"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/list-webhook-endpoints.mdx
+
+---
+title: "List webhook endpoints"
+openapi: "GET /api/webhooks/v1/endpoints"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/overview.mdx
+
+---
+title: "Overview"
+description: "Register endpoints that receive signed, retried batches of LangWatch events, and inspect their delivery log, health, and the events the organization emitted."
+---
+
+## Intro
+
+Register endpoints that receive signed, retried batches of LangWatch events, and inspect their delivery log, health, and the events the organization emitted.
+
+---
+
+# FILE: ./api-reference/webhooks/read-an-endpoint-s-delivery-health.mdx
+
+---
+title: "Read an endpoint's delivery health"
+openapi: "GET /api/webhooks/v1/endpoints/{id}/health"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/roll-an-endpoint-s-signing-secret.mdx
+
+---
+title: "Roll an endpoint's signing secret"
+openapi: "POST /api/webhooks/v1/endpoints/{id}/roll-secret"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/send-a-test-event-to-an-endpoint.mdx
+
+---
+title: "Send a test event to an endpoint"
+openapi: "POST /api/webhooks/v1/endpoints/{id}/test"
+---
+
+---
+
+# FILE: ./api-reference/webhooks/update-a-webhook-endpoint.mdx
+
+---
+title: "Update a webhook endpoint"
+openapi: "PATCH /api/webhooks/v1/endpoints/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/action-evaluate.mdx
+
+---
+title: "Create Evaluate"
+openapi: "POST /api/workflows/{id}/evaluate"
 ---
 
 ---

@@ -371,6 +371,8 @@ secured.access(requires("gatewaySpend:view")).get(
         next_cursor: nextCursorSchema,
       }),
     ),
+    tags: ["Gateway Spend"],
+    summary: "List spend summaries",
     description:
       "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.",
   }),
@@ -419,6 +421,8 @@ secured.access(requires("gatewaySpend:view")).get(
   "/spend-events",
   requireBillingPlan,
   describeRoute({
+    tags: ["Gateway Spend"],
+    summary: "List spend events",
     description: SPEND_EVENTS_PULL_DESCRIPTION,
     responses: okResponse(
       "One page of billing envelopes",
@@ -460,6 +464,8 @@ secured.access(requires("gatewaySpend:view")).get(
   "/end-users/:id/spend",
   requireBillingPlan,
   describeRoute({
+    tags: ["Gateway Spend"],
+    summary: "Read one end user's spend",
     description: END_USER_SPEND_DESCRIPTION,
     responses: okResponse(
       "Spend and standing for one end user",
@@ -640,6 +646,8 @@ secured.access(requires("gatewaySpend:manage")).post(
   "/spend-events/replay",
   requireBillingPlan,
   describeRoute({
+    tags: ["Gateway Spend"],
+    summary: "Replay spend events to an endpoint",
     description: REPLAY_DESCRIPTION,
     responses: okResponse(
       "Replay accepted",

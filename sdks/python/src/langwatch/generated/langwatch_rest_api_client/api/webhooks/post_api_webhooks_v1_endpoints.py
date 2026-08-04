@@ -118,7 +118,9 @@ def sync_detailed(
     | PostApiWebhooksV1EndpointsResponse409
     | PostApiWebhooksV1EndpointsResponse500
 ]:
-    """Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
+    """Create a webhook endpoint
+
+     Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
     roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original
     response including its `secret`, which is the only way to recover a secret whose response was lost
     in transit.
@@ -161,7 +163,9 @@ def sync(
     | PostApiWebhooksV1EndpointsResponse500
     | None
 ):
-    """Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
+    """Create a webhook endpoint
+
+     Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
     roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original
     response including its `secret`, which is the only way to recover a secret whose response was lost
     in transit.
@@ -198,7 +202,9 @@ async def asyncio_detailed(
     | PostApiWebhooksV1EndpointsResponse409
     | PostApiWebhooksV1EndpointsResponse500
 ]:
-    """Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
+    """Create a webhook endpoint
+
+     Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
     roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original
     response including its `secret`, which is the only way to recover a secret whose response was lost
     in transit.
@@ -239,7 +245,9 @@ async def asyncio(
     | PostApiWebhooksV1EndpointsResponse500
     | None
 ):
-    """Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
+    """Create a webhook endpoint
+
+     Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
     roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original
     response including its `secret`, which is the only way to recover a secret whose response was lost
     in transit.

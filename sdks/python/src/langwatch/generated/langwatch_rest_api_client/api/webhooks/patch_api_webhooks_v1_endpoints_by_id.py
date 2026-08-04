@@ -119,7 +119,9 @@ def sync_detailed(
     | PatchApiWebhooksV1EndpointsByIdResponse404
     | PatchApiWebhooksV1EndpointsByIdResponse500
 ]:
-    """Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
+    """Update a webhook endpoint
+
+     Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
     pauses; re-enabling does not re-send the gap, replay covers it)
 
     Args:
@@ -160,7 +162,9 @@ def sync(
     | PatchApiWebhooksV1EndpointsByIdResponse500
     | None
 ):
-    """Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
+    """Update a webhook endpoint
+
+     Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
     pauses; re-enabling does not re-send the gap, replay covers it)
 
     Args:
@@ -195,7 +199,9 @@ async def asyncio_detailed(
     | PatchApiWebhooksV1EndpointsByIdResponse404
     | PatchApiWebhooksV1EndpointsByIdResponse500
 ]:
-    """Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
+    """Update a webhook endpoint
+
+     Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
     pauses; re-enabling does not re-send the gap, replay covers it)
 
     Args:
@@ -234,7 +240,9 @@ async def asyncio(
     | PatchApiWebhooksV1EndpointsByIdResponse500
     | None
 ):
-    """Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
+    """Update a webhook endpoint
+
+     Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
     pauses; re-enabling does not re-send the gap, replay covers it)
 
     Args:

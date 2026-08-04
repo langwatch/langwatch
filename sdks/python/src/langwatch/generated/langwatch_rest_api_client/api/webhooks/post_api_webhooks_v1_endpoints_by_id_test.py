@@ -120,7 +120,9 @@ def sync_detailed(
     | PostApiWebhooksV1EndpointsByIdTestResponse404
     | PostApiWebhooksV1EndpointsByIdTestResponse500
 ]:
-    """Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
+    """Send a test event to an endpoint
+
+     Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
     the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the
     body, not the status code.
 
@@ -159,7 +161,9 @@ def sync(
     | PostApiWebhooksV1EndpointsByIdTestResponse500
     | None
 ):
-    """Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
+    """Send a test event to an endpoint
+
+     Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
     the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the
     body, not the status code.
 
@@ -192,7 +196,9 @@ async def asyncio_detailed(
     | PostApiWebhooksV1EndpointsByIdTestResponse404
     | PostApiWebhooksV1EndpointsByIdTestResponse500
 ]:
-    """Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
+    """Send a test event to an endpoint
+
+     Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
     the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the
     body, not the status code.
 
@@ -229,7 +235,9 @@ async def asyncio(
     | PostApiWebhooksV1EndpointsByIdTestResponse500
     | None
 ):
-    """Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
+    """Send a test event to an endpoint
+
+     Send a signed test event through the full delivery path. Contract: the route answers 200 whenever
     the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the
     body, not the status code.
 

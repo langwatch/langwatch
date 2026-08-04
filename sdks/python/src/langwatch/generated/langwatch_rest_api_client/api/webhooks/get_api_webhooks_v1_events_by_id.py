@@ -108,7 +108,9 @@ def sync_detailed(
     | GetApiWebhooksV1EventsByIdResponse404
     | GetApiWebhooksV1EventsByIdResponse500
 ]:
-    """One emitted event by its id, as it was delivered. Serves the same families the events log serves. A
+    """Get one emitted event
+
+     One emitted event by its id, as it was delivered. Serves the same families the events log serves. A
     404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or
     belonging to another organization -- because telling those apart would confirm the existence of
     another tenant's request ids.
@@ -148,7 +150,9 @@ def sync(
     | GetApiWebhooksV1EventsByIdResponse500
     | None
 ):
-    """One emitted event by its id, as it was delivered. Serves the same families the events log serves. A
+    """Get one emitted event
+
+     One emitted event by its id, as it was delivered. Serves the same families the events log serves. A
     404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or
     belonging to another organization -- because telling those apart would confirm the existence of
     another tenant's request ids.
@@ -182,7 +186,9 @@ async def asyncio_detailed(
     | GetApiWebhooksV1EventsByIdResponse404
     | GetApiWebhooksV1EventsByIdResponse500
 ]:
-    """One emitted event by its id, as it was delivered. Serves the same families the events log serves. A
+    """Get one emitted event
+
+     One emitted event by its id, as it was delivered. Serves the same families the events log serves. A
     404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or
     belonging to another organization -- because telling those apart would confirm the existence of
     another tenant's request ids.
@@ -220,7 +226,9 @@ async def asyncio(
     | GetApiWebhooksV1EventsByIdResponse500
     | None
 ):
-    """One emitted event by its id, as it was delivered. Serves the same families the events log serves. A
+    """Get one emitted event
+
+     One emitted event by its id, as it was delivered. Serves the same families the events log serves. A
     404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or
     belonging to another organization -- because telling those apart would confirm the existence of
     another tenant's request ids.

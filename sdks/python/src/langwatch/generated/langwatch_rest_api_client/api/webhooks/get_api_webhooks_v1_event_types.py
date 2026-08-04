@@ -93,7 +93,9 @@ def sync_detailed(
     | GetApiWebhooksV1EventTypesResponse403
     | GetApiWebhooksV1EventTypesResponse500
 ]:
-    """The event catalog: every subscribable type, grouped by family; types marked emitting=false are
+    """List subscribable event types
+
+     The event catalog: every subscribable type, grouped by family; types marked emitting=false are
     declared contracts whose producers have not shipped yet
 
     Raises:
@@ -124,7 +126,9 @@ def sync(
     | GetApiWebhooksV1EventTypesResponse500
     | None
 ):
-    """The event catalog: every subscribable type, grouped by family; types marked emitting=false are
+    """List subscribable event types
+
+     The event catalog: every subscribable type, grouped by family; types marked emitting=false are
     declared contracts whose producers have not shipped yet
 
     Raises:
@@ -150,7 +154,9 @@ async def asyncio_detailed(
     | GetApiWebhooksV1EventTypesResponse403
     | GetApiWebhooksV1EventTypesResponse500
 ]:
-    """The event catalog: every subscribable type, grouped by family; types marked emitting=false are
+    """List subscribable event types
+
+     The event catalog: every subscribable type, grouped by family; types marked emitting=false are
     declared contracts whose producers have not shipped yet
 
     Raises:
@@ -179,7 +185,9 @@ async def asyncio(
     | GetApiWebhooksV1EventTypesResponse500
     | None
 ):
-    """The event catalog: every subscribable type, grouped by family; types marked emitting=false are
+    """List subscribable event types
+
+     The event catalog: every subscribable type, grouped by family; types marked emitting=false are
     declared contracts whose producers have not shipped yet
 
     Raises:

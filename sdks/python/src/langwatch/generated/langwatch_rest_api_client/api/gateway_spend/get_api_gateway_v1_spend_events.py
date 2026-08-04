@@ -141,7 +141,9 @@ def sync_detailed(
     | GetApiGatewayV1SpendEventsResponse403
     | GetApiGatewayV1SpendEventsResponse500
 ]:
-    """Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
+    """List spend events
+
+     Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
     are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries
     carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a
     downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older
@@ -205,7 +207,9 @@ def sync(
     | GetApiGatewayV1SpendEventsResponse500
     | None
 ):
-    """Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
+    """List spend events
+
+     Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
     are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries
     carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a
     downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older
@@ -263,7 +267,9 @@ async def asyncio_detailed(
     | GetApiGatewayV1SpendEventsResponse403
     | GetApiGatewayV1SpendEventsResponse500
 ]:
-    """Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
+    """List spend events
+
+     Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
     are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries
     carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a
     downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older
@@ -325,7 +331,9 @@ async def asyncio(
     | GetApiGatewayV1SpendEventsResponse500
     | None
 ):
-    """Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
+    """List spend events
+
+     Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
     are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries
     carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a
     downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older

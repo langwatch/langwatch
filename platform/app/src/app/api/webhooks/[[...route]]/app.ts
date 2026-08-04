@@ -334,6 +334,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "Create a webhook endpoint",
     description:
       "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
     parameters: [idempotencyKeyParameter],
@@ -387,6 +388,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "List webhook endpoints",
     description: "List the organization's webhook endpoints",
     responses: okResponse(
       "Every endpoint the organization has, archived ones excluded",
@@ -405,6 +407,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "Get a webhook endpoint",
     description: "Get one webhook endpoint",
     responses: {
       ...okResponse("The endpoint", z.object({ data: endpointDtoSchema })),
@@ -426,6 +429,7 @@ secured.access(requires("webhookEndpoints:manage")).patch(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "Update a webhook endpoint",
     description:
       "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
     responses: {
@@ -483,6 +487,7 @@ secured.access(requires("webhookEndpoints:manage")).delete(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "Archive a webhook endpoint",
     description: "Archive a webhook endpoint",
     responses: {
       ...okResponse(
@@ -507,6 +512,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "Roll an endpoint's signing secret",
     description:
       "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.",
     responses: {
@@ -532,6 +538,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "Send a test event to an endpoint",
     description:
       "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.",
     responses: {
@@ -615,6 +622,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "List an endpoint's delivery attempts",
     description:
       "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error",
     responses: {
@@ -672,6 +680,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "Read an endpoint's delivery health",
     description:
       "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.",
     responses: {
@@ -710,6 +719,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "List subscribable event types",
     description:
       "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet",
     responses: okResponse(
@@ -735,6 +745,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "List emitted events",
     description:
       "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
     responses: okResponse(
@@ -769,6 +780,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   requireWebhookPlan,
   describeRoute({
     tags: ["Webhooks"],
+    summary: "Get one emitted event",
     description:
       "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.",
     responses: {
