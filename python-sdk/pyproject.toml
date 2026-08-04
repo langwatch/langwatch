@@ -106,11 +106,11 @@ examples = [
     "openinference-instrumentation-litellm>=0.1.19",
     "pandas>=2.2.3",
     "fonttools>=4.62.0",  # security: CVE-2025-66034 (#328)
-    "jupyterlab>=4.5.6",  # security: CVE-2025-59842 (#319)
+    "jupyterlab>=4.6.2",  # security: CVE-2025-59842 (#319), jupyterlab advisories (#1749-#1753)
     "langsmith>=0.8.0",  # security: CVE-2026-45134 (#1175)
     "pypdf>=6.8.0",  # security: CVE-2026-31826 (#543)
     "strands-agents[otel]>=1.14.0,<2.0.0",
-    "nltk>=3.9.4",
+    "nltk>=3.10.0",  # security: nltk advisory (#1495)
     "unstructured[pdf]>=0.18.18",
 ]
 tests = [
@@ -133,4 +133,9 @@ constraint-dependencies = [
     "python-socketio>=5.16.2",  # security: python-socketio advisory (#1547)
     "bleach>=6.4.0",  # security: bleach advisory (#1494)
     "onnx>=1.22.0",  # security: onnx advisory (#1560)
+    "mcp>=1.28.1",  # security: mcp advisories (#1601, #1603, #1607)
+    "pillow>=12.3.0",  # security: pillow advisories (#1645-#1650, #1688-#1694)
+    "pyasn1>=0.6.4",  # security: pyasn1 advisories (#1717, #1718)
+    "gitpython>=3.1.55",  # security: GitPython advisories (#1719-#1722, #1755, #1762-#1764, #1771)
+    "pi-heif>=1.3.0",  # security: pi-heif advisory (#1611)
 ]

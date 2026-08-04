@@ -52,7 +52,7 @@ dev = [
     "toml>=0.10.2",
     "tomli-w>=1.0.0",
     "grevillea>=0.0.1",
-    "litellm>=1.79.0",
+    "litellm>=1.84.0",
     "instructor>=1.2.2",
     "pytest-xdist>=3.5.0",
     "flaky>=3.8.1",
@@ -81,6 +81,19 @@ override-dependencies = [
     "pydantic-settings>=2.14.2",  # security: pydantic-settings advisory (#1517)
     # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
     "json-repair>=0.60.1",
+    # security: GHSA-p4gq-832x-fm9v — URL-encoded path traversal in nltk.data.load()
+    # allows arbitrary local file read; patched in 3.10.0. Pulled in by rouge-score.
+    "nltk>=3.10.0",
+]
+
+# Transitive-dependency security floors. These only raise a lower bound, so a
+# consumer that caps below them surfaces as a resolution error rather than being
+# silently forced onto an incompatible version.
+constraint-dependencies = [
+    "pillow>=12.3.0",  # security: pillow advisories (#1615-#1620, #1672-#1678)
+    "pyasn1>=0.6.4",  # security: pyasn1 advisories (#1699, #1700)
+    "setuptools>=83.0.0",  # security: setuptools advisory (#1698)
+    "litellm>=1.84.0",  # security: litellm advisories (#1533, #1534, #1744-#1747)
 ]
 
 [tool.uv.workspace]
