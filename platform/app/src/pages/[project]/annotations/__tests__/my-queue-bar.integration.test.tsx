@@ -245,12 +245,26 @@ describe("given a reviewer walking their annotation queue", () => {
 
       await user.click(screen.getByRole("button", { name: /Edit trace/ }));
 
-      expect(mocks.openTrace).toHaveBeenCalledWith("trace-1", TRACE_STARTED_AT);
-      expect(mocks.enterTraceEditMode).toHaveBeenCalledWith("trace-1");
       expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
         traceId: "trace-1",
         t: String(TRACE_STARTED_AT),
+        urlParams: { edit: "1" },
       });
+    });
+
+    /** @scenario "Edit trace opens the trace drawer already in edit mode" */
+    it("leaves the drawer state to the link, so the two cannot disagree", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(screen.getByRole("button", { name: /Edit trace/ }));
+
+      // Seeding the store here would mount the drawer a frame before the URL
+      // names it, and the drawer's URL hydrator reads that frame as "no drawer
+      // in the URL, close it" — a fight with the sync writing the URL that
+      // never settles.
+      expect(mocks.openTrace).not.toHaveBeenCalled();
+      expect(mocks.enterTraceEditMode).not.toHaveBeenCalled();
     });
   });
 

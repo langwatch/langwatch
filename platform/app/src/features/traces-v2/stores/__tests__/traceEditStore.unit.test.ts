@@ -219,6 +219,69 @@ describe("traceEditStore", () => {
         expect(patch.spans[0]?.params).toEqual({ model: "gpt-5" });
       });
     });
+
+    describe("when a nested attribute is changed", () => {
+      /** @scenario "Changing an attribute value records it in the correction" */
+      it("replaces the value in place instead of adding a dotted key", () => {
+        state().startEditing({ traceId: "trace-1" });
+        state().setSpanParam({
+          spanId: "span-1",
+          key: "langwatch.params.region",
+          value: "eu-central-1",
+          baselineParams: {
+            langwatch: { params: { region: "eu-west-1", retries: 0 } },
+          },
+        });
+
+        const patch = buildTraceEditPatch(draftState());
+
+        expect(patch.spans[0]?.params).toEqual({
+          langwatch: { params: { region: "eu-central-1", retries: 0 } },
+        });
+      });
+    });
+
+    describe("when a nested attribute is removed", () => {
+      /** @scenario "Changing an attribute value records it in the correction" */
+      it("drops the leaf and any ancestor left empty", () => {
+        state().startEditing({ traceId: "trace-1" });
+        const baselineParams = {
+          langwatch: { params: { retries: 0 }, span: { type: "tool" } },
+        };
+        state().setSpanParam({
+          spanId: "span-1",
+          key: "langwatch.params.retries",
+          value: null,
+          baselineParams,
+        });
+
+        const patch = buildTraceEditPatch(draftState());
+
+        expect(patch.spans[0]?.params).toEqual({
+          langwatch: { span: { type: "tool" } },
+        });
+      });
+    });
+
+    describe("when an attribute is added", () => {
+      /** @scenario "Changing an attribute value records it in the correction" */
+      it("keeps the new key as the reviewer typed it", () => {
+        state().startEditing({ traceId: "trace-1" });
+        state().setSpanParam({
+          spanId: "span-1",
+          key: "langwatch.params.verified_by",
+          value: "support-qa",
+          baselineParams: { langwatch: { params: { retries: 0 } } },
+        });
+
+        const patch = buildTraceEditPatch(draftState());
+
+        expect(patch.spans[0]?.params).toEqual({
+          langwatch: { params: { retries: 0 } },
+          "langwatch.params.verified_by": "support-qa",
+        });
+      });
+    });
   });
 
   describe("given a deleted span that was also edited", () => {

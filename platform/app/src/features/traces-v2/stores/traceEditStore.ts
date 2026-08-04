@@ -507,11 +507,76 @@ function encodeDraftIO(draft: SpanIODraft): SpanInputOutput {
   });
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Where each attribute the reviewer sees lives inside the nested params object.
+ * The attributes table shows one flat dotted key per leaf, so an edit to
+ * `langwatch.params.region` has to land on `params.langwatch.params.region`
+ * rather than on a new top-level key that only looks the same. Building the map
+ * by walking the params exactly as the table flattens them keeps the two in
+ * step even for a segment that itself contains a dot.
+ */
+function attributePathsByFlatKey(
+  params: Record<string, unknown>,
+  prefix: string[] = [],
+  out = new Map<string, string[]>(),
+): Map<string, string[]> {
+  for (const [key, value] of Object.entries(params)) {
+    const path = [...prefix, key];
+    if (isPlainObject(value)) attributePathsByFlatKey(value, path, out);
+    else out.set(path.join("."), path);
+  }
+  return out;
+}
+
+/**
+ * Writes a value at a nested path, copying every object along the way so the
+ * baseline the draft started from is never mutated.
+ */
+function setAtPath(
+  target: Record<string, unknown>,
+  path: string[],
+  value: unknown,
+): void {
+  let cursor = target;
+  for (const segment of path.slice(0, -1)) {
+    const next = cursor[segment];
+    const copy = isPlainObject(next) ? { ...next } : {};
+    cursor[segment] = copy;
+    cursor = copy;
+  }
+  cursor[path[path.length - 1]!] = value;
+}
+
+/**
+ * Removes the leaf at a nested path and any ancestor left empty by the removal,
+ * so a removed attribute leaves no trace behind in the exported span.
+ */
+function deleteAtPath(target: Record<string, unknown>, path: string[]): void {
+  const [head, ...rest] = path;
+  if (head === undefined) return;
+  if (rest.length === 0) {
+    delete target[head];
+    return;
+  }
+  const child = target[head];
+  if (!isPlainObject(child)) return;
+  const copy = { ...child };
+  deleteAtPath(copy, rest);
+  if (Object.keys(copy).length === 0) delete target[head];
+  else target[head] = copy;
+}
+
 function mergedParams(draft: SpanEditDraft): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...draft.paramsBase };
+  const paths = attributePathsByFlatKey(merged);
   for (const [key, value] of Object.entries(draft.params ?? {})) {
-    if (value === null) delete merged[key];
-    else merged[key] = value;
+    const path = paths.get(key) ?? [key];
+    if (value === null) deleteAtPath(merged, path);
+    else setAtPath(merged, path, value);
   }
   return merged;
 }

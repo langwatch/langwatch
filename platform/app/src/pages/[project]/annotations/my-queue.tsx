@@ -13,8 +13,6 @@ import { LuPencil } from "react-icons/lu";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { Checkbox } from "~/components/ui/checkbox";
 import { toaster } from "~/components/ui/toaster";
-import { useDrawerStore } from "~/features/traces-v2/stores/drawerStore";
-import { enterTraceEditMode } from "~/features/traces-v2/utils/traceEditMode";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -341,19 +339,28 @@ const AnnotationQueuePicker = ({
     const occurredAtMs = partitionHint(
       currentQueueItem.trace?.timestamps?.started_at,
     );
-    // The drawer store carries the trace before the URL does, so the drawer
-    // renders on the right trace from the first frame. Opening a trace leaves
-    // edit mode, so editing is entered after it.
-    useDrawerStore.getState().openTrace(traceId, occurredAtMs);
-    enterTraceEditMode(traceId);
+    // The link states the whole intent — which trace, and that it opens for
+    // editing — and the drawer's URL hydrator opens it. Seeding the drawer
+    // store here instead would mount the drawer a frame before the URL names
+    // it, and the hydrator reads that frame as "the URL has no drawer, close
+    // it", which fights the sync that is writing the URL.
     openDrawer("traceV2Details", {
       traceId,
       ...(occurredAtMs === null ? {} : { t: String(occurredAtMs) }),
+      urlParams: { edit: "1" },
     });
   };
 
   return (
-    <Box shadow="md" padding={5} width="full" position="relative">
+    <Box
+      shadow="md"
+      padding={5}
+      // The Langy launcher is fixed to the bottom-right corner, so the bar
+      // keeps its right edge clear of it and Done stays readable and clickable.
+      paddingRight="86px"
+      width="full"
+      position="relative"
+    >
       {isNavigating && (
         <Box
           position="absolute"
