@@ -17,7 +17,7 @@ These are the only events that increment your count. Everything else the platfor
 
 | What you did | Billable event | Counted |
 |---|---|---|
-| Your app sent a span (an LLM call, tool call, retrieval step, or any other step in a trace) | `lw.obs.trace.span_received` | One per span |
+| Your app, or a coding assistant you track, sent a span (an LLM call, tool call, retrieval step, or any other step in a trace) | `lw.obs.trace.span_received` | One per span |
 | An evaluation produced a result | `lw.evaluation.reported` | One per evaluation result |
 | An experiment run started | `lw.experiment_run.started` | One per run |
 | An experiment recorded a target's output | `lw.experiment_run.target_result` | One per target result |
@@ -37,6 +37,7 @@ A scenario run produces one `started` event plus one snapshot per conversation t
 
 ## What is never billed
 
+- Logs and metrics. A coding assistant sends these alongside its spans, and LangWatch stores them and joins them onto the trace, but only the spans are counted.
 - Reading your data: dashboards, the trace explorer, analytics queries, and search.
 - Anything you create: prompts, evaluators, scenarios, agents, datasets, dashboards, custom graphs, automations, projects, or teams.
 - Users. Seats are priced separately from events, not metered as events.
