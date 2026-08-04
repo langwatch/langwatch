@@ -131,6 +131,24 @@ const SCHEMA = defineCommandSchema(
 const CONFIG_METADATA_KEYS = new Set(["evaluatorType", "settings"]);
 
 /**
+ * The one `Evaluator.type` whose `config` holds judge settings.
+ *
+ * `evaluatorTypeSchema` in the evaluators router enumerates three: "evaluator"
+ * (built-in), "code" and "workflow". Only the built-in kind stores settings in
+ * `config`, and only its writers can lose them — the router validates `config`
+ * as a bare `z.record`, so nothing stops a prompt landing at the top level.
+ * The other two own their `config` shape outright: a code evaluator's is a
+ * VALID top-level `{ code, inputs, outputs }` per `codeEvaluatorConfigSchema`,
+ * and a workflow evaluator's is empty. Recovering from those would rewrite a
+ * correct config into judge settings and count healthy rows as affected.
+ *
+ * Deliberately an allowlist, not a `!== "code"` denylist: a type added later
+ * gets the previous, safe behaviour by default rather than silently inheriting
+ * a recovery rule written before it existed.
+ */
+const SETTINGS_BEARING_EVALUATOR_TYPE = "evaluator";
+
+/**
  * Where the settings handed to the judge came from.
  *
  * `top-level-recovery` is the langwatch#6397 case: the prompt the previous rule
@@ -162,10 +180,19 @@ export type EvaluatorSettingsSource =
 export function resolveEvaluatorSettingsWithSource({
   config,
   parameters,
+  evaluatorRecordType,
   recoveryDisabled = false,
 }: {
   config: Record<string, unknown> | null | undefined;
   parameters: Record<string, unknown> | null | undefined;
+  /**
+   * `Evaluator.type` of the linked record. REQUIRED, and deliberately not
+   * defaulted: an optional dependency that defaults to the safe value fails
+   * silently when a call site forgets it, which is exactly how this command's
+   * rollback flag shipped inert earlier in langwatch#6397. Making it required
+   * turns the same mistake into a compile error.
+   */
+  evaluatorRecordType: string | null | undefined;
   /**
    * Operator rollback (`ops_evaluator_settings_recovery_disabled`). Defaults to
    * false so every caller that does not know about the flag — and the shipped
@@ -201,6 +228,13 @@ export function resolveEvaluatorSettingsWithSource({
   }
 
   if (recoveryDisabled) {
+    return { settings: parameters, source: "monitor-parameters" };
+  }
+
+  // Only the settings-bearing type can have LOST settings. Everything else
+  // keeps the pre-langwatch#6397 rule verbatim, so this change cannot alter
+  // what a code or workflow evaluator sends to the engine.
+  if (evaluatorRecordType !== SETTINGS_BEARING_EVALUATOR_TYPE) {
     return { settings: parameters, source: "monitor-parameters" };
   }
 
@@ -424,6 +458,7 @@ export class ExecuteEvaluationCommand
       resolveEvaluatorSettingsWithSource({
         config: monitor.evaluator?.config as Record<string, unknown> | null,
         parameters: monitor.parameters as Record<string, unknown> | null,
+        evaluatorRecordType: monitor.evaluator?.type,
         recoveryDisabled: await this.readSettingsRecoveryFlag(),
       });
 

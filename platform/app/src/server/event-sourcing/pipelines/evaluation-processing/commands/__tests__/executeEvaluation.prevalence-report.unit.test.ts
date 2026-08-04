@@ -30,6 +30,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => loggerSpy,
 }));
 
+import { DEFAULT_CODE_EVALUATOR_CONFIG } from "~/server/evaluators/codeEvaluator";
 import type { Command } from "../../../../";
 import { createTenantId } from "../../../../";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
@@ -43,7 +44,13 @@ const USER_PROMPT = "Is the response empathetic and polite in tone?";
 const REPORT_MESSAGE =
   "Recovered evaluator settings from the top level of config — langwatch#6397 affected config";
 
-function buildMonitor(evaluatorConfig: Record<string, unknown> | null) {
+function buildMonitor({
+  config,
+  evaluatorRecordType,
+}: {
+  config: Record<string, unknown> | null;
+  evaluatorRecordType: string;
+}) {
   return {
     id: "monitor_1",
     checkType: "custom/settings-eval",
@@ -52,16 +59,25 @@ function buildMonitor(evaluatorConfig: Record<string, unknown> | null) {
     preconditions: [],
     mappings: null,
     parameters: null,
-    evaluator: evaluatorConfig
-      ? { id: "evaluator_1", type: "evaluator", config: evaluatorConfig }
+    evaluator: config
+      ? { id: "evaluator_1", type: evaluatorRecordType, config }
       : null,
   } as Record<string, unknown>;
 }
 
-async function execute(evaluatorConfig: Record<string, unknown> | null) {
+async function execute({
+  config,
+  evaluatorRecordType = "evaluator",
+}: {
+  config: Record<string, unknown> | null;
+  /** `Evaluator.type`: "evaluator" (built-in) | "code" | "workflow". */
+  evaluatorRecordType?: string;
+}) {
   const deps = {
     monitors: {
-      getMonitorById: vi.fn().mockResolvedValue(buildMonitor(evaluatorConfig)),
+      getMonitorById: vi
+        .fn()
+        .mockResolvedValue(buildMonitor({ config, evaluatorRecordType })),
     },
     spanStorage: { getSpansByTraceId: vi.fn().mockResolvedValue([]) },
     traceEvents: { getEventsByTraceId: vi.fn().mockResolvedValue([]) },
@@ -100,8 +116,10 @@ describe("ExecuteEvaluationCommand prevalence reporting", () => {
       /** @scenario An affected evaluator config is reported so its prevalence can be counted */
       it("reports the configuration so its prevalence can be counted", async () => {
         const reports = await execute({
-          evaluatorType: "custom/settings-eval",
-          prompt: USER_PROMPT,
+          config: {
+            evaluatorType: "custom/settings-eval",
+            prompt: USER_PROMPT,
+          },
         });
 
         expect(reports).toHaveLength(1);
@@ -120,9 +138,11 @@ describe("ExecuteEvaluationCommand prevalence reporting", () => {
         // prevalence counter that echoes either turns a measurement into a leak.
         const CUSTOMER_KEY = "contact-alex@example.com";
         const reports = await execute({
-          evaluatorType: "custom/settings-eval",
-          prompt: USER_PROMPT,
-          [CUSTOMER_KEY]: "arbitrary",
+          config: {
+            evaluatorType: "custom/settings-eval",
+            prompt: USER_PROMPT,
+            [CUSTOMER_KEY]: "arbitrary",
+          },
         });
 
         expect(reports).toHaveLength(1);
@@ -139,8 +159,35 @@ describe("ExecuteEvaluationCommand prevalence reporting", () => {
     describe("when the online pipeline executes it for a trace", () => {
       it("reports nothing, so the count only ever names affected rows", async () => {
         const reports = await execute({
-          evaluatorType: "custom/settings-eval",
-          settings: { prompt: USER_PROMPT },
+          config: {
+            evaluatorType: "custom/settings-eval",
+            settings: { prompt: USER_PROMPT },
+          },
+        });
+
+        expect(reports).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given a code evaluator, whose valid config is top-level by design", () => {
+    describe("when the online pipeline executes it for a trace", () => {
+      /**
+       * A code evaluator stores `{ code, inputs, outputs }` at the top level
+       * with no `settings` key — the same SHAPE the recovery branch keys off,
+       * arrived at legitimately. Counting those would inflate AC0d's prevalence
+       * number with rows that were never affected, and put an info line on the
+       * hot path of an unrelated evaluator type.
+       *
+       * @scenario A code evaluator's own config is never mistaken for a lost prompt
+       */
+      it("reports nothing, so the count is not inflated by an unaffected type", async () => {
+        const reports = await execute({
+          evaluatorRecordType: "code",
+          config: DEFAULT_CODE_EVALUATOR_CONFIG as unknown as Record<
+            string,
+            unknown
+          >,
         });
 
         expect(reports).toHaveLength(0);

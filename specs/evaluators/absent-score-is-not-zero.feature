@@ -203,6 +203,19 @@ Feature: An absent evaluator score is never presented as zero
     Then the settings the judge receives are exactly the user's settings
     And the settings the judge receives are not empty
 
+  # ⚠ A code evaluator arrives at the SAME SHAPE this fix keys off — top-level
+  # keys, no settings — but legitimately: { code, inputs, outputs } is its whole
+  # valid config. Recovery must not read that as a lost prompt, or a healthy
+  # evaluator's Python is handed to the judge as settings and every one of its
+  # runs is counted as an affected row.
+
+  @integration
+  Scenario: A code evaluator's own config is never mistaken for a lost prompt
+    Given a monitor backed by a code evaluator whose valid config is top-level
+    When the online evaluation pipeline executes it for a trace
+    Then the settings sent to the judge are the monitor's own parameters
+    And the code evaluator's configuration is not reported as affected
+
   @unit
   Scenario Outline: The shared score formatter distinguishes absent from zero
     Given a score value of "<value>"
@@ -245,6 +258,7 @@ Feature: An absent evaluator score is never presented as zero
 # AC 0g: a recovered model naming an unconfigured provider degrades, does not throw every trace
 #        -> Scenario: A recovered model naming an unconfigured provider degrades rather than erroring
 # AC 12b: correctly-configured monitors unaffected -- the 99% regression case
+#        -> Scenario: A code evaluator's own config is never mistaken for a lost prompt
 #        -> Scenario: A correctly configured evaluator's settings reach the judge unchanged
 #           (asserted one hop below executeForTrace, at langevalsClient.evaluate, which is
 #           where the existing settings-resolution tests do NOT reach)

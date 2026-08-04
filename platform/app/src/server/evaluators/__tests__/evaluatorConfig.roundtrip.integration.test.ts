@@ -70,6 +70,10 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
       const { settings } = resolveEvaluatorSettingsWithSource({
         config: row.config as Record<string, unknown>,
         parameters: null,
+        // Read back from Postgres, not restated: recovery is gated on this
+        // column, so a literal here would assert the gate against a value the
+        // database never had to agree with.
+        evaluatorRecordType: row.type,
       });
 
       // Exact, not partial: `toMatchObject` cannot fail if the resolver leaks

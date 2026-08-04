@@ -345,6 +345,7 @@ describe("EvaluationExecutionService", () => {
           model: "openai/gpt-5-mini",
         },
         parameters: null,
+        evaluatorRecordType: "evaluator",
       });
 
       /** @scenario Model environment is resolved from the recovered settings */

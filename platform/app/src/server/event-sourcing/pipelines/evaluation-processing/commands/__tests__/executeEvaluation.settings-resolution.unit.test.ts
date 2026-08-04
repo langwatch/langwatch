@@ -20,6 +20,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_CODE_EVALUATOR_CONFIG } from "~/server/evaluators/codeEvaluator";
 import type { Command } from "../../../../";
 import { createTenantId } from "../../../../";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
@@ -407,6 +408,30 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
         expect(call.settings).toMatchObject({
           prompt: "a prompt saved long before the settings key existed",
         });
+      });
+    });
+  });
+
+  describe("given a code evaluator, whose valid config is top-level by design", () => {
+    describe("when the online pipeline executes it for a trace", () => {
+      /** @scenario A code evaluator's own config is never mistaken for a lost prompt */
+      it("leaves the config alone and falls back to monitor.parameters", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            checkType: "code",
+            evaluator: {
+              id: "evaluator_code",
+              type: "code",
+              // The shape the editor seeds and `codeEvaluatorConfigSchema`
+              // accepts — imported, not retyped, so a change to the persisted
+              // shape reaches this test instead of drifting past it.
+              config: DEFAULT_CODE_EVALUATOR_CONFIG,
+            },
+          }),
+        );
+
+        expect(call.settings).toEqual(MONITOR_PARAMETERS);
+        expect(call.settings).not.toHaveProperty("code");
       });
     });
   });
