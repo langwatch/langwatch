@@ -184,11 +184,15 @@ export const TracesMapping = ({
     return Array.from(new Set(ids));
   }, [traces]);
 
-  // Fetch all traces for these thread_ids
+  // Fetch all traces for these thread_ids. Corrections apply here for the same
+  // reason they apply to the traces being mapped: a thread_* column and a
+  // trace column filled from the same drawer must not disagree about what the
+  // conversation said.
   const allThreadTraces = api.traces.getTracesWithSpansByThreadIds.useQuery(
     {
       projectId: project?.id ?? "",
       threadIds,
+      withEditOverlay: true,
     },
     {
       enabled: !!project?.id && threadIds.length > 0,

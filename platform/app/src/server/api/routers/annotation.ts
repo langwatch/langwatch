@@ -11,7 +11,7 @@ import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { slugify } from "~/utils/slugify";
 import type { Protections } from "../../traces/protections";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -117,32 +117,65 @@ const annotatorReferenceSchema = z.string().transform((annotator, ctx) => {
 type AnnotatorReference = z.infer<typeof annotatorReferenceSchema>;
 
 /**
- * A suggested expected output is the output-only case of a trace correction.
- * The annotation row stays the record of who suggested what; the correction is
- * the trace's current corrected truth and is what the dataset flow reads.
+ * Carries a suggested expected output over to the trace's correction. The
+ * annotation row stays the record of who suggested what; the correction is the
+ * trace's current corrected truth and is what the dataset flow reads.
  *
- * Deliberately not best-effort: a suggestion the reviewer believes was saved
- * but which never reached the correction would silently ship the uncorrected
- * trace into a dataset.
+ * Only a suggestion that actually CHANGED is carried over, which is what makes
+ * the two sides safe to keep in step:
+ *   - no suggestion field at all (undefined) leaves the correction alone;
+ *   - the same text the annotation already held is not re-asserted, so saving a
+ *     comment on an old annotation cannot overwrite a newer correction with the
+ *     text the form loaded when it opened;
+ *   - clearing the text withdraws the corrected output, leaving every other
+ *     edit on the trace in place. A save that never held a suggestion has
+ *     nothing to withdraw, so an ordinary comment never removes a correction
+ *     made elsewhere.
+ *
+ * Writing a correction is `annotations:update` work on every other surface, so
+ * a reviewer who may only create annotations still gets their annotation and
+ * simply does not move the correction.
+ *
+ * Runs BEFORE the annotation is written and is deliberately not best-effort: a
+ * suggestion the reviewer believes was saved but which never reached the
+ * correction would silently ship the uncorrected trace into a dataset. Merging
+ * the same text twice is a no-op, so a retry after a failed annotation write
+ * costs nothing, while the reverse order would leave a duplicate annotation
+ * behind on every retry.
  */
-const mergeSuggestedOutputIntoOverlay = async ({
-  prisma,
+const carrySuggestedOutputToOverlay = async ({
+  ctx,
   projectId,
   traceId,
   expectedOutput,
+  previousExpectedOutput,
   userId,
 }: {
-  prisma: PrismaClient;
+  ctx: { prisma: PrismaClient; session: Session };
   projectId: string;
   traceId: string;
   expectedOutput?: string | null;
+  previousExpectedOutput?: string | null;
   userId: string;
 }) => {
-  if (typeof expectedOutput !== "string" || expectedOutput.length === 0) return;
-  await TraceEditOverlayService.create(prisma).mergeTraceOutputEdit({
+  if (expectedOutput === undefined) return;
+  const next = expectedOutput ?? "";
+  const previous = previousExpectedOutput ?? "";
+  if (next === previous) return;
+
+  if (!(await hasProjectPermission(ctx, projectId, "annotations:update"))) {
+    return;
+  }
+
+  const overlay = TraceEditOverlayService.create(ctx.prisma);
+  if (next.length === 0) {
+    await overlay.removeTraceOutputEdit({ projectId, traceId, userId });
+    return;
+  }
+  await overlay.mergeTraceOutputEdit({
     projectId,
     traceId,
-    output: expectedOutput,
+    output: next,
     userId,
   });
 };
@@ -222,6 +255,14 @@ export const annotationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
 
+      await carrySuggestedOutputToOverlay({
+        ctx,
+        projectId: input.projectId,
+        traceId: input.traceId,
+        expectedOutput: input.expectedOutput,
+        userId: ctx.session.user.id,
+      });
+
       const createdAnnotation = await service.create({
         id: nanoid(),
         projectId: input.projectId,
@@ -231,14 +272,6 @@ export const annotationRouter = createTRPCRouter({
         isThumbsUp: input.isThumbsUp ?? null,
         scoreOptions: input.scoreOptions ?? {},
         expectedOutput: input.expectedOutput ?? null,
-      });
-
-      await mergeSuggestedOutputIntoOverlay({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-        traceId: input.traceId,
-        expectedOutput: input.expectedOutput,
-        userId: ctx.session.user.id,
       });
 
       // Best-effort ClickHouse sync: Prisma is the source of truth.
@@ -277,7 +310,24 @@ export const annotationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
 
-      const updated = await service.update({
+      // The suggestion the annotation held before this save is what tells a
+      // real edit apart from a form re-sending what it loaded, so it is read
+      // before the row moves.
+      const existing = await ctx.prisma.annotation.findFirst({
+        where: { id: input.id, projectId: input.projectId },
+        select: { expectedOutput: true },
+      });
+
+      await carrySuggestedOutputToOverlay({
+        ctx,
+        projectId: input.projectId,
+        traceId: input.traceId,
+        expectedOutput: input.expectedOutput,
+        previousExpectedOutput: existing?.expectedOutput,
+        userId: ctx.session.user.id,
+      });
+
+      return service.update({
         id: input.id,
         projectId: input.projectId,
         traceId: input.traceId,
@@ -286,16 +336,6 @@ export const annotationRouter = createTRPCRouter({
         scoreOptions: input.scoreOptions ?? {},
         expectedOutput: input.expectedOutput ?? null,
       });
-
-      await mergeSuggestedOutputIntoOverlay({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-        traceId: input.traceId,
-        expectedOutput: input.expectedOutput,
-        userId: ctx.session.user.id,
-      });
-
-      return updated;
     }),
   getByTraceId: protectedProcedure
     .input(
@@ -727,6 +767,11 @@ export const annotationRouter = createTRPCRouter({
    * finishes the queue. Persisted rather than kept in the browser so the
    * selection survives a refresh and the end-of-queue step can still find items
    * that were already marked done.
+   *
+   * Scoped to the items the caller is responsible for, the same reach the
+   * hand-off reads back: a mark is one reviewer's note about their own queue,
+   * so marking a teammate's item would put a trace they never chose into a
+   * hand-off they never see.
    */
   markQueueItemForDataset: protectedProcedure
     .input(
@@ -738,12 +783,31 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("annotations:update"))
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.annotationQueueItem.update({
-        where: { id: input.queueItemId, projectId: input.projectId },
+      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const organizationId = await service.getProjectOrganizationId({
+        projectId: input.projectId,
+      });
+
+      const result = await ctx.prisma.annotationQueueItem.updateMany({
+        where: {
+          ...callerQueueItemsFilter({
+            projectId: input.projectId,
+            organizationId,
+            userId: ctx.session.user.id,
+          }),
+          id: input.queueItemId,
+        },
         data: {
           markedForDatasetAt: input.marked ? new Date() : null,
         },
       });
+      if (result.count === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Queue item not found",
+        });
+      }
+      return { marked: input.marked };
     }),
   /**
    * The reviewer's queue items that are waiting for the dataset hand-off,
@@ -774,7 +838,10 @@ export const annotationRouter = createTRPCRouter({
         orderBy: { createdAt: "asc" },
       });
     }),
-  /** Clears the marks after the hand-off, so the next queue walk starts clean. */
+  /**
+   * Clears the marks after the hand-off, so the next queue walk starts clean.
+   * Same reach as marking and reading them: only the caller's own items.
+   */
   clearDatasetMarks: protectedProcedure
     .input(
       z.object({
@@ -785,9 +852,18 @@ export const annotationRouter = createTRPCRouter({
     .use(checkProjectPermission("annotations:update"))
     .mutation(async ({ ctx, input }) => {
       if (input.queueItemIds.length === 0) return { cleared: 0 };
+      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const organizationId = await service.getProjectOrganizationId({
+        projectId: input.projectId,
+      });
+
       const result = await ctx.prisma.annotationQueueItem.updateMany({
         where: {
-          projectId: input.projectId,
+          ...callerQueueItemsFilter({
+            projectId: input.projectId,
+            organizationId,
+            userId: ctx.session.user.id,
+          }),
           id: { in: input.queueItemIds },
         },
         data: { markedForDatasetAt: null },

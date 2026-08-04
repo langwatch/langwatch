@@ -137,6 +137,47 @@ export class TraceEditOverlayService {
     return this.upsert({ projectId, traceId, patch: merged, userId });
   }
 
+  /**
+   * Takes the corrected trace output back off, leaving every other edit in
+   * place. This is what clearing a suggestion writes: the reviewer withdrew the
+   * output they proposed, not the span renames or deletions someone made in the
+   * drawer. When the output was the only edit the row goes with it, so a
+   * withdrawn suggestion returns the trace to uncorrected rather than leaving an
+   * inert row behind.
+   */
+  async removeTraceOutputEdit({
+    projectId,
+    traceId,
+    userId,
+  }: {
+    projectId: string;
+    traceId: string;
+    userId: string | null;
+  }): Promise<TraceEditOverlayDto | null> {
+    const existing = await this.repository.findByProjectAndTrace({
+      projectId,
+      traceId,
+    });
+    if (!existing) return null;
+
+    const current = parseTraceEditOverlayPatch(existing.patch);
+    if (!current?.trace?.output) return null;
+
+    const { output: _removed, ...remainingTraceEdits } = current.trace;
+    const next: TraceEditOverlayPatch = {
+      ...current,
+      ...(remainingTraceEdits.input !== undefined
+        ? { trace: remainingTraceEdits }
+        : { trace: void 0 }),
+    };
+
+    if (!patchHasAnyEdit(next)) {
+      await this.repository.delete({ projectId, traceId });
+      return null;
+    }
+    return this.upsert({ projectId, traceId, patch: next, userId });
+  }
+
   async delete({
     projectId,
     traceId,

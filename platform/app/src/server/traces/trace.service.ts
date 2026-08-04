@@ -17,6 +17,7 @@ import type { Evaluation, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { applyOverlayToTrace } from "./edit-overlay/applyTraceEditOverlay";
+import { redactPatchForViewer } from "./edit-overlay/redactTraceEditOverlayPatch";
 import { TraceEditOverlayService } from "./edit-overlay/traceEditOverlay.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 import { resolveOffloadedTracesBatch } from "./resolve-offloaded-traces-batch";
@@ -268,10 +269,13 @@ export class TraceService {
    * coding-agent enrichment, so a correction wins over whatever the resolvers
    * put in the field.
    *
-   * A correction never widens what a viewer may read: when the viewer cannot
-   * see captured input or output, or the content was teaser-redacted by the
-   * plan's visibility window, the corrected content for that category is
-   * skipped and only the structural edits apply.
+   * A correction never widens what a viewer may read. The trace it lands on has
+   * already been through `applyTraceProtections`, so each patch is first cut
+   * down to the edits this viewer may read — content categories they cannot
+   * see, content teased by the plan's visibility window, and attributes a
+   * restrict rule hides from them all drop out — and only then applied. Without
+   * that, a corrected `params` or output would put back exactly what the
+   * redaction pass had just removed, and a dataset record would carry it.
    */
   private async applyEditOverlays(
     projectId: string,
@@ -289,14 +293,13 @@ export class TraceService {
     const corrected = traces.map((trace) => {
       const patch = patches.get(trace.trace_id);
       if (!patch) return trace;
-      const windowRedacted = trace.redacted_by_visibility_window === true;
       const next = applyOverlayToTrace({
         trace,
-        patch,
-        suppressContent: {
-          input: !protections.canSeeCapturedInput || windowRedacted,
-          output: !protections.canSeeCapturedOutput || windowRedacted,
-        },
+        patch: redactPatchForViewer({
+          patch,
+          protections,
+          windowRedacted: trace.redacted_by_visibility_window === true,
+        }),
       });
       if (next !== trace) changed = true;
       return next;

@@ -7,6 +7,7 @@
  */
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestUser } from "../../../../utils/testUtils";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
@@ -38,6 +39,9 @@ describe("Trace edit overlay storage", () => {
   let viewer: ReturnType<typeof appRouter.createCaller>;
   let authorId: string;
   let otherReviewerId: string;
+  let readOnlyId: string;
+  let teamId: string;
+  let organizationId: string;
 
   beforeAll(async () => {
     previousApp = globalForApp.__langwatch_app;
@@ -51,7 +55,8 @@ describe("Trace edit overlay storage", () => {
       where: { id: PROJECT_ID },
       select: { teamId: true, team: { select: { organizationId: true } } },
     });
-    const organizationId = project.team.organizationId;
+    teamId = project.teamId;
+    organizationId = project.team.organizationId;
 
     const joinProject = async ({
       userId,
@@ -96,6 +101,7 @@ describe("Trace edit overlay storage", () => {
         email: "trace-edit-overlay-viewer@example.com",
       },
     });
+    readOnlyId = readOnly.id;
     await joinProject({ userId: readOnly.id, role: TeamUserRole.VIEWER });
     viewer = callerFor(readOnly.id);
 
@@ -105,9 +111,13 @@ describe("Trace edit overlay storage", () => {
   });
 
   afterAll(async () => {
-    await prisma.traceEditOverlay.deleteMany({
-      where: { projectId: PROJECT_ID },
-    });
+    const reviewers = [otherReviewerId, readOnlyId];
+    await cleanupTestRows(prisma, [
+      ["traceEditOverlay", { projectId: PROJECT_ID }],
+      ["teamUser", { userId: { in: reviewers }, teamId }],
+      ["organizationUser", { userId: { in: reviewers }, organizationId }],
+      ["user", { id: { in: reviewers } }],
+    ]);
     globalForApp.__langwatch_app = previousApp;
   });
 

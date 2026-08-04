@@ -9,6 +9,9 @@
 --
 -- AnnotationQueueItem.markedForDatasetAt is nullable and defaults to NULL, so
 -- every existing queue item stays unmarked.
+--
+-- No foreign keys: the schema runs `relationMode = "prisma"`, so relational
+-- integrity is enforced in the application and the database carries none.
 
 CREATE TABLE "TraceEditOverlay" (
     "id" TEXT NOT NULL,
@@ -27,18 +30,9 @@ CREATE UNIQUE INDEX "TraceEditOverlay_projectId_traceId_key" ON "TraceEditOverla
 
 CREATE INDEX "TraceEditOverlay_projectId_idx" ON "TraceEditOverlay"("projectId");
 
-ALTER TABLE "TraceEditOverlay" ADD CONSTRAINT "TraceEditOverlay_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE "TraceEditOverlay" ADD CONSTRAINT "TraceEditOverlay_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
-ALTER TABLE "TraceEditOverlay" ADD CONSTRAINT "TraceEditOverlay_updatedById_fkey" FOREIGN KEY ("updatedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
 ALTER TABLE "AnnotationQueueItem" ADD COLUMN "markedForDatasetAt" TIMESTAMP(3);
 
 -- Down (manual): reverses in dependency order; run only to roll back this
 -- migration.
 --   ALTER TABLE "AnnotationQueueItem" DROP COLUMN "markedForDatasetAt";
---   ALTER TABLE "TraceEditOverlay" DROP CONSTRAINT "TraceEditOverlay_updatedById_fkey";
---   ALTER TABLE "TraceEditOverlay" DROP CONSTRAINT "TraceEditOverlay_createdById_fkey";
---   ALTER TABLE "TraceEditOverlay" DROP CONSTRAINT "TraceEditOverlay_projectId_fkey";
 --   DROP TABLE "TraceEditOverlay";

@@ -176,54 +176,6 @@ describe("applying a trace correction", () => {
     });
   });
 
-  describe("given a viewer who may not read captured content", () => {
-    /** @scenario "A viewer who may not read captured content sees the original" */
-    it("keeps captured content and still applies the structural edits", () => {
-      const corrected = applyOverlayToTrace({
-        trace: trace([
-          span({
-            span_id: "span-1",
-            input: { type: "text", value: "captured input" },
-            output: { type: "text", value: "captured output" },
-            params: { temperature: 0.1 },
-          }),
-          span({ span_id: "span-2" }),
-        ]),
-        patch: patchOf({
-          trace: {
-            input: { value: "corrected trace input" },
-            output: { value: "corrected trace output" },
-          },
-          spans: [
-            {
-              spanId: "span-1",
-              name: "renamed",
-              input: { type: "text", value: "corrected input" },
-              output: { type: "text", value: "corrected output" },
-              params: { temperature: 0.9 },
-            },
-          ],
-          deletedSpanIds: ["span-2"],
-        }),
-        suppressContent: { input: true, output: true },
-      });
-
-      expect(corrected.spans).toHaveLength(1);
-      expect(corrected.spans[0]?.name).toBe("renamed");
-      expect(corrected.spans[0]?.input).toEqual({
-        type: "text",
-        value: "captured input",
-      });
-      expect(corrected.spans[0]?.output).toEqual({
-        type: "text",
-        value: "captured output",
-      });
-      expect(corrected.spans[0]?.params).toEqual({ temperature: 0.1 });
-      expect(corrected.input).toEqual({ value: "captured input" });
-      expect(corrected.output).toEqual({ value: "captured output" });
-    });
-  });
-
   describe("given a correction with nothing to apply here", () => {
     /** @scenario "A correction with nothing to apply returns the trace untouched" */
     it("returns the very same trace", () => {

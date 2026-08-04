@@ -31,8 +31,12 @@
 #   - Reading a correction needs permission to view traces; writing one needs
 #     permission to update annotations, because correcting a trace is review
 #     work and external reviewers hold annotation permissions, not trace ones.
-#   - A correction never overrides privacy. A viewer who may not read captured
-#     input or output sees the original placeholder, not the corrected content.
+#   - A correction never overrides privacy. A correction quotes the trace it
+#     corrects, so it is cut down to what the reader may see BEFORE it is
+#     handed out or applied: content categories they cannot read, content teased
+#     by the plan's visibility window, and attributes a restrict rule hides all
+#     drop out of the patch itself. Structural edits always survive, because
+#     they say what the trace should have looked like without quoting any of it.
 #   - The existing "suggest an expected output" flow keeps writing its
 #     annotation and additionally merges an output-only correction, so the
 #     annotation stays the record of who suggested what and the overlay stays
@@ -107,6 +111,64 @@ Feature: Correcting a trace without rewriting it
       Then the save is refused
       And the trace still has no correction
 
+    @unit
+    Scenario: Two reviewers saving the first correction at once both succeed
+      Given a trace with no correction
+      When two reviewers save the first correction at the same moment
+      Then the reviewer who lost the race stores their correction as an update
+      And neither reviewer sees an error
+
+  Rule: A correction is read through the same privacy gates as the trace
+
+    @integration
+    Scenario: A viewer who may not read captured content is handed only the structural edits
+      Given a correction that edits a span input, a span output and the trace output, and renames a span
+      And a privacy policy that hides captured input and output from me
+      When I read the correction for that trace
+      Then the correction I receive carries no corrected content
+      And the rename and the deletions are still there
+      And a viewer the policy allows receives the whole correction
+
+    @unit
+    Scenario: A viewer who may not read captured content sees the original
+      Given a correction that edits a span input and the trace output
+      And a viewer whose privacy policy hides captured input and output
+      When that viewer reads the trace
+      Then the captured input and output are unchanged
+      And structural edits such as renames and deletions still apply
+
+    @unit
+    Scenario: A restricted attribute stays hidden inside a corrected attribute set
+      Given a correction that rewrites a span's attributes
+      And an attribute rule that hides one of them from me
+      When I read the trace with corrections
+      Then that attribute reads as restricted rather than as the corrected value
+      And the other corrected attributes are there
+
+    @unit
+    Scenario: Corrected content is withheld beyond the plan's visibility window
+      Given a trace whose content is teased because it predates the plan window
+      When its correction is read
+      Then no corrected content comes back
+      And the structural edits still do
+
+    @integration
+    Scenario: A reviewer who cannot read a field cannot remove its correction
+      Given a correction whose span output and trace output were written by someone else
+      And a privacy policy that hides captured output from me
+      When I save a correction that only renames a span
+      Then the rename is stored
+      And the corrected outputs I never saw are still stored
+      And removing the whole correction stays a separate, deliberate action
+
+    @unit
+    Scenario: A saved correction keeps the edits the saver was never shown
+      Given a stored correction holding content edits and a restricted attribute
+      When a reviewer who may not read them saves their own edits over it
+      Then their edits are kept
+      And the withheld edits come back exactly as they were stored
+      And a span whose only edits were withheld is not dropped
+
   Rule: Corrections are applied over the original at read time
 
     @unit
@@ -140,14 +202,6 @@ Feature: Correcting a trace without rewriting it
       Given a correction naming a span id that this trace does not contain
       When the trace is read
       Then every captured span is still returned
-
-    @unit
-    Scenario: A viewer who may not read captured content sees the original
-      Given a correction that edits a span input and the trace output
-      And a viewer whose privacy policy hides captured input and output
-      When that viewer reads the trace
-      Then the captured input and output are unchanged
-      And structural edits such as renames and deletions still apply
 
     @unit
     Scenario: A correction with nothing to apply returns the trace untouched
@@ -200,6 +254,13 @@ Feature: Correcting a trace without rewriting it
       When the trace is read with corrections
       Then the correction wins over the resolved captured content
 
+    @unit
+    Scenario: A dataset output column carries the corrected output
+      Given a trace whose output was corrected, whether in the drawer or through a suggestion
+      When the trace is mapped into a dataset row
+      Then the output column holds the corrected output, not the captured one
+      And the trace id column still identifies the captured trace
+
   Rule: A suggested expected output is recorded as a correction
 
     @integration
@@ -227,6 +288,38 @@ Feature: Correcting a trace without rewriting it
       Given a trace with no correction
       When I save an annotation with a comment and no suggested output
       Then the trace still has no correction
+
+    @integration
+    Scenario: Clearing the suggestion takes the corrected output back off
+      Given a trace whose correction renames a span and carries a suggested output
+      When I clear the suggestion on that annotation
+      Then the trace output correction is gone
+      And the span rename is still there
+
+    @integration
+    Scenario: Clearing the only suggestion returns the trace to uncorrected
+      Given a trace corrected only through a suggested output
+      When I clear the suggestion on that annotation
+      Then the trace reads as uncorrected
+
+    @integration
+    Scenario: Re-saving a comment does not re-assert the suggestion it opened with
+      Given a trace whose correction was updated after the annotation was written
+      When I save that annotation again with only its comment changed
+      Then the correction is left exactly as it was
+
+    @integration
+    Scenario: Saving a comment with an empty suggestion never removes a correction
+      Given a trace with a correction and a comment form that carries no suggestion text
+      When I save the comment
+      Then the correction is still there
+
+    @integration
+    Scenario: An annotator who may only create annotations does not move the correction
+      Given I may create annotations but not update them
+      When I save an annotation carrying a suggested output
+      Then the annotation is saved
+      And the trace correction is left alone
 
     @integration
     Scenario: Deleting the suggestion annotation leaves the correction in place
@@ -263,3 +356,16 @@ Feature: Correcting a trace without rewriting it
       When I mark a queue item for the dataset
       Then the request is refused
       And the queue item carries no mark
+
+    @integration
+    Scenario: Marking a teammate's queue item is refused
+      Given a queue item assigned to a teammate, on a queue I do not belong to
+      When I mark it for the dataset
+      Then the request is refused
+      And the queue item carries no mark
+
+    @integration
+    Scenario: Clearing marks leaves a teammate's marks alone
+      Given a marked item of mine and a marked item of a teammate's
+      When I clear the marks for both
+      Then only mine is cleared

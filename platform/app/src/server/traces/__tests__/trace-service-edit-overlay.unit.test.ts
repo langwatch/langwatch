@@ -296,6 +296,95 @@ describe("TraceService read seam for reviewer corrections", () => {
     });
   });
 
+  describe("given an attribute rule that hides one of the corrected attributes", () => {
+    it("does not let the correction put the hidden attribute back", async () => {
+      mockGetTracesWithSpans.mockResolvedValue([trace("trace-1")]);
+      mockGetPatchesByTraceIds.mockResolvedValue(
+        new Map([
+          [
+            "trace-1",
+            {
+              version: 1,
+              spans: [
+                {
+                  spanId: "trace-1-span",
+                  params: {
+                    model: "gpt-5-mini",
+                    gen_ai: { prompt: { id: "secret-prompt" } },
+                  },
+                },
+              ],
+              deletedSpanIds: [],
+            } satisfies TraceEditOverlayPatch,
+          ],
+        ]),
+      );
+
+      const [corrected] = await buildService().getTracesWithSpans(
+        PROJECT_ID,
+        ["trace-1"],
+        {
+          ...protections,
+          hiddenAttributes: [
+            { pattern: "gen_ai.prompt.id", visibleTo: "Admins" },
+          ],
+        },
+        undefined,
+        { withEditOverlay: true },
+      );
+
+      expect(corrected?.spans[0]?.params).toEqual({
+        model: "gpt-5-mini",
+        gen_ai: { prompt: { id: "[REDACTED] (visible to Admins)" } },
+      });
+    });
+
+    it("drops the corrected attributes for a viewer who may not read input", async () => {
+      mockGetTracesWithSpans.mockResolvedValue([
+        trace("trace-1", {
+          spans: [
+            span({
+              span_id: "trace-1-span",
+              trace_id: "trace-1",
+              params: { model: "[REDACTED] (visible to Admins)" },
+            }),
+          ],
+        }),
+      ]);
+      mockGetPatchesByTraceIds.mockResolvedValue(
+        new Map([
+          [
+            "trace-1",
+            {
+              version: 1,
+              spans: [
+                {
+                  spanId: "trace-1-span",
+                  name: "cleaned up",
+                  params: { model: "gpt-5-mini" },
+                },
+              ],
+              deletedSpanIds: [],
+            } satisfies TraceEditOverlayPatch,
+          ],
+        ]),
+      );
+
+      const [corrected] = await buildService().getTracesWithSpans(
+        PROJECT_ID,
+        ["trace-1"],
+        { ...protections, canSeeCapturedInput: false },
+        undefined,
+        { withEditOverlay: true },
+      );
+
+      expect(corrected?.spans[0]?.params).toEqual({
+        model: "[REDACTED] (visible to Admins)",
+      });
+      expect(corrected?.spans[0]?.name).toBe("cleaned up");
+    });
+  });
+
   describe("given a viewer who may not read captured output", () => {
     it("keeps the captured output and still applies the structural edits", async () => {
       mockGetTracesWithSpans.mockResolvedValue([trace("trace-1")]);

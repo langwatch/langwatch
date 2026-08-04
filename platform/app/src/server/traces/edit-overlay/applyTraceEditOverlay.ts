@@ -13,45 +13,6 @@ import {
   type TraceEditSpanPatch,
 } from "./traceEditOverlay.schemas";
 
-/**
- * Which content categories the viewer may not read. A correction never widens
- * what a privacy policy hides: when a category is suppressed the reader keeps
- * the captured value (usually a redaction placeholder) and only the structural
- * edits (renames, type changes, deletions, error clears) apply.
- */
-export interface SuppressedContent {
-  input?: boolean;
-  output?: boolean;
-}
-
-/**
- * The content category each editable span field belongs to. `params` rides
- * under `input` because it carries the request payload; `name`, `type` and
- * `error` are structural and are never suppressed.
- */
-const SPAN_FIELD_CONTENT_CATEGORY: Record<
-  TraceEditSpanField,
-  keyof SuppressedContent | null
-> = {
-  name: null,
-  type: null,
-  error: null,
-  input: "input",
-  params: "input",
-  output: "output",
-};
-
-function isFieldSuppressed({
-  field,
-  suppressContent,
-}: {
-  field: TraceEditSpanField;
-  suppressContent?: SuppressedContent;
-}): boolean {
-  const category = SPAN_FIELD_CONTENT_CATEGORY[field];
-  return category !== null && suppressContent?.[category] === true;
-}
-
 function buildChildrenIndex(
   links: ReadonlyArray<{ id: string; parentId?: string | null }>,
 ): Map<string, string[]> {
@@ -131,11 +92,9 @@ function indexSpanPatches(
 function applySpanPatch({
   span,
   spanPatch,
-  suppressContent,
 }: {
   span: Span;
   spanPatch: TraceEditSpanPatch;
-  suppressContent?: SuppressedContent;
 }): Span {
   const next = { ...span } as Span;
   const draft = next as unknown as Record<TraceEditSpanField, unknown>;
@@ -144,7 +103,6 @@ function applySpanPatch({
   for (const field of TRACE_EDIT_SPAN_FIELDS) {
     const value = spanPatch[field];
     if (value === undefined) continue;
-    if (isFieldSuppressed({ field, suppressContent })) continue;
     draft[field] = value;
     changed = true;
   }
@@ -159,11 +117,9 @@ function applySpanPatch({
 function correctedSpans({
   spans,
   patch,
-  suppressContent,
 }: {
   spans: Span[];
   patch: TraceEditOverlayPatch;
-  suppressContent?: SuppressedContent;
 }): Span[] | null {
   const deleted = expandDeletedSpanIds({
     links: spans.map((span) => ({
@@ -182,62 +138,39 @@ function correctedSpans({
       continue;
     }
     const spanPatch = patchesBySpanId.get(span.span_id);
-    const corrected = spanPatch
-      ? applySpanPatch({ span, spanPatch, suppressContent })
-      : span;
+    const corrected = spanPatch ? applySpanPatch({ span, spanPatch }) : span;
     if (corrected !== span) changed = true;
     next.push(corrected);
   }
   return changed ? next : null;
 }
 
-function pickTraceIO<T>({
-  captured,
-  edited,
-  suppressed,
-}: {
-  captured: T;
-  edited: T | undefined;
-  suppressed?: boolean;
-}): T {
-  return edited !== undefined && !suppressed ? edited : captured;
-}
-
 /**
  * Applies a correction to a canonical trace. Returns the very same trace when
- * the correction changes nothing about it, so a caller can compare references
- * to learn whether anything was corrected without diffing the payload.
+ * the correction leaves every field it carries untouched, so a caller can
+ * compare references to learn whether anything was corrected without diffing
+ * the payload. An edit whose value equals the captured one still produces a new
+ * trace: equality is a property of the values, not of the correction.
  *
  * Timings, metrics, evaluations and events are never touched: a correction
  * says what the trace should have contained, not how long it took or what it
  * cost.
+ *
+ * The patch is applied as given. What a viewer may read is decided before the
+ * patch reaches here, by `redactPatchForViewer`.
  */
 export function applyOverlayToTrace({
   trace,
   patch,
-  suppressContent,
 }: {
   trace: Trace;
   patch: TraceEditOverlayPatch | null | undefined;
-  suppressContent?: SuppressedContent;
 }): Trace {
   if (!patch || !patchHasAnyEdit(patch)) return trace;
 
-  const spans = correctedSpans({
-    spans: trace.spans ?? [],
-    patch,
-    suppressContent,
-  });
-  const input = pickTraceIO({
-    captured: trace.input,
-    edited: patch.trace?.input,
-    suppressed: suppressContent?.input,
-  });
-  const output = pickTraceIO({
-    captured: trace.output,
-    edited: patch.trace?.output,
-    suppressed: suppressContent?.output,
-  });
+  const spans = correctedSpans({ spans: trace.spans ?? [], patch });
+  const input = patch.trace?.input ?? trace.input;
+  const output = patch.trace?.output ?? trace.output;
 
   const unchanged = !spans && input === trace.input && output === trace.output;
   if (unchanged) return trace;
@@ -336,11 +269,9 @@ function spanDetailFieldValue({
 export function applyOverlayToSpanDetail({
   detail,
   patch,
-  suppressContent,
 }: {
   detail: SpanDetail;
   patch: TraceEditOverlayPatch | null | undefined;
-  suppressContent?: SuppressedContent;
 }): SpanDetail {
   if (!patch || !patchHasAnyEdit(patch)) return detail;
   const spanPatch = indexSpanPatches(patch).get(detail.spanId);
@@ -349,7 +280,6 @@ export function applyOverlayToSpanDetail({
   let next = detail;
   for (const field of TRACE_EDIT_SPAN_FIELDS) {
     if (spanPatch[field] === undefined) continue;
-    if (isFieldSuppressed({ field, suppressContent })) continue;
     next = { ...next, ...spanDetailFieldValue({ field, spanPatch }) };
   }
   return next;
@@ -393,23 +323,21 @@ function correctedSpanCount({
 export function applyOverlayToTraceHeader({
   header,
   patch,
-  suppressContent,
   spans,
 }: {
   header: TraceHeader;
   patch: TraceEditOverlayPatch | null | undefined;
-  suppressContent?: SuppressedContent;
   spans?: ReadonlyArray<{ spanId: string; parentSpanId?: string | null }>;
 }): TraceHeader {
   if (!patch || !patchHasAnyEdit(patch)) return header;
 
   const next = { ...header };
   let changed = false;
-  if (patch.trace?.input !== undefined && !suppressContent?.input) {
+  if (patch.trace?.input !== undefined) {
     next.input = patch.trace.input.value;
     changed = true;
   }
-  if (patch.trace?.output !== undefined && !suppressContent?.output) {
+  if (patch.trace?.output !== undefined) {
     next.output = patch.trace.output.value;
     changed = true;
   }
