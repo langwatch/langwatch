@@ -220,7 +220,7 @@ export const TeamForm = ({
           )}
         </HStack>
         <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0}>
+          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
             <Table.Root variant="line" width="full">
               <Table.Header>
                 <Table.Row>
@@ -381,7 +381,7 @@ export const TeamForm = ({
           <>
             <TeamFormProjects team={team} />
             <Card.Root width="full" overflow="hidden">
-              <Card.Body paddingY={0} paddingX={0}>
+              <Card.Body paddingY={0} paddingX={0} overflowX="auto">
                 <Table.Root variant="line" width="full" size="md">
                   <Table.Header>
                     <Table.Row>
