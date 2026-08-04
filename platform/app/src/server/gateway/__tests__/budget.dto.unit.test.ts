@@ -88,6 +88,42 @@ describe("toBudgetDto", () => {
     expect(dto.limit_nano_usd).toBe(25_500_000_000);
   });
 
+  /** @scenario "A budget and its spend events report the same integer" */
+  it("publishes the ledger's integer and renders the string from it", () => {
+    // A cost of 73950 nano is not a whole microdollar, so a decimal carrying
+    // six places cannot hold it. Taking the integer from the ledger is what
+    // makes the published figure the one the spend events also publish;
+    // deriving it from `spentUsd` would republish the rounding instead.
+    const dto = toBudgetDto(
+      budget({
+        spentNanoUsd: 73_950,
+        spentUsd: new Prisma.Decimal("0.000074"),
+      }),
+    );
+    expect(dto.spent_nano_usd).toBe(73_950);
+    expect(dto.spent_usd).toBe("0.00007395");
+  });
+
+  /** @scenario "A per-person template reports no total of its own" */
+  it("nulls the spend fields on a per-person template", () => {
+    const dto = toBudgetDto(
+      budget({
+        scopeType: "ATTRIBUTED_USER",
+        spentNanoUsd: 73_950,
+        endUsersSeen: 12,
+        endUsersOver: 3,
+      }),
+    );
+    // One allowance per person has no single total, so any number here is a
+    // confident answer to a question the row cannot answer.
+    expect(dto.spent_usd).toBeNull();
+    expect(dto.spent_nano_usd).toBeNull();
+    // What the row CAN say, it still says.
+    expect(dto.end_users_seen).toBe(12);
+    expect(dto.end_users_over).toBe(3);
+    expect(dto.limit_usd).toBe("25.5");
+  });
+
   /** @scenario Per-person and per-member fields appear only on their scopes */
   it("carries the seat fields only when the scope has them", () => {
     expect(toBudgetDto(budget())).not.toHaveProperty("end_users_seen");

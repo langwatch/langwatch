@@ -10,15 +10,45 @@ import { effectiveBudgetPeriod } from "./budget.clickhouse.repository";
 import type { GatewayBudgetWithSeats } from "./budget.service";
 import { metadataFromRow } from "./resourceMetadata";
 import { toWireEnum } from "./wireEnums";
-import { decimalUsdToNanoUsd, usdDisplayString } from "./wireMoney";
+import {
+  decimalUsdToNanoUsd,
+  nanoUsdToDecimalString,
+  usdDisplayString,
+} from "./wireMoney";
+
+/**
+ * What this row reports as spend, in both units, or null when there is no
+ * total this row can honestly carry.
+ *
+ * Two rows have no total. `spendAvailable` false means spend could not be
+ * read at all, and the stored `spentUsd` is then a stale column rather than
+ * spend. A per-person template has no single total by construction: it is one
+ * allowance per end user, so its spend is a distribution, and the seats it is
+ * watching are reported as `end_users_seen` / `end_users_over` instead. Both
+ * answer null, because a caller that ignored the distinction used to read a
+ * confident figure as real money, and null is the only value that cannot be
+ * misread that way.
+ *
+ * When there is a total, the integer is the ledger's own and the string is
+ * that integer rendered. Deriving the pair the other way round, from the
+ * decimal, cannot recover digits the decimal never carried.
+ */
+function spendFields(b: GatewayBudgetWithSeats, spendAvailable: boolean) {
+  if (!spendAvailable || b.scopeType === "ATTRIBUTED_USER") {
+    return { spent_usd: null, spent_nano_usd: null };
+  }
+  const nano = b.spentNanoUsd ?? decimalUsdToNanoUsd(b.spentUsd);
+  return {
+    spent_usd:
+      nano === null
+        ? usdDisplayString(b.spentUsd)
+        : nanoUsdToDecimalString(nano),
+    spent_nano_usd: nano,
+  };
+}
 
 export /**
  * The budget row on the wire.
- *
- * `spendAvailable` is false when spend could not be totalled. The stored
- * `spentUsd` is then a stale column, not spend, so both spend fields answer
- * null: a caller that ignored the flag used to read the stale figure as real
- * money, and null is the only value that cannot be misread that way.
  */
 function toBudgetDto(
   b: GatewayBudgetWithSeats,
@@ -45,8 +75,7 @@ function toBudgetDto(
     // decimals. Null nano means the amount is past the safe integer range.
     limit_usd: usdDisplayString(b.limitUsd),
     limit_nano_usd: decimalUsdToNanoUsd(b.limitUsd),
-    spent_usd: spendAvailable ? usdDisplayString(b.spentUsd) : null,
-    spent_nano_usd: spendAvailable ? decimalUsdToNanoUsd(b.spentUsd) : null,
+    ...spendFields(b, spendAvailable),
     timezone: b.timezone,
     provider_key: b.providerKey,
     external_id: b.externalId ?? null,

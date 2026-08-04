@@ -1316,9 +1316,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       // buckets are the only place this spend exists; the template's own
       // scope id never accrues a row.
       const chRepo = new GatewayBudgetClickHouseRepository(async () => ch());
-      for (const [endUserId, amountUsd] of [
-        ["seat-over", "1.500000"],
-        ["seat-under", "0.250000"],
+      for (const { endUserId, amountNanoUsd } of [
+        { endUserId: "seat-over", amountNanoUsd: 1_500_000_000 },
+        { endUserId: "seat-under", amountNanoUsd: 250_000_000 },
       ]) {
         await chRepo.insertDebit([
           {
@@ -1329,7 +1329,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
             window: "MONTH",
             virtualKeyId: anchorId,
             gatewayRequestId: `req-seat-${endUserId}-${suffix}`,
-            amountUsd: amountUsd!,
+            amountNanoUsd,
             tokensInput: 10,
             tokensOutput: 5,
             tokensCacheRead: 0,
@@ -1458,7 +1458,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
           window: "MONTH",
           virtualKeyId: vkId,
           gatewayRequestId: `req-gwrest-${suffix}`,
-          amountUsd: "1.2500",
+          amountNanoUsd: 1_250_000_000,
           tokensInput: 10,
           tokensOutput: 5,
           tokensCacheRead: 0,
