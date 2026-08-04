@@ -9,8 +9,8 @@ Feature: Idempotency-Key on the control-plane creates
   # first one's response.
   #
   # Bound scenarios run in
-  # langwatch/src/app/api/gateway-platform/__tests__/ and
-  # langwatch/src/app/api/webhooks/__tests__/ against the real Hono apps and
+  # platform/app/src/app/api/gateway-platform/__tests__/ and
+  # platform/app/src/app/api/webhooks/__tests__/ against the real Hono apps and
   # real Postgres.
 
   As a backend provisioning gateway resources programmatically

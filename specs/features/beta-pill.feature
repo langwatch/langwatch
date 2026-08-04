@@ -3,7 +3,7 @@ Feature: Beta Pill Indicator
   I want to see a visual indicator when a feature is in beta
   So that I understand the feature's maturity level and can learn more on hover
 
-  # 5 of 6 scenarios are bound to existing tests in langwatch/src/components/ui/__tests__/BetaPill.integration.test.tsx.
+  # 5 of 6 scenarios are bound to existing tests in platform/app/src/components/ui/__tests__/BetaPill.integration.test.tsx.
   # The remaining 1 @unimplemented scenario has no integration test yet:
   #   - "Suites sidebar item displays a beta indicator"
 

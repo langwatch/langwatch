@@ -98,7 +98,7 @@ Replace the placeholders with your actual data. The `@-` tells `curl` to read th
 
 All `timestamps` are unix epoch **milliseconds**. The optional `first_token_at` records when the first streamed token reached the user and powers the Time to First Token (TTFT) metric, see [Tracking Time to First Token](/integration/python/tutorials/tracking-time-to-first-token). Token counts and cost are derived from `metrics` and the model pricing registry, see [Tracking LLM Costs and Tokens](/integration/python/tutorials/tracking-llm-costs).
 
-For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/python-sdk/src/langwatch/types.py).
+For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/sdks/python/src/langwatch/types.py).
 
 It's optional but highly recommended to pass the `user_id` on the metadata if you want to leverage user-specific analytics and the `thread_id` to group related traces together. To connect it to an event later on. Read more about those and other concepts [here](../concepts).
 

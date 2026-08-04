@@ -866,7 +866,7 @@ func EnsurePlayCheckout(ctx context.Context, repoRoot string, number int, checko
 
 // playEnvDirs mirrors the directories .githooks/post-checkout copies .env files
 // into, plus the repo root.
-var playEnvDirs = []string{".", "langwatch", "langwatch_nlp", "langevals", "python-sdk", "typescript-sdk", "mcp-server"}
+var playEnvDirs = []string{".", "platform/app", "services/langevals", "sdks/python", "sdks/typescript", "mcp/typescript"}
 
 // StripInheritedEnvFiles removes every untracked .env* file from a play checkout.
 //
@@ -1014,7 +1014,7 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, number int, checkout, lwD
 	// than re-deriving fork status inside this detached child. Nothing is lost:
 	// the repo's postinstall is codegen, and the very next step runs it
 	// explicitly through start:prepare:files.
-	if err := o.ensureDeps(ctx, lwDir, false); err != nil {
+	if err := o.ensureDeps(ctx, checkout, false); err != nil {
 		return err
 	}
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")

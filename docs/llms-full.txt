@@ -343,7 +343,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 
 The two URLs are split for **auth + routing convenience**, not for architectural reasons. Internally they share everything that matters:
 
-- **Same hardened OTLP parser**: `langwatch/src/server/otel/parseOtlpBody.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli decompression, JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
+- **Same hardened OTLP parser**: `platform/app/src/server/otel/parseOtlpBody.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli decompression, JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
 - **Same trace pipeline**: both URLs hand off to the existing `traces.collection.handleOtlpTraceRequest` (or `traces.logCollection.handleOtlpLogRequest` for log-shaped sources) that powers `/api/otel/v1/traces`. No parallel write path. No parallel storage.
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
@@ -2779,7 +2779,7 @@ Every gateway-resource mutation (Virtual Key, Budget, ModelProvider, Routing Pol
 
 ## What's logged
 
-Action codes for gateway mutations (TypeScript `const` union in `langwatch/src/server/gateway/auditLog.repository.ts`):
+Action codes for gateway mutations (TypeScript `const` union in `platform/app/src/server/gateway/auditLog.repository.ts`):
 
 Action codes use a `gateway.<resource>.<verb>` dotted-lowercase shape, parallel to platform-side codes (`organization.member.add`, `project.update`). Verbs are past-tense to match Stripe, GitHub, Slack, Datadog audit conventions.
 
@@ -2810,7 +2810,7 @@ Go to **/settings/audit-log** (Enterprise plan, gated on `auditLog:view`, grante
 There is **no public REST endpoint** for audit log retrieval, gateway audit reads share the same tRPC procedure (`organization.getAuditLogs`) that powers `/settings/audit-log`. Three paths, ranked by typical operator use case:
 
 1. **One-off, human review**: open `/settings/audit-log`, set the filters you want (Source, Action, Target), then hit **Export CSV** to download the filtered rows. The CSV carries gateway-shape fields (`targetKind`, `targetId`, `before`, `after`) for gateway rows and platform-shape fields (`args`, `metadata`) for platform rows.
-2. **Scripted, scheduled SIEM export**: query the Postgres `AuditLog` table directly from your SIEM ingestion pipeline. Filter on `targetKind IN ('virtual_key', 'budget', 'provider_binding', 'cache_rule')` to scope to gateway rows; join `User` on `userId` for actor enrichment. The schema is documented in `langwatch/prisma/schema.prisma → model AuditLog`.
+2. **Scripted, scheduled SIEM export**: query the Postgres `AuditLog` table directly from your SIEM ingestion pipeline. Filter on `targetKind IN ('virtual_key', 'budget', 'provider_binding', 'cache_rule')` to scope to gateway rows; join `User` on `userId` for actor enrichment. The schema is documented in `platform/app/prisma/schema.prisma → model AuditLog`.
 3. **In-app integrations**: call the tRPC procedure from a TypeScript client that already has a session: `await trpc.organization.getAuditLogs.query({ organizationId, targetKind, targetId, since, limit })`. Mirrors what the UI does. Not intended for cross-network REST consumers.
 
 A first-class REST audit-export endpoint is a v1.2 follow-up; until then, the CSV download is the supported export path for governance, compliance use cases.
@@ -10534,7 +10534,7 @@ Default role matrix assignments flow through SCIM, when an IdP pushes a user wit
 
 ## Changing the permission matrix
 
-Default roles are code-defined in `langwatch/src/server/api/rbac.ts`, see commit history for the shipping order. **Do not edit the default matrix in production**: changes to TEAM_ROLE_PERMISSIONS affect every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
+Default roles are code-defined in `platform/app/src/server/api/rbac.ts`, see commit history for the shipping order. **Do not edit the default matrix in production**: changes to TEAM_ROLE_PERMISSIONS affect every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
 
 For the policy rationale (why MEMBER can mint VKs but not create budgets, etc.), see [spec contract §10, Permissions](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/_shared/contract.md#10-permissions).
 
@@ -13248,9 +13248,9 @@ See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
 
 ```bash
 # Whichever the banner names as missing
-echo "LW_VIRTUAL_KEY_PEPPER=$(openssl rand -hex 32)" >> langwatch/.env
-echo "LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32)" >> langwatch/.env
-echo "LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)" >> langwatch/.env
+echo "LW_VIRTUAL_KEY_PEPPER=$(openssl rand -hex 32)" >> platform/app/.env
+echo "LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32)" >> platform/app/.env
+echo "LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)" >> platform/app/.env
 ```
 
 Restart the entry point (the validator runs at import time, so no incremental refresh).
@@ -13615,7 +13615,7 @@ sidebarTitle: REST API
 
 <Info>**Pairs with:** [Governance CLI](/ai-governance/cli) (the CLI is a thin shell over this API) and [Governance MCP server](/ai-governance/mcp) (the MCP tools are a thin shell over this API). All three surfaces dispatch through the same service-layer functions; the dashboard tRPC procedures call into the same services. There is exactly one place each governance verb is implemented.</Info>
 
-<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. Sergey's Lane B-5 commit at `8fffad4ad` locked the invariant for the governance resources shipped in v1: see `langwatch/ee/governance/repositories/ingestionTemplate.repository.ts` and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
+<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. Sergey's Lane B-5 commit at `8fffad4ad` locked the invariant for the governance resources shipped in v1: see `platform/app/ee/governance/repositories/ingestionTemplate.repository.ts` and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
 
 ## Why a separate REST API alongside tRPC
 
@@ -13697,16 +13697,16 @@ The Zod schemas backing each request and response body are the same schemas the 
 
 ## OpenAPI spec generation + SDK regen
 
-Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI spec lives at `langwatch/src/app/api/openapiLangWatch.json`, and the generated client layers regenerate from it.
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI spec lives at `platform/app/src/app/api/openapiLangWatch.json`, and both SDKs regenerate from it on the standard build target.
 
 ```bash
 # from langwatch/
 pnpm run task generateOpenAPISpec   # regenerate openapiLangWatch.json from the Hono routes
 
-# from typescript-sdk/
+# from sdks/typescript/
 pnpm generate:openapi-types         # regenerate the TS generated client from that spec
 
-# from python-sdk/ (regenerates the spec first, then the client)
+# from sdks/python/ (regenerates the spec first, then the client)
 make generate/api-client            # regenerate the Python generated client
 ```
 
@@ -13741,9 +13741,9 @@ The mutating verbs across the two shipped resources (`createOrgTemplate`, `updat
 
 The wire shape, request bodies, response envelopes, status-code mapping, and surface attribution, is locked by two integration tests that run against real Postgres + the real Hono pipeline (no service mocks):
 
-**Ingestion-templates wire shape**: `langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`. 14 scenarios (Lane B-4 at `1839d9f54`) covering the full ingestion-templates verb set, 401, 400, 403, 404 envelopes, and a wire-level audit-uniform assertion that `metadata.surface === "hono"` for state-changing calls.
+**Ingestion-templates wire shape**: `platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`. 14 scenarios (Lane B-4 at `1839d9f54`) covering the full ingestion-templates verb set, 401, 400, 403, 404 envelopes, and a wire-level audit-uniform assertion that `metadata.surface === "hono"` for state-changing calls.
 
-**Ingestion-key wire shape**: `langwatch/src/app/api/governance/__tests__/governance-ingestion-keys.integration.test.ts`. 9 scenarios (Lane B-6 at `60f769498`) covering the ingestion-key flows. Specifically locks:
+**Ingestion-key wire shape**: `platform/app/src/app/api/governance/__tests__/governance-ingestion-keys.integration.test.ts`. 9 scenarios (Lane B-6 at `60f769498`) covering the ingestion-key flows. Specifically locks:
 
 - the mint route returns a one-time `sk-lw-…` token and thereafter exposes only the prefix
 - `install` and `rotate` audit rows both stamp `metadata.surface === "hono"` end-to-end (cross-validates the B-3 surface threading at `fc6d54100`)
@@ -13751,18 +13751,18 @@ The wire shape, request bodies, response envelopes, status-code mapping, and sur
 
 The setup pattern in this file (project + ingest-only RoleBinding + `aiTools:manage` caller) is the canonical reference for any downstream lane (CLI, MCP) that needs an ingestion-key test path.
 
-**No-bypass invariant (CI-enforced)**: `langwatch/ee/governance/repositories/__tests__/no-bypass.unit.test.ts`. 3 tests (Lane B-7 at `94c219035`) statically reject any future PR that adds a direct `prisma.ingestionTemplate.*` call outside the allowlist. Locks the umbrella spec's `@no-bypass` invariant in CI so the repository-pattern boundary won't silently drift.
+**No-bypass invariant (CI-enforced)**: `platform/app/ee/governance/repositories/__tests__/no-bypass.unit.test.ts`. 3 tests (Lane B-7 at `94c219035`) statically reject any future PR that adds a direct `prisma.ingestionTemplate.*` call outside the allowlist. Locks the umbrella spec's `@no-bypass` invariant in CI so the repository-pattern boundary won't silently drift.
 
-**MCP audit-uniform regression**: `langwatch/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts`. 3 cases (Lane B-MCP audit at `66fd35162`) prove the Path B contract end-to-end: `governance_ingestion_templates_create` and `governance_ingestion_keys_mint` both stamp `metadata.surface === "mcp"` against real Postgres, and the `AUTH_REQUIRED:` negative case stays closed (write tool with no `callerUserId` fails before any audit row is written).
+**MCP audit-uniform regression**: `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts`. 3 cases (Lane B-MCP audit at `66fd35162`) prove the Path B contract end-to-end: `governance_ingestion_templates_create` and `governance_ingestion_keys_mint` both stamp `metadata.surface === "mcp"` against real Postgres, and the `AUTH_REQUIRED:` negative case stays closed (write tool with no `callerUserId` fails before any audit row is written).
 
-**Cross-surface audit-uniformity regression**: `langwatch/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via all four surfaces, tRPC service-direct, Hono REST, CLI REST (with `X-LangWatch-Surface: cli`), and MCP service-direct, in one test (Lane B-8 at `d96cd4300`, extended to 4 surfaces at `cb4c8224c`); asserts the four audit rows have **identical** payload shape, same `action`, same `targetKind`, same `organizationId`, same metadata-key-set, with only `metadata.surface` varying (`"trpc"`, `"hono"`, `"cli"`, `"mcp"`). Slug regex format identical, no default-fallback leakage.
+**Cross-surface audit-uniformity regression**: `platform/app/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via all four surfaces, tRPC service-direct, Hono REST, CLI REST (with `X-LangWatch-Surface: cli`), and MCP service-direct, in one test (Lane B-8 at `d96cd4300`, extended to 4 surfaces at `cb4c8224c`); asserts the four audit rows have **identical** payload shape, same `action`, same `targetKind`, same `organizationId`, same metadata-key-set, with only `metadata.surface` varying (`"trpc"`, `"hono"`, `"cli"`, `"mcp"`). Slug regex format identical, no default-fallback leakage.
 
 **Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`; asserts all three audit rows fall back to `metadata.surface === "hono"`. Locks Alexis's `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags, the only legal value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. Together with the cross-surface uniformity test this exhaustively pins the umbrella spec's `@audit-uniform` invariant for v1.
 
 To run locally:
 
 ```bash
-cd langwatch
+cd platform/app
 pnpm test:integration governance-rest-api.integration.test.ts
 pnpm test:integration governance-ingestion-keys.integration.test.ts
 pnpm test:integration governance-tools.audit-uniform.integration.test.ts
@@ -13781,7 +13781,7 @@ Use these files as the authoritative reference when implementing a CLI command o
 - [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
 - v1 scope-fence audit, `specs/ai-gateway/governance/agentic-first-parity-v1-status.md` (12-resource × 4-surface matrix on shipped SHAs; scoring 2/12 full parity, 8/12 tRPC-only deferred to follow-on)
-- Wire-shape lock, `langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`
+- Wire-shape lock, `platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`
 
 ---
 
@@ -14101,7 +14101,7 @@ The 409 contract is asserted in `specs/ai-gateway/governance/personal-keys.featu
 
 ## CLI wrapper e2e coverage
 
-The five wrapped tools (`langwatch claude`, `langwatch codex`, `langwatch cursor`, `langwatch gemini`, `langwatch opencode`) are exercised by a Node-only end-to-end suite at `typescript-sdk/__tests__/e2e/cli/governance-wrapper.e2e.test.ts`, fake control-plane Express + fake gateway Express + mocked tool binaries on `PATH`. No Docker, no live LLM, ~3-second total runtime; runs on every PR.
+The five wrapped tools (`langwatch claude`, `langwatch codex`, `langwatch cursor`, `langwatch gemini`, `langwatch opencode`) are exercised by a Node-only end-to-end suite at `sdks/typescript/__tests__/e2e/cli/governance-wrapper.e2e.test.ts`, fake control-plane Express + fake gateway Express + mocked tool binaries on `PATH`. No Docker, no live LLM, ~3-second total runtime; runs on every PR.
 
 Per-tool assertions:
 
@@ -14184,7 +14184,7 @@ langwatch governance ingestion-templates --help
 #   clone-from-platform Clone a platform template into the caller's org.
 ```
 
-The actual help-text strings + command tree land in `typescript-sdk/src/cli/commands/governance/` and `typescript-sdk/src/cli/index.ts` (Lane-B at `ed51b0ea1`).
+The actual help-text strings + command tree land in `sdks/typescript/src/cli/commands/governance/` and `sdks/typescript/src/cli/index.ts` (Lane-B at `ed51b0ea1`).
 
 ## Authentication
 
@@ -14224,13 +14224,13 @@ The first preview ships with the two governance resources Sergey wired through H
 | `ingestion-templates` | `list` `admin-list` `get` `create` `update-ottl-rules` `archive` `clone-from-platform` | `aiTools:view` (reads), `aiTools:manage` (writes) |
 | `ingestion-keys` | `list` `mint` `rotate` (project-scoped ingest-only ApiKeys, `sk-lw-` token returned once at mint) | `aiTools:manage` |
 
-Resources expected to fold into the same namespace as their REST surfaces ship: `anomaly-rules`, `audit-log`, `gateway-budgets`, `ingestion-sources`, `members`, `invites`, `role-bindings`, `ai-tool-entries`, `sessions`, `virtual-keys`. The CLI is built so adding a new resource is a `commands/governance/<resource>.ts` file plus a `governanceCmd.command(...)` wiring in `typescript-sdk/src/cli/index.ts`.
+Resources expected to fold into the same namespace as their REST surfaces ship: `anomaly-rules`, `audit-log`, `gateway-budgets`, `ingestion-sources`, `members`, `invites`, `role-bindings`, `ai-tool-entries`, `sessions`, `virtual-keys`. The CLI is built so adding a new resource is a `commands/governance/<resource>.ts` file plus a `governanceCmd.command(...)` wiring in `sdks/typescript/src/cli/index.ts`.
 
 ## Audit emission
 
 Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"`. The CLI is a REST shell, it calls `/api/governance/*` and sends the `X-LangWatch-Surface: cli` request header. The Hono backend's `resolveSurfaceFromRequest` helper reads the header, validates it against the `GovernanceCallSurface` enum (in-process spoofing of `trpc`, `mcp` is rejected at the enum filter), and threads the value into the service-layer `surface` parameter Sergey wired at `fc6d54100`. The payload shape is identical to a Hono REST audit row apart from the surface field.
 
-The header-validating Hono helper + the 7 mutation call-sites switching from hardcoded `'hono'` to `resolveSurfaceFromRequest(req)` ship in Lane-B's CLI scaffold at `ed51b0ea1`. The `X-LangWatch-Surface: cli` constant lives at `typescript-sdk/src/cli/utils/governance/surface.ts`.
+The header-validating Hono helper + the 7 mutation call-sites switching from hardcoded `'hono'` to `resolveSurfaceFromRequest(req)` ship in Lane-B's CLI scaffold at `ed51b0ea1`. The `X-LangWatch-Surface: cli` constant lives at `sdks/typescript/src/cli/utils/governance/surface.ts`.
 
 ```bash
 langwatch governance audit-log query --filter 'surface=cli' --since '24h ago'
@@ -14366,7 +14366,7 @@ See [Per-origin retention](/ai-gateway/governance/retention) for the full retent
 
 ### 3. RBAC: permission-driven, not role-driven
 
-LangWatch's RBAC layer (`langwatch/src/server/api/rbac.ts`) is the single source of truth for governance access. Permissions are the abstraction; role enums (`OrganizationUserRole.{ADMIN, MEMBER, EXTERNAL}`) are just default permission bags. Custom roles compose any subset via the existing `CustomRolePermissions` JSON column without requiring a Prisma enum change.
+LangWatch's RBAC layer (`platform/app/src/server/api/rbac.ts`) is the single source of truth for governance access. Permissions are the abstraction; role enums (`OrganizationUserRole.{ADMIN, MEMBER, EXTERNAL}`) are just default permission bags. Custom roles compose any subset via the existing `CustomRolePermissions` JSON column without requiring a Prisma enum change.
 
 **Governance permissions catalog** (added in this PR):
 
@@ -15908,7 +15908,7 @@ Whatever OTLP body Cowork emits, `resource_spans` are walked, each span turns in
 langwatch ingest tail <sourceId> --follow
 ```
 
-You should see Cowork events landing as `tool.invocation` and `api.call`. If everything shows `agent.action`, the heuristic isn't matching Cowork's span names, file an issue with a sample span name and the [Cowork adapter](https://github.com/langwatch/langwatch/blob/main/langwatch/src/server/governance/activity-monitor/normalizers/otel.ts) heuristic will be tightened.
+You should see Cowork events landing as `tool.invocation` and `api.call`. If everything shows `agent.action`, the heuristic isn't matching Cowork's span names, file an issue with a sample span name and the [Cowork adapter](https://github.com/langwatch/langwatch/blob/main/platform/app/src/server/governance/activity-monitor/normalizers/otel.ts) heuristic will be tightened.
 
 ---
 
@@ -16839,7 +16839,7 @@ discipline**: (a) a fixture-track verification, canned OTLP payloads emitted via
 base and tier-2 protected lists, and (b) a real-user track, admin publishes via
 `/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
 tool emits a real trace, and the result is verified end-to-end with cross-user isolation.
-Per-template rituals live at `langwatch/ee/governance/ingestion-templates/<slug>/dogfood.md`.
+Per-template rituals live at `platform/app/ee/governance/ingestion-templates/<slug>/dogfood.md`.
 
 ### What is audited
 
@@ -16900,13 +16900,13 @@ and we'll evaluate.
 ## Verifying the contract
 
 The full admin OTTL authoring flow has a Playwright real-user dogfood at
-`langwatch/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
+`platform/app/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
 navigate → list 3 platform rows → View OTTL drawer → Clone-to-customise →
 Save OTTL → list 4 rows → Edit OTTL → Archive. Pairs with the
 service-level integration test at
-`langwatch/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
+`platform/app/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
 and the wire-level REST integration test at
-`langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
+`platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
 
 If you're touching the IngestionTemplatesEditor surface, the OttlEditor
 component, or the IngestionTemplateService, run the dogfood + both
@@ -16934,7 +16934,7 @@ sidebarTitle: MCP server
 
 <Info>**Pairs with:** [Governance REST API](/ai-governance/api) and [Governance CLI](/ai-governance/cli): all three surfaces dispatch through the same service-layer functions, with audit emission tagged `metadata.surface = "trpc" | "hono" | "cli" | "mcp"` for incident response. Distinct from LangWatch's general MCP server, this is a governance-namespaced toolset specifically for setting up and querying governance state.</Info>
 
-<Note>**Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP tools register in `langwatch/src/mcp/handler.ts` via `registerGovernanceMcpTools(server, prisma)` and call the governance services (`IngestionTemplateService`, `IngestionKeyService`, etc.) directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the project-API-key vs PAT auth mismatch and matches Sergey's explicit `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes. Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer is the single source of truth, and `metadata.surface` distinguishes the entrypoint.</Note>
+<Note>**Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP tools register in `platform/app/src/mcp/handler.ts` via `registerGovernanceMcpTools(server, prisma)` and call the governance services (`IngestionTemplateService`, `IngestionKeyService`, etc.) directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the project-API-key vs PAT auth mismatch and matches Sergey's explicit `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes. Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer is the single source of truth, and `metadata.surface` distinguishes the entrypoint.</Note>
 
 <Note>**RBAC enforced at the tool layer.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, write tools and admin reads resolve the caller's user session to its RBAC scopes and reject with `FORBIDDEN` (or `AUTH_REQUIRED` when no user is bound) if the required permission is missing; the plain `list`/`get` read tools are available to a project API key without a user. No tool can bypass the service-layer or the multitenancy middleware, the same defense-in-depth that protects the REST API protects the MCP surface, even though MCP doesn't go through the REST surface.</Note>
 
@@ -16995,13 +16995,13 @@ Governance MCP tools register inside LangWatch's existing MCP server (mounted at
 }
 ```
 
-The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `langwatch/src/mcp/governance-tools.ts` (Lane-Q at `7639b6c2b`). The same registration runs at all three `createMcpServer()` callsites in `handler.ts` so the tools are available regardless of which MCP transport the client chose.
+The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `platform/app/src/mcp/governance-tools.ts` (Lane-Q at `7639b6c2b`). The same registration runs at all three `createMcpServer()` callsites in `handler.ts` so the tools are available regardless of which MCP transport the client chose.
 
-<Note>**Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp` + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add langwatch http://localhost:5560/mcp` (or the OAuth flow at `http://localhost:5560/api/mcp/authorize` for write tools). The proxy wiring + a real-SDK probe at `langwatch/scripts/dogfood/governance/mcp-client-probe.ts` shipped at `82375478e`; the probe asserts all 9 tools register, that read tools return the catalog with a project apiKey Bearer, and that write tools return `AUTH_REQUIRED:` until the OAuth flow completes.</Note>
+<Note>**Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp` + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add langwatch http://localhost:5560/mcp` (or the OAuth flow at `http://localhost:5560/api/mcp/authorize` for write tools). The proxy wiring + a real-SDK probe at `platform/app/scripts/dogfood/governance/mcp-client-probe.ts` shipped at `82375478e`; the probe asserts all 9 tools register, that read tools return the catalog with a project apiKey Bearer, and that write tools return `AUTH_REQUIRED:` until the OAuth flow completes.</Note>
 
 ## RBAC enforcement
 
-Governance tools enforce two distinct gates at the tool layer (`langwatch/src/mcp/governance-tools.ts`), BEFORE the service call:
+Governance tools enforce two distinct gates at the tool layer (`platform/app/src/mcp/governance-tools.ts`), BEFORE the service call:
 
 **`AUTH_REQUIRED:`**, write tools (e.g. `governance_ingestion_templates_create`, `governance_ingestion_keys_mint`) called from a project-apiKey-only session without OAuth. Read tools are NOT subject to this gate; they work with project-apiKey-only sessions.
 
@@ -17012,7 +17012,7 @@ Governance tools enforce two distinct gates at the tool layer (`langwatch/src/mc
 }
 ```
 
-**`FORBIDDEN:`**, the caller has a session but their organization role doesn't include the required permission (mirrors `hasOrganizationPermission` from `langwatch/src/server/api/rbac.ts`).
+**`FORBIDDEN:`**, the caller has a session but their organization role doesn't include the required permission (mirrors `hasOrganizationPermission` from `platform/app/src/server/api/rbac.ts`).
 
 ```jsonc
 {
@@ -17025,7 +17025,7 @@ In both cases no record is created and no audit row is emitted (failed calls are
 
 The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 
-- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool mirrors `hasOrganizationPermission` from `langwatch/src/server/api/rbac.ts` and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
+- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool mirrors `hasOrganizationPermission` from `platform/app/src/server/api/rbac.ts` and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
 - **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
 - **Snake_case ↔ camelCase boundary**: MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
 
@@ -17042,7 +17042,7 @@ Every state-changing tool call emits an audit row with `AuditLog.metadata.surfac
 
 Payload shapes are identical to the REST API's audit rows apart from `metadata.surface`, every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
 
-The contract is service-layer-asserted by `langwatch/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` (Lane B-MCP audit at `66fd35162`), 3 cases against real Postgres: `governance_ingestion_templates_create` stamps `metadata.surface = "mcp"`, `governance_ingestion_keys_mint` stamps `metadata.surface = "mcp"`, and the `AUTH_REQUIRED:` negative path fails before any audit row is written. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at).
+The contract is service-layer-asserted by `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` (Lane B-MCP audit at `66fd35162`), 3 cases against real Postgres: `governance_ingestion_templates_create` stamps `metadata.surface = "mcp"`, `governance_ingestion_keys_mint` stamps `metadata.surface = "mcp"`, and the `AUTH_REQUIRED:` negative path fails before any audit row is written. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at).
 
 For the agent-end-to-end gate (real Claude Code agent provisions governance via MCP only, no UI clicks) the runbook lives at `dev/docs/runbooks/governance-dogfood-mcp-claude-code.md`. Six steps: `claude mcp add langwatch http://localhost:5560/mcp` → read-tool walkthrough (list + get with project apiKey) → write-tool walkthrough (admin_list + clone + update_ottl_rules + archive after OAuth → 3 audit rows with `metadata.surface = "mcp"`) → ingestion-key mint (1 audit row + one-time `sk-lw-…` token) → fail-closed `AUTH_REQUIRED:` negative case → checklist for pasting evidence back.
 
@@ -17329,8 +17329,8 @@ The repository tree is split 1:1 by license, so the directory a file lives in is
 
 | Path | License | SPDX identifier |
 |---|---|---|
-| `typescript-sdk/`, `python-sdk/`, `mcp-server/` | MIT | `MIT` |
-| Inside `langwatch/ee/` | Enterprise (LangWatch EE) | `LicenseRef-LangWatch-Enterprise` |
+| `sdks/typescript/`, `sdks/python/`, `mcp/typescript/` | MIT | `MIT` |
+| Inside `platform/app/ee/` | Enterprise (LangWatch EE) | `LicenseRef-LangWatch-Enterprise` |
 | Everything else | Apache 2.0 | `Apache-2.0` |
 
 The client SDKs are MIT so that integrating LangWatch never puts a copyleft
@@ -17338,9 +17338,9 @@ obligation on your own application. MIT still asks you to retain its copyright
 and permission notice when you redistribute the SDK or a substantial portion of
 it, which is the usual third-party-notices entry rather than a constraint on how
 you license your own code. The rows are read most-specific
-first: the SDK directories are MIT even though they sit outside `langwatch/ee/`.
+first: the SDK directories are MIT even though they sit outside `platform/app/ee/`.
 
-The header is the first line of the file, written as `SPDX-License-Identifier: <identifier>` behind whatever the language uses for a line comment: `//` in TypeScript and Go, `#` in Python and YAML. It is a single line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary flip one line to record the result. Recording it is not the same as making it true: the SPDX line states a file's license, it does not relicense existing contributions, so a move across the boundary needs the rights checked and any applicable notices preserved before the line changes. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives in [`langwatch/ee/LICENSE.md`](https://github.com/langwatch/langwatch/blob/main/langwatch/ee/LICENSE.md), and the per-directory breakdown is in [`NOTICE`](https://github.com/langwatch/langwatch/blob/main/NOTICE).
+The header is the first line of the file, written as `SPDX-License-Identifier: <identifier>` behind whatever the language uses for a line comment: `//` in TypeScript and Go, `#` in Python and YAML. It is a single line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary flip one line to record the result. Recording it is not the same as making it true: the SPDX line states a file's license, it does not relicense existing contributions, so a move across the boundary needs the rights checked and any applicable notices preserved before the line changes. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives in [`platform/app/ee/LICENSE.md`](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md), and the per-directory breakdown is in [`NOTICE`](https://github.com/langwatch/langwatch/blob/main/NOTICE).
 
 The directory is what the license follows, read most-specific row first rather than as a single Apache-2.0-unless-`ee` rule. The SPDX header records the result per file, and files that predate the convention do not carry one yet.
 
@@ -18273,7 +18273,7 @@ If neither `http_polling` nor `s3_polling` fits your source, you can
 ship a custom adapter:
 
 ```ts
-// langwatch/ee/governance/services/pullers/myCustom.puller.ts
+// platform/app/ee/governance/services/pullers/myCustom.puller.ts
 import { PullerAdapter, PullResult } from "./PullerAdapter";
 import { z } from "zod";
 
@@ -19235,61 +19235,61 @@ Below are some examples for integrating LangWatch into your project.
   ### Python
 
     <CardGroup cols={3}>
-      <Card title="Azure OpenAI Streaming Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/azure_openai_stream_bot.py" />
-      <Card title="Custom Evaluation Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/custom_evaluation_bot.py" />
-      <Card title="DSPy Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/dspy_bot.py" />
-      <Card title="DSPy Visualization" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/dspy_visualization.ipynb" />
-      <Card title="Evaluation Manual Call" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/evaluation_manual_call.py" />
-      <Card title="FastAPI App" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/fastapi_app.py" />
-      <Card title="Generic Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot.py" />
-      <Card title="Generic Bot Exception" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_exception.py" />
-      <Card title="Generic Bot RAG" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_rag.py" />
-      <Card title="Generic Bot RAG Expected Output" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_rag_expected_output.py" />
-      <Card title="Generic Bot Span Context Manager" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_span_context_manager.py" />
-      <Card title="Generic Bot Span Low Level" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_span_low_level.py" />
-      <Card title="Generic Bot Sync Function" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_sync_function.py" />
-      <Card title="Generic Bot Update Metadata Later" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_update_metadata_later.py" />
-      <Card title="Guardrails" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/guardrails.py" />
-      <Card title="Guardrails Parallel" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/guardrails_parallel.py" />
-      <Card title="Guardrails Without Tracing" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/guardrails_without_tracing.py" />
-      <Card title="LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/langchain_bot.py" />
-      <Card title="LangChain RAG Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/langchain_rag_bot.py" />
-      <Card title="LangChain RAG Bot Vertex AI" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/langchain_rag_bot_vertex_ai.py" />
-      <Card title="LiteLLM Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/litellm_bot.py" />
-      <Card title="OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/openai_bot.py" />
-      <Card title="OpenAI Bot Function Call" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/openai_bot_function_call.py" />
-      <Card title="OpenAI Bot RAG" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/openai_bot_rag.py" />
-      <Card title="Weaviate DSPy Visualization" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/weaviate_dspy_visualization.ipynb" />
-      <Card title="Streamlit OpenAI Assistants API Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/streamlit_openai_assistants_api_bot.py" />
+      <Card title="Azure OpenAI Streaming Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/azure_openai_stream_bot.py" />
+      <Card title="Custom Evaluation Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/custom_evaluation_bot.py" />
+      <Card title="DSPy Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/dspy_bot.py" />
+      <Card title="DSPy Visualization" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/dspy_visualization.ipynb" />
+      <Card title="Evaluation Manual Call" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/evaluation_manual_call.py" />
+      <Card title="FastAPI App" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/fastapi_app.py" />
+      <Card title="Generic Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot.py" />
+      <Card title="Generic Bot Exception" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_exception.py" />
+      <Card title="Generic Bot RAG" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_rag.py" />
+      <Card title="Generic Bot RAG Expected Output" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_rag_expected_output.py" />
+      <Card title="Generic Bot Span Context Manager" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_span_context_manager.py" />
+      <Card title="Generic Bot Span Low Level" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_span_low_level.py" />
+      <Card title="Generic Bot Sync Function" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_sync_function.py" />
+      <Card title="Generic Bot Update Metadata Later" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_update_metadata_later.py" />
+      <Card title="Guardrails" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/guardrails.py" />
+      <Card title="Guardrails Parallel" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/guardrails_parallel.py" />
+      <Card title="Guardrails Without Tracing" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/guardrails_without_tracing.py" />
+      <Card title="LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/langchain_bot.py" />
+      <Card title="LangChain RAG Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/langchain_rag_bot.py" />
+      <Card title="LangChain RAG Bot Vertex AI" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/langchain_rag_bot_vertex_ai.py" />
+      <Card title="LiteLLM Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/litellm_bot.py" />
+      <Card title="OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/openai_bot.py" />
+      <Card title="OpenAI Bot Function Call" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/openai_bot_function_call.py" />
+      <Card title="OpenAI Bot RAG" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/openai_bot_rag.py" />
+      <Card title="Weaviate DSPy Visualization" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/weaviate_dspy_visualization.ipynb" />
+      <Card title="Streamlit OpenAI Assistants API Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/streamlit_openai_assistants_api_bot.py" />
     </CardGroup>
 
   ### TypeScript
 
     <CardGroup cols={3}>
-      <Card title="LangGraph Chatbot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/typescript-sdk/examples/langgraph" />
-      <Card title="LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/typescript-sdk/examples/langchain" />
-      <Card title="Mastra Weather Agent" icon="link" href="https://github.com/langwatch/langwatch/blob/main/typescript-sdk/examples/mastra" />
-      <Card title="Prompt CLI" icon="link" href="https://github.com/langwatch/langwatch/blob/main/typescript-sdk/examples/prompt-cli" />
-      <Card title="Vercel AI SDK Chatbot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/typescript-sdk/examples/vercel-ai" />
+      <Card title="LangGraph Chatbot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/typescript/examples/langgraph" />
+      <Card title="LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/typescript/examples/langchain" />
+      <Card title="Mastra Weather Agent" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/typescript/examples/mastra" />
+      <Card title="Prompt CLI" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/typescript/examples/prompt-cli" />
+      <Card title="Vercel AI SDK Chatbot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/typescript/examples/vercel-ai" />
     </CardGroup>
 
   ### Go
 
     <CardGroup cols={3}>
-      <Card title="LangWatch Go SDK" icon="link" href="https://github.com/langwatch/langwatch/blob/main/go-sdk/examples" />
+      <Card title="LangWatch Go SDK" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdks/go/examples" />
     </CardGroup>
 
   ### OpenTelemetry
 
     <CardGroup cols={3}>
-      <Card title="OpenInference DSPy Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openinference_dspy_bot.py" />
-      <Card title="OpenInference Haystack" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openinference_haystack.py" />
-      <Card title="OpenInference LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openinference_langchain_bot.py" />
-      <Card title="OpenInference OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openinference_openai_bot.py" />
-      <Card title="OpenTelemetry Anthropic Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openllmetry_anthropic_bot.py" />
-      <Card title="OpenTelemetry LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openllmetry_langchain_bot.py" />
-      <Card title="OpenTelemetry OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openllmetry_openai_bot.py" />
-      <Card title="Traditional Instrumentation FastAPI App" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/traditional_instrumentation_fastapi_app.py" />
+      <Card title="OpenInference DSPy Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openinference_dspy_bot.py" />
+      <Card title="OpenInference Haystack" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openinference_haystack.py" />
+      <Card title="OpenInference LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openinference_langchain_bot.py" />
+      <Card title="OpenInference OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openinference_openai_bot.py" />
+      <Card title="OpenTelemetry Anthropic Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openllmetry_anthropic_bot.py" />
+      <Card title="OpenTelemetry LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openllmetry_langchain_bot.py" />
+      <Card title="OpenTelemetry OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openllmetry_openai_bot.py" />
+      <Card title="Traditional Instrumentation FastAPI App" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/traditional_instrumentation_fastapi_app.py" />
     </CardGroup>
 
 
@@ -24404,7 +24404,7 @@ keywords: azure openai, langwatch, typescript, javascript, sdk, instrumentation,
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
   <div>
-  <a href="https://github.com/langwatch/langwatch/tree/main/typescript-sdk" target="_blank">
+  <a href="https://github.com/langwatch/langwatch/tree/main/sdks/typescript" target="_blank">
     <img src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github" noZoom alt="LangWatch TypeScript Repo" />
   </a>
   </div>
@@ -24872,7 +24872,7 @@ keywords: openai, langwatch, typescript, javascript, sdk, instrumentation
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
   <div>
-  <a href="https://github.com/langwatch/langwatch/tree/main/typescript-sdk" target="_blank">
+  <a href="https://github.com/langwatch/langwatch/tree/main/sdks/typescript" target="_blank">
     <img src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github" noZoom alt="LangWatch TypeScript Repo" />
   </a>
   </div>
@@ -25013,7 +25013,7 @@ keywords: vercel ai sdk, langwatch, tracing, observability, vercel, ai, sdk
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
   <div>
-  <a href="https://github.com/langwatch/langwatch/tree/main/typescript-sdk" target="_blank">
+  <a href="https://github.com/langwatch/langwatch/tree/main/sdks/typescript" target="_blank">
     <img src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github" noZoom alt="LangWatch TypeScript Repo" />
   </a>
   </div>
@@ -28150,7 +28150,7 @@ LangWatch supports tracing Anthropic Claude API calls using the same `otelopenai
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -28167,8 +28167,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -28240,7 +28240,7 @@ LangWatch supports tracing Azure OpenAI API calls using the same `otelopenai` mi
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -28257,8 +28257,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -28332,7 +28332,7 @@ LangWatch supports tracing Google Gemini models through Google Cloud Vertex AI's
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -28349,8 +28349,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -28421,7 +28421,7 @@ LangWatch supports tracing Grok (xAI) API calls using the same `otelopenai` midd
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -28438,8 +28438,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -28510,7 +28510,7 @@ LangWatch can trace calls to the Groq API, allowing you to monitor its high-spee
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -28527,8 +28527,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -28599,7 +28599,7 @@ LangWatch supports tracing local models served by Ollama through its OpenAI-comp
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -28615,8 +28615,8 @@ import (
 	"context"
 	"log"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -28688,7 +28688,7 @@ LangWatch provides automatic instrumentation for the official `openai-go` client
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -28705,8 +28705,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -28800,8 +28800,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -29487,7 +29487,7 @@ Replace the placeholders with your actual data. The `@-` tells `curl` to read th
 
 All `timestamps` are unix epoch **milliseconds**. The optional `first_token_at` records when the first streamed token reached the user and powers the Time to First Token (TTFT) metric, see [Tracking Time to First Token](/integration/python/tutorials/tracking-time-to-first-token). Token counts and cost are derived from `metrics` and the model pricing registry, see [Tracking LLM Costs and Tokens](/integration/python/tutorials/tracking-llm-costs).
 
-For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/python-sdk/src/langwatch/types.py).
+For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/sdks/python/src/langwatch/types.py).
 
 It's optional but highly recommended to pass the `user_id` on the metadata if you want to leverage user-specific analytics and the `thread_id` to group related traces together. To connect it to an event later on. Read more about those and other concepts [here](../concepts).
 
@@ -35199,7 +35199,7 @@ sidebarTitle: Quickstart
 description: Quickly visualize DSPy notebooks and optimization experiments in LangWatch to support debugging and agent evaluation.
 ---
 
-[<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/langwatch/langwatch/blob/main/python-sdk/examples/dspy_visualization.ipynb)
+[<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/langwatch/langwatch/blob/main/sdks/python/examples/dspy_visualization.ipynb)
 
 LangWatch DSPy Visualization allows you to start tracking your DSPy experiments in real-time and easily follow the progress, track costs and debug each step.
 
@@ -49857,7 +49857,7 @@ langwatch docs evaluations/experiments/sdk         # Experiment SDK basics
 langwatch docs evaluations/evaluators/list         # Browse evaluator types
 ```
 
-For PDF evaluation specifically, reference the pattern from `python-sdk/examples/pdf_parsing_evaluation.ipynb`:
+For PDF evaluation specifically, reference the pattern from `sdks/python/examples/pdf_parsing_evaluation.ipynb`:
 
 - Download/load documents
 - Define extraction pipeline
@@ -54402,10 +54402,10 @@ Docker Compose is the quickest way to try LangWatch locally. It runs the full st
 ```bash
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
-cd langwatch
+cd platform/app
 
 # Copy the example environment file
-cp langwatch/.env.example langwatch/.env
+cp platform/app/.env.example platform/app/.env
 
 # Start all services
 docker compose up
@@ -54433,7 +54433,7 @@ Docker Compose starts the following services:
 
 ## Configuration
 
-Edit `langwatch/.env` to customize your deployment. Key variables:
+Edit `platform/app/.env` to customize your deployment. Key variables:
 
 ```bash
 # Required: generate a secret for each
@@ -54486,7 +54486,7 @@ docker compose up
 
 ### Disable optional services
 
-If you don't need NLP or evaluators, comment them out in `compose.yml`:
+If you don't need NLP or evaluators, comment them out in `infra/compose.yml`:
 
 ```yaml
 services:
@@ -55810,7 +55810,7 @@ Click **Create GitHub App**. On the resulting page:
 
 ## Plumb the secrets
 
-Add these to the control-plane env (`.env`, `values.yaml`, or your secret manager). All are optional in the schema (`langwatch/src/env-create.mjs`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
+Add these to the control-plane env (`.env`, `values.yaml`, or your secret manager). All are optional in the schema (`platform/app/src/env-create.mjs`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
 
 ```bash title=".env"
 GITHUB_LANGY_APP_ID="<App ID from registration>"
@@ -56443,7 +56443,7 @@ Volume is bounded by your own hardware, not by us. Self-hosted deployments are n
 | **Extended retention** | Multi-class retention policies configured per category. |
 | **Support and SLA** | Named contact, response targets, upgrade guidance. |
 
-The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`langwatch/ee/`](https://github.com/langwatch/langwatch/tree/main/langwatch/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/langwatch/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
+The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
 
 ## SSO requires a license
 
@@ -57657,7 +57657,7 @@ Another process is using port 5560. Find and stop it:
 
 ```bash
 lsof -i :5560
-# Then either stop that process or change the port in compose.yml
+# Then either stop that process or change the port in infra/compose.yml
 ```
 
 ### Containers keep restarting
@@ -58261,10 +58261,8 @@ The `es-migration` tool reads documents from Elasticsearch and writes them to Cl
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
 
-# Navigate to the langwatch workspace
-cd langwatch
-
-# Install dependencies from the langwatch pnpm workspace
+# Install dependencies — the repo is a single pnpm workspace, so one
+# install at the repo root covers everything
 pnpm install
 
 # Navigate to the migration tool
@@ -61995,7 +61993,7 @@ It works with no login and no API key, and comes in two shapes:
      --summary "langwatch scenario create returned HTTP 500 with ..."
    ```
 
-**Privacy**: everything is redacted locally before upload. API keys and tokens, private-key blocks, passwords inside connection URLs, values of secret-named environment variables, email addresses, phone numbers, credit card numbers, and public IP addresses are all replaced with typed markers. The redaction rules are [open source and auditable](https://github.com/langwatch/langwatch/blob/main/langwatch/packages/redaction/src/sessionReport.ts), and `--dry-run` previews exactly what would be sent without sending it.
+**Privacy**: everything is redacted locally before upload. API keys and tokens, private-key blocks, passwords inside connection URLs, values of secret-named environment variables, email addresses, phone numbers, credit card numbers, and public IP addresses are all replaced with typed markers. The redaction rules are [open source and auditable](https://github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts), and `--dry-run` previews exactly what would be sent without sending it.
 
 **Consent**: agents must ask the user for permission before sending, then pass `--user-approved`.
 

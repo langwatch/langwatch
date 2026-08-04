@@ -6,7 +6,7 @@
  * The ci-self-test job runs this file, captures the failure, and asserts
  * that detection succeeded. If you make this test pass, ci-self-test breaks.
  *
- * This file lives outside langwatch/ and is excluded from normal test runs.
+ * This file lives outside platform/app/ and is excluded from normal test runs.
  */
 
 import { expect, test } from "vitest";

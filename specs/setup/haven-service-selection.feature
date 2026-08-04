@@ -66,7 +66,7 @@ Feature: haven service selection
     And it names the one command that replaces it, "haven up -nlp"
 
   Scenario: A variable haven never read as a selection does not block a stack
-    Given the developer sets "WORKERS_IN_PROCESS=1", which asks plain "pnpm dev" for a single process
+    Given the developer sets "WORKERS_IN_PROCESS=1", which is what plain "pnpm dev" already sets
     When they run "haven up"
     Then the stack starts normally
 

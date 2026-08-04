@@ -43,7 +43,7 @@ jobs:
           version: v3.12.0
       - name: Build Docker image for Kind
         run: |
-          docker build -t langwatch/clickhouse-serverless:next ../../clickhouse-serverless/
+          docker build -t langwatch/clickhouse-serverless:next ../../infra/clickhouse-serverless/
       - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ch-test

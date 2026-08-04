@@ -420,7 +420,7 @@ app:
     # it exists for installs that LangWatch issues licenses to from a separate
     # signing chain. Replacing this key does not grant an Enterprise License,
     # and a key that verifies only against a replaced value is not one; see
-    # langwatch/ee/LICENSE.md.
+    # platform/app/ee/LICENSE.md.
     publicKey:
       value: ""
       secretKeyRef: { name: "", key: "" }

@@ -5,7 +5,7 @@ Feature: MCP Scenario Management Tools
   So that I can author and refine test scenarios for AI agents
 
   # Most list/get scenarios bound via existing
-  # `mcp-server/src/__tests__/scenario-tools.unit.test.ts`. The remaining
+  # `mcp/typescript/src/__tests__/scenario-tools.unit.test.ts`. The remaining
   # @unimplemented scenarios describe create/update/delete tool calls that
   # are exercised in `all-tools.integration.test.ts` but with cases the
   # MCP API surfaces (e.g. error paths, criteria-array handling) that

@@ -32,12 +32,12 @@ jobs:
         with:
           # push-strategy diff + no release-please-manifest entry: the test
           # job spends real LLM money, so it must not run on pushes or
-          # release PRs that touched nothing under sdk-go/. An SDK release
-          # PR still matches via sdk-go/CHANGELOG.md.
+          # release PRs that touched nothing under sdks/go/. An SDK release
+          # PR still matches via sdks/go/CHANGELOG.md.
           push-strategy: diff
           filters: |
             relevant:
-              - 'sdk-go/**'
+              - 'sdks/go/**'
               - '.github/workflows/sdk-go-ci.yml'
 
   test:
@@ -47,6 +47,11 @@ jobs:
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
+    # The repo-root go.work targets a newer Go than the SDK's floor (see
+    # sdk-go-cd.yml); the SDK must build standalone at its declared go
+    # directive, so ignore the workspace for every step in this job.
+    env:
+      GOWORK: "off"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
@@ -59,23 +64,23 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        working-directory: ./sdk-go
+        working-directory: ./sdks/go
         run: go mod download
 
       - name: Run tests
-        working-directory: ./sdk-go
+        working-directory: ./sdks/go
         run: go test -v ./...
 
       - name: Install examples dependencies
-        working-directory: ./sdk-go/examples
+        working-directory: ./sdks/go/examples
         run: go mod download
 
       - name: Run filtering example
-        working-directory: ./sdk-go/examples
+        working-directory: ./sdks/go/examples
         run: go run ./filtering
 
       - name: Install e2e dependencies
-        working-directory: ./sdk-go/e2e
+        working-directory: ./sdks/go/e2e
         run: go mod download
 
       - name: Run e2e examples
@@ -87,7 +92,7 @@ jobs:
            || github.event.pull_request.head.repo.full_name == github.repository)
           && (github.event_name != 'pull_request'
            || github.actor != 'dependabot[bot]')
-        working-directory: ./sdk-go/e2e
+        working-directory: ./sdks/go/e2e
         run: go run cmd/main.go --ci run-examples
         env:
           LANGWATCH_API_KEY: ${{ secrets.GO_SDK_LANGWATCH_API_KEY }}
@@ -110,6 +115,10 @@ jobs:
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
+    # See the `test` job above: ignore the repo-root go.work so the SDK
+    # builds standalone at its own declared go directive.
+    env:
+      GOWORK: "off"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
@@ -122,11 +131,11 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        working-directory: ./sdk-go
+        working-directory: ./sdks/go
         run: go mod download
 
       - name: Build
-        working-directory: ./sdk-go
+        working-directory: ./sdks/go
         run: go build -v ./...
 
   sdk-go-complete:
