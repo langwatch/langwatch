@@ -296,7 +296,7 @@ services:
       - root_modules:/node_modules
       - app_modules:/platform/app/node_modules
       - goose_bin:/opt/goose-bin:ro
-    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm exec tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
+    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm exec tsx src/workers.ts; sleep 1; done"
     environment:
       <<: *common-env
       # Override BASE_HOST for Docker networking - scenario child processes post events here
