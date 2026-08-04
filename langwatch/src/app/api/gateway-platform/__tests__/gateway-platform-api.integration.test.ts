@@ -26,6 +26,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
+  Prisma,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
@@ -43,6 +44,7 @@ import {
   GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
 import { nextAnchoredResetAt } from "~/server/gateway/budgetWindow";
+import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
@@ -1919,6 +1921,228 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const b = await createVk({ name: `ext-null-b-${suffix}` });
       expect(a.status).toBe(201);
       expect(b.status).toBe(201);
+    });
+  });
+
+  // ── Idempotency-Key ───────────────────────────────────────────────────
+
+  describe("idempotency on creates", () => {
+    /** A distinct budget body per test, so counting by name counts one test. */
+    function budgetBody(label: string) {
+      return {
+        scope: { kind: "project", project_id: PROJECT_ID },
+        name: `idem-${label}-${suffix}`,
+        window: "month",
+        limit_usd: 5,
+      };
+    }
+
+    function keyed(key: string): Record<string, string> {
+      return { ...legacyAuth(), "Idempotency-Key": key };
+    }
+
+    const budgetsNamed = (name: string) =>
+      prisma.gatewayBudget.findMany({
+        where: { organizationId: ORG_ID, name },
+      });
+
+    const receiptFor = (key: string) =>
+      prisma.idempotencyReceipt.findUnique({
+        where: { scopeId_key: { scopeId: PROJECT_ID, key } },
+      });
+
+    /** @scenario A create sent without an idempotency key is unchanged */
+    it("writes no receipt when the header is absent", async () => {
+      const body = budgetBody("keyless");
+      const res = await post("/api/gateway/v1/budgets", body, legacyAuth());
+
+      expect(res.status).toBe(201);
+      expect(res.headers.get("X-Idempotent-Replay")).toBeNull();
+      // The unkeyed path must not touch the table at all, so the whole scope
+      // is checked rather than one key: a stray write would land under a key
+      // this test does not know to look for.
+      expect(
+        await prisma.idempotencyReceipt.count({
+          where: { scopeId: PROJECT_ID },
+        }),
+      ).toBe(0);
+    });
+
+    /** @scenario Retrying a create with the same key replays the first response */
+    it("replays the stored response and creates nothing the second time", async () => {
+      const key = `idem-replay-key-${suffix}`;
+      const body = budgetBody("replay");
+
+      const first = await post("/api/gateway/v1/budgets", body, keyed(key));
+      expect(first.status).toBe(201);
+      expect(first.headers.get("X-Idempotent-Replay")).toBeNull();
+      const firstBody = await first.text();
+
+      const receipt = await receiptFor(key);
+      expect(receipt?.responseStatus).toBe(201);
+
+      const second = await post("/api/gateway/v1/budgets", body, keyed(key));
+      expect(second.status).toBe(201);
+      expect(second.headers.get("X-Idempotent-Replay")).toBe("true");
+      // Byte-for-byte, not merely equivalent: the receipt column is `json`
+      // rather than `jsonb` precisely so key order survives the round trip.
+      expect(await second.text()).toBe(firstBody);
+
+      expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /** @scenario Reusing a key with a different body is refused */
+    it("refuses a second request whose body changed", async () => {
+      const key = `idem-mismatch-key-${suffix}`;
+      const body = budgetBody("mismatch");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      const mutated = await post(
+        "/api/gateway/v1/budgets",
+        { ...body, limit_usd: 6 },
+        keyed(key),
+      );
+      const error = await expectCanonicalError(mutated, {
+        status: 409,
+        code: "idempotency_error",
+      });
+      expect(error.meta?.reason).toBe("body_mismatch");
+      expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /** @scenario A retry sent while the original is still running is refused */
+    it("refuses a retry against a receipt still marked pending", async () => {
+      const key = `idem-pending-key-${suffix}`;
+      const body = budgetBody("pending");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      // Wound back to the state the first request held between claiming the
+      // key and storing its answer. Doctoring a real receipt rather than
+      // inserting one keeps the fingerprint identical to the route's, which
+      // is taken over the VALIDATED body and so cannot be recomputed here.
+      const claimed = await receiptFor(key);
+      await prisma.idempotencyReceipt.update({
+        where: { id: claimed!.id },
+        data: {
+          responseStatus: null,
+          responseBody: Prisma.DbNull,
+          createdAt: new Date(),
+        },
+      });
+
+      const retry = await post("/api/gateway/v1/budgets", body, keyed(key));
+      const error = await expectCanonicalError(retry, {
+        status: 409,
+        code: "idempotency_error",
+      });
+      expect(error.meta?.reason).toBe("in_progress");
+      // Refused, not queued: nothing new was written.
+      expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /** @scenario A pending receipt older than the window is treated as a crash */
+    it("supersedes a pending receipt left behind by a dead request", async () => {
+      const key = `idem-stale-key-${suffix}`;
+      const body = budgetBody("stale");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      const claimed = await receiptFor(key);
+      await prisma.idempotencyReceipt.update({
+        where: { id: claimed!.id },
+        data: {
+          responseStatus: null,
+          responseBody: Prisma.DbNull,
+          createdAt: new Date(Date.now() - 61_000),
+        },
+      });
+
+      // Without the takeover this answers 409 for the next 24 hours, and the
+      // caller can never complete the create it was trying to make.
+      const retry = await post("/api/gateway/v1/budgets", body, keyed(key));
+      expect(retry.status).toBe(201);
+      expect(retry.headers.get("X-Idempotent-Replay")).toBeNull();
+      expect((await receiptFor(key))?.responseStatus).toBe(201);
+      // Two, because this test faked the crash after a create that really
+      // happened. A genuine crash in that window left nothing behind.
+      expect(await budgetsNamed(body.name)).toHaveLength(2);
+    });
+
+    /** @scenario An expired receipt lets the key be used again */
+    it("treats a lapsed key as a fresh one", async () => {
+      const key = `idem-expired-key-${suffix}`;
+      const body = budgetBody("expired");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      const stored = await receiptFor(key);
+      await prisma.idempotencyReceipt.update({
+        where: { id: stored!.id },
+        data: { expiresAt: new Date(Date.now() - 1_000) },
+      });
+
+      const again = await post("/api/gateway/v1/budgets", body, keyed(key));
+      expect(again.status).toBe(201);
+      expect(again.headers.get("X-Idempotent-Replay")).toBeNull();
+      expect(await budgetsNamed(body.name)).toHaveLength(2);
+
+      // Collected on the way past, so the table does not keep a row nothing
+      // will ever read again.
+      const replacement = await receiptFor(key);
+      expect(replacement?.id).not.toBe(stored!.id);
+      expect(replacement?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    /** @scenario An unusable idempotency key is refused before anything is created */
+    it("refuses a key that is too short", async () => {
+      const body = budgetBody("shortkey");
+      const res = await post("/api/gateway/v1/budgets", body, keyed("short"));
+
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "validation_error",
+      });
+      expect(error.meta?.target).toBe("header");
+      expect(await budgetsNamed(body.name)).toHaveLength(0);
+    });
+
+    /** @scenario The other keyed creates take the same header */
+    it("replays a cache rule create too", async () => {
+      const key = `idem-cache-key-${suffix}`;
+      const body = {
+        name: `idem-cache-${suffix}`,
+        matchers: { model: "gpt-4o-mini" },
+        action: { mode: "respect", ttl: 60 },
+      };
+
+      const first = await post("/api/gateway/v1/cache-rules", body, keyed(key));
+      expect(first.status).toBe(201);
+      const firstBody = await first.text();
+
+      const second = await post(
+        "/api/gateway/v1/cache-rules",
+        body,
+        keyed(key),
+      );
+      expect(second.status).toBe(201);
+      expect(second.headers.get("X-Idempotent-Replay")).toBe("true");
+      expect(await second.text()).toBe(firstBody);
+
+      expect(
+        await prisma.gatewayCacheRule.findMany({
+          where: { organizationId: ORG_ID, name: body.name },
+        }),
+      ).toHaveLength(1);
     });
   });
 });

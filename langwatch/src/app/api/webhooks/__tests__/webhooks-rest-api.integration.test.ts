@@ -174,6 +174,58 @@ describe("Feature: Webhook endpoints REST API", () => {
     });
   });
 
+  /** @scenario An idempotency key on this family is unique within the organization */
+  it("replays an endpoint create, secret and all, scoped to the organization", async () => {
+    planHasWebhookEndpoints = true;
+    const key = `idem-webhook-${ns}`;
+    const body = {
+      url: "https://example.com/hooks/idempotent",
+      enabled_events: ["gateway.request.completed"],
+    };
+    const send = () =>
+      app.request("/api/webhooks/v1/endpoints", {
+        method: "POST",
+        headers: { ...headers(), "Idempotency-Key": key },
+        body: JSON.stringify(body),
+      });
+
+    const first = await send();
+    expect(first.status).toBe(201);
+    expect(first.headers.get("X-Idempotent-Replay")).toBeNull();
+    const firstBody = await first.text();
+
+    const second = await send();
+    expect(second.status).toBe(201);
+    expect(second.headers.get("X-Idempotent-Replay")).toBe("true");
+    // Including the signing secret, which the endpoint hands out exactly once.
+    // Withholding it on the replay would return an endpoint nobody can verify.
+    expect(await second.text()).toBe(firstBody);
+
+    // The receipt hangs off the organization, not a project: this family
+    // authenticates at the org, so that is the tenancy its keys are unique in.
+    const receipt = await prisma.idempotencyReceipt.findUnique({
+      where: { scopeId_key: { scopeId: organization.id, key } },
+    });
+    expect(receipt?.responseStatus).toBe(201);
+
+    expect(
+      await prisma.webhookEndpoint.findMany({
+        where: { organizationId: organization.id, url: body.url },
+      }),
+    ).toHaveLength(1);
+
+    const mutated = await app.request("/api/webhooks/v1/endpoints", {
+      method: "POST",
+      headers: { ...headers(), "Idempotency-Key": key },
+      body: JSON.stringify({ ...body, url: "https://example.com/hooks/other" }),
+    });
+    const error = await expectCanonicalError(mutated, {
+      status: 409,
+      code: "idempotency_error",
+    });
+    expect(error.meta?.reason).toBe("body_mismatch");
+  });
+
   /** @scenario The signing secret is returned only at create and roll time */
   it("creates an endpoint returning the secret once; reads never carry it", async () => {
     planHasWebhookEndpoints = true;

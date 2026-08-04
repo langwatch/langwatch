@@ -3640,3 +3640,39 @@ model BugReport {
 
   @@index([createdAt])
 }
+
+// The stored outcome of a request that carried an `Idempotency-Key`, so that
+// retrying a create returns the original answer instead of creating a second
+// row. See `~/server/api/idempotency` for the semantics.
+//
+// `scopeId` is the tenancy the key is unique within: the project on the
+// gateway platform's creates, the organization on the webhook platform's,
+// matching each family's auth scope. A key is private to the tenant that used
+// it, so two tenants can pick the same string without colliding.
+//
+// A NULL `responseStatus` is the pending marker, written before the handler
+// runs and filled in once it succeeds. Only successful outcomes are ever
+// stored, so a row with a status is always a 2xx worth replaying.
+//
+// `responseBody` is `json` rather than the `jsonb` used everywhere else in
+// this schema, and that is the point: jsonb normalises key order, so a replay
+// read back through it would answer the same document with different bytes
+// than the original caller received. `json` keeps the text as written, which
+// is what makes a replay byte-for-byte identical.
+//
+// Expired rows are dropped lazily, when their key is next presented. The
+// `expiresAt` index is there so an operator can also prune in bulk, since keys
+// that are never retried are never revisited.
+model IdempotencyReceipt {
+  id                 String   @id @default(nanoid())
+  scopeId            String
+  key                String
+  requestFingerprint String
+  responseStatus     Int?
+  responseBody       Json?    @db.Json
+  createdAt          DateTime @default(now())
+  expiresAt          DateTime
+
+  @@unique([scopeId, key])
+  @@index([expiresAt])
+}

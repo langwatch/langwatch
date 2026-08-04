@@ -29,6 +29,11 @@ import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  readIdempotencyKey,
+  withIdempotency,
+} from "~/server/api/idempotency";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
@@ -86,8 +91,16 @@ import {
   PAGE_LIMIT_MAX,
 } from "~/server/gateway/wirePagination";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { canonicalBaseResponses } from "../../shared/base-responses";
+import {
+  canonicalBaseResponses,
+  canonicalConflictResponses,
+} from "../../shared/base-responses";
 import { requestTraceIds } from "../../shared/canonical-error";
+import {
+  idempotencyKeyParameter,
+  idempotentJson,
+  idempotentReplayHeaders,
+} from "../../shared/idempotent-response";
 import { apiErrorBody, apiErrorSchema } from "../../shared/schemas";
 
 const logger = createLogger("langwatch:api:gateway-platform");
@@ -881,12 +894,15 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
   describeRoute({
     summary: "Create virtual key",
     description:
-      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.",
+      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
     tags: ["Virtual Keys"],
+    parameters: [idempotencyKeyParameter],
     responses: {
       ...canonicalBaseResponses,
+      ...canonicalConflictResponses,
       201: {
         description: "Virtual key created",
+        headers: idempotentReplayHeaders,
         content: {
           "application/json": {
             schema: resolver(
@@ -916,6 +932,9 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
   async (c) => {
     const project = c.get("project");
     const body = { data: c.req.valid("json") };
+    const idempotencyKey = readIdempotencyKey(
+      c.req.header(IDEMPOTENCY_KEY_HEADER),
+    );
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
     const scopes = scopesFromWire(body.data.scopes, project.id);
@@ -965,13 +984,32 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
         metadata: body.data.metadata,
         actorUserId,
       };
-      const { virtualKey, secret } = await service.create(input);
-      logger.info(
-        { projectId: project.id, vkId: virtualKey.id },
-        "Created virtual key via REST",
-      );
-      // Secret is returned exactly once — caller MUST persist it.
-      return c.json({ virtual_key: toVkDto(virtualKey), secret }, 201);
+      // Only the create is inside the idempotent section. The pre-flight
+      // above is read-only, so leaving it out means a replay still re-checks
+      // the caller's scopes rather than trusting a grant it held yesterday.
+      const outcome = await withIdempotency({
+        prisma,
+        scopeId: project.id,
+        key: idempotencyKey,
+        validatedBody: body.data,
+        handler: async () => {
+          const { virtualKey, secret } = await service.create(input);
+          logger.info(
+            { projectId: project.id, vkId: virtualKey.id },
+            "Created virtual key via REST",
+          );
+          // The secret is minted once and stored only as a hash, so a caller
+          // that loses this response has no second way to read it. That is the
+          // whole reason this route takes an idempotency key, and the reason a
+          // stored receipt holds the secret in clear for its 24 hours: a replay
+          // that withheld it would hand back a key nobody can ever use.
+          return {
+            status: 201,
+            body: { virtual_key: toVkDto(virtualKey), secret },
+          };
+        },
+      });
+      return idempotentJson(c, outcome);
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1598,12 +1636,15 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
   describeRoute({
     summary: "Create budget",
     description:
-      "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date.",
+      "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a retry safe.",
     tags: ["Budgets"],
+    parameters: [idempotencyKeyParameter],
     responses: {
       ...canonicalBaseResponses,
+      ...canonicalConflictResponses,
       201: {
         description: "Budget created",
+        headers: idempotentReplayHeaders,
         content: {
           "application/json": {
             schema: resolver(z.object({ budget: budgetDtoSchema })),
@@ -1622,32 +1663,47 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
   async (c) => {
     const project = c.get("project");
     const body = { data: c.req.valid("json") };
+    // Read before the try: a malformed key is a request-validation failure and
+    // takes the same route to the wire as one the schema caught, rather than
+    // being reshaped by the service-error mapping below.
+    const idempotencyKey = readIdempotencyKey(
+      c.req.header(IDEMPOTENCY_KEY_HEADER),
+    );
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
     try {
-      const row = await service.create({
-        organizationId,
-        scope: scopeFromWire(body.data.scope),
-        name: body.data.name,
-        description: body.data.description ?? null,
-        window: toStoredEnum(body.data.window),
-        limitUsd: body.data.limit_usd,
-        onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
-        timezone: body.data.timezone ?? null,
-        providerKey: body.data.provider_key ?? null,
-        externalId: body.data.external_id,
-        metadata: body.data.metadata,
-        cycleAnchorAt: body.data.cycle_anchor_at
-          ? new Date(body.data.cycle_anchor_at)
-          : null,
-        actorUserId,
+      const outcome = await withIdempotency({
+        prisma,
+        scopeId: project.id,
+        key: idempotencyKey,
+        validatedBody: body.data,
+        handler: async () => {
+          const row = await service.create({
+            organizationId,
+            scope: scopeFromWire(body.data.scope),
+            name: body.data.name,
+            description: body.data.description ?? null,
+            window: toStoredEnum(body.data.window),
+            limitUsd: body.data.limit_usd,
+            onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
+            timezone: body.data.timezone ?? null,
+            providerKey: body.data.provider_key ?? null,
+            externalId: body.data.external_id,
+            metadata: body.data.metadata,
+            cycleAnchorAt: body.data.cycle_anchor_at
+              ? new Date(body.data.cycle_anchor_at)
+              : null,
+            actorUserId,
+          });
+          const memberCounts = await groupMemberCounts([row]);
+          return {
+            status: 201,
+            body: { budget: toBudgetDto(row, memberCounts.get(row.scopeId)) },
+          };
+        },
       });
-      const memberCounts = await groupMemberCounts([row]);
-      return c.json(
-        { budget: toBudgetDto(row, memberCounts.get(row.scopeId)) },
-        201,
-      );
+      return idempotentJson(c, outcome);
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1965,12 +2021,15 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
   describeRoute({
     summary: "Create a cache rule",
     description:
-      "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.",
+      "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll. Send `Idempotency-Key` to make a retry safe.",
     tags: ["Cache Rules"],
+    parameters: [idempotencyKeyParameter],
     responses: {
       ...canonicalBaseResponses,
+      ...canonicalConflictResponses,
       201: {
         description: "Created",
+        headers: idempotentReplayHeaders,
         content: {
           "application/json": {
             schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
@@ -1989,21 +2048,33 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
   async (c) => {
     const project = c.get("project");
     const body = { data: c.req.valid("json") };
+    const idempotencyKey = readIdempotencyKey(
+      c.req.header(IDEMPOTENCY_KEY_HEADER),
+    );
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayCacheRuleService.create(prisma);
     try {
-      const row = await service.create({
-        organizationId,
-        name: body.data.name,
-        description: body.data.description ?? null,
-        priority: body.data.priority,
-        enabled: body.data.enabled,
-        matchers: body.data.matchers,
-        action: body.data.action,
-        actorUserId,
+      const outcome = await withIdempotency({
+        prisma,
+        scopeId: project.id,
+        key: idempotencyKey,
+        validatedBody: body.data,
+        handler: async () => {
+          const row = await service.create({
+            organizationId,
+            name: body.data.name,
+            description: body.data.description ?? null,
+            priority: body.data.priority,
+            enabled: body.data.enabled,
+            matchers: body.data.matchers,
+            action: body.data.action,
+            actorUserId,
+          });
+          return { status: 201, body: { cache_rule: toCacheRuleDto(row) } };
+        },
       });
-      return c.json({ cache_rule: toCacheRuleDto(row) }, 201);
+      return idempotentJson(c, outcome);
     } catch (error) {
       return trpcErrorResponse(c, error);
     }

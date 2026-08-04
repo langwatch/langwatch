@@ -1311,6 +1311,16 @@ const presentations = {
         : "Another record in this organization already uses it. Pick a different one, or update that record instead.";
     },
   },
+  idempotency_error: {
+    // Two refusals share one code because the caller's next move is the same
+    // shape in both cases: stop reusing this key, or wait for the first
+    // request to land. `meta.reason` is what lets the copy say which.
+    title: "That idempotency key can't answer this request",
+    describe: (error) =>
+      str(error, "reason", "") === "in_progress"
+        ? "The first request sent with this key is still running. Wait a moment, then retry with the same key."
+        : "This key was already used for a different request. Send a new key, or repeat the original request exactly.",
+  },
   cache_rule_not_found: {
     title: "Cache rule not found",
     describe: () => "It may have been archived by someone else.",

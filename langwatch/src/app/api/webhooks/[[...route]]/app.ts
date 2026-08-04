@@ -17,6 +17,11 @@ import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  readIdempotencyKey,
+  withIdempotency,
+} from "~/server/api/idempotency";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {
@@ -28,8 +33,16 @@ import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { canonicalBaseResponses } from "../../shared/base-responses";
+import {
+  canonicalBaseResponses,
+  canonicalConflictResponses,
+} from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
+import {
+  idempotencyKeyParameter,
+  idempotentJson,
+  idempotentReplayHeaders,
+} from "../../shared/idempotent-response";
 import { apiErrorSchema } from "../../shared/schemas";
 import { handleWebhookApiError } from "./error-handler";
 
@@ -320,12 +333,15 @@ secured.access(requires("webhookEndpoints:manage")).post(
   requireWebhookPlan,
   describeRoute({
     description:
-      "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one.",
+      "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+    parameters: [idempotencyKeyParameter],
     responses: {
       ...canonicalBaseResponses,
+      ...canonicalConflictResponses,
       201: {
         description:
           "The endpoint, with the signing secret this body alone carries",
+        headers: idempotentReplayHeaders,
         content: {
           "application/json": {
             schema: resolver(z.object({ data: endpointWithSecretDtoSchema })),
@@ -338,15 +354,29 @@ secured.access(requires("webhookEndpoints:manage")).post(
   async (c) => {
     const organization = c.get("organization") as Organization;
     const body = c.req.valid("json");
-    const { endpoint, secret } = await endpoints.create({
-      organizationId: organization.id,
-      url: body.url,
-      enabledEvents: body.enabled_events,
-      maxBatchSize: body.max_batch_size,
-      maxBatchDelayMs: body.max_batch_delay_ms,
-      maxInFlight: body.max_in_flight,
+    // Scoped to the organization, not a project: this family authenticates at
+    // the org, so that is the tenancy a key is unique within.
+    const outcome = await withIdempotency({
+      prisma,
+      scopeId: organization.id,
+      key: readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER)),
+      validatedBody: body,
+      handler: async () => {
+        const { endpoint, secret } = await endpoints.create({
+          organizationId: organization.id,
+          url: body.url,
+          enabledEvents: body.enabled_events,
+          maxBatchSize: body.max_batch_size,
+          maxBatchDelayMs: body.max_batch_delay_ms,
+          maxInFlight: body.max_in_flight,
+        });
+        return {
+          status: 201,
+          body: { data: { ...endpointResponse(endpoint), secret } },
+        };
+      },
     });
-    return c.json({ data: { ...endpointResponse(endpoint), secret } }, 201);
+    return idempotentJson(c, outcome);
   },
 );
 

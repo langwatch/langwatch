@@ -72,6 +72,7 @@ export const APP_ERROR_CODES = [
   "gateway_scope_org_mismatch",
   "gateway_spend_unavailable",
   "guardrail_attach_forbidden",
+  "idempotency_error",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",
   // Also a Go code, with copy already written under the shared/transport
