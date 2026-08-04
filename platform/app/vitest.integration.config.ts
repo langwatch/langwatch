@@ -10,6 +10,9 @@ import WeightBalancedSequencer from "./vitest.sequencer";
 
 config();
 
+// One switch for the CI-vs-laptop trade-offs below.
+const isCI = !!process.env.CI;
+
 export default defineConfig({
   test: {
     // Global setup runs once before all tests - starts shared containers
@@ -32,12 +35,18 @@ export default defineConfig({
     // Run test files sequentially to avoid BullMQ/Redis resource contention
     // when multiple pipelines are created and destroyed in parallel.
     //
-    // Redis is the loudest of them: BullMQ keys a queue by name alone, so two
-    // files building the same pipeline share it. It is not the only one.
-    // Tenant-scoped ClickHouse fixtures do stay out of each other's way, but
-    // schema-scoped ones cannot: two files replaying the same migration both
-    // drop and recreate its scratch table in the one shared database, and
-    // concurrently that is a lost race, not a slow one.
+    // Redis is the loudest: BullMQ keys a queue by name alone, so two files
+    // building the same pipeline share it. Tenant-scoped ClickHouse and
+    // Postgres fixtures mostly stay out of each other's way -- of the 111
+    // integration files that touch ClickHouse there are five hardcoded tenant
+    // ids between them, and one appears in more than one file.
+    //
+    // Schema-scoped fixtures are the exception, and they do not need this flag
+    // to overlap: vitest starts the next file's fork before the previous file
+    // has finished, so an `afterAll` and the next `beforeAll` run at once even
+    // with one worker and files serial. Anything mutating shared schema takes
+    // its own cross-process lock rather than trusting file order; see
+    // withReplayLock in src/server/clickhouse/__tests__/migrationReplay.ts.
     //
     // So parallelism is opt-in rather than impossible: set both
     // VITEST_INTEGRATION_PARALLEL and VITEST_ISOLATE_WORKER_REDIS (see
@@ -66,18 +75,16 @@ export default defineConfig({
     // above is the reason: threads panic inside @prisma/client's query engine,
     // and that is true wherever it runs.
     //
-    // One worker, stated rather than inferred. `fileParallelism: false` does
-    // NOT clamp this the way vitest documents: asking for two got two, and a
-    // shard log shows a pair of fork pids alive at once, each running a
-    // different file against the same ClickHouse and Postgres. Only Redis is
-    // isolated per worker, so an overlapping pair shares every other fixture,
-    // which is how two files replaying one migration collided on its scratch
-    // table and failed with "table already exists".
-    //
-    // The second worker bought nothing anyway: across 127 files in a shard,
-    // exactly one pair ever overlapped. Serial files are the invariant the
-    // whole design rests on, so the number here has to say so.
-    maxWorkers: 1,
+    // This only takes effect when fileParallelism is on. Vitest documents that
+    // `fileParallelism: false` overrides maxWorkers to 1, so with the flag off
+    // — which is the current state everywhere — the value here is inert, and
+    // an earlier `isCI ? "100%" : 1` read as if CI were running four workers
+    // when it was running one. Keep it honest: ask for two, and let vitest
+    // clamp it to one while files are serial. Two rather than every core
+    // because the runner has 4 vCPUs and is also hosting ClickHouse, Postgres
+    // and Redis; handing vitest the whole box starved the datastores and
+    // suites failed on vi.waitFor timeouts rather than on their assertions.
+    maxWorkers: isCI ? 2 : 1,
     // Same weight-balanced split as the unit config: equal file counts are not
     // equal work, and a matrix is only as fast as its slowest leg.
     sequence: { sequencer: WeightBalancedSequencer },

@@ -12,7 +12,8 @@
  * Only the variables the replayed migrations use are supported; an
  * unrecognised `${...}` placeholder throws instead of reaching ClickHouse.
  */
-import { readFile } from "node:fs/promises";
+import { open, readFile, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
 
@@ -98,12 +99,12 @@ export async function replayGooseMigrationUp({
       : "AggregatingMergeTree()",
   };
 
-  for (const statement of statements) {
+  const queries = statements.map((statement) =>
     // `${VAR}` and `${VAR:-fallback}`, the two forms goose's envsub accepts.
     // An unmodelled variable still throws rather than reaching ClickHouse:
     // its fallback is only correct when goose would have left it unset, and
     // guessing that is how a replay quietly builds the wrong table.
-    const sql = statement.replace(
+    statement.replace(
       /\$\{([A-Z_]+)(?::-([^}]*))?\}/g,
       (_whole, name: string, fallback: string | undefined) => {
         const value = vars[name];
@@ -114,8 +115,92 @@ export async function replayGooseMigrationUp({
           }} which this replay helper does not substitute`,
         );
       },
-    );
+    ),
+  );
 
-    await client.command({ query: sql });
+  await withReplayLock(database, async () => {
+    for (const query of queries) {
+      await client.command({ query });
+    }
+  });
+}
+
+/**
+ * One replay at a time per database, across processes.
+ *
+ * A rebuild migration drops and recreates scratch tables (`..._rebuild`,
+ * `..._recon`) under fixed names, so two replays running at once corrupt each
+ * other: one's DROP lands between the other's CREATE and its INSERT, and the
+ * loser reports either "table already exists" or "table does not exist" from a
+ * migration whose own statements are perfectly ordered.
+ *
+ * Two files replaying at once is not hypothetical and is not a worker-count
+ * setting. Vitest starts the next file's fork before the previous file has
+ * finished, so an `afterAll` that replays overlaps the next file's `beforeAll`
+ * that replays, with `fileParallelism: false` and one worker. Only a lock
+ * outside both processes can order them, and this helper is the single door
+ * every replay goes through.
+ */
+const LOCK_POLL_MS = 50;
+const LOCK_WAIT_TIMEOUT_MS = 120_000;
+/** Longer than the hook timeout, so a live holder is never mistaken for a corpse. */
+const LOCK_STALE_MS = 180_000;
+
+async function withReplayLock<T>(
+  database: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  const lockPath = join(
+    tmpdir(),
+    `langwatch-migration-replay-${database}.lock`,
+  );
+  await acquireLock(lockPath);
+  try {
+    return await run();
+  } finally {
+    await rm(lockPath, { force: true });
+  }
+}
+
+/** Exclusive-create as the primitive: `wx` fails rather than truncates. */
+async function tryTakeLock(lockPath: string): Promise<boolean> {
+  let handle: Awaited<ReturnType<typeof open>>;
+  try {
+    handle = await open(lockPath, "wx");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    throw error;
+  }
+  try {
+    await handle.writeFile(`${process.pid}`);
+  } finally {
+    await handle.close();
+  }
+  return true;
+}
+
+/** How long the current holder has had it, or 0 once it has let go. */
+async function lockHeldForMs(lockPath: string): Promise<number> {
+  return stat(lockPath)
+    .then((entry) => Date.now() - entry.mtimeMs)
+    .catch(() => 0);
+}
+
+async function acquireLock(lockPath: string): Promise<void> {
+  const deadline = Date.now() + LOCK_WAIT_TIMEOUT_MS;
+
+  while (!(await tryTakeLock(lockPath))) {
+    // A crashed holder must not wedge every later suite, so a lock older than
+    // any replay could legitimately take is broken rather than waited on.
+    if ((await lockHeldForMs(lockPath)) > LOCK_STALE_MS) {
+      await rm(lockPath, { force: true });
+      continue;
+    }
+    if (Date.now() > deadline) {
+      throw new Error(
+        `timed out waiting for the migration replay lock at ${lockPath}`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, LOCK_POLL_MS));
   }
 }
