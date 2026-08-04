@@ -1,3 +1,4 @@
+import { ValidationError } from "@langwatch/handled-error";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
@@ -11,9 +12,9 @@ import { baseResponses } from "../../shared/base-responses";
 
 patchZodOpenapi();
 
-// Rejected here so an over-large `limit` reads as a 400 rather than a
-// silently narrower page; the service clamps to the same ceiling for every
-// other caller.
+// Rejected here so an over-large `limit` is refused outright rather than
+// silently answered with a narrower page; the service clamps to the same
+// ceiling for every other caller.
 const MAX_PAGE = MAX_SESSION_EVENTS_PAGE_SIZE;
 const DEFAULT_PAGE = 500;
 
@@ -167,16 +168,13 @@ secured.access(requires("traces:view")).get(
       cursor: c.req.query("cursor"),
     });
     if (!query.success) {
-      return c.json(
-        { error: `Invalid query: ${query.error.issues[0]?.message}` },
-        400,
-      );
+      throw ValidationError.fromZodError(query.error);
     }
     const { limit, kinds, from, to, cursor } = query.data;
     // Both bounds or neither: half a window would silently widen the read
     // past what the caller asked for.
     if ((from === undefined) !== (to === undefined)) {
-      return c.json({ error: "from and to must be supplied together" }, 400);
+      throw new ValidationError("from and to must be supplied together");
     }
 
     const { events, nextCursor } =
