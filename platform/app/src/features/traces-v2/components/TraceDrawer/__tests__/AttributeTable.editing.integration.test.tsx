@@ -157,6 +157,67 @@ describe("AttributeTable editing", () => {
     });
   });
 
+  describe("given a stored correction that changed an attribute", () => {
+    function renderCorrected(
+      attributes: Record<string, unknown>,
+      correctedFrom: Record<string, unknown>,
+    ) {
+      return render(
+        <ChakraProvider value={defaultSystem}>
+          <AttributeTable
+            attributes={attributes}
+            correctedFrom={correctedFrom}
+          />
+        </ChakraProvider>,
+      );
+    }
+
+    describe("when the span detail renders", () => {
+      /** @scenario "A corrected attribute is highlighted and names its captured value" */
+      it("marks the changed attribute and names the captured value", () => {
+        const { getByLabelText, getByText } = renderCorrected(
+          { "gen_ai.request.model": "gpt-5" },
+          { "gen_ai.request.model": "gpt-5-mini" },
+        );
+
+        expect(getByText("Edited")).toBeInTheDocument();
+        expect(
+          getByLabelText("gen_ai.request.model, edited. Original: gpt-5-mini"),
+        ).toBeInTheDocument();
+      });
+
+      /** @scenario "A corrected attribute is highlighted and names its captured value" */
+      it("leaves attributes the correction did not touch unmarked", () => {
+        const { queryByLabelText } = renderCorrected(
+          { "gen_ai.request.model": "gpt-5-mini" },
+          { "gen_ai.request.model": "gpt-5-mini" },
+        );
+
+        expect(queryByLabelText(/edited\. Original/)).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a stored correction that added an attribute", () => {
+    describe("when the span detail renders", () => {
+      /** @scenario "An attribute the correction added is marked as added" */
+      it("marks it as added by an edit", () => {
+        const { getByLabelText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{ "review.note": "corrected by hand" }}
+              correctedFrom={{}}
+            />
+          </ChakraProvider>,
+        );
+
+        expect(
+          getByLabelText("review.note, added by an edit"),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given resource attributes", () => {
     describe("when the span attributes are being corrected", () => {
       it("leaves the resource attributes read-only", () => {

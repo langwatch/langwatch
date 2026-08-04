@@ -15,14 +15,17 @@ import {
   RESERVED_OUTPUT_MEDIA_REFS,
 } from "~/shared/traces/media-refs";
 import { mediaRefToMediaData } from "~/shared/traces/mediaParts";
+import { useAppliedTraceEditPatch } from "../../../hooks/useTraceEditOverlay";
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceEvents } from "../../../hooks/useTraceEvents";
+import { useTraceHeaderCanonical } from "../../../hooks/useTraceHeader";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
 import { ExceptionsContent } from "../ExceptionsContent";
+import { CorrectedFieldFrame } from "../editMode/CorrectedField";
 import { TraceEditableOutput } from "../editMode/TraceEditableOutput";
 import { EvalsList } from "../evalCards";
 import { IOViewer } from "../IOViewer";
@@ -46,6 +49,11 @@ export function TraceSummaryAccordions({
   onSelectSpan?: (spanId: string) => void;
 }) {
   const isEditing = useDrawerStore((s) => s.editing);
+  // The trace's own output is the one trace-level field a correction can
+  // replace, so it is the only one that carries the corrected treatment here.
+  const appliedPatch = useAppliedTraceEditPatch();
+  const outputCorrected = appliedPatch?.trace?.output !== undefined;
+  const capturedOutput = useTraceHeaderCanonical().data?.output;
   const hasIO = !!(trace.input || trace.output);
   // A restrict privacy rule hides content the viewer may not see — the server
   // nulls `input`/`output` and sets these flags. The IO section then reads as a
@@ -266,12 +274,26 @@ export function TraceSummaryAccordions({
                         capturedText={trace.output ?? null}
                       />
                     ) : trace.output ? (
-                      <IOViewer
-                        label="Output"
-                        content={trace.output}
-                        mode="output"
-                        traceId={trace.traceId}
-                      />
+                      outputCorrected ? (
+                        <CorrectedFieldFrame
+                          label="Output"
+                          original={capturedOutput}
+                        >
+                          <IOViewer
+                            label="Output"
+                            content={trace.output}
+                            mode="output"
+                            traceId={trace.traceId}
+                          />
+                        </CorrectedFieldFrame>
+                      ) : (
+                        <IOViewer
+                          label="Output"
+                          content={trace.output}
+                          mode="output"
+                          traceId={trace.traceId}
+                        />
+                      )
                     ) : (
                       <MissingIORow label="Output" mode="output" />
                     )}

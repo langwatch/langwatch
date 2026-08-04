@@ -1,5 +1,4 @@
 import { Button, HStack, Icon, Text } from "@chakra-ui/react";
-import { useState } from "react";
 import { LuGitCompare } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useTraceEditOverlay } from "../../../hooks/useTraceEditOverlay";
@@ -30,7 +29,9 @@ export function EditedOriginalToggle() {
   const isEditing = useDrawerStore((s) => s.editing);
   const overlayView = useTraceEditStore((s) => s.overlayView);
   const setOverlayView = useTraceEditStore((s) => s.setOverlayView);
-  const [diffOpen, setDiffOpen] = useState(false);
+  // Shared with the hover on every corrected field, so both reach one dialog.
+  const diffOpen = useTraceEditStore((s) => s.diffOpen);
+  const setDiffOpen = useTraceEditStore((s) => s.setDiffOpen);
 
   const correction = overlay.data;
   if (!correction || isEditing) return null;

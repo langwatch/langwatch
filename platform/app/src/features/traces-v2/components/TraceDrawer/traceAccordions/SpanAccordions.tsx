@@ -20,9 +20,12 @@ import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { AttributeTable } from "../AttributeTable";
+import { CorrectedFieldFrame } from "../editMode/CorrectedField";
+import { CorrectedSpanScalars } from "../editMode/CorrectedSpanScalars";
 import { SpanEditableIO } from "../editMode/SpanEditableIO";
 import { SpanNameTypeEditor } from "../editMode/SpanNameTypeEditor";
 import { useSpanAttributeEditing } from "../editMode/useSpanAttributeEditing";
+import { useSpanCorrection } from "../editMode/useSpanCorrection";
 import { IOViewer } from "../IOViewer";
 import { hasPromptMetadata, PromptAccordion } from "../PromptAccordion";
 import { ScopeBlock } from "../ScopeChip";
@@ -36,6 +39,29 @@ import { UnmappedCostSuggestion } from "./UnmappedCostSuggestion";
 import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 
+/**
+ * Frames a field the correction changed, and leaves every other field exactly
+ * as it renders normally.
+ */
+function MaybeCorrected({
+  label,
+  corrected,
+  original,
+  children,
+}: {
+  label: string;
+  corrected: boolean;
+  original: string | null | undefined;
+  children: React.ReactNode;
+}) {
+  if (!corrected) return <>{children}</>;
+  return (
+    <CorrectedFieldFrame label={label} original={original}>
+      {children}
+    </CorrectedFieldFrame>
+  );
+}
+
 export function SpanAccordions({
   traceId,
   span,
@@ -48,6 +74,9 @@ export function SpanAccordions({
   const detailQuery = useSpanDetail();
   const detail = detailQuery.data;
   const isEditing = useDrawerStore((s) => s.editing);
+  // What a stored correction changed about this span, and the span exactly as
+  // captured, so each corrected field can show what it replaced.
+  const { changedFields, captured } = useSpanCorrection(span.spanId);
   const attributeEditing = useSpanAttributeEditing({
     spanId: span.spanId,
     capturedParams:
@@ -142,6 +171,13 @@ export function SpanAccordions({
           capturedType={detail.type}
         />
       )}
+      {!isEditing && detail && (
+        <CorrectedSpanScalars
+          changedFields={changedFields}
+          corrected={detail}
+          captured={captured}
+        />
+      )}
       {/* Span-switch loading banner — makes it explicit that the panel
         below is still resolving, instead of letting the user stare at
         an empty accordion stack and wonder if anything's happening. */}
@@ -225,13 +261,19 @@ export function SpanAccordions({
                             capturedText={detail.input ?? null}
                           />
                         ) : detail?.input ? (
-                          <IOViewer
+                          <MaybeCorrected
                             label="Input"
-                            content={detail.input}
-                            mode="input"
-                            spanId={detail.spanId}
-                            spanType={detail.type}
-                          />
+                            corrected={changedFields.includes("input")}
+                            original={captured?.input}
+                          >
+                            <IOViewer
+                              label="Input"
+                              content={detail.input}
+                              mode="input"
+                              spanId={detail.spanId}
+                              spanType={detail.type}
+                            />
+                          </MaybeCorrected>
                         ) : null}
                       </RedactedField>
                       <RedactedField
@@ -247,13 +289,19 @@ export function SpanAccordions({
                             capturedText={detail.output ?? null}
                           />
                         ) : detail?.output ? (
-                          <IOViewer
+                          <MaybeCorrected
                             label="Output"
-                            content={detail.output}
-                            mode="output"
-                            spanId={detail.spanId}
-                            spanType={detail.type}
-                          />
+                            corrected={changedFields.includes("output")}
+                            original={captured?.output}
+                          >
+                            <IOViewer
+                              label="Output"
+                              content={detail.output}
+                              mode="output"
+                              spanId={detail.spanId}
+                              spanType={detail.type}
+                            />
+                          </MaybeCorrected>
                         ) : null}
                       </RedactedField>
                     </VStack>
@@ -367,6 +415,13 @@ export function SpanAccordions({
                       title="Span Attributes"
                       spanId={detail?.spanId ?? span.spanId}
                       editing={attributeEditing.editing}
+                      correctedFrom={
+                        changedFields.includes("params")
+                          ? ((captured?.params as
+                              | Record<string, unknown>
+                              | undefined) ?? {})
+                          : undefined
+                      }
                     />
                   ) : resources.isLoading || detailQuery.isLoading ? (
                     <EmptyHint>Loading attributes…</EmptyHint>

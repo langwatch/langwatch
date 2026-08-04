@@ -86,9 +86,16 @@ interface TraceEditState {
    * one decision.
    */
   pendingExit: (() => void) | null;
+  /**
+   * Whether the full difference is open. Held here rather than in the button
+   * that opens it because the hover on a corrected field also offers to open
+   * it, and both must reach the same dialog.
+   */
+  diffOpen: boolean;
 
   requestExit: (run: () => void) => void;
   clearPendingExit: () => void;
+  setDiffOpen: (open: boolean) => void;
 
   startEditing: (params: {
     traceId: string;
@@ -179,9 +186,11 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
   ...EMPTY_DRAFTS,
   overlayView: "edited",
   pendingExit: null,
+  diffOpen: false,
 
   requestExit: (run) => set({ pendingExit: run }),
   clearPendingExit: () => set({ pendingExit: null }),
+  setDiffOpen: (open) => set({ diffOpen: open }),
 
   startEditing: ({ traceId, basePatch }) =>
     // Always from a clean slate: a draft left behind by an earlier trace (or

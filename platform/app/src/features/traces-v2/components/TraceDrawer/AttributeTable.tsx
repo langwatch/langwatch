@@ -204,6 +204,18 @@ interface AttributeTableProps {
   spanId?: string;
   /** Present while the reviewer is correcting this span's attributes. */
   editing?: AttributeEditing;
+  /**
+   * The attributes as captured, when a stored correction replaced them. Rows
+   * that differ are marked so a reader can see which values are corrections and
+   * hover each one for what the trace originally carried.
+   */
+  correctedFrom?: Record<string, unknown>;
+}
+
+/** How one row differs from what was captured. */
+interface AttributeCorrection {
+  /** The captured value rendered for the tooltip, or null when it is new. */
+  original: string | null;
 }
 
 /** Synthetic, always-first row key for the injected span id. */
@@ -407,6 +419,47 @@ function RestrictionMarker({ visibleTo, canSee }: AttributeRestriction) {
   );
 }
 
+/**
+ * Marks one attribute a correction replaced or added, with the captured value
+ * in the tooltip. An attribute value is a scalar, so the whole of it fits
+ * there and the reader never has to open anything to compare.
+ */
+function CorrectionMarker({
+  attrKey,
+  original,
+}: {
+  attrKey: string;
+  original: string | null;
+}) {
+  const label =
+    original === null
+      ? `${attrKey}, added by an edit`
+      : `${attrKey}, edited. Original: ${original}`;
+  return (
+    <Tooltip
+      content={original === null ? "Added by an edit" : `Original: ${original}`}
+      positioning={{ placement: "top" }}
+    >
+      <Text
+        as="span"
+        textStyle="2xs"
+        fontWeight="semibold"
+        color="green.fg"
+        bg="green.subtle"
+        borderWidth="1px"
+        borderColor="green.muted"
+        borderRadius="sm"
+        paddingX={1.5}
+        flexShrink={0}
+        cursor="help"
+        aria-label={label}
+      >
+        Edited
+      </Text>
+    </Tooltip>
+  );
+}
+
 function CopyAllButton({ payload }: { payload: string }) {
   const { copied, copy } = useCopyToClipboard();
   const handleClick = () => copy(payload);
@@ -538,6 +591,7 @@ function FlatRow({
   onLabelResize,
   restriction,
   editing,
+  correction,
 }: {
   attrKey: string;
   value: unknown;
@@ -550,6 +604,7 @@ function FlatRow({
   onLabelResize: (deltaPx: number) => void;
   restriction?: AttributeRestriction | null;
   editing?: RowEditing;
+  correction?: AttributeCorrection | null;
 }) {
   const display = formatValue(value);
   // A value already hidden from this viewer has nothing on screen to correct,
@@ -563,7 +618,12 @@ function FlatRow({
       gap={0}
       paddingRight={2}
       className="attr-row"
-      bg={pinned ? "bg.subtle" : undefined}
+      bg={correction ? "green.subtle" : pinned ? "bg.subtle" : undefined}
+      boxShadow={
+        correction
+          ? "inset 2px 0 0 var(--chakra-colors-green-solid)"
+          : undefined
+      }
     >
       {pinnable ? (
         <PinToggle
@@ -613,6 +673,9 @@ function FlatRow({
           payload reads identically wherever it surfaces. */}
       <HStack flex={1} minWidth={0} gap={1.5}>
         {restriction ? <RestrictionMarker {...restriction} /> : null}
+        {correction ? (
+          <CorrectionMarker attrKey={attrKey} original={correction.original} />
+        ) : null}
         {isEditableRow ? (
           <EditableValueCell
             attrKey={attrKey}
@@ -658,6 +721,7 @@ function AttrSection({
   leadingKeys,
   restrictionFor,
   editing,
+  correctionFor,
 }: {
   title: string;
   attributes: Record<string, unknown>;
@@ -671,6 +735,8 @@ function AttrSection({
   restrictionFor?: (key: string) => AttributeRestriction | null;
   /** Present while this section's attributes are being corrected. */
   editing?: AttributeEditing;
+  /** Resolves the captured value a stored correction replaced, when it did. */
+  correctionFor?: (key: string) => AttributeCorrection | null;
 }) {
   const { project } = useOrganizationTeamProject();
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
@@ -737,6 +803,9 @@ function AttrSection({
                 labelWidth={labelWidth}
                 onLabelResize={onLabelResize}
                 restriction={restrictionFor ? restrictionFor(key) : null}
+                correction={
+                  correctionFor && !isLeading ? correctionFor(key) : null
+                }
                 editing={
                   editing && !isLeading
                     ? {
@@ -852,6 +921,7 @@ export function AttributeTable({
   title,
   spanId,
   editing,
+  correctedFrom,
 }: AttributeTableProps) {
   const [viewMode, setViewMode] = useState<AttrViewMode>("flat");
   // The JSON view is a read-only rendering of the same rows, so while the
@@ -896,6 +966,21 @@ export function AttributeTable({
       resourceAttributes ? flattenAttributes(resourceAttributes) : undefined,
     [resourceAttributes],
   );
+
+  // A row is marked when the correction gave it a different value than the one
+  // captured, or added it outright. The comparison is on the rendered value,
+  // which is what the reader is looking at.
+  const correctionFor = useMemo(() => {
+    if (!correctedFrom) return undefined;
+    const capturedFlat = flattenAttributes(correctedFrom);
+    return (key: string): AttributeCorrection | null => {
+      if (!(key in capturedFlat)) return { original: null };
+      const captured = formatValue(capturedFlat[key]);
+      return captured === formatValue(flatAttrs[key])
+        ? null
+        : { original: captured };
+    };
+  }, [correctedFrom, flatAttrs]);
 
   const filterAttrs = useMemo(
     () => filterAttributesBySearch(flatAttrs, searchTerm),
@@ -957,6 +1042,7 @@ export function AttributeTable({
         leadingKeys={spanId ? SPAN_ID_LEADING_KEYS : undefined}
         restrictionFor={restrictionFor}
         editing={editing}
+        correctionFor={correctionFor}
       />
       {filterResAttrs && (
         <AttrSection

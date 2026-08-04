@@ -280,11 +280,37 @@ Feature: Editing a trace in the drawer
       When I switch to the captured trace
       Then that span is listed and marked as deleted
 
-    @planned
+    @integration
     Scenario: A corrected field is highlighted and reveals its captured value
       Given the trace has a correction that changes a span output
-      When I hover the corrected output
+      Then the corrected output is highlighted as edited
+      When I hover the edited marker
       Then the captured output is shown
+
+    @integration
+    Scenario: A captured value too long to read in a hover links to the diff
+      Given the trace has a correction that changes a very long span output
+      When I hover the edited marker
+      Then the captured output is shortened
+      And I am offered the full difference instead
+
+    @integration
+    Scenario: A corrected attribute is highlighted and names its captured value
+      Given the trace has a correction that changes a span attribute
+      Then that attribute is highlighted as edited
+      And it names the captured value
+
+    @integration
+    Scenario: An attribute the correction added is marked as added
+      Given the trace has a correction that adds a span attribute
+      Then that attribute is marked as added by an edit
+
+    @integration
+    Scenario: A corrected span name names its captured name
+      Given the trace has a correction that renames a span
+      When I open that span
+      Then the corrected name is highlighted as edited
+      And it names the captured name
 
   Rule: The full difference is one click away
 
