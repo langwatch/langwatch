@@ -101,7 +101,7 @@ def sync_detailed(
 ]:
     """Archive budget
 
-     Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical
+     Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical
     ledger entries are retained.
 
     Args:
@@ -140,7 +140,7 @@ def sync(
 ):
     """Archive budget
 
-     Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical
+     Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical
     ledger entries are retained.
 
     Args:
@@ -173,7 +173,7 @@ async def asyncio_detailed(
 ]:
     """Archive budget
 
-     Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical
+     Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical
     ledger entries are retained.
 
     Args:
@@ -210,7 +210,7 @@ async def asyncio(
 ):
     """Archive budget
 
-     Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical
+     Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical
     ledger entries are retained.
 
     Args:

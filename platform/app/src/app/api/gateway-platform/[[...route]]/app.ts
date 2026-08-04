@@ -894,7 +894,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
   describeRoute({
     summary: "Create virtual key",
     description:
-      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
     tags: ["Virtual Keys"],
     parameters: [idempotencyKeyParameter],
     responses: {
@@ -1063,7 +1063,7 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
   describeRoute({
     summary: "Read a virtual key's spend",
     description:
-      "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.",
+      "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.",
     tags: ["Virtual Keys"],
     responses: {
       ...canonicalBaseResponses,
@@ -1159,7 +1159,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
   describeRoute({
     summary: "Update virtual key",
     description:
-      "Partial update — send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
+      "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
     tags: ["Virtual Keys"],
     responses: {
       ...canonicalBaseResponses,
@@ -1766,7 +1766,7 @@ secured.access(apiKeyPermission("gatewayBudgets:delete")).delete(
   describeRoute({
     summary: "Archive budget",
     description:
-      "Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.",
+      "Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.",
     tags: ["Budgets"],
     responses: {
       ...canonicalBaseResponses,
@@ -2133,7 +2133,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:delete")).delete(
   describeRoute({
     summary: "Archive a cache rule",
     description:
-      "Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.",
+      "Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.",
     tags: ["Cache Rules"],
     responses: {
       ...canonicalBaseResponses,

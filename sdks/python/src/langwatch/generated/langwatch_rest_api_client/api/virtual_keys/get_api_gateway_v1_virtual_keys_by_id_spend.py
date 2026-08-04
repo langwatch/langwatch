@@ -148,8 +148,8 @@ def sync_detailed(
     """Read a virtual key's spend
 
      Aggregate spend and request count for one key over a window given in epoch milliseconds (default:
-    current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the
-    dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by
+    current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the
+    dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by
     construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source
     rather than a $0.00 that cannot be told apart from a zero-spend key.
 
@@ -198,8 +198,8 @@ def sync(
     """Read a virtual key's spend
 
      Aggregate spend and request count for one key over a window given in epoch milliseconds (default:
-    current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the
-    dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by
+    current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the
+    dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by
     construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source
     rather than a $0.00 that cannot be told apart from a zero-spend key.
 
@@ -242,8 +242,8 @@ async def asyncio_detailed(
     """Read a virtual key's spend
 
      Aggregate spend and request count for one key over a window given in epoch milliseconds (default:
-    current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the
-    dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by
+    current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the
+    dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by
     construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source
     rather than a $0.00 that cannot be told apart from a zero-spend key.
 
@@ -290,8 +290,8 @@ async def asyncio(
     """Read a virtual key's spend
 
      Aggregate spend and request count for one key over a window given in epoch milliseconds (default:
-    current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the
-    dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by
+    current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the
+    dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by
     construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source
     rather than a $0.00 that cannot be told apart from a zero-spend key.
 

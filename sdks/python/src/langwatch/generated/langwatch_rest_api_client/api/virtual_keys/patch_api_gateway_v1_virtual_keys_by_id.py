@@ -112,9 +112,9 @@ def sync_detailed(
 ]:
     """Update virtual key
 
-     Partial update — send only the fields you want to change. `scopes` replaces the entire visibility
-    set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts
-    the key's own cap; explicit null archives it.
+     Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
+    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
+    key's own cap; explicit null archives it.
 
     Args:
         id (str):
@@ -155,9 +155,9 @@ def sync(
 ):
     """Update virtual key
 
-     Partial update — send only the fields you want to change. `scopes` replaces the entire visibility
-    set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts
-    the key's own cap; explicit null archives it.
+     Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
+    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
+    key's own cap; explicit null archives it.
 
     Args:
         id (str):
@@ -192,9 +192,9 @@ async def asyncio_detailed(
 ]:
     """Update virtual key
 
-     Partial update — send only the fields you want to change. `scopes` replaces the entire visibility
-    set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts
-    the key's own cap; explicit null archives it.
+     Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
+    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
+    key's own cap; explicit null archives it.
 
     Args:
         id (str):
@@ -233,9 +233,9 @@ async def asyncio(
 ):
     """Update virtual key
 
-     Partial update — send only the fields you want to change. `scopes` replaces the entire visibility
-    set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts
-    the key's own cap; explicit null archives it.
+     Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
+    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
+    key's own cap; explicit null archives it.
 
     Args:
         id (str):

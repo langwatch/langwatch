@@ -101,7 +101,7 @@ def sync_detailed(
 ]:
     """Archive a cache rule
 
-     Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after
+     Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after
     snapshots. Returns the archived row.
 
     Args:
@@ -140,7 +140,7 @@ def sync(
 ):
     """Archive a cache rule
 
-     Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after
+     Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after
     snapshots. Returns the archived row.
 
     Args:
@@ -173,7 +173,7 @@ async def asyncio_detailed(
 ]:
     """Archive a cache rule
 
-     Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after
+     Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after
     snapshots. Returns the archived row.
 
     Args:
@@ -210,7 +210,7 @@ async def asyncio(
 ):
     """Archive a cache rule
 
-     Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after
+     Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after
     snapshots. Returns the archived row.
 
     Args:

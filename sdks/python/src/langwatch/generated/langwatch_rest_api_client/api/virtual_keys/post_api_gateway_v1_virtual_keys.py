@@ -121,9 +121,9 @@ def sync_detailed(
     """Create virtual key
 
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
-    value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-
-    scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org-
-    or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
+    value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
+    team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
+    org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
     (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and
     creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a
     retry safe: a replay returns the original response including its `secret`, which is the only way to
@@ -170,9 +170,9 @@ def sync(
     """Create virtual key
 
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
-    value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-
-    scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org-
-    or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
+    value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
+    team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
+    org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
     (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and
     creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a
     retry safe: a replay returns the original response including its `secret`, which is the only way to
@@ -213,9 +213,9 @@ async def asyncio_detailed(
     """Create virtual key
 
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
-    value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-
-    scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org-
-    or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
+    value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
+    team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
+    org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
     (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and
     creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a
     retry safe: a replay returns the original response including its `secret`, which is the only way to
@@ -260,9 +260,9 @@ async def asyncio(
     """Create virtual key
 
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
-    value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-
-    scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org-
-    or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
+    value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
+    team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
+    org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
     (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and
     creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a
     retry safe: a replay returns the original response including its `secret`, which is the only way to

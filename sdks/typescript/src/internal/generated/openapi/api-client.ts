@@ -810,6 +810,202 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all non-archived teams for the organization (paginated) */
+        get: operations["getApiTeams"];
+        put?: never;
+        /** @description Create a new team that can group projects and members */
+        post: operations["postApiTeams"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a team by its id */
+        get: operations["getApiTeamsById"];
+        put?: never;
+        post?: never;
+        /** @description Archive a team (soft-delete) */
+        delete: operations["deleteApiTeamsById"];
+        options?: never;
+        head?: never;
+        /** @description Update a team by its id */
+        patch: operations["patchApiTeamsById"];
+        trace?: never;
+    };
+    "/api/teams/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a team */
+        get: operations["getApiTeamsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a team */
+        post: operations["postApiTeamsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a team */
+        delete: operations["deleteApiTeamsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List projects in a team */
+        get: operations["getApiTeamsByIdProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all groups for the organization */
+        get: operations["getApiGroups"];
+        put?: never;
+        /** @description Create a new group */
+        post: operations["postApiGroups"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a group with members and bindings */
+        get: operations["getApiGroupsById"];
+        put?: never;
+        post?: never;
+        /** @description Delete a group */
+        delete: operations["deleteApiGroupsById"];
+        options?: never;
+        head?: never;
+        /** @description Rename a group */
+        patch: operations["patchApiGroupsById"];
+        trace?: never;
+    };
+    "/api/groups/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a group */
+        get: operations["getApiGroupsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a group */
+        post: operations["postApiGroupsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a group */
+        delete: operations["deleteApiGroupsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List role bindings for a group */
+        get: operations["getApiGroupsByIdBindings"];
+        put?: never;
+        /** @description Add a role binding to a group */
+        post: operations["postApiGroupsByIdBindings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings/{bindingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a role binding from a group */
+        delete: operations["deleteApiGroupsByIdBindingsByBindingId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents": {
         parameters: {
             query?: never;
@@ -1212,7 +1408,7 @@ export interface paths {
         put?: never;
         /**
          * Create virtual key
-         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
         post: operations["postApiGatewayV1Virtual-keys"];
         delete?: never;
@@ -1237,7 +1433,7 @@ export interface paths {
         head?: never;
         /**
          * Update virtual key
-         * @description Partial update — send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
+         * @description Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
          */
         patch: operations["patchApiGatewayV1Virtual-keysById"];
         trace?: never;
@@ -1251,7 +1447,7 @@ export interface paths {
         };
         /**
          * Read a virtual key's spend
-         * @description Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
+         * @description Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
          */
         get: operations["getApiGatewayV1Virtual-keysByIdSpend"];
         put?: never;
@@ -1406,7 +1602,7 @@ export interface paths {
         post?: never;
         /**
          * Archive budget
-         * @description Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.
+         * @description Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.
          */
         delete: operations["deleteApiGatewayV1BudgetsById"];
         options?: never;
@@ -1502,7 +1698,7 @@ export interface paths {
         post?: never;
         /**
          * Archive a cache rule
-         * @description Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.
+         * @description Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.
          */
         delete: operations["deleteApiGatewayV1Cache-rulesById"];
         options?: never;
@@ -3846,6 +4042,308 @@ export interface operations {
                 };
             };
         };
+    };
+    getApiTeams: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiTeamsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiTeamsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    userId: string;
+                    /**
+                     * @default MEMBER
+                     * @enum {string}
+                     */
+                    role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiTeamsByIdMembersByUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiTeamsByIdProjects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiGroups: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    bindings?: {
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId?: string;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                    memberIds?: string[];
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiGroupsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroupsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    userId: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiGroupsByIdMembersByUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiGroupsByIdBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroupsByIdBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                    /** @enum {string} */
+                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                    scopeId: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiGroupsByIdBindingsByBindingId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                bindingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
     };
     getApiAgents: {
         parameters: {

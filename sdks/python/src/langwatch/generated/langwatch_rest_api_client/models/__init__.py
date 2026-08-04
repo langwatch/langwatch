@@ -1541,6 +1541,7 @@ from .patch_api_graphs_by_id_response_401 import PatchApiGraphsByIdResponse401
 from .patch_api_graphs_by_id_response_404 import PatchApiGraphsByIdResponse404
 from .patch_api_graphs_by_id_response_422 import PatchApiGraphsByIdResponse422
 from .patch_api_graphs_by_id_response_500 import PatchApiGraphsByIdResponse500
+from .patch_api_groups_by_id_body import PatchApiGroupsByIdBody
 from .patch_api_monitors_by_id_body import PatchApiMonitorsByIdBody
 from .patch_api_monitors_by_id_body_execution_mode import PatchApiMonitorsByIdBodyExecutionMode
 from .patch_api_monitors_by_id_body_level import PatchApiMonitorsByIdBodyLevel
@@ -1580,6 +1581,7 @@ from .patch_api_suites_by_id_response_401 import PatchApiSuitesByIdResponse401
 from .patch_api_suites_by_id_response_404 import PatchApiSuitesByIdResponse404
 from .patch_api_suites_by_id_response_422 import PatchApiSuitesByIdResponse422
 from .patch_api_suites_by_id_response_500 import PatchApiSuitesByIdResponse500
+from .patch_api_teams_by_id_body import PatchApiTeamsByIdBody
 from .patch_api_traces_by_trace_id_metadata_body import PatchApiTracesByTraceIdMetadataBody
 from .patch_api_traces_by_trace_id_metadata_body_metadata import PatchApiTracesByTraceIdMetadataBodyMetadata
 from .patch_api_traces_by_trace_id_metadata_body_metadata_additional_property_type_4 import (
@@ -2680,6 +2682,14 @@ from .post_api_graphs_response_400 import PostApiGraphsResponse400
 from .post_api_graphs_response_401 import PostApiGraphsResponse401
 from .post_api_graphs_response_422 import PostApiGraphsResponse422
 from .post_api_graphs_response_500 import PostApiGraphsResponse500
+from .post_api_groups_body import PostApiGroupsBody
+from .post_api_groups_body_bindings_item import PostApiGroupsBodyBindingsItem
+from .post_api_groups_body_bindings_item_role import PostApiGroupsBodyBindingsItemRole
+from .post_api_groups_body_bindings_item_scope_type import PostApiGroupsBodyBindingsItemScopeType
+from .post_api_groups_by_id_bindings_body import PostApiGroupsByIdBindingsBody
+from .post_api_groups_by_id_bindings_body_role import PostApiGroupsByIdBindingsBodyRole
+from .post_api_groups_by_id_bindings_body_scope_type import PostApiGroupsByIdBindingsBodyScopeType
+from .post_api_groups_by_id_members_body import PostApiGroupsByIdMembersBody
 from .post_api_model_defaults_body import PostApiModelDefaultsBody
 from .post_api_model_defaults_body_config import PostApiModelDefaultsBodyConfig
 from .post_api_model_defaults_body_scopes_item import PostApiModelDefaultsBodyScopesItem
@@ -3157,6 +3167,9 @@ from .post_api_suites_response_400 import PostApiSuitesResponse400
 from .post_api_suites_response_401 import PostApiSuitesResponse401
 from .post_api_suites_response_422 import PostApiSuitesResponse422
 from .post_api_suites_response_500 import PostApiSuitesResponse500
+from .post_api_teams_body import PostApiTeamsBody
+from .post_api_teams_by_id_members_body import PostApiTeamsByIdMembersBody
+from .post_api_teams_by_id_members_body_role import PostApiTeamsByIdMembersBodyRole
 from .post_api_trace_id_share_response_200 import PostApiTraceIdShareResponse200
 from .post_api_trace_id_unshare_response_200 import PostApiTraceIdUnshareResponse200
 from .post_api_traces_search_body import PostApiTracesSearchBody
@@ -4728,6 +4741,7 @@ __all__ = (
     "PatchApiGraphsByIdResponse404",
     "PatchApiGraphsByIdResponse422",
     "PatchApiGraphsByIdResponse500",
+    "PatchApiGroupsByIdBody",
     "PatchApiMonitorsByIdBody",
     "PatchApiMonitorsByIdBodyExecutionMode",
     "PatchApiMonitorsByIdBodyLevel",
@@ -4757,6 +4771,7 @@ __all__ = (
     "PatchApiSuitesByIdResponse404",
     "PatchApiSuitesByIdResponse422",
     "PatchApiSuitesByIdResponse500",
+    "PatchApiTeamsByIdBody",
     "PatchApiTracesByTraceIdMetadataBody",
     "PatchApiTracesByTraceIdMetadataBodyMetadata",
     "PatchApiTracesByTraceIdMetadataBodyMetadataAdditionalPropertyType4",
@@ -5273,6 +5288,14 @@ __all__ = (
     "PostApiGraphsResponse401",
     "PostApiGraphsResponse422",
     "PostApiGraphsResponse500",
+    "PostApiGroupsBody",
+    "PostApiGroupsBodyBindingsItem",
+    "PostApiGroupsBodyBindingsItemRole",
+    "PostApiGroupsBodyBindingsItemScopeType",
+    "PostApiGroupsByIdBindingsBody",
+    "PostApiGroupsByIdBindingsBodyRole",
+    "PostApiGroupsByIdBindingsBodyScopeType",
+    "PostApiGroupsByIdMembersBody",
     "PostApiModelDefaultsBody",
     "PostApiModelDefaultsBodyConfig",
     "PostApiModelDefaultsBodyScopesItem",
@@ -5532,6 +5555,9 @@ __all__ = (
     "PostApiSuitesResponse401",
     "PostApiSuitesResponse422",
     "PostApiSuitesResponse500",
+    "PostApiTeamsBody",
+    "PostApiTeamsByIdMembersBody",
+    "PostApiTeamsByIdMembersBodyRole",
     "PostApiTraceIdShareResponse200",
     "PostApiTraceIdUnshareResponse200",
     "PostApiTracesSearchBody",
