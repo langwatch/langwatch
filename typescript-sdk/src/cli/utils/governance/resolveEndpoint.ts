@@ -42,15 +42,17 @@ export interface ResolvedEndpoint {
 export function resolveControlPlaneEndpoint(
   opts: ResolveEndpointOptions = {},
 ): ResolvedEndpoint {
-  // Every source is checked for content, not truthiness: a whitespace-only
-  // value normalizes to the empty string, and returning that as the resolved
-  // URL is worse than falling through to the next source.
-  if (opts.flag?.trim()) {
-    return { url: normalizeEndpoint(opts.flag), source: "flag" };
+  // Each source is judged on what it normalizes to, not on truthiness: both a
+  // whitespace-only value and a slash-only one reduce to the empty string, and
+  // returning that as the resolved URL is worse than falling through to the
+  // next source.
+  const flag = normalizeEndpoint(opts.flag ?? "");
+  if (flag) {
+    return { url: flag, source: "flag" };
   }
-  const env = process.env.LANGWATCH_ENDPOINT;
-  if (env?.trim()) {
-    return { url: normalizeEndpoint(env), source: "env" };
+  const env = normalizeEndpoint(process.env.LANGWATCH_ENDPOINT ?? "");
+  if (env) {
+    return { url: env, source: "env" };
   }
   // Reading the config involves disk I/O; only do it if we need to.
   // Callers that already have a cfg in scope can pass it in to skip.
@@ -66,9 +68,9 @@ export function resolveControlPlaneEndpoint(
   // `langwatch login --device` (snapshot of env at save time) OR by an
   // explicit `langwatch config set endpoint <url>`. If it differs from
   // the hardcoded default, treat it as a user choice.
-  const persisted = cfg?.control_plane_url;
-  if (persisted?.trim() && persisted !== DEFAULT_ENDPOINT) {
-    return { url: normalizeEndpoint(persisted), source: "config" };
+  const persisted = normalizeEndpoint(cfg?.control_plane_url ?? "");
+  if (persisted && persisted !== DEFAULT_ENDPOINT) {
+    return { url: persisted, source: "config" };
   }
   return { url: normalizeEndpoint(DEFAULT_ENDPOINT), source: "default" };
 }

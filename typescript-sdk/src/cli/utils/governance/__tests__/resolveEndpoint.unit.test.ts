@@ -156,6 +156,31 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
+  describe("when a source holds only slashes", () => {
+    it("skips a slash-only flag rather than resolving to an empty url", () => {
+      process.env.LANGWATCH_ENDPOINT = "https://env.example.com";
+      const result = resolveControlPlaneEndpoint({ flag: "///" });
+      expect(result.url).toBe("https://env.example.com");
+      expect(result.source).toBe("env");
+    });
+
+    it("skips a slash-only env var rather than resolving to an empty url", () => {
+      process.env.LANGWATCH_ENDPOINT = "/";
+      const result = resolveControlPlaneEndpoint({});
+      expect(result.url).toBe("https://app.langwatch.ai");
+      expect(result.source).toBe("default");
+    });
+
+    it("skips a slash-only persisted url rather than resolving to an empty url", () => {
+      delete process.env.LANGWATCH_ENDPOINT;
+      const result = resolveControlPlaneEndpoint({
+        cfg: cfgFixture({ control_plane_url: "//" }),
+      });
+      expect(result.url).toBe("https://app.langwatch.ai");
+      expect(result.source).toBe("default");
+    });
+  });
+
   describe("when a source carries a trailing slash", () => {
     it("strips it", () => {
       delete process.env.LANGWATCH_ENDPOINT;

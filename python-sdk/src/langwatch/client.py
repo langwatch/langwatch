@@ -232,7 +232,7 @@ class Client(LangWatchClientProtocol):
             Client._project_id = os.getenv("LANGWATCH_PROJECT_ID")
 
         if endpoint_url is not None:
-            Client._endpoint_url = normalize_endpoint(endpoint_url)
+            Client._endpoint_url = normalize_endpoint(endpoint_url) or DEFAULT_ENDPOINT
         else:
             # Always re-read LANGWATCH_ENDPOINT from env on every setup()
             # call. The previous "pin once on first init" behavior caused

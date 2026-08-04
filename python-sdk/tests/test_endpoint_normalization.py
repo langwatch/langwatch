@@ -37,6 +37,32 @@ class TestGetEndpointWithoutAClient:
 
 
 class TestClientSetup:
+    def test_falls_back_to_the_default_when_the_explicit_endpoint_is_blank(self) -> None:
+        Client.reset_for_testing()
+        try:
+            client = Client(
+                api_key="test-key",
+                endpoint_url="   ",
+                skip_open_telemetry_setup=True,
+            )
+            assert client.endpoint_url == DEFAULT_ENDPOINT
+        finally:
+            Client.reset_for_testing()
+
+    def test_falls_back_to_the_default_when_the_explicit_endpoint_is_only_slashes(
+        self,
+    ) -> None:
+        Client.reset_for_testing()
+        try:
+            client = Client(
+                api_key="test-key",
+                endpoint_url="///",
+                skip_open_telemetry_setup=True,
+            )
+            assert client.endpoint_url == DEFAULT_ENDPOINT
+        finally:
+            Client.reset_for_testing()
+
     def test_stores_the_endpoint_without_its_trailing_slash(self) -> None:
         Client.reset_for_testing()
         try:

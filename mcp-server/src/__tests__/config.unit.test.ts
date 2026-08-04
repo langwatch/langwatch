@@ -64,6 +64,11 @@ describe("config", () => {
       expect(getConfig().endpoint).toBe("https://cli.example.com");
     });
 
+    it("trims whitespace around a CLI endpoint", () => {
+      initConfig({ endpoint: "  https://cli.example.com///  " });
+      expect(getConfig().endpoint).toBe("https://cli.example.com");
+    });
+
     it("strips repeated slashes from the env var", () => {
       process.env.LANGWATCH_ENDPOINT = "http://localhost:5560///";
       initConfig({});
