@@ -61830,16 +61830,18 @@ LangWatch Cloud pricing is built around two ideas: **seats scale with your team,
 
 LangWatch Cloud pricing is based on the number of **ingested events per billing period.**
 
-An event is a standard telemetry point — the building block of everything you observe in LangWatch. The most common event is a **span**: a single step in your system, such as an LLM call, a tool execution, a retrieval step, a span timer firing, or the point at which an error occurred.
+An event is a standard telemetry point, the building block of everything you observe in LangWatch. The most common one is a **span**: a single step in your system, such as an LLM call, a tool execution, a retrieval step, a span timer firing, or the point at which an error occurred.
 
-A **billable event** is either:
+A **billable event** is any of these:
 
-- **A span within a trace** — the individual steps that make up a request to your agent or LLM application, or
-- **A scenario or evaluation run** — a single execution used to test your AI agents in simulation.
+- **A span, log or metric your app sent us.** The telemetry that makes up a request to your agent or LLM application, or to a coding assistant you track. Spans are the individual steps; logs and metrics are what those steps recorded along the way.
+- **An evaluation result.** One score from an evaluator, whether it ran on live traffic or over a dataset.
+- **A step of an experiment run.** A sweep counts its start, each dataset row it ran, and each score it produced, so one experiment is many events rather than one.
+- **A step of a scenario simulation.** A run counts its start plus each turn of the conversation.
 
-Both contribute to your event count for the billing period. There are no separate charges per feature on top of this — evaluations, monitoring, and simulations all run against the same event stream.
+Spans dominate the count for most customers, but testing produces billable events: an experiment over 100 rows with 2 evaluators is roughly 300 events. There are no separate charges per feature on top of this, and everything you create (prompts, evaluators, datasets, dashboards) is free.
 
-For the complete list, including exactly how many events an experiment sweep or a scenario run produces and what is never billed, see [What counts as a billable event](/pricing/billable-events).
+For the exact arithmetic per family, what is never billed, and how retries are deduplicated, see [What counts as a billable event](/pricing/billable-events).
 
 ### What's included
 
@@ -61890,7 +61892,7 @@ Self-hosted deployments are different: the data sits in your own database, so th
   </Accordion>
 
   <Accordion title="What counts as a billable event?">
-    A billable event is either a span within a trace or a scenario run used to test your AI agents. Pricing is based on the total number of ingested events per billing period. [The full list is here](/pricing/billable-events), including what is never billed and how retries are deduplicated.
+    Billable events are the spans, logs and metrics your app or a tracked coding assistant sends, evaluation results, the steps of an experiment run, and the steps of a scenario simulation. Pricing is based on the total number of ingested events per billing period. [The full list is here](/pricing/billable-events), including how many events a sweep or a simulation produces, what is never billed, and how retries are deduplicated.
   </Accordion>
 
   <Accordion title="Can I customize how long my data is retained?">
