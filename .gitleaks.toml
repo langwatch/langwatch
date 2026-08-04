@@ -78,3 +78,21 @@ targetRules = ["generic-api-key"]
 matchCondition = "AND"
 paths = ['''\.github/workflows/langwatch-app-ci\.yml''']
 regexes = ['''(0123456789abcdef){4}''']
+
+# `Idempotency-Key: signup-acme-4171` and its SDK equivalents in the billing
+# docs. An idempotency key is a value the CALLER invents to make a retry safe,
+# and it is meaningless to anyone who is not already authenticated: it names a
+# request, never grants access to one. gitleaks' `generic-api-key` rule fires on
+# the `Key: "<value>"` shape and cannot tell a caller-chosen request tag from a
+# credential. `llms-full.txt` is the generated concatenation of the same pages.
+#
+# Scoped to `generic-api-key` and to docs paths only, so a real token pasted
+# into the documentation is still caught by every provider-specific rule.
+[[allowlists]]
+description = "Idempotency-Key examples in the docs are caller-chosen request tags, not credentials"
+targetRules = ["generic-api-key"]
+paths = [
+  '''docs/ai-gateway/api/management\.mdx''',
+  '''docs/ai-gateway/cookbooks/metering-and-rebilling\.mdx''',
+  '''docs/llms-full\.txt''',
+]
