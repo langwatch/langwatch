@@ -172,15 +172,19 @@ describe("ExecuteEvaluationCommand prevalence reporting", () => {
 
   describe("given a code evaluator, whose valid config is top-level by design", () => {
     describe("when the online pipeline executes it for a trace", () => {
-      /**
-       * A code evaluator stores `{ code, inputs, outputs }` at the top level
-       * with no `settings` key — the same SHAPE the recovery branch keys off,
-       * arrived at legitimately. Counting those would inflate AC0d's prevalence
-       * number with rows that were never affected, and put an info line on the
-       * hot path of an unrelated evaluator type.
-       *
-       * @scenario A code evaluator's own config is never mistaken for a lost prompt
-       */
+      // A code evaluator stores `{ code, inputs, outputs }` at the top level
+      // with no `settings` key — the same SHAPE the recovery branch keys off,
+      // arrived at legitimately. Counting those would inflate AC0d's prevalence
+      // number with rows that were never affected, and put an info line on the
+      // hot path of an unrelated evaluator type.
+      //
+      // Prose in `//` lines, not the JSDoc: check-feature-parity's binding
+      // scanner cannot walk past a `*/` that resumes a block it is already
+      // inside, so a spec annotation buried in a multi-paragraph JSDoc reads
+      // as UNBOUND. The single-line form below is the only one it follows.
+      // (And the token itself must not appear in prose — the checker reads
+      // any occurrence as a binding and fails on the unknown scenario name.)
+      /** @scenario A code evaluator's own config is never mistaken for a lost prompt */
       it("reports nothing, so the count is not inflated by an unaffected type", async () => {
         const reports = await execute({
           evaluatorRecordType: "code",

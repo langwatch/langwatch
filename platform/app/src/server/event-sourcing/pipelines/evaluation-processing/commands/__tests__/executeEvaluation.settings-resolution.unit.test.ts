@@ -436,6 +436,31 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
     });
   });
 
+  describe("given an evaluator type that did not exist when recovery was written", () => {
+    describe("when the online pipeline executes it for a trace", () => {
+      // The gate is an ALLOWLIST on purpose, and `type: "code"` alone cannot
+      // prove that: `=== "evaluator"` and `!== "code"` agree on every case a
+      // code evaluator produces. Only a type outside the current enum
+      // separates them, which is exactly the case a fourth evaluator type
+      // would create — and it must inherit the safe behaviour rather than a
+      // recovery rule written before it existed.
+      it("does not recover its config, so a later type inherits the safe path", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            evaluator: {
+              id: "evaluator_future",
+              type: "some-type-added-later",
+              config: { prompt: "not a judge prompt", threshold: 0.8 },
+            },
+          }),
+        );
+
+        expect(call.settings).toEqual(MONITOR_PARAMETERS);
+        expect(call.settings).not.toHaveProperty("threshold");
+      });
+    });
+  });
+
   describe("given a workflow evaluator", () => {
     describe("when the online pipeline executes it for a trace", () => {
       it("resolves workflowId from the evaluator record", async () => {
