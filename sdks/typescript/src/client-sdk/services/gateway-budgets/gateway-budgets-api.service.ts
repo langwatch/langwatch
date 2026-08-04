@@ -2,6 +2,7 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   collectCursorPages,
+  walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
@@ -64,20 +65,35 @@ export interface GatewayBudget {
   end_users_over?: number;
 }
 
-export interface GatewayBudgetList {
-  budgets: GatewayBudget[];
+/**
+ * One page of the budget listing, exactly as the wire serves it.
+ *
+ * Budgets come back in an envelope where virtual keys come back as a bare
+ * array because `spend_available` is a correctness flag about the whole page,
+ * and an array cannot carry it.
+ */
+export interface GatewayBudgetPage {
+  data: GatewayBudget[];
   /**
-   * False when spend could not be totalled — render "unavailable" rather
-   * than trusting `spent_usd` as real spend. Across a whole walk this is
-   * false when ANY page could not total spend.
+   * False when spend could not be totalled: render "unavailable" rather
+   * than trusting `spent_usd` as real spend.
    */
   spend_available: boolean;
   /**
    * Pass back as `cursor` for the next page. Null means the walk is
-   * exhausted; a FULL page does not by itself mean there is more. Always
-   * null from `list()`, which walks to exhaustion before returning.
+   * exhausted; a FULL page does not by itself mean there is more.
    */
   next_cursor: string | null;
+}
+
+/** The complete budget listing, after a walk to exhaustion. */
+export interface GatewayBudgetListing {
+  data: GatewayBudget[];
+  /**
+   * False when ANY page of the walk could not total spend: one unreadable
+   * page makes the whole listing's spend unreal.
+   */
+  spend_available: boolean;
 }
 
 export type CreateGatewayBudgetScope =
@@ -133,6 +149,14 @@ export class GatewayBudgetsApiError extends Error {
   }
 }
 
+/**
+ * Client for the gateway budget surface (/api/gateway/v1).
+ *
+ * Entity types and the create/update bodies mirror the wire verbatim, so
+ * their fields are lowercase snake_case. Call options this SDK invents (query
+ * filters, per-call behaviour, action arguments) are camelCase like the rest
+ * of the SDK.
+ */
 export class GatewayBudgetsApiService {
   private readonly endpoint: string;
   private readonly apiKey: string;
@@ -157,6 +181,8 @@ export class GatewayBudgetsApiService {
   private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
+      // A hung control plane must fail the command, not freeze it.
+      signal: init?.signal ?? AbortSignal.timeout(30_000),
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
     });
     if (!response.ok) {
@@ -195,7 +221,7 @@ export class GatewayBudgetsApiService {
     scopeTypes?: BudgetScopeKind[];
     cursor?: string;
     limit?: number;
-  }): Promise<GatewayBudgetList> {
+  }): Promise<GatewayBudgetPage> {
     const params = new URLSearchParams();
     if (options?.scopeTypes?.length) {
       params.set("scope_type", options.scopeTypes.join(","));
@@ -209,7 +235,7 @@ export class GatewayBudgetsApiService {
       next_cursor?: string | null;
     }>("list gateway budgets", `/api/gateway/v1/budgets${query}`);
     return {
-      budgets: data,
+      data,
       spend_available,
       next_cursor: next_cursor ?? null,
     };
@@ -220,20 +246,20 @@ export class GatewayBudgetsApiService {
    * types, optionally filtered by `scopeTypes`.
    *
    * The endpoint pages; this follows `next_cursor` until it comes back null,
-   * so the result is the complete listing and its own `next_cursor` is always
-   * null. Callers that count, total, or decide an all-clear on this list need
-   * that completeness for correctness, not just for display.
+   * so the result is the complete listing and carries no cursor of its own.
+   * Callers that count, total, or decide an all-clear on this list need that
+   * completeness for correctness, not just for display.
    *
    * `limit` sizes each request in the walk, it does NOT cap what comes back.
    * `cursor` resumes an interrupted walk. Take a single page with
-   * `listPage()`.
+   * `listPage()`, or stream the walk with `iterate()`.
    */
   async list(options?: {
     scopeTypes?: BudgetScopeKind[];
     cursor?: string;
     limit?: number;
-  }): Promise<GatewayBudgetList> {
-    const pages = await collectCursorPages<GatewayBudgetList>({
+  }): Promise<GatewayBudgetListing> {
+    const pages = await collectCursorPages<GatewayBudgetPage>({
       startCursor: options?.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
@@ -249,12 +275,44 @@ export class GatewayBudgetsApiService {
         }),
     });
     return {
-      budgets: pages.flatMap((page) => page.budgets),
+      data: pages.flatMap((page) => page.data),
       // One page that could not total spend makes the whole listing's spend
       // unreal, so the set's honest answer is the pessimistic one.
       spend_available: pages.every((page) => page.spend_available),
-      next_cursor: null,
     };
+  }
+
+  /**
+   * Every non-archived budget, one row at a time, fetching each page only
+   * when the consumer reaches it.
+   *
+   * The rows come without the listing's `spend_available` flag, which is a
+   * property of the pages rather than of any single budget. Use `list()`
+   * when the answer depends on whether spend could be totalled at all.
+   */
+  async *iterate(options?: {
+    scopeTypes?: BudgetScopeKind[];
+    cursor?: string;
+    limit?: number;
+  }): AsyncGenerator<GatewayBudget> {
+    const pages = walkCursorPages<GatewayBudgetPage>({
+      startCursor: options?.cursor,
+      nextCursorOf: (page) => page.next_cursor,
+      onEndlessWalk: (reason) =>
+        new GatewayBudgetsApiError(
+          `Failed to list gateway budgets: ${reason}.`,
+          "list gateway budgets",
+        ),
+      fetchPage: (cursor) =>
+        this.listPage({
+          scopeTypes: options?.scopeTypes,
+          cursor,
+          limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+        }),
+    });
+    for await (const page of pages) {
+      yield* page.data;
+    }
   }
 
   async create(input: CreateGatewayBudgetInput): Promise<GatewayBudget> {

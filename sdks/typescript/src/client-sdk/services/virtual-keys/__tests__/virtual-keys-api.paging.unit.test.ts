@@ -53,6 +53,13 @@ const queryOf = (call: number): string => {
   return url.slice(url.indexOf("?") + 1);
 };
 
+/** Reads an iterator to exhaustion and hands back every row it yielded. */
+const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+  const collected: T[] = [];
+  for await (const row of rows) collected.push(row);
+  return collected;
+};
+
 describe("VirtualKeysApiService cursor paging", () => {
   const previousApiKey = process.env.LANGWATCH_API_KEY;
   const previousEndpoint = process.env.LANGWATCH_ENDPOINT;
@@ -143,6 +150,73 @@ describe("VirtualKeysApiService cursor paging", () => {
       await expect(new VirtualKeysApiService().list()).rejects.toBeInstanceOf(
         VirtualKeysApiError,
       );
+    });
+  });
+
+  describe("iterate()", () => {
+    it("yields keys across pages without collecting the listing first", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(page(["a", "b"], "cursor-1")))
+        .mockResolvedValueOnce(jsonResponse(page(["c"], null)));
+
+      const keys = await drain(new VirtualKeysApiService().iterate());
+
+      expect(keys.map((k) => k.id)).toEqual(["a", "b", "c"]);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("reads a page only when the consumer reaches it", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(page(["a", "b"], "cursor-1")))
+        .mockResolvedValueOnce(jsonResponse(page(["c"], null)));
+
+      const keys = new VirtualKeysApiService().iterate();
+      // Constructing the iterator asks for nothing at all.
+      expect(mockFetch).not.toHaveBeenCalled();
+
+      await keys.next();
+      // Both rows of page one are in hand, so page two is still unread.
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      await keys.next();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      await keys.next();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("leaves the rest of the walk unread when the consumer stops early", async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse(page(["a", "b"], "cursor-1")),
+      );
+
+      const seen: string[] = [];
+      for await (const key of new VirtualKeysApiService().iterate()) {
+        seen.push(key.id);
+        break;
+      }
+
+      expect(seen).toEqual(["a"]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks for the wire's maximum page like the eager walk does", async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(page(["a"], null)));
+
+      await drain(new VirtualKeysApiService().iterate());
+
+      expect(queryOf(0)).toBe("limit=200");
+    });
+
+    it("raises rather than looping forever when the cursor chain never ends", async () => {
+      // A fresh Response per call: a body can only be read once.
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(jsonResponse(page(["a"], "stuck"))),
+      );
+
+      // The guard fires on the second page, long before this drains.
+      await expect(
+        drain(new VirtualKeysApiService().iterate()),
+      ).rejects.toBeInstanceOf(VirtualKeysApiError);
     });
   });
 

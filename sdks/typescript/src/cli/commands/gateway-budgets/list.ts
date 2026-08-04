@@ -60,7 +60,7 @@ export const listGatewayBudgetsCommand = async (
   const spinner = createSpinner("Fetching gateway budgets...").start();
 
   try {
-    const { budgets, spend_available } = await service.list({ scopeTypes });
+    const { data: budgets, spend_available } = await service.list({ scopeTypes });
 
     spinner.succeed(`Found ${budgets.length} budget${budgets.length !== 1 ? "s" : ""}`);
 

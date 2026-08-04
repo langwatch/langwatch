@@ -289,7 +289,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
    * must say so instead of ticking green.
    */
   async function fetchBudgetsAtRisk(): Promise<BudgetAtRisk[]> {
-    const { budgets, spend_available } = await new GatewayBudgetsApiService({
+    const { data: budgets, spend_available } = await new GatewayBudgetsApiService({
       endpoint,
       apiKey,
     }).list();

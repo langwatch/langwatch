@@ -2,6 +2,7 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   collectCursorPages,
+  walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
@@ -128,6 +129,14 @@ export class VirtualKeysApiError extends Error {
   }
 }
 
+/**
+ * Client for the gateway virtual-key surface (/api/gateway/v1).
+ *
+ * Entity types and the create/update bodies mirror the wire verbatim, so
+ * their fields are lowercase snake_case. Call options this SDK invents (query
+ * filters, per-call behaviour, action arguments) are camelCase like the rest
+ * of the SDK.
+ */
 export class VirtualKeysApiService {
   private readonly endpoint: string;
   private readonly apiKey: string;
@@ -152,6 +161,8 @@ export class VirtualKeysApiService {
   private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
+      // A hung control plane must fail the command, not freeze it.
+      signal: init?.signal ?? AbortSignal.timeout(30_000),
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
     });
     if (!response.ok) {
@@ -212,7 +223,7 @@ export class VirtualKeysApiService {
    *
    * `limit` sizes each request in the walk, it does NOT cap what comes back.
    * `cursor` resumes an interrupted walk. Take a single page with
-   * `listPage()`.
+   * `listPage()`, or stream the walk with `iterate()`.
    */
   async list(options?: {
     cursor?: string;
@@ -233,6 +244,36 @@ export class VirtualKeysApiService {
         }),
     });
     return pages.flatMap((page) => page.data);
+  }
+
+  /**
+   * Every visible virtual key, one row at a time, fetching each page only
+   * when the consumer reaches it. Stop early and the rest is never read,
+   * which `list()` cannot offer because it materialises the whole listing
+   * first. Raises rather than looping forever on a cursor chain that never
+   * ends, exactly like `list()`.
+   */
+  async *iterate(options?: {
+    cursor?: string;
+    limit?: number;
+  }): AsyncGenerator<VirtualKey> {
+    const pages = walkCursorPages<VirtualKeyPage>({
+      startCursor: options?.cursor,
+      nextCursorOf: (page) => page.next_cursor,
+      onEndlessWalk: (reason) =>
+        new VirtualKeysApiError(
+          `Failed to list virtual keys: ${reason}.`,
+          "list virtual keys",
+        ),
+      fetchPage: (cursor) =>
+        this.listPage({
+          cursor,
+          limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+        }),
+    });
+    for await (const page of pages) {
+      yield* page.data;
+    }
   }
 
   async get(id: string): Promise<VirtualKey> {
@@ -308,11 +349,11 @@ export class VirtualKeysApiService {
    */
   async spend(
     id: string,
-    window?: { from?: number; to?: number },
+    options?: { from?: number; to?: number },
   ): Promise<VirtualKeySpendSummary> {
     const params = new URLSearchParams();
-    if (window?.from !== undefined) params.set("from", String(window.from));
-    if (window?.to !== undefined) params.set("to", String(window.to));
+    if (options?.from !== undefined) params.set("from", String(options.from));
+    if (options?.to !== undefined) params.set("to", String(options.to));
     const query = params.size > 0 ? `?${params.toString()}` : "";
     return this.request<VirtualKeySpendSummary>(
       `read virtual key spend "${id}"`,

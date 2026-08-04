@@ -1979,11 +1979,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     webhooksCmd
-      .command("delete <id>")
-      .description("Archive an endpoint")
+      .command("archive <id>")
+      .description("Archive an endpoint (deliveries stop; history stays readable)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string) => {
-      const { deleteWebhookCommand: impl } = await import("./commands/webhooks/delete.js");
+      const { archiveWebhookCommand: impl } = await import("./commands/webhooks/archive.js");
       return impl(id);
     },
   );
@@ -2014,9 +2014,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     webhooksCmd
       .command("deliveries <id>")
       .description("The endpoint's delivery log with receiver status codes")
-      .option("--limit <n>", "Max attempts to return (default 50)")
+      .option("--cursor <cursor>", "Page cursor from the previous call")
+      .option("--limit <n>", "Attempts per page (default 50)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { limit?: string }) => {
+    async (id: string, options: { cursor?: string; limit?: string }) => {
       const { webhookDeliveriesCommand: impl } = await import("./commands/webhooks/deliveries.js");
       return impl(id, options);
     },
