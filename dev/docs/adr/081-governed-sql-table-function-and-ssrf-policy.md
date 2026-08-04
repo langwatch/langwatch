@@ -11,7 +11,7 @@ accepts native ClickHouse SQL from an authenticated API client and runs it
 against `analytics.*` as a single shared restricted database identity. Tenant
 isolation is carried by row policies keyed on a per-query capability, and
 read-only enforcement by `readonly = 1` in a settings profile — both provisioned
-by `langwatch/src/server/analytics/governed-sql/provisioning.ts` and proven
+by `platform/app/src/server/analytics/governed-sql/provisioning.ts` and proven
 against the deployed ClickHouse image by the isolation suite.
 
 ClickHouse **table functions** sit awkwardly inside that model. They are read
@@ -23,7 +23,7 @@ chooses — including a link-local metadata endpoint. `s3()`, `remote()`,
 reads the server's filesystem.
 
 We already refuse them once, on the ops EXPLAIN endpoint, with a name-list regex
-(`TABLE_FUNCTION_RE` in `langwatch/src/server/ops/explain-core.ts`). That guard
+(`TABLE_FUNCTION_RE` in `platform/app/src/server/ops/explain-core.ts`). That guard
 predates this API and covers a different, narrower surface.
 
 The database layer's behaviour here is **not uniform**, and the policy has to be
@@ -94,7 +94,7 @@ one-line fix rather than a mystery.
   is not a question anyone has to hold.
 - Widening this is a deliberate act with an obvious shape: add a rule to
   `NODE_RULES`/`TableExpression` in
-  `langwatch/src/server/analytics/governed-sql/validation/validate.ts`, and
+  `platform/app/src/server/analytics/governed-sql/validation/validate.ts`, and
   amend this ADR. It cannot happen by accident, and it cannot happen by a
   dependency upgrade.
 - The two guards say different things on purpose and must not be merged: the
@@ -107,7 +107,7 @@ one-line fix rather than a mystery.
 
 - Issue [#6480](https://github.com/langwatch/langwatch/issues/6480) — governed analytics SQL API
 - `specs/analytics/governed-sql-api.feature` — the behavioural contract
-- `langwatch/src/server/analytics/governed-sql/provisioning.ts` — the grants, row policies and settings profile
-- `langwatch/src/server/analytics/governed-sql/validation/validate.ts` — the default-deny AST walk
-- `langwatch/src/server/ops/explain-core.ts` — `TABLE_FUNCTION_RE`, the ops endpoint's separate name-list pre-check
+- `platform/app/src/server/analytics/governed-sql/provisioning.ts` — the grants, row policies and settings profile
+- `platform/app/src/server/analytics/governed-sql/validation/validate.ts` — the default-deny AST walk
+- `platform/app/src/server/ops/explain-core.ts` — `TABLE_FUNCTION_RE`, the ops endpoint's separate name-list pre-check
 - [ADR-045](./045-domain-errors-handled-boundary.md) — how the refusal reaches the caller

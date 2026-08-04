@@ -182,7 +182,7 @@ proving it cannot be probed.
 ## References
 
 - Issue: [#6480](https://github.com/langwatch/langwatch/issues/6480)
-- `langwatch/src/server/analytics/governed-sql/catalog/postgresViews.ts` — the six entries
-- `langwatch/src/server/analytics/governed-sql/views.ts` — `postgresTenantPredicate`
-- `langwatch/src/server/analytics/governed-sql/provisioning.ts` — approved views, engine tables, reader role
-- `langwatch/src/server/analytics/governed-sql/__tests__/postgresEngineIsolation.integration.test.ts` — the proof and the measurements
+- `platform/app/src/server/analytics/governed-sql/catalog/postgresViews.ts` — the six entries
+- `platform/app/src/server/analytics/governed-sql/views.ts` — `postgresTenantPredicate`
+- `platform/app/src/server/analytics/governed-sql/provisioning.ts` — approved views, engine tables, reader role
+- `platform/app/src/server/analytics/governed-sql/__tests__/postgresEngineIsolation.integration.test.ts` — the proof and the measurements

@@ -144,10 +144,10 @@ doubles aggregates, which is the failure mode nobody notices.
 
 ## References
 
-- `langwatch/src/server/analytics/governed-sql/catalog/` — the catalog and the
+- `platform/app/src/server/analytics/governed-sql/catalog/` — the catalog and the
   content-gating derivation
-- `langwatch/src/server/analytics/governed-sql/views.ts` — the generators, and
+- `platform/app/src/server/analytics/governed-sql/views.ts` — the generators, and
   the measurement on `SHIPPED_GOVERNED_DEDUP`
-- `langwatch/src/server/analytics/governed-sql/__tests__/governedViews.integration.test.ts`
+- `platform/app/src/server/analytics/governed-sql/__tests__/governedViews.integration.test.ts`
 - `specs/analytics/governed-sql-api.feature`
 - ADR-081 — the table-function and SSRF policy over the same identity

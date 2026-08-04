@@ -104,11 +104,11 @@ growth. Revisit if a consumer needs the intersection.
 
 ## References
 
-- `langwatch/src/server/analytics/governed-sql/diagnostics.ts` — the rules
-- `langwatch/src/server/analytics/governed-sql/validation/validate.ts` — the
+- `platform/app/src/server/analytics/governed-sql/diagnostics.ts` — the rules
+- `platform/app/src/server/analytics/governed-sql/validation/validate.ts` — the
   walk and the accept shape it records
-- `langwatch/src/server/analytics/governed-sql/__tests__/governedSqlDiagnostics.unit.test.ts`
-- `langwatch/src/app/api/analytics-sql/__tests__/governedSqlAnswerableQuestions.integration.test.ts`
+- `platform/app/src/server/analytics/governed-sql/__tests__/governedSqlDiagnostics.unit.test.ts`
+- `platform/app/src/app/api/analytics-sql/__tests__/governedSqlAnswerableQuestions.integration.test.ts`
   — every rule triggered through the public endpoint against a seeded fixture
 - `specs/analytics/governed-sql-api.feature`
 - ADR-082 — the governed views whose `dedup.keyColumns` the fanout rule reads as
