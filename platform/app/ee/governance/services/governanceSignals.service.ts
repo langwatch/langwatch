@@ -10,12 +10,14 @@ import type {
   VkLifecycleAction,
 } from "~/server/event-sourcing/pipelines/governance-events/schemas/commands";
 import { GOVERNANCE_EVENTS_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/governance-events/schemas/constants";
+import type {
+  BudgetSpendTarget,
+  GatewayBudgetClickHouseRepository,
+} from "~/server/gateway/budget.clickhouse.repository";
 import {
-  type BudgetSpendTarget,
   budgetPeriodFloorMs,
   currentPeriodStart,
-  type GatewayBudgetClickHouseRepository,
-} from "~/server/gateway/budget.clickhouse.repository";
+} from "~/server/gateway/budgetPeriod";
 import { SoftWarnPercent } from "./governanceSignals.constants";
 
 const logger = createLogger("langwatch:governance:signals");

@@ -16,6 +16,7 @@ import type {
   GatewayBudgetClickHouseRepository,
 } from "../budget.clickhouse.repository";
 import { GatewayBudgetService } from "../budget.service";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "../wireMoney";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {
@@ -52,10 +53,14 @@ function stubProjectBudget(): GatewayBudget {
 }
 
 function bucketsOf(...spends: string[]): BucketSpend[] {
-  return spends.map((spentUsd, i) => ({
-    scopeId: `vk_anchor:user${i + 1}`,
-    spentUsd,
-  }));
+  return spends.map((usd, i) => {
+    const spentNanoUsd = Number(usdToNanoUsd(usd));
+    return {
+      scopeId: `vk_anchor:user${i + 1}`,
+      spentNanoUsd,
+      spentUsd: nanoUsdToDecimalString(spentNanoUsd),
+    };
+  });
 }
 
 function mockPrisma(budgets: GatewayBudget[], boundaries: unknown[] = []) {

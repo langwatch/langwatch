@@ -1261,6 +1261,17 @@ const presentations = {
     title: "Budget not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  gateway_budget_cycle_anchor_invalid: {
+    // Names the window back, because the fix is to change one of the two:
+    // drop the anchor, or pick a window that rolls.
+    title: "That window can't start on a chosen date",
+    describe: (error) => {
+      const window = str(error, "window", "");
+      return window
+        ? `A ${window.toLowerCase()} budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.`
+        : "This budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.";
+    },
+  },
   gateway_scope_org_mismatch: {
     // Names the KIND of scope, never the id — the id belongs to a record in
     // another organization, which is exactly what this guard refuses to
@@ -1293,6 +1304,21 @@ const presentations = {
     describe: () =>
       "This deployment doesn't record spend per key, so there's no figure to show.",
   },
+  webhook_endpoint_not_found: {
+    // An archived endpoint reads the same as one that never existed, so the
+    // copy names archiving as the likely cause rather than only the typo.
+    title: "That webhook endpoint isn't there",
+    describe: () =>
+      "It may have been archived, or the id may belong to another organization. List your endpoints to see the ones that are live.",
+  },
+  webhook_endpoint_invalid: {
+    // Names the three things the endpoint form can get wrong, rather than
+    // echoing the server's sentence: `meta.message` on this code can carry
+    // an internal reason, and the customer channel is not where that goes.
+    title: "That webhook endpoint can't be saved",
+    describe: () =>
+      "Check the URL is reachable over HTTPS, that every subscribed event type is one the catalog lists, and that the delivery controls are inside their limits.",
+  },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that
     // governance events were never in it to begin with.
@@ -1310,6 +1336,16 @@ const presentations = {
         ? `Another record in this organization already uses "${externalId}". Pick a different one, or update that record instead.`
         : "Another record in this organization already uses it. Pick a different one, or update that record instead.";
     },
+  },
+  idempotency_error: {
+    // Two refusals share one code because the caller's next move is the same
+    // shape in both cases: stop reusing this key, or wait for the first
+    // request to land. `meta.reason` is what lets the copy say which.
+    title: "That idempotency key can't answer this request",
+    describe: (error) =>
+      str(error, "reason", "") === "in_progress"
+        ? "The first request sent with this key is still running. Wait a moment, then retry with the same key."
+        : "This key was already used for a different request. Send a new key, or repeat the original request exactly.",
   },
   cache_rule_not_found: {
     title: "Cache rule not found",

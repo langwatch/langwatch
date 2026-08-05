@@ -15,6 +15,7 @@ class PostApiAnalyticsTimeseriesBodyGroupBy(str, Enum):
     METADATA_USER_ID = "metadata.user_id"
     SENTIMENT_THUMBS_UP_DOWN = "sentiment.thumbs_up_down"
     TOPICS_TOPICS = "topics.topics"
+    TRACES_TRACE_NAME = "traces.trace_name"
 
     def __str__(self) -> str:
         return str(self.value)
