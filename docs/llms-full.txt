@@ -53378,7 +53378,7 @@ Settings can instead arrive through `extraEnvs` or `extraEnvFrom`, which the cha
 
 What the chart cannot check fails at the first send instead: a gateway configured through `extraEnvs`, which it is not allowed to look inside, or a referenced Secret that exists but holds an empty value. The message names the setting to fill in, and when a different gateway is fully configured it names that one too, which is what an install sees when it names one gateway and supplies another's settings:
 
-```
+```text wrap
 EMAIL_PROVIDER is "sendgrid" but it is not configured: set SENDGRID_API_KEY. Settings for "ses" are present, did you mean EMAIL_PROVIDER=ses?
 ```
 
