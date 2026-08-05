@@ -20,13 +20,21 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
   # size is 16384 on Apple silicon, not 4096: multiplying by the wrong constant
   # understates the compressor 4x and the governor never fires.
   #
-  # MACOS HAS NO CGROUPS, so there is no hard per-stack memory bound to set.
-  # What it has is `taskpolicy -b`, which moves a process into the throttled
-  # background band for CPU and IO. Inheritance covers processes forked AFTER
-  # the policy is set — it does NOT retroactively demote already-running
-  # children, and a live stack is precisely a tree of already-running children
-  # (vite, node, workers under the launcher). So demotion walks the process
-  # group; signalling the launcher alone would demote the launcher alone.
+  # DEMOTION, NOT A MEMORY BOUND — but not because a bound is impossible.
+  # `taskpolicy -m <MiB>` sets a jetsam memory limit and `-j` a jetsam
+  # priority, both at spawn. That is rejected on its merits rather than on
+  # impossibility: jetsam KILLS the process that breaches its limit, which is
+  # the lost-work outcome this whole design is arranged to avoid, and
+  # RunOnceBounded already covers the runaway case.
+  #
+  # What is used instead is `taskpolicy -b`, which moves a process into the
+  # throttled background band for CPU and IO, with `-B` to move it back out.
+  # `-p` applies both to an already-running process. But the inheritance
+  # guarantee covers children of a program LAUNCHED under the policy, not a
+  # tree that is already running — and a live stack is precisely a tree of
+  # already-running children (vite, node, workers under the launcher). So
+  # demotion walks the process group; signalling the launcher alone would
+  # demote the launcher alone.
 
   # --- Reading the machine ---
 
@@ -151,9 +159,12 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
   @integration @unimplemented
   Scenario: The doctor reports both ways a run can lose its cache
     When I run the doctor
-    Then it reports agent-driven parks whose wait crossed the prompt-cache floor
+    Then it reports agent-driven parks whose wait crossed that session's own cache floor
     And narrowed runs whose actual duration crossed it
     And interactive waits are counted in neither
+    # Both are expected to sit near zero, because a session on the one-hour
+    # cache has an hour of headroom and the existing failsafe stops well inside
+    # it. A number that is not near zero is the finding, not the baseline.
 
   # Those two counters are the ones that say whether this mechanism is a net
   # win, and there have to be two. A park past the floor means the wait ceiling

@@ -7,13 +7,18 @@ Feature: The gate prices an action before it silently invalidates a prompt cache
   # Second duty of `haven gate` (specs/claude/agent-admission-gate.feature).
   # Separate concern, same seam. See ADR-088.
   #
-  # THE BUST CONSTANT, from published rates. Prompt caching is a prefix match:
-  # any byte change in the prefix invalidates everything after it. A cache read
-  # costs 0.1x base input; a cache write costs 1.25x on the 5-minute TTL, 2x on
-  # the hour. So invalidating a prefix you were about to read costs the
-  # difference — 1.15x base input per token re-cached, or 1.9x on the hour TTL.
-  # On a 300k-token prefix at Opus 5's input rate that is roughly $1.73 or
-  # $2.85. Per bust. Per agent.
+  # THE BUST CONSTANT. Prompt caching is a prefix match: any byte change in the
+  # prefix invalidates everything after it. A cache read costs 0.1x base input;
+  # a cache write costs 2x on the one-hour TTL and 1.25x on the five-minute one.
+  # So invalidating a prefix you were about to read costs the difference.
+  #
+  # WHICH LIFETIME IS NOT A GUESS ANY MORE. A probe of a headless session
+  # reports its writes as ephemeral_1h_input_tokens with ephemeral_5m at zero:
+  # Claude Code takes the ONE-HOUR TTL. So the figure that matters here is a
+  # 1.9x premium — about $2.85 on a 300k-token prefix at Opus 5's input rate,
+  # not the $1.73 the five-minute rate gives. Sessions in usage overage fall
+  # back to the five-minute TTL and its 1.15x premium, which is why the warning
+  # below reads the lifetime rather than assuming one.
   #
   # THE WARNINGS ARE FOR THE DEVELOPER, NOT THE MODEL. There is no primitive
   # that shows the model a price and still lets the action proceed: a system
@@ -87,10 +92,10 @@ Feature: The gate prices an action before it silently invalidates a prompt cache
     Given the session's cached prefix is above the threshold
     When a cache-invalidating action is priced
     Then the report names the approximate size of the prefix and what re-caching it costs
-    And it names which cache lifetime the figure assumes
-    # The two lifetimes differ by nearly a factor of two, and which one a session
-    # is using is not something the gate can read. Quoting a figure without
-    # naming its assumption is half a warning.
+    And the figure is priced against the cache lifetime that session is actually using
+    # The two lifetimes differ by nearly a factor of two, and the session's own
+    # recent cache writes say which one is in force, so the gate reads it rather
+    # than quoting a range.
 
   @unit @unimplemented
   Scenario: The prefix size is a cheap approximation, and says so
