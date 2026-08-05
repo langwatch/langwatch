@@ -5,7 +5,7 @@ Feature: Recent Items Backend
   So that I can quickly jump back to what I was working on
 
   # Most scenarios bound via existing
-  # `langwatch/src/server/home/__tests__/recent-items.integration.test.ts`.
+  # `platform/app/src/server/home/__tests__/recent-items.integration.test.ts`.
   # The remaining @unimplemented scenarios (monitor/annotation extraction,
   # ordering, dedup, deep-link URLs) need additional cases in that same
   # file — the audit-log → entity-resolver pipeline is fully functional

@@ -53,6 +53,7 @@ func TestCodeBlock_StdoutCaptured(t *testing.T) {
 	assert.Contains(t, res.Stdout, "hello-stdout")
 }
 
+// @scenario "A declared output the code never returns fails the run"
 func TestCodeBlock_MissingDeclaredOutput(t *testing.T) {
 	requirePython(t)
 	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
@@ -159,18 +160,21 @@ func TestCodeBlock_SyntaxErrorReported(t *testing.T) {
 	assert.Contains(t, res.Error.Type, "SyntaxError")
 }
 
+// @scenario "Exceeding the wall-clock budget is reported as a timeout"
 func TestCodeBlock_TimeoutKillsSubprocess(t *testing.T) {
 	requirePython(t)
 	start := time.Now()
 	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
-		Code:    "def execute():\n    import time\n    time.sleep(10)\n    return {'ok': True}\n",
-		Timeout: 500 * time.Millisecond,
+		Code:            "def execute():\n    import time\n    time.sleep(10)\n    return {'ok': True}\n",
+		DeclaredOutputs: []string{"ok"},
+		Timeout:         500 * time.Millisecond,
 	})
 	elapsed := time.Since(start)
 	require.NoError(t, err)
 	assert.True(t, res.TimedOut)
 	require.NotNil(t, res.Error)
 	assert.Equal(t, "Timeout", res.Error.Type)
+	assert.Empty(t, res.Outputs, "a timed-out run must not surface outputs")
 	assert.Less(t, elapsed, 3*time.Second, "subprocess must die promptly")
 }
 

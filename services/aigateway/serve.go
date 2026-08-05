@@ -65,6 +65,12 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		lifecycle.Worker("statusprobe", statusMon.Start, statusMon.Stop),
 		lifecycle.ListenServer("http", srv),
 	)
+	if deps.SpendDrainer != nil {
+		g.Add(lifecycle.Worker("spend-drainer", deps.SpendDrainer.Start, deps.SpendDrainer.Stop))
+	}
+	if deps.SpendSpool != nil {
+		g.Add(lifecycle.Closer("spend-spool", func(context.Context) error { return deps.SpendSpool.Close() }))
+	}
 	return g.Run(ctx)
 }
 

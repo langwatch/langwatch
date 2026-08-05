@@ -128,3 +128,120 @@ Feature: AI Gateway — OpenAI client-param compatibility translation
     # gpt-4o-via-alias requests flow to gpt-5-mini with both the model
     # substitution AND the param translation. Too policy-heavy for v1.1 —
     # defer to v2 behind an explicit VK-config opt-in.
+
+  # ============================================================================
+  # Translated lanes: the client's output cap must survive translation
+  # ============================================================================
+
+  # Everything above is about the RAW-FORWARD lanes (OpenAI, Azure, vLLM),
+  # where the gateway passes the body through and upstream applies its own
+  # param rules. The lanes below are different: for Anthropic, Bedrock,
+  # Gemini and Vertex the gateway PARSES the OpenAI-shape body and builds
+  # the provider-native request itself, so param fidelity is the gateway's
+  # own responsibility. Bifrost's neutral ChatParameters carries the cap
+  # only as max_completion_tokens; a client's legacy max_tokens used to
+  # unmarshal into nothing, the Anthropic and Bedrock translators found no
+  # cap and substituted the model's own maximum (Anthropic's Messages API
+  # requires max_tokens, so a default was injected; Bedrock omitted
+  # inferenceConfig.maxTokens). Result observed on the production canary:
+  # max_tokens: 5 answered with 26 to 28 completion tokens and
+  # finish_reason "stop". A client-set cap is a guarantee, not a hint:
+  # dropping it silently breaks cost control on exactly the lanes where
+  # the gateway is the one writing the provider request.
+
+  Rule: Translated lanes honor the client's output cap
+
+    @unit
+    Scenario: translated lanes map legacy max_tokens onto the provider request
+      When a client POSTs /v1/chat/completions with max_tokens 5 toward an anthropic, bedrock, gemini, or vertex credential
+      Then the parsed provider request carries the client's cap as its native max-tokens field
+      And the provider stops generation at the cap, surfacing finish_reason "length"
+
+    @unit
+    Scenario: explicit max_completion_tokens wins over the max_tokens alias
+      When a client sends both max_tokens 5 and max_completion_tokens 9
+      Then the provider request carries 9
+      # max_tokens is OpenAI's deprecated alias for max_completion_tokens;
+      # when both arrive, the explicit modern field is authoritative.
+
+    @unit
+    Scenario: a malformed max_tokens is rejected, not silently un-capped
+      When a client sends max_tokens "five" or 5.7 toward a translated lane
+      Then the gateway responds 400 bad_request
+      And nothing is dispatched upstream
+      # Mirrors the strictness of max_completion_tokens, which is typed as
+      # an integer and already rejects malformed values at parse time.
+
+  Rule: Every parameter has an explicit disposition per translated lane
+
+    # The parameter policy table (adapters/providers/param_policy.go) is
+    # the single source of truth: every OpenAI chat-completions parameter
+    # is mapped, dropped with a signal, or refused, per lane. Raw-forward
+    # lanes bypass it entirely. The docs page
+    # docs/ai-gateway/parameter-mapping.mdx renders the table and a parity
+    # test keeps the two in sync.
+
+    @unit
+    Scenario: tier-3 params are dropped with a signal by default
+      When a client sends a tuning param the lane cannot map (seed, logit_bias, user, ...) with drop_tuning_params unset
+      Then the request proceeds without the param
+      And the response carries extra_fields.params_dropped naming it
+      And the X-LangWatch-Params-Dropped response header carries the same list
+      And the gateway span records langwatch.gateway.params_dropped
+
+    @unit
+    Scenario: drop_tuning_params false refuses any unmappable param
+      When a client sends seed toward anthropic with drop_tuning_params false
+      Then the gateway responds 400 unsupported_parameter
+      And the message names the param, the lane, and how to proceed
+
+    @unit
+    Scenario: contract params always refuse, drop_tuning_params cannot drop them
+      When a client sends response_format json_object toward anthropic or bedrock, or logprobs toward anthropic or bedrock, or legacy functions, or tool_choice allowed_tools, or reasoning_effort toward a Bedrock family with no reasoning mapping
+      Then the gateway responds 400 unsupported_parameter regardless of drop_tuning_params
+      And the message explains the functional dependency
+
+    @unit
+    Scenario: a named tool_choice must reference a tool in the request
+      When tool_choice names a function absent from tools on a translated lane
+      Then the gateway refuses with the missing name instead of letting the provider fail downstream
+
+    @unit
+    Scenario: top_p with temperature is dropped visibly on Anthropic models
+      When a client sends both temperature and top_p toward an Anthropic model on the anthropic or bedrock lane
+      Then top_p is dropped with a signal and temperature wins
+      And strict mode refuses the combination instead
+      # Verified live: Anthropic models hard-400 the pair ("temperature and
+      # top_p cannot both be specified"), so a faithful both-params mapping
+      # does not exist; the previous behavior was the same drop, silent.
+
+    @unit
+    Scenario: a thinking-exhausted cap yields finish_reason length, not an empty 200
+      Given a gemini request whose thinking consumes the whole completion cap
+      When the provider answers with no content parts
+      Then the response carries one choice with finish_reason "length" and empty content
+      And usage stays intact
+      # Previously: HTTP 200 with choices null, usage billed, no signal.
+
+    @unit
+    Scenario: the managed Bedrock endpoint maps reasoning and json_schema like public bedrock
+      When a request with reasoning_effort or response_format json_schema dispatches over the Bedrock VPCE path
+      Then additionalModelRequestFields carries the same thinking and output_config shapes bifrost's bedrock translator emits
+      And no output cap the caller never sent is force-set
+
+    @live
+    Scenario Outline: client cap verifiably bounds output on the anthropic and bedrock lanes
+      When a client POSTs /v1/chat/completions toward <provider> with <cap_field> 16 asking for a long answer, <mode>
+      Then the response carries usage.completion_tokens <= 16
+      And the finish reason is "length"
+
+      Examples:
+        | provider  | cap_field             | mode      |
+        | anthropic | max_tokens            | sync      |
+        | anthropic | max_tokens            | streaming |
+        | anthropic | max_completion_tokens | sync      |
+        | anthropic | max_completion_tokens | streaming |
+        | bedrock   | max_tokens            | sync      |
+        | bedrock   | max_tokens            | streaming |
+        | bedrock   | max_completion_tokens | sync      |
+        | bedrock   | max_completion_tokens | streaming |

@@ -12,7 +12,7 @@ Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The ch
 - `kubectl` configured for your cluster
 - A StorageClass that supports dynamic provisioning (for persistent volumes)
 - A domain name (for Ingress with TLS)
-- **Default resource requirements:** ~6 CPU and ~18 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
+- **Default resource requirements:** ~5 CPU and ~17 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
 
 ## Quick Start
 
@@ -49,7 +49,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 
 ## Low-Resources Deployment
 
-The default install requests ~6 CPU and ~18 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2 CPU and ~4 Gi RAM**:
+The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
 
 ```bash
 curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
@@ -178,7 +178,12 @@ clickhouse:
     # its password key.
     existingSecret: langwatch-clickhouse-creds
 
-# Ingress with TLS
+# Ingress with TLS.
+#
+# `/api/internal` is hard-blocked at the edge by default (ingress.blockedPaths)
+# so the private control plane is never internet-reachable. Blocked requests
+# answer 503 on ingress-nginx. See the Security guide for the opt-out, the
+# AWS/GKE caveat, and what the block does not cover.
 ingress:
   enabled: true
   className: nginx

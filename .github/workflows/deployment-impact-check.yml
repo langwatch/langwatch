@@ -16,7 +16,7 @@ on:
       - "services/**"
       - "dev/docs/adr/**"
       - "dev/docs/best_practices/**"
-      - "langwatch/.env.example"
+      - "platform/app/.env.example"
       - "docs/self-hosting/**"
 
 permissions:

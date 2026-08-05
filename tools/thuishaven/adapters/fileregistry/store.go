@@ -190,7 +190,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return os.Rename(tmpName, path)
 }
 
-// WriteOverlay writes langwatch/.env.portless. Mode 0o600: it carries
+// WriteOverlay writes platform/app/.env.portless. Mode 0o600: it carries
 // LANGWATCH_API_KEY, so it must not be world-readable.
 func (s *Store) WriteOverlay(lwDir string, st domain.Stack) error {
 	return os.WriteFile(filepath.Join(lwDir, ".env.portless"), []byte(st.OverlayFile()), 0o600)

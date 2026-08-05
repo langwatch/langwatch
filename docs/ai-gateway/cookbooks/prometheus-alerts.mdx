@@ -85,10 +85,23 @@ groups:
             =true on the client.
             See /ai-gateway/streaming#usage-extraction-critical-for-streaming-budgets.
 
-      # The gateway does not debit budgets. Cost rides the OTel span and the
-      # control plane's trace-fold reactor writes the ClickHouse ledger, so
-      # there is no gateway-side queue to alert on. The signal that
-      # enforcement is actually firing is the block counter below.
+      - alert: SpendSpoolDrops
+        expr: |
+          sum by (reason) (rate(gateway_spend_spool_dropped_total[10m])) > 0
+        for: 10m
+        labels: { severity: page, team: ai-platform }
+        annotations:
+          summary: "Gateway spend records dropped (reason={{ $labels.reason }})"
+          description: |
+            Budget debits are written from the spend records this pod spools,
+            so a dropped record is spend nobody bills and no budget enforces
+            against. reason=intake means the pod produced faster than the
+            spool could write; reason=overflow means the drainer is not
+            shipping fast enough and the oldest segments were deleted to stay
+            inside the size bound. Check the control plane's spend-command
+            ingest is reachable and returning 2xx
+            (gateway_control_plane_requests_total).
+
       - alert: BudgetBlockSpike
         expr: |
           sum by (scope) (rate(gateway_budget_blocks_total[10m])) > 1
@@ -123,9 +136,9 @@ groups:
 
       # Note: the registry carries no per-request cost metric, by design.
       # Cost anomalies are easier to derive from the ledger table in the
-      # control-plane warehouse than from Prometheus, since cost attribution
-      # happens control-plane side when the trace-fold reactor folds the span.
-      # See /gateway/usage UI for the visual equivalent.
+      # control-plane warehouse than from Prometheus, since attribution
+      # happens control-plane side when the spend commands are folded into
+      # debits. See /gateway/usage UI for the visual equivalent.
 
       # ─── Blocked-by-policy noise ────────────────────────────────────────
 

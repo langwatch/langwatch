@@ -3,8 +3,8 @@
 # See dev/docs/adr/027-trace-drawer-code-highlighting.md for the rationale.
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts   (eager base, ensureLanguageLoaded, normalizeShikiLang)
-#   langwatch/src/features/traces-v2/components/TraceDrawer/markdownView/ShikiHighlight.tsx (ShikiCodeBlock + render-gating hook)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts   (eager base, ensureLanguageLoaded, normalizeShikiLang)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/markdownView/ShikiHighlight.tsx (ShikiCodeBlock + render-gating hook)
 #
 # Related specs (same Shiki highlighting path, all governed by ADR-027):
 #   specs/traces-v2/attribute-value-readability.feature — JSON via the shared Shiki renderer

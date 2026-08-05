@@ -29,10 +29,10 @@ Feature: Per-tool path policy - an org admin enables or disables each langwatch 
     - specs/ai-gateway/governance/ingest-api-key-lifecycle.feature (Path B mint)
 
   Implementation lives under:
-    - langwatch/ee/governance/services/platformToolPolicy.service.ts   (resolve + upsert)
-    - langwatch/ee/governance/routers/platformToolPolicy.ts            (tRPC list/update)
-    - langwatch/ee/governance/services/cliBootstrap.service.ts         (login payload)
-    - typescript-sdk/src/cli/utils/governance/platform-tool-policy.ts  (CLI resolver)
+    - platform/app/ee/governance/services/platformToolPolicy.service.ts   (resolve + upsert)
+    - platform/app/ee/governance/routers/platformToolPolicy.ts            (tRPC list/update)
+    - platform/app/ee/governance/services/cliBootstrap.service.ts         (login payload)
+    - sdks/typescript/src/cli/utils/governance/platform-tool-policy.ts  (CLI resolver)
 
   Background:
     Given the user is signed in as an org admin of "acme-corp"
