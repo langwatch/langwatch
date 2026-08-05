@@ -2786,6 +2786,558 @@
         "description": "Delete a default-model config. Scope attachments cascade."
       }
     },
+    "/api/teams": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiTeams",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          }
+        ],
+        "description": "List all non-archived teams for the organization (paginated)"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiTeams",
+        "parameters": [],
+        "description": "Create a new team that can group projects and members",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/teams/{id}": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiTeamsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Get a team by its id"
+      },
+      "patch": {
+        "responses": {},
+        "operationId": "patchApiTeamsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Update a team by its id",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiTeamsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Archive a team (soft-delete)"
+      }
+    },
+    "/api/teams/{id}/members": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiTeamsByIdMembers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "List members of a team"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiTeamsByIdMembers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Add a member to a team",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "ADMIN",
+                      "MEMBER",
+                      "VIEWER",
+                      "CUSTOM"
+                    ],
+                    "default": "MEMBER"
+                  }
+                },
+                "required": [
+                  "userId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/teams/{id}/members/{userId}": {
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiTeamsByIdMembersByUserId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "userId",
+            "required": true
+          }
+        ],
+        "description": "Remove a member from a team"
+      }
+    },
+    "/api/teams/{id}/projects": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiTeamsByIdProjects",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "List projects in a team"
+      }
+    },
+    "/api/groups": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiGroups",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          }
+        ],
+        "description": "List all groups for the organization"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiGroups",
+        "parameters": [],
+        "description": "Create a new group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "bindings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "ADMIN",
+                            "MEMBER",
+                            "VIEWER",
+                            "CUSTOM"
+                          ]
+                        },
+                        "customRoleId": {
+                          "type": "string"
+                        },
+                        "scopeType": {
+                          "type": "string",
+                          "enum": [
+                            "ORGANIZATION",
+                            "TEAM",
+                            "PROJECT"
+                          ]
+                        },
+                        "scopeId": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "scopeType",
+                        "scopeId"
+                      ]
+                    }
+                  },
+                  "memberIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups/{id}": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiGroupsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Get a group with members and bindings"
+      },
+      "patch": {
+        "responses": {},
+        "operationId": "patchApiGroupsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Rename a group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiGroupsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Delete a group"
+      }
+    },
+    "/api/groups/{id}/members": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiGroupsByIdMembers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "List members of a group"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiGroupsByIdMembers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Add a member to a group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "userId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups/{id}/members/{userId}": {
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiGroupsByIdMembersByUserId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "userId",
+            "required": true
+          }
+        ],
+        "description": "Remove a member from a group"
+      }
+    },
+    "/api/groups/{id}/bindings": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiGroupsByIdBindings",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "List role bindings for a group"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiGroupsByIdBindings",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Add a role binding to a group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "ADMIN",
+                      "MEMBER",
+                      "VIEWER",
+                      "CUSTOM"
+                    ]
+                  },
+                  "customRoleId": {
+                    "type": "string"
+                  },
+                  "scopeType": {
+                    "type": "string",
+                    "enum": [
+                      "ORGANIZATION",
+                      "TEAM",
+                      "PROJECT"
+                    ]
+                  },
+                  "scopeId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "role",
+                  "scopeType",
+                  "scopeId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups/{id}/bindings/{bindingId}": {
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiGroupsByIdBindingsByBindingId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "bindingId",
+            "required": true
+          }
+        ],
+        "description": "Remove a role binding from a group"
+      }
+    },
     "/api/agents": {
       "get": {
         "responses": {},
@@ -7408,6 +7960,17 @@
         "responses": {
           "201": {
             "description": "Virtual key created",
+            "headers": {
+              "X-Idempotent-Replay": {
+                "description": "Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -7699,6 +8262,50 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -7748,9 +8355,21 @@
         "tags": [
           "Virtual Keys"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key.",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 255
+            }
+          }
+        ],
         "summary": "Create virtual key",
-        "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.",
+        "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -8808,7 +9427,7 @@
           }
         ],
         "summary": "Update virtual key",
-        "description": "Partial update — send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
+        "description": "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -9452,7 +10071,7 @@
           }
         ],
         "summary": "Read a virtual key's spend",
-        "description": "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key."
+        "description": "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key."
       }
     },
     "/api/gateway/v1/virtual-keys/{id}/rotate": {
@@ -11474,10 +12093,19 @@
                             }
                           },
                           "current_period_started_at": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's."
                           },
                           "resets_at": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own."
+                          },
+                          "cycle_anchor_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                           },
                           "last_reset_at": {
                             "type": [
@@ -11523,6 +12151,7 @@
                           "metadata",
                           "current_period_started_at",
                           "resets_at",
+                          "cycle_anchor_at",
                           "last_reset_at",
                           "archived_at",
                           "created_at"
@@ -11768,12 +12397,23 @@
           }
         ],
         "summary": "List budgets",
-        "description": "Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals."
+        "description": "Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and `spent_nano_usd` are null because one allowance per person has no single total to report; each person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means spend could not be totalled at all, and both fields are null for that reason instead, rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals."
       },
       "post": {
         "responses": {
           "201": {
             "description": "Budget created",
+            "headers": {
+              "X-Idempotent-Replay": {
+                "description": "Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -11881,10 +12521,19 @@
                           }
                         },
                         "current_period_started_at": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's."
                         },
                         "resets_at": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own."
+                        },
+                        "cycle_anchor_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -11930,6 +12579,7 @@
                         "metadata",
                         "current_period_started_at",
                         "resets_at",
+                        "cycle_anchor_at",
                         "last_reset_at",
                         "archived_at",
                         "created_at"
@@ -12075,6 +12725,50 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -12124,9 +12818,21 @@
         "tags": [
           "Budgets"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key.",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 255
+            }
+          }
+        ],
         "summary": "Create budget",
-        "description": "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.",
+        "description": "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a retry safe.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -12321,6 +13027,11 @@
                       "type": "string",
                       "maxLength": 500
                     }
+                  },
+                  "cycle_anchor_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Phases the budget's cycle off this instant instead of the calendar, so a `month` budget anchored 2026-01-17T09:00:00Z starts a fresh period every 17th at 09:00 UTC. Omit for calendar alignment, which is the default and unchanged behaviour. A month cycle anchored past the 28th clamps into shorter months and springs back: anchored on the 31st gives Feb 28, then Mar 31. Immutable after create, since moving it would redraw periods the budget has already reported and enforced on. Rejected with `gateway_budget_cycle_anchor_invalid` on `total` and `manual`, which do not cycle."
                   }
                 },
                 "required": [
@@ -12447,10 +13158,19 @@
                           }
                         },
                         "current_period_started_at": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's."
                         },
                         "resets_at": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own."
+                        },
+                        "cycle_anchor_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -12496,6 +13216,7 @@
                         "metadata",
                         "current_period_started_at",
                         "resets_at",
+                        "cycle_anchor_at",
                         "last_reset_at",
                         "archived_at",
                         "created_at"
@@ -12749,7 +13470,7 @@
           }
         ],
         "summary": "Get budget",
-        "description": "One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend."
+        "description": "One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend. A per-person template reports null there too, because one allowance per person has no single total; each person's figure is in `GET /spend-summaries` and the seat buckets."
       },
       "patch": {
         "responses": {
@@ -12862,10 +13583,19 @@
                           }
                         },
                         "current_period_started_at": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's."
                         },
                         "resets_at": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own."
+                        },
+                        "cycle_anchor_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -12911,6 +13641,7 @@
                         "metadata",
                         "current_period_started_at",
                         "resets_at",
+                        "cycle_anchor_at",
                         "last_reset_at",
                         "archived_at",
                         "created_at"
@@ -13116,7 +13847,7 @@
           }
         ],
         "summary": "Update budget",
-        "description": "Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.",
+        "description": "Partial update. Scope, window and cycle_anchor_at are immutable after create. Use explicit null to clear timezone / description.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -13296,10 +14027,19 @@
                           }
                         },
                         "current_period_started_at": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's."
                         },
                         "resets_at": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own."
+                        },
+                        "cycle_anchor_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -13345,6 +14085,7 @@
                         "metadata",
                         "current_period_started_at",
                         "resets_at",
+                        "cycle_anchor_at",
                         "last_reset_at",
                         "archived_at",
                         "created_at"
@@ -13550,7 +14291,7 @@
           }
         ],
         "summary": "Archive budget",
-        "description": "Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained."
+        "description": "Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained."
       }
     },
     "/api/gateway/v1/budgets/{id}/reset": {
@@ -13665,10 +14406,19 @@
                           }
                         },
                         "current_period_started_at": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's."
                         },
                         "resets_at": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own."
+                        },
+                        "cycle_anchor_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -13714,6 +14464,7 @@
                         "metadata",
                         "current_period_started_at",
                         "resets_at",
+                        "cycle_anchor_at",
                         "last_reset_at",
                         "archived_at",
                         "created_at"
@@ -14753,6 +15504,17 @@
         "responses": {
           "201": {
             "description": "Created",
+            "headers": {
+              "X-Idempotent-Replay": {
+                "description": "Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -14984,6 +15746,50 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -15033,9 +15839,21 @@
         "tags": [
           "Cache Rules"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key.",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 255
+            }
+          }
+        ],
         "summary": "Create a cache rule",
-        "description": "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.",
+        "description": "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll. Send `Idempotency-Key` to make a retry safe.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -16107,7 +16925,7 @@
           }
         ],
         "summary": "Archive a cache rule",
-        "description": "Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row."
+        "description": "Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row."
       }
     },
     "/api/governance/ingestion-templates": {
@@ -26204,7 +27022,8 @@
                     "default": 1
                   },
                   "evaluatorId": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "level": {
                     "type": "string",
@@ -26813,7 +27632,8 @@
                     "type": [
                       "string",
                       "null"
-                    ]
+                    ],
+                    "minLength": 1
                   },
                   "level": {
                     "type": "string",
@@ -35790,6 +36610,17 @@
         "responses": {
           "201": {
             "description": "The endpoint, with the signing secret this body alone carries",
+            "headers": {
+              "X-Idempotent-Replay": {
+                "description": "Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -36024,6 +36855,50 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -36070,8 +36945,24 @@
           }
         },
         "operationId": "postApiWebhooksV1Endpoints",
-        "parameters": [],
-        "description": "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one.",
+        "tags": [
+          "Webhooks"
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key.",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 255
+            }
+          }
+        ],
+        "summary": "Create a webhook endpoint",
+        "description": "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -36395,7 +37286,11 @@
           }
         },
         "operationId": "getApiWebhooksV1Endpoints",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [],
+        "summary": "List webhook endpoints",
         "description": "List the organization's webhook endpoints"
       }
     },
@@ -36724,6 +37619,9 @@
           }
         },
         "operationId": "getApiWebhooksV1EndpointsById",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -36734,6 +37632,7 @@
             "required": true
           }
         ],
+        "summary": "Get a webhook endpoint",
         "description": "Get one webhook endpoint"
       },
       "patch": {
@@ -37060,6 +37959,9 @@
           }
         },
         "operationId": "patchApiWebhooksV1EndpointsById",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -37070,6 +37972,7 @@
             "required": true
           }
         ],
+        "summary": "Update a webhook endpoint",
         "description": "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
         "requestBody": {
           "content": {
@@ -37365,6 +38268,9 @@
           }
         },
         "operationId": "deleteApiWebhooksV1EndpointsById",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -37375,6 +38281,7 @@
             "required": true
           }
         ],
+        "summary": "Archive a webhook endpoint",
         "description": "Archive a webhook endpoint"
       }
     },
@@ -37707,6 +38614,9 @@
           }
         },
         "operationId": "postApiWebhooksV1EndpointsByIdRoll-secret",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -37717,6 +38627,7 @@
             "required": true
           }
         ],
+        "summary": "Roll an endpoint's signing secret",
         "description": "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately."
       }
     },
@@ -37984,6 +38895,9 @@
           }
         },
         "operationId": "postApiWebhooksV1EndpointsByIdTest",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -37994,6 +38908,7 @@
             "required": true
           }
         ],
+        "summary": "Send a test event to an endpoint",
         "description": "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code."
       }
     },
@@ -38306,6 +39221,9 @@
           }
         },
         "operationId": "getApiWebhooksV1EndpointsByIdDeliveries",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -38334,6 +39252,7 @@
             "required": true
           }
         ],
+        "summary": "List an endpoint's delivery attempts",
         "description": "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error"
       }
     },
@@ -38649,6 +39568,9 @@
           }
         },
         "operationId": "getApiWebhooksV1EndpointsByIdHealth",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -38659,6 +39581,7 @@
             "required": true
           }
         ],
+        "summary": "Read an endpoint's delivery health",
         "description": "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour."
       }
     },
@@ -38888,7 +39811,11 @@
           }
         },
         "operationId": "getApiWebhooksV1Event-types",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [],
+        "summary": "List subscribable event types",
         "description": "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet"
       }
     },
@@ -39127,6 +40054,9 @@
           }
         },
         "operationId": "getApiWebhooksV1Events",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -39172,6 +40102,7 @@
             }
           }
         ],
+        "summary": "List emitted events",
         "description": "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly."
       }
     },
@@ -39443,6 +40374,9 @@
           }
         },
         "operationId": "getApiWebhooksV1EventsById",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -39453,6 +40387,7 @@
             "required": true
           }
         ],
+        "summary": "Get one emitted event",
         "description": "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids."
       }
     },
@@ -39727,6 +40662,9 @@
           }
         },
         "operationId": "getApiGatewayV1Spend-summaries",
+        "tags": [
+          "Gateway Spend"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -39799,6 +40737,7 @@
             "required": false
           }
         ],
+        "summary": "List spend summaries",
         "description": "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more."
       }
     },
@@ -40167,6 +41106,9 @@
           }
         },
         "operationId": "getApiGatewayV1Spend-events",
+        "tags": [
+          "Gateway Spend"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -40265,6 +41207,7 @@
             "required": false
           }
         ],
+        "summary": "List spend events",
         "description": "Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill."
       }
     },
@@ -40582,6 +41525,9 @@
           }
         },
         "operationId": "getApiGatewayV1End-usersByIdSpend",
+        "tags": [
+          "Gateway Spend"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -40630,6 +41576,7 @@
             "required": true
           }
         ],
+        "summary": "Read one end user's spend",
         "description": "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then."
       }
     },
@@ -40864,7 +41811,11 @@
           }
         },
         "operationId": "postApiGatewayV1Spend-eventsReplay",
+        "tags": [
+          "Gateway Spend"
+        ],
         "parameters": [],
+        "summary": "Replay spend events to an endpoint",
         "description": "Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.",
         "requestBody": {
           "content": {

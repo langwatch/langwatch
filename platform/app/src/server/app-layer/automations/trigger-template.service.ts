@@ -58,6 +58,10 @@ export interface TriggerNotifier {
     url: string;
     method: "POST" | "PUT" | "PATCH";
     headers: Record<string, string>;
+    /** Decrypted signing secrets, newest first. A test fire signs exactly as
+     *  a real one does, so an author can point it at their receiver's
+     *  verification before the trigger goes live. Empty sends unsigned. */
+    signingSecrets?: readonly string[];
     body: string;
     triggerName: string;
   }): Promise<{ status: number }>;
@@ -203,6 +207,20 @@ export interface TestFireReportInput {
   scheduleLabel?: string;
 }
 
+/** The webhook channel's test-fire destination (ADR-040): the full request
+ *  shape, body template included, since it lives in `actionParams` rather
+ *  than the four Trigger template columns. */
+export interface TestFireWebhookDestination {
+  url: string;
+  method: "POST" | "PUT" | "PATCH";
+  headers: Record<string, string>;
+  /** Resolved server-side from the saved trigger, never sent by the browser.
+   *  Absent sends the test fire unsigned, which is what a trigger with no
+   *  configured secret does. */
+  signingSecrets?: readonly string[];
+  bodyTemplate: string | null;
+}
+
 export interface TestFireTriggerInput {
   channel: TemplateChannel;
   trigger: DraftIdentity;
@@ -216,12 +234,7 @@ export interface TestFireTriggerInput {
   /** Present for the webhook channel (ADR-040): the full request shape,
    *  body template included — it lives in `actionParams`, not the four
    *  Trigger template columns, so it rides its own field here. */
-  webhookDestination?: {
-    url: string;
-    method: "POST" | "PUT" | "PATCH";
-    headers: Record<string, string>;
-    bodyTemplate: string | null;
-  } | null;
+  webhookDestination?: TestFireWebhookDestination | null;
   /** Present when the draft is a custom-graph alert. */
   graphAlert?: TestFireGraphAlertInput | null;
   /** Present when the draft is a scheduled report. */
@@ -357,7 +370,8 @@ export async function testFireTrigger(
         "This automation has no endpoint URL to test-fire to.",
       );
     }
-    const { url, method, headers, bodyTemplate } = input.webhookDestination;
+    const { url, method, headers, signingSecrets, bodyTemplate } =
+      input.webhookDestination;
     const rendered = await renderWebhookBody({
       template: bodyTemplate,
       context,
@@ -370,6 +384,7 @@ export async function testFireTrigger(
       url,
       method,
       headers,
+      signingSecrets,
       body: rendered.body,
       triggerName: trigger.name,
     });

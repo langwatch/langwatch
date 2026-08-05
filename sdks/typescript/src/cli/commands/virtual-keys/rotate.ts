@@ -11,10 +11,9 @@ import type { CommandResult } from "../../utils/output";
  * in whatever format the caller asked for (utils/output.ts).
  *
  * `data` deliberately includes the new `secret`, for the same reason create
- * does: rotation is the only moment it exists, the old secret stops working
- * immediately, and the human output already prints it in full — as did the
- * previous `--format json` branch. A rotate that withheld the new secret from
- * a scripted caller would break the very deployment it was rotating.
+ * does: rotation is the only moment it exists, and the human output already
+ * prints it in full. A rotate that withheld the new secret from a scripted
+ * caller would break the very deployment it was rotating.
  */
 export const rotateVirtualKeyCommand = async (
   id: string,
@@ -33,7 +32,7 @@ export const rotateVirtualKeyCommand = async (
       data: { virtual_key, secret },
       table: () => {
         console.log();
-        console.log(chalk.bold.yellow("⚠  New secret — save it NOW. The old secret stops working immediately."));
+        console.log(chalk.bold.yellow("⚠  New secret, save it NOW. The old secret keeps working for 24 hours."));
         console.log();
         console.log(`  ${chalk.green(secret)}`);
         console.log();

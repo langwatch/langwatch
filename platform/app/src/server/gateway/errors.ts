@@ -235,3 +235,26 @@ export class GatewayGroupBudgetUnsupportedError extends HandledError {
     this.name = "GatewayGroupBudgetUnsupportedError";
   }
 }
+
+/**
+ * A cycle anchor was sent on a window that has no cycle to phase.
+ *
+ * TOTAL never rolls and MANUAL rolls only when someone asks it to, so an
+ * anchor on either would be stored and then never read. Refused rather than
+ * ignored: a caller who set one believes their budget rolls on the 17th, and
+ * silently accepting it would let them find out otherwise from an invoice.
+ *
+ * `meta.window` echoes the window the caller sent, which is their own value.
+ */
+export class GatewayBudgetCycleAnchorInvalidError extends HandledError {
+  declare readonly code: "gateway_budget_cycle_anchor_invalid";
+
+  constructor(window: string) {
+    super(
+      "gateway_budget_cycle_anchor_invalid",
+      "That window does not cycle, so it cannot take a cycle anchor",
+      { meta: { window }, httpStatus: 400, fault: "customer" },
+    );
+    this.name = "GatewayBudgetCycleAnchorInvalidError";
+  }
+}

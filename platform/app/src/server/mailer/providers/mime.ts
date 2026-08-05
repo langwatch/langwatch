@@ -73,7 +73,7 @@ export const rfc2047EncodeHeader = (value: string): string => {
   if (!needsEncoding) return clean;
 
   // Maximum bytes we can pack into one encoded-word:
-  //   =?UTF-8?B?<base64>?=  — the wrapper itself is 12 chars
+  //   =?UTF-8?B?<base64>?=  the wrapper itself is 12 chars
   //   RFC 2047 §2: encoded-word ≤ 75 chars total, so base64 payload ≤ 63 chars
   //   Base64 always pads to a multiple of 4, so the usable maximum is 60 chars
   //   (the next multiple of 4 below 63), encoding 45 input bytes exactly.

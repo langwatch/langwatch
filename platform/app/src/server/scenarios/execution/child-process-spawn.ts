@@ -1,8 +1,12 @@
 /**
  * Resolves the command and arguments for spawning a scenario child process.
  *
- * In production, uses the pre-compiled esbuild bundle (node + dist/scenario-child-process.js).
- * If the bundle is missing, falls back to tsx with a loud warning (never crashes).
+ * In production, uses the pre-compiled esbuild bundle (node + dist/server/scenario-child-process.cjs).
+ * If the bundle is missing, this resolver logs the remediation and returns the
+ * tsx command rather than throwing. That fallback only actually runs where dev
+ * dependencies are present: tsx is a devDependency, so the Docker image and the
+ * published npx tree both prune it and the spawn fails there — a missing bundle
+ * is a build fault to fix, not a degraded mode to live in.
  * In development, uses tsx to run the TypeScript source directly.
  *
  * @see specs/scenarios/pre-compiled-child-process.feature
@@ -51,7 +55,8 @@ function resolveProductionSpawn(packageRoot: string): SpawnConfig {
   const bundlePath = path.join(
     packageRoot,
     "dist",
-    "scenario-child-process.js",
+    "server",
+    "scenario-child-process.cjs",
   );
 
   if (fs.existsSync(bundlePath)) {
@@ -68,8 +73,10 @@ function resolveProductionSpawn(packageRoot: string): SpawnConfig {
   logger.error(
     { bundlePath },
     "Pre-compiled scenario child process bundle NOT FOUND. " +
-      "Falling back to tsx — this will cause slow cold-starts (~4 min). " +
-      'Run "pnpm run build:scenario-child-process" to fix this.',
+      "Falling back to tsx — this costs ~4 min cold-starts, and it only works " +
+      "where dev dependencies are installed. The Docker image and the npx " +
+      "install prune tsx, so there this spawn fails outright. " +
+      'Run "pnpm run build:server" to fix this.',
   );
 
   return resolveDevelopmentSpawn(packageRoot);

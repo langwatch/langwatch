@@ -261,8 +261,11 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "ModelProvider",
   "ModelDefaultConfig",
   // Webhook platform: enforced by guardProjectId's SCOPED_MODELS (org id,
-  // row id, or endpoint FK required on every query; creates must carry the
-  // org); the delivery sweep and retention prune use the raw-SQL opt-out.
+  // row id, endpoint FK, or project FK required on every query; creates must
+  // carry one channel's complete tenancy pair); the delivery sweep and
+  // retention prune use the raw-SQL opt-out. The delivery log is shared with
+  // the automations channel, whose rows are project-scoped and carry no
+  // organizationId at all, so a mandatory-organizationId guard cannot apply.
   "WebhookEndpoint",
   "WebhookEndpointDelivery",
   // organizationId is NULLABLE here (NULL = platform-published default), so a

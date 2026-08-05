@@ -10,6 +10,30 @@ from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
 from .prompts.types import FetchPolicy
 
+# Imported eagerly rather than lazily like the facades: a webhook receiver
+# verifies a delivery inside a request handler and never calls setup(), and
+# the module costs nothing to import, being standard library only.
+from .api_errors import (
+    LangWatchApiAuthenticationError,
+    LangWatchApiConflictError,
+    LangWatchApiError,
+    LangWatchApiNotFoundError,
+    LangWatchApiPlanLimitError,
+    LangWatchApiServerError,
+    LangWatchApiValidationError,
+)
+from .webhook_signature import (
+    WEBHOOK_DELIVERY_ID_HEADER,
+    WEBHOOK_EVENT_ID_HEADER,
+    WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS,
+    WEBHOOK_SIGNATURE_HEADER,
+    WebhookSignatureExpiredError,
+    WebhookSignatureHeaderError,
+    WebhookSignatureMismatchError,
+    WebhookSignatureVerificationError,
+    verify_webhook_signature,
+)
+
 
 # Type hints for IntelliSense (only imported for typing)
 from typing import TYPE_CHECKING
@@ -37,7 +61,8 @@ if TYPE_CHECKING:
     from .analytics import AnalyticsFacade
     from .traces import TracesFacade
     from .monitors import MonitorsFacade
-    from .gateway_admin import GatewayAdminFacade
+    from .virtual_keys import VirtualKeysFacade
+    from .gateway_budgets import GatewayBudgetsFacade
     from .spend_events import SpendEventsFacade
     from .webhooks import WebhooksFacade
     from .secrets import SecretsFacade
@@ -58,7 +83,8 @@ if TYPE_CHECKING:
     analytics: AnalyticsFacade
     traces: TracesFacade
     monitors: MonitorsFacade
-    gateway_admin: GatewayAdminFacade
+    virtual_keys: VirtualKeysFacade
+    gateway_budgets: GatewayBudgetsFacade
     spend_events: SpendEventsFacade
     webhooks: WebhooksFacade
     secrets: SecretsFacade
@@ -102,7 +128,8 @@ _LAZY_FACADES = {
     "analytics": (".analytics", "AnalyticsFacade"),
     "traces": (".traces", "TracesFacade"),
     "monitors": (".monitors", "MonitorsFacade"),
-    "gateway_admin": (".gateway_admin", "GatewayAdminFacade"),
+    "virtual_keys": (".virtual_keys", "VirtualKeysFacade"),
+    "gateway_budgets": (".gateway_budgets", "GatewayBudgetsFacade"),
     "spend_events": (".spend_events", "SpendEventsFacade"),
     "webhooks": (".webhooks", "WebhooksFacade"),
     "secrets": (".secrets", "SecretsFacade"),
@@ -232,4 +259,26 @@ __all__ = [
     "model_providers",
     "analytics",
     "traces",
+    "virtual_keys",
+    "gateway_budgets",
+    "spend_events",
+    "webhooks",
+    "secrets",
+    "monitors",
+    "verify_webhook_signature",
+    "WebhookSignatureVerificationError",
+    "WebhookSignatureHeaderError",
+    "WebhookSignatureExpiredError",
+    "WebhookSignatureMismatchError",
+    "WEBHOOK_SIGNATURE_HEADER",
+    "WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS",
+    "WEBHOOK_DELIVERY_ID_HEADER",
+    "WEBHOOK_EVENT_ID_HEADER",
+    "LangWatchApiError",
+    "LangWatchApiValidationError",
+    "LangWatchApiAuthenticationError",
+    "LangWatchApiPlanLimitError",
+    "LangWatchApiNotFoundError",
+    "LangWatchApiConflictError",
+    "LangWatchApiServerError",
 ]

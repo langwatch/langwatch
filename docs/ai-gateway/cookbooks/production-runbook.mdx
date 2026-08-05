@@ -101,7 +101,7 @@ go tool pprof http://localhost:6060/debug/pprof/heap
 
 - `internal/auth.(*Cache).Put` holding more than ~1 MB per cached bundle, unusual, a bundle should be ≤ 50 KB. Oversized `policy_rules.urls.allow` with thousands of entries can trigger this.
 - `internal/dispatch` buffered responses, if streaming responses are being accumulated instead of flushed per-chunk, every request consumes full response size. Check for `bufio.NewWriter` wrapping a streaming writer anywhere.
-- Cached bundles never being evicted, a very large tenant count with long `HARD_GRACE_SECONDS` keeps every bundle resident. Check `gateway_auth_cache_size{tier="l1"}` against your expected VK count.
+- Cached bundles never being evicted, a very large tenant count with long `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` keeps every bundle resident. Check `gateway_auth_cache_size{tier="l1"}` against your expected VK count.
 
 ## Recipe 4: Mutex or block profiling for contention
 
@@ -239,7 +239,7 @@ The three log lines form a ladder operators read in order:
 |---|---|---|---|
 | `auth_cache_serve_stale` | INFO | Grace is active; cached bundle is being served past JWT exp | None, this is expected behaviour during outage. Includes `vk_id`, `stale_for`, `hard_grace_remaining`, `refresh_error_class` |
 | `auth_cache_refresh_transport_failure` | WARN | Each refresh attempt is failing; soft expiry bumped. Includes `error`, `error_class`, `new_soft_expires_at` | Investigate control plane (this is the actual outage signal). Stop bumping once CP returns |
-| `auth_cache_hard_evict` | ERROR | Grace cap exceeded OR auth rejection. `reason` field disambiguates: `hard_cap_exceeded` (outage too long) vs `auth_rejection` (real bad-credential evict) vs `auth_rejection_async`, `hard_cap_exceeded_on_lookup` | If `hard_cap_exceeded`, customers start seeing 401s. Bump `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` if outage is ongoing and you'd rather extend than reject |
+| `auth_cache_hard_evict` | ERROR | Grace cap exceeded OR auth rejection. `reason` field disambiguates: `hard_cap_exceeded` (outage too long) vs `auth_rejection` (real bad-credential evict) vs `auth_rejection_async`, `hard_cap_exceeded_on_lookup` | If `hard_cap_exceeded`, the grace is spent and customers start seeing `503 auth_upstream_unavailable`: the entry is evicted and the re-resolve hits the same unreachable control plane. A `401` on this line means `reason=auth_rejection`, a genuinely rejected credential rather than the outage. Bump `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` if the outage is ongoing and you'd rather extend than reject |
 
 **Customer-facing behaviour during the grace window:**
 
@@ -274,7 +274,7 @@ The gateway is a cache of the control plane, so a surprising amount continues to
 
 | Component down | Customer impact | How long gateway stays up | Notes |
 |---|---|---|---|
-| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the OTel span and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; Redis L2 extends coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite, circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
 | Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite, L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
 | Gateway pod (crash, eviction) | None, HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |
@@ -288,7 +288,7 @@ When you find something worth filing:
 1. Grab the `.pb.gz` with `go tool pprof -symbolize=remote -proto http://localhost:6060/debug/pprof/heap > /tmp/heap.pb.gz`.
 2. Attach it to the issue along with:
    - Pod name + image digest (`kubectl get pod -n langwatch -o yaml | grep image`).
-   - `X-LangWatch-Request-Id` from one exemplar bad request.
+   - `X-LangWatch-Gateway-Request-Id` from one exemplar bad request.
    - `kubectl top pod` output around the spike.
 3. For urgent escalation, post in `#ai-gateway-support` with the request id.
 

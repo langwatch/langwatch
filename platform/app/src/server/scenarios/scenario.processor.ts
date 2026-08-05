@@ -14,8 +14,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import { type ChildProcess, spawn } from "child_process";
-import path from "path";
 import { env } from "~/env.mjs";
+import { resolveAppPackageRoot } from "../appPackageRoot";
 import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
 import {
   createContextFromJobData,
@@ -485,7 +485,7 @@ async function spawnScenarioChildProcess(
       ...tlsEnv,
     });
 
-    const packageRoot = path.resolve(__dirname, "../../..");
+    const packageRoot = resolveAppPackageRoot();
     const spawnStart = Date.now();
     const { command, args } = resolveChildProcessSpawn({
       packageRoot,

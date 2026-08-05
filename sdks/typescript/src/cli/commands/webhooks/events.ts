@@ -21,7 +21,7 @@ export const webhookEventsCommand = async (options: {
       const parsed = Date.parse(value);
       return Number.isNaN(parsed) ? Number(value) : parsed;
     };
-    const page = await service.events({
+    const page = await service.eventsPage({
       type: options.type,
       from: options.from !== undefined ? parseInstantValue(options.from) : undefined,
       to: options.to !== undefined ? parseInstantValue(options.to) : undefined,
