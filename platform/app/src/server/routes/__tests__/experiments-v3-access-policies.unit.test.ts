@@ -50,11 +50,15 @@ describe("experiments API access policies", () => {
   });
 
   describe("when a route attaches a comparison", () => {
-    /** @scenario "Rejects a request without the evaluations:manage permission" */
-    it("asks for the manage permission, so a run-only key is refused", async () => {
+    // `:manage` would be the wrong ask even though this write outlives a run:
+    // it implies the delete, and no least-privilege key holds it, so demanding
+    // it here would put an API-key route out of reach of every caller the CLI
+    // is built for. `langy-permission-coverage.unit.test.ts` pins that rule for
+    // the whole surface.
+    it("asks for the create permission, the same grain as the other writes", async () => {
       await expect(
         permissionsFor("POST", "/api/experiments/:slug/comparison"),
-      ).resolves.toEqual(["evaluations:manage"]);
+      ).resolves.toEqual(["evaluations:create"]);
     });
   });
 });

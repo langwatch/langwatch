@@ -45,11 +45,17 @@ export class ComparisonVariantTargetNotFoundError extends HandledError {
 export class ComparisonVariantAgentNotFoundError extends HandledError {
   declare readonly code: "comparison_variant_agent_not_found";
 
-  constructor(agentId: string, options: { reasons?: readonly Error[] } = {}) {
+  constructor({
+    agentId,
+    reasons,
+  }: {
+    agentId: string;
+    reasons?: readonly Error[];
+  }) {
     super(
       "comparison_variant_agent_not_found",
       `Agent "${agentId}" not found`,
-      { httpStatus: 404, meta: { agentId }, reasons: options.reasons },
+      { httpStatus: 404, meta: { agentId }, reasons },
     );
     this.name = "ComparisonVariantAgentNotFoundError";
   }

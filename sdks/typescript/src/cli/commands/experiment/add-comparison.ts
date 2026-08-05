@@ -87,23 +87,43 @@ export interface AddComparisonOptions {
 
 /**
  * A flag given as an empty string (`--golden-field ""`) names no column, so it
- * means the same as not passing the flag at all.
+ * means the same as not passing the flag at all. Surrounding space is dropped
+ * from what survives: a column name is what the caller typed, not what their
+ * shell left around it, and sending the padded version gets it rejected as a
+ * column that does not exist.
  */
-const omitBlank = (value: string | undefined): string | undefined =>
-  value !== undefined && value.trim() !== "" ? value : undefined;
+const omitBlank = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim();
+  return trimmed === undefined || trimmed === "" ? undefined : trimmed;
+};
 
+const SUPPORTED_METRICS = ["cost", "duration"] as const;
+type SupportedMetric = (typeof SUPPORTED_METRICS)[number];
+
+/**
+ * Parses `--metrics cost,duration`, refusing anything else by name.
+ *
+ * Dropping an unrecognised metric silently would answer `--metrics latency`
+ * with a comparison carrying no metrics at all and no indication why, which is
+ * the same permissive-parse failure the version suffix above refuses.
+ */
 const parseIncludeMetrics = (
   metrics: string | undefined,
-): Array<"cost" | "duration"> | undefined =>
-  metrics
-    ? metrics
-        .split(",")
-        .map((metric) => metric.trim())
-        .filter(
-          (metric): metric is "cost" | "duration" =>
-            metric === "cost" || metric === "duration",
-        )
-    : undefined;
+): SupportedMetric[] | undefined => {
+  if (!metrics) return undefined;
+  return metrics
+    .split(",")
+    .map((metric) => metric.trim())
+    .filter((metric) => metric !== "")
+    .map((metric) => {
+      if (!(SUPPORTED_METRICS as readonly string[]).includes(metric)) {
+        throw new Error(
+          `Invalid --metrics value "${metric}". Expected ${SUPPORTED_METRICS.join(" or ")}.`,
+        );
+      }
+      return metric as SupportedMetric;
+    });
+};
 
 const renderAttachedComparison = (result: AttachComparisonResponse): void => {
   if (result.createdTargetIds.length > 0) {
@@ -134,9 +154,13 @@ export const addComparisonCommand = async (
     process.exit(1);
   }
 
+  // Everything the flags say is parsed before the request goes out, so a
+  // malformed flag reports itself as bad input rather than as a failed attach.
   let variants: ComparisonVariantSpec[];
+  let includeMetrics: SupportedMetric[] | undefined;
   try {
     variants = rawVariants.map(parseVariantSpec);
+    includeMetrics = parseIncludeMetrics(options.metrics);
   } catch (error) {
     console.error(chalk.red(`Error: ${(error as Error).message}`));
     process.exit(1);
@@ -152,7 +176,7 @@ export const addComparisonCommand = async (
         variants,
         goldenField: omitBlank(options.goldenField),
         inputField: omitBlank(options.inputField),
-        includeMetrics: parseIncludeMetrics(options.metrics),
+        includeMetrics,
         randomizeOrder: options.randomize,
       },
     });

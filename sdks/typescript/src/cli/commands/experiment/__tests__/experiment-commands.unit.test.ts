@@ -306,6 +306,64 @@ describe("addComparisonCommand()", () => {
     });
   });
 
+  describe("when a field flag carries surrounding space", () => {
+    it("sends the column name the caller meant, not the padded one", async () => {
+      mockAttachComparison.mockResolvedValue({
+        comparisonTargetId: "target_new",
+        createdTargetIds: [],
+        reusedTargetIds: [],
+        targets: [],
+      });
+
+      await addComparisonCommand("quality-check", {
+        variant: ["target:target-a", "target:target-b"],
+        goldenField: "  expected_output  ",
+      });
+
+      expect(mockAttachComparison).toHaveBeenCalledWith({
+        slug: "quality-check",
+        body: expect.objectContaining({ goldenField: "expected_output" }),
+      });
+    });
+  });
+
+  describe("when --metrics names supported metrics", () => {
+    it("passes them through, ignoring surrounding space", async () => {
+      mockAttachComparison.mockResolvedValue({
+        comparisonTargetId: "target_new",
+        createdTargetIds: [],
+        reusedTargetIds: [],
+        targets: [],
+      });
+
+      await addComparisonCommand("quality-check", {
+        variant: ["target:target-a", "target:target-b"],
+        metrics: "cost, duration",
+      });
+
+      expect(mockAttachComparison).toHaveBeenCalledWith({
+        slug: "quality-check",
+        body: expect.objectContaining({ includeMetrics: ["cost", "duration"] }),
+      });
+    });
+  });
+
+  describe("when --metrics names a metric that does not exist", () => {
+    it("refuses it by name instead of dropping it in silence", async () => {
+      await expect(
+        addComparisonCommand("quality-check", {
+          variant: ["target:target-a", "target:target-b"],
+          metrics: "cost,latency",
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockAttachComparison).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("latency"),
+      );
+    });
+  });
+
   describe("when the caller asked for machine output", () => {
     it("returns the document for the output port rather than printing it", async () => {
       const attached = {

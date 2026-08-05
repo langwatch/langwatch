@@ -215,7 +215,7 @@ describe("attachComparison()", () => {
     });
   });
 
-  describe("when fewer than two variants resolve", () => {
+  describe("when a variant is itself a comparison", () => {
     /** @scenario "Rejects a variant that is itself a comparison" */
     it("rejects a variant that is itself a comparison", async () => {
       const comparisonTarget: TargetConfig = {
@@ -339,6 +339,7 @@ describe("attachComparison()", () => {
   });
 
   describe("when goldenField does not match a real dataset column", () => {
+    /** @scenario "Rejects a golden field that is not a dataset column" */
     it("rejects rather than persisting a mapping to nothing", async () => {
       const error = await rejectionOf(
         attachComparison({
@@ -464,6 +465,7 @@ describe("attachComparison()", () => {
   });
 
   describe("when two --variant specs resolve to the same underlying target", () => {
+    /** @scenario "Rejects variants that all resolve to the same target" */
     it("rejects an explicit duplicate existingTarget reference", async () => {
       const error = await rejectionOf(
         attachComparison({

@@ -112,7 +112,7 @@ describe.skipIf(process.env.CI)(
                   },
                 },
                 localPromptConfig: {
-                  llm: { model: "openai/gpt-4o-mini" },
+                  llm: { model: "openai/gpt-5-mini" },
                   messages: [{ role: "user", content: "{{input}}" }],
                   inputs: [{ identifier: "input", type: "str" }],
                   outputs: [{ identifier: "output", type: "str" }],
@@ -134,7 +134,7 @@ describe.skipIf(process.env.CI)(
                   },
                 },
                 localPromptConfig: {
-                  llm: { model: "openai/gpt-4o-mini" },
+                  llm: { model: "openai/gpt-5-mini" },
                   messages: [{ role: "user", content: "{{input}}" }],
                   inputs: [{ identifier: "input", type: "str" }],
                   outputs: [{ identifier: "output", type: "str" }],
@@ -264,8 +264,10 @@ describe.skipIf(process.env.CI)(
         expect(response.status).toBe(200);
         const body = await response.json();
         expect(body.comparisonTargetId).toBeDefined();
+        // Asserted as a delta, not an absolute count: every case in this file
+        // writes to the same experiment, so a total would encode the order the
+        // blocks happen to run in.
         expect(body.createdTargetIds).toEqual([]);
-        expect(body.targets).toHaveLength(3);
 
         const comparisonTarget = body.targets.find(
           (t: { id: string }) => t.id === body.comparisonTargetId,
@@ -327,6 +329,10 @@ describe.skipIf(process.env.CI)(
           },
           authHeaders(),
         );
+        // Asserted before the id is read: a failed setup would otherwise send
+        // `targetId: undefined` below and fail the schema instead of the case
+        // this block is about.
+        expect(setupResponse.status).toBe(200);
         const { comparisonTargetId } = await setupResponse.json();
 
         const response = await post(

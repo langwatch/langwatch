@@ -61,6 +61,23 @@ const str = (
 };
 
 /**
+ * Reads a list of names out of `meta` without trusting it. Plain strings pass
+ * through; an object contributes its `id`, which is how a list of targets
+ * reaches copy that only wants to name them. Anything else is dropped.
+ */
+const strList = (error: HandledErrorShape, key: string): string[] => {
+  const value = error.meta[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === "string") return item;
+      const id = (item as { id?: unknown } | null)?.id;
+      return typeof id === "string" ? id : null;
+    })
+    .filter((name): name is string => name !== null);
+};
+
+/**
  * Whether any code in the error's reason chain (depth-first, nested included)
  * is one of `codes`.
  *
@@ -262,18 +279,7 @@ const presentations = {
     describe: (error) => {
       // meta.availableTargets is the experiment's own target list, so naming
       // it turns "wrong id" into "here is what you can pick instead".
-      const available = error.meta.availableTargets;
-      const ids = Array.isArray(available)
-        ? available
-            .map((target) =>
-              typeof target === "object" &&
-              target !== null &&
-              typeof (target as { id?: unknown }).id === "string"
-                ? (target as { id: string }).id
-                : null,
-            )
-            .filter((id): id is string => id !== null)
-        : [];
+      const ids = strList(error, "availableTargets");
       return ids.length > 0
         ? `Pick one of its targets: ${listLabels(ids)}.`
         : "It has no targets yet. Add one before building a comparison.";
@@ -292,10 +298,7 @@ const presentations = {
   comparison_variant_unmappable: {
     title: "This target has nowhere to read its input from",
     describe: (error) => {
-      const fields = error.meta.fields;
-      const names = Array.isArray(fields)
-        ? fields.filter((field): field is string => typeof field === "string")
-        : [];
+      const names = strList(error, "fields");
       return names.length > 0
         ? `Add a dataset column for ${listLabels(names)}, or compare targets that are already set up.`
         : "Add the dataset columns it needs, or compare targets that are already set up.";
@@ -309,12 +312,7 @@ const presentations = {
   comparison_field_not_in_dataset: {
     title: "That field isn't in the dataset",
     describe: (error) => {
-      const columns = error.meta.availableColumns;
-      const names = Array.isArray(columns)
-        ? columns.filter(
-            (column): column is string => typeof column === "string",
-          )
-        : [];
+      const names = strList(error, "availableColumns");
       return names.length > 0
         ? `Pick one of its columns: ${listLabels(names)}.`
         : "Add the column to the dataset first.";

@@ -14,9 +14,9 @@ Feature: Attach a comparison via the CLI
   # variants a user already built in the UI is the common case, not the
   # exception.
   #
-  # Attaching one rewrites the experiment's saved configuration, so it asks for
-  # the `evaluations:manage` permission. A key scoped to run experiments in CI
-  # keeps running them without gaining the ability to reshape what they measure.
+  # Attaching one creates an evaluator and the target wiring for it, so it asks
+  # for the `evaluations:create` permission, the same grain starting a run
+  # needs. A key that can only read evaluations cannot reshape an experiment.
 
   Background:
     Given an experiment "quality-check" exists with an active dataset
@@ -80,17 +80,31 @@ Feature: Attach a comparison via the CLI
     And no partially-built comparison target is persisted
 
   @unit
+  Scenario: Rejects variants that all resolve to the same target
+    Given the experiment already has a prompt target for prompt "draft-v1"
+    When I run "langwatch experiment add-comparison quality-check --variant target:draft-v1 --variant prompt:draft-v1"
+    Then the command fails
+    And the error explains a comparison needs two different candidates
+
+  @unit
+  Scenario: Rejects a golden field that is not a dataset column
+    When I run "langwatch experiment add-comparison quality-check --variant prompt:draft-v1 --variant prompt:draft-v2 --golden-field expcted_output"
+    Then the command fails
+    And the error lists the dataset's real columns so I can pick one
+
+  @unit
   Scenario: Rejects an experiment with no dataset to compare against
     Given the experiment's active dataset is not one of its datasets
     When I run "langwatch experiment add-comparison quality-check --variant prompt:draft-v1 --variant prompt:draft-v2"
     Then the command fails
     And the error asks me to pick a dataset rather than guessing one
 
-  @unit
-  Scenario: Rejects a request without the evaluations:manage permission
-    Given my API key does not have the "evaluations:manage" permission
+  @integration
+  Scenario: Rejects a request from a key that can only read evaluations
+    Given my API key has the "evaluations:view" permission and no more
     When I run "langwatch experiment add-comparison quality-check --variant prompt:draft-v1 --variant prompt:draft-v2"
     Then the command fails with a permission error
+    And no comparison is attached to the experiment
 
   @integration
   Scenario: A comparison attached over the API is persisted on the experiment

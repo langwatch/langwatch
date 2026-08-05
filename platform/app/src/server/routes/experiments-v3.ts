@@ -77,31 +77,26 @@ const sessionAuth = handlerManagedAuth({
   permissions: ["evaluations:manage"],
   credential: "session",
 });
-// The read endpoints (runs list / status / results), the run endpoint and the
-// configuration endpoints gate on different grains, so they declare
-// separately: a single shared policy would report the coarsest of the three
-// for routes that only read.
+// The read endpoints (runs list / status / results) and the write endpoints
+// gate on different grains, so they declare separately: a single shared policy
+// would report the coarser of the two for routes that only read.
 const apiKeyAuthRead = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
   permissions: ["evaluations:view"],
   credential: "apiKey",
 });
+// Every API-key-reachable write on this surface shares the create grain:
+// starting a run creates a run, and attaching a comparison creates an
+// evaluator and the target wiring for it. `:manage` is deliberately not
+// reachable by an API key here. It implies the delete, no least-privilege key
+// holds it (the Langy session key stops short of it on purpose), and
+// `hasPermissionWithHierarchy` already lets a `:manage` holder satisfy
+// `:create`, so asking for the narrower grain takes access away from nobody.
 const apiKeyAuthRun = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
   permissions: ["evaluations:create"],
-  credential: "apiKey",
-});
-// Attaching a comparison edits the experiment's saved configuration: it adds
-// targets and rewrites the workbench state that every later run reads. That
-// outlives any one run, so it asks for `:manage` rather than the `:create`
-// that starting a run needs. A key scoped to run experiments in CI can keep
-// running them without gaining the ability to reshape what they measure.
-const apiKeyAuthManage = handlerManagedAuth({
-  reason:
-    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
-  permissions: ["evaluations:manage"],
   credential: "apiKey",
 });
 
@@ -590,14 +585,14 @@ secured.access(apiKeyAuthRun).post("/:slug/run", async (c) => {
 // ── POST /:slug/comparison (attach a comparison target via API key) ─
 
 secured
-  .access(apiKeyAuthManage)
+  .access(apiKeyAuthRun)
   .post(
     "/:slug/comparison",
     zValidator("json", attachComparisonBodySchema),
     async (c) => {
       const { slug } = c.req.param();
 
-      const authResult = await authenticateRequest(c, "evaluations:manage");
+      const authResult = await authenticateRequest(c, "evaluations:create");
       if ("error" in authResult) {
         return c.json(authResult.body ?? { error: authResult.error }, {
           status: authResult.status,
