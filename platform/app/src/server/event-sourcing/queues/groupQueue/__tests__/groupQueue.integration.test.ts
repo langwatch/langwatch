@@ -29,6 +29,15 @@ async function foreignSiblingsRestagedCount(
   );
 }
 
+async function readyScoreImplausibleCount(queueName: string): Promise<number> {
+  const metric = await register
+    .getSingleMetric("gq_ready_score_implausible_total")
+    ?.get();
+  return (
+    metric?.values.find((v) => v.labels.queue_name === queueName)?.value ?? 0
+  );
+}
+
 // Skip when running without testcontainers (unit-only test runs)
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL ||
@@ -166,7 +175,7 @@ describe.skipIf(!hasTestcontainers)(
          * the staged score back out of the group's own jobs zset.
          */
         /** @scenario "a job staged with an unusable score dispatches behind one that occurred earlier" */
-        it("stages it at the current time and dispatches it behind an genuinely older job", async () => {
+        it("stages it at the current time and dispatches it behind a genuinely older job", async () => {
           const processedOrder: string[] = [];
           let releaseBlocker: (() => void) | undefined;
           const blockerHeld = new Promise<void>((resolve) => {
@@ -227,6 +236,11 @@ describe.skipIf(!hasTestcontainers)(
           // Rescored to now, so it sorts BEHIND the job that really did occur a
           // minute ago. Staged at 0 it would have led the group for ever.
           expect(processedOrder).toEqual(["blocker", "older", "broken"]);
+
+          // Exactly one: the counter reports PRODUCERS, so only the supplied
+          // score the queue refused registers. The two accepted scores do not,
+          // and neither would a re-stage - see `restageScore`.
+          expect(await readyScoreImplausibleCount(queueName)).toBe(1);
         });
       });
 

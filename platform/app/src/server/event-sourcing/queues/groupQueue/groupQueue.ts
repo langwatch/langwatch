@@ -478,8 +478,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * about when the work occurred is judged here.
    */
   private resolveScore(rawScore: unknown, nowMs: number = Date.now()): number {
-    const { score, rejected } = resolveReadyScore({ score: rawScore, nowMs });
-    if (rejected) {
+    const { score, isRejected } = resolveReadyScore({
+      score: rawScore,
+      nowMs,
+    });
+    if (isRejected) {
       gqReadyScoreImplausibleTotal.inc({ queue_name: this.queueName });
     }
     return score;
@@ -501,11 +504,20 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * kept theirs verbatim, so one failure could move the failed job to now and
    * leave its siblings at 0 - and on unblock the siblings dispatched ahead of
    * the job they were drained behind.
+   *
+   * Deliberately does NOT raise `gq_ready_score_implausible_total`, which
+   * counts producers, not us. `originalScore` is always a value this queue
+   * wrote and then read back out of Redis, and staging already required it to
+   * clear MIN_PLAUSIBLE_EPOCH_MS - an ABSOLUTE floor, so a score that cleared
+   * it once clears it for ever. This check can therefore only ever fire for a
+   * row staged before the guard existed, or one corrupted in Redis. Neither is
+   * a broken score function, and counting them here would dilute the one
+   * signal that is with our own bookkeeping.
    */
   private restageScore(originalScore: unknown): number {
-    if (isPlausibleReadyScore(originalScore)) return originalScore;
-    gqReadyScoreImplausibleTotal.inc({ queue_name: this.queueName });
-    return fallbackReadyScore();
+    return isPlausibleReadyScore(originalScore)
+      ? originalScore
+      : fallbackReadyScore();
   }
 
   /**

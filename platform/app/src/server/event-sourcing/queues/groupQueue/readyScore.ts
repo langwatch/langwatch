@@ -131,7 +131,7 @@ export function fallbackReadyScore(nowMs: number = Date.now()): number {
  * report an age of zero. It degrades ordering within the group from occurrence
  * order to arrival order, and loses nothing.
  *
- * `rejected` distinguishes the two ways of arriving at the fallback, because
+ * `isRejected` distinguishes the two ways of arriving at the fallback, because
  * only one of them is a defect:
  *   - absent (`undefined` / `null`): the producer has no occurrence time and
  *     never claimed to. Scoring it now is the designed default, not a repair.
@@ -148,10 +148,10 @@ export function resolveReadyScore({
 }: {
   score: unknown;
   nowMs?: number;
-}): { score: number; rejected: boolean } {
+}): { score: number; isRejected: boolean } {
   if (score === undefined || score === null) {
-    return { score: fallbackReadyScore(nowMs), rejected: false };
+    return { score: fallbackReadyScore(nowMs), isRejected: false };
   }
-  if (isUsableReadyScore(score, nowMs)) return { score, rejected: false };
-  return { score: fallbackReadyScore(nowMs), rejected: true };
+  if (isUsableReadyScore(score, nowMs)) return { score, isRejected: false };
+  return { score: fallbackReadyScore(nowMs), isRejected: true };
 }

@@ -44,7 +44,7 @@ describe("resolveReadyScore", () => {
     ])("falls back to the staging time when the score is %s", (_label, score) => {
       expect(resolveReadyScore({ score })).toEqual({
         score: NOW,
-        rejected: true,
+        isRejected: true,
       });
     });
 
@@ -53,7 +53,7 @@ describe("resolveReadyScore", () => {
 
       expect(resolveReadyScore({ score: 0, nowMs: shared })).toEqual({
         score: shared,
-        rejected: true,
+        isRejected: true,
       });
     });
   });
@@ -72,7 +72,7 @@ describe("resolveReadyScore", () => {
     ])("scores at the staging time and does not report %s", (_label, score) => {
       expect(resolveReadyScore({ score })).toEqual({
         score: NOW,
-        rejected: false,
+        isRejected: false,
       });
     });
   });
@@ -84,7 +84,7 @@ describe("resolveReadyScore", () => {
 
       expect(resolveReadyScore({ score: occurredAt })).toEqual({
         score: occurredAt,
-        rejected: false,
+        isRejected: false,
       });
     });
 
@@ -94,7 +94,10 @@ describe("resolveReadyScore", () => {
       ["late but inside the past bound", NOW - 6 * 60 * 60 * 1000],
       ["a little ahead, as an unsynchronised client emits", NOW + 30_000],
     ])("accepts a score %s", (_label, score) => {
-      expect(resolveReadyScore({ score })).toEqual({ score, rejected: false });
+      expect(resolveReadyScore({ score })).toEqual({
+        score,
+        isRejected: false,
+      });
     });
   });
 
