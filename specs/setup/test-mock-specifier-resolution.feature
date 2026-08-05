@@ -57,3 +57,10 @@ Feature: A test mock cannot name a module that does not exist
       When the mock check builds its resolver
       Then it expands each alias against the directory of the config declaring it
       And an alias entry it cannot read fails loudly instead of being dropped
+
+    @unit
+    Scenario: Overlapping aliases keep the order the config declares
+      Given a config declaring two aliases that both claim the same specifier
+      When the mock check resolves that specifier
+      Then it takes the alias declared first, the way the test runner does
+      And not the longest or most specific one

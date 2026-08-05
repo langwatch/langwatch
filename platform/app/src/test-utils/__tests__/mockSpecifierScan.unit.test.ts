@@ -6,6 +6,9 @@
  * what actually keeps a mock that names no module out. Both ride the
  * ordinary unit shards, so there is no gate that can quietly stop checking.
  *
+ * The alias-table reader this resolves against is covered separately, in
+ * `vitestAliasTable.unit.test.ts`.
+ *
  * Spec: specs/setup/test-mock-specifier-resolution.feature
  */
 import { execFileSync } from "node:child_process";
@@ -13,12 +16,14 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
-  aliasesForFile,
-  type ModuleAlias,
-  parseVitestConfigAliases,
   resolveMockSpecifier,
   scanSourceForMockSpecifiers,
 } from "../mockSpecifierScan";
+import {
+  aliasesForFile,
+  type ModuleAlias,
+  parseVitestConfigAliases,
+} from "../vitestAliasTable";
 
 /** platform/app/, from src/test-utils/__tests__/. */
 const APP_ROOT = resolve(__dirname, "../../..");
@@ -61,35 +66,29 @@ function readAliasTables(files: string[]): Map<string, ModuleAlias[]> {
   return tables;
 }
 
-type Offender = {
-  location: string;
-  specifier: string;
-};
-
 function offendersIn({
   relativePath,
   aliasesByConfigDir,
 }: {
   relativePath: string;
   aliasesByConfigDir: Map<string, ModuleAlias[]>;
-}): Offender[] {
+}): string[] {
   const fileName = join(REPO_ROOT, relativePath);
   const sourceText = readFileSync(fileName, "utf8");
   if (!sourceText.includes("mock")) return [];
 
   const aliases = aliasesForFile({ file: fileName, aliasesByConfigDir });
-  const offenders: Offender[] = [];
-  for (const site of scanSourceForMockSpecifiers(fileName, sourceText)) {
+  const offenders: string[] = [];
+  for (const site of scanSourceForMockSpecifiers({ fileName, sourceText })) {
     const resolution = resolveMockSpecifier({
       specifier: site.specifier,
       fromDir: dirname(fileName),
       aliases,
     });
     if (resolution.kind !== "missing") continue;
-    offenders.push({
-      location: `${relativePath}:${site.line}`,
-      specifier: site.specifier ?? "<computed>",
-    });
+    offenders.push(
+      `${relativePath}:${site.line} vi.mock("${site.specifier ?? "<computed>"}")`,
+    );
   }
   return offenders;
 }
@@ -111,9 +110,7 @@ function scanTrackedTestFiles(): {
 
   const offenders: string[] = [];
   for (const relativePath of testFiles) {
-    for (const offender of offendersIn({ relativePath, aliasesByConfigDir })) {
-      offenders.push(`${offender.location} vi.mock("${offender.specifier}")`);
-    }
+    offenders.push(...offendersIn({ relativePath, aliasesByConfigDir }));
   }
 
   return {
@@ -125,7 +122,7 @@ function scanTrackedTestFiles(): {
 }
 
 const scan = (sourceText: string) =>
-  scanSourceForMockSpecifiers("virtual.test.ts", sourceText);
+  scanSourceForMockSpecifiers({ fileName: "virtual.test.ts", sourceText });
 
 const APP_ALIASES: ModuleAlias[] = [
   { find: "~/", replacement: join(APP_ROOT, "src/") },
@@ -135,15 +132,17 @@ const resolveIn = ({
   specifier,
   fromDir,
   exists,
+  aliases = APP_ALIASES,
 }: {
   specifier: string | undefined;
   fromDir: string;
   exists: string[];
+  aliases?: ModuleAlias[];
 }) =>
   resolveMockSpecifier({
     specifier,
     fromDir,
-    aliases: APP_ALIASES,
+    aliases,
     fileExists: (path) => exists.includes(path),
   });
 
@@ -151,9 +150,9 @@ describe("the mock-specifier rule", () => {
   describe("given a plain string specifier", () => {
     /** @scenario "A mock naming a module that exists passes the check" */
     it("reports the module it names and the line it sits on", () => {
-      expect(
-        scan(['vi.mock("../ui/toaster", () => ({}));'].join("\n")),
-      ).toEqual([{ line: 1, specifier: "../ui/toaster" }]);
+      expect(scan('vi.mock("../ui/toaster", () => ({}));')).toEqual([
+        { line: 1, specifier: "../ui/toaster" },
+      ]);
     });
   });
 
@@ -280,6 +279,25 @@ describe("resolving a mock specifier", () => {
     });
   });
 
+  describe("given two aliases that both claim a specifier", () => {
+    /** @scenario "Overlapping aliases keep the order the config declares" */
+    it("takes the first one declared, the way vite does", () => {
+      const throughFirst = "/mocks/at/generated/sdk.ts";
+
+      expect(
+        resolveIn({
+          specifier: "@/generated/sdk",
+          fromDir: APP_ROOT,
+          exists: [throughFirst, "/mocks/generated/sdk.ts"],
+          aliases: [
+            { find: "@/", replacement: "/mocks/at/" },
+            { find: "@/generated/", replacement: "/mocks/generated/" },
+          ],
+        }),
+      ).toEqual({ kind: "resolved", file: throughFirst });
+    });
+  });
+
   describe("given a specifier one directory level off", () => {
     /** @scenario "A mock naming no module at all fails the check" */
     it("reports it as naming nothing", () => {
@@ -290,140 +308,6 @@ describe("resolving a mock specifier", () => {
       });
 
       expect(resolution.kind).toBe("missing");
-    });
-  });
-});
-
-describe("reading a vitest config's alias table", () => {
-  const parse = (sourceText: string) =>
-    parseVitestConfigAliases({
-      fileName: join(APP_ROOT, "vitest.config.ts"),
-      sourceText,
-      configDir: APP_ROOT,
-    });
-
-  describe("given the table the app's configs declare", () => {
-    /** @scenario "The check reads the alias table from the vitest configs" */
-    it("expands each entry against the config's own directory", () => {
-      expect(
-        parse(
-          [
-            "export default defineConfig({",
-            "  resolve: {",
-            "    alias: {",
-            '      "~/": join(__dirname, "./src/"),',
-            '      "@ee/": join(__dirname, "./ee/"),',
-            "    },",
-            "  },",
-            "});",
-          ].join("\n"),
-        ),
-      ).toEqual([
-        { find: "~/", replacement: join(APP_ROOT, "src/") },
-        { find: "@ee/", replacement: join(APP_ROOT, "ee/") },
-      ]);
-    });
-  });
-
-  describe("given the array table vite also accepts", () => {
-    /** @scenario "The check reads the alias table from the vitest configs" */
-    it("reads each find and replacement pair", () => {
-      expect(
-        parse(
-          [
-            "export default defineConfig({",
-            "  resolve: {",
-            "    alias: [",
-            '      { find: "~", replacement: resolve(__dirname, "./src") },',
-            "    ],",
-            "  },",
-            "});",
-          ].join("\n"),
-        ),
-      ).toEqual([{ find: "~", replacement: join(APP_ROOT, "src") }]);
-    });
-  });
-
-  describe("given an entry built in a shape the reader does not know", () => {
-    it("fails loudly rather than dropping the entry", () => {
-      expect(() =>
-        parse(
-          [
-            "export default defineConfig({",
-            "  resolve: {",
-            '    alias: { "~/": buildSomehow() },',
-            "  },",
-            "});",
-          ].join("\n"),
-        ),
-      ).toThrow(/cannot read/);
-    });
-
-    it("fails loudly on a table that is neither an object nor an array", () => {
-      expect(() =>
-        parse(
-          [
-            "export default defineConfig({",
-            "  resolve: { alias: sharedAliases },",
-            "});",
-          ].join("\n"),
-        ),
-      ).toThrow(/neither an object nor an array/);
-    });
-
-    it("fails loudly on an entry spread in from elsewhere", () => {
-      expect(() =>
-        parse(
-          [
-            "export default defineConfig({",
-            "  resolve: { alias: { ...sharedAliases } },",
-            "});",
-          ].join("\n"),
-        ),
-      ).toThrow(/not a simple/);
-    });
-
-    it("fails loudly on a regular-expression find, which cannot be prefix-matched", () => {
-      expect(() =>
-        parse(
-          [
-            "export default defineConfig({",
-            "  resolve: {",
-            '    alias: [{ find: /^~\\//, replacement: "./src/" }],',
-            "  },",
-            "});",
-          ].join("\n"),
-        ),
-      ).toThrow(/find is not a string literal/);
-    });
-
-    it("fails loudly on an entry carrying a custom resolver", () => {
-      expect(() =>
-        parse(
-          [
-            "export default defineConfig({",
-            "  resolve: {",
-            "    alias: [",
-            '      { find: "~", replacement: "./src", customResolver: r },',
-            "    ],",
-            "  },",
-            "});",
-          ].join("\n"),
-        ),
-      ).toThrow(/customResolver/);
-    });
-
-    it("fails loudly on a config whose table is partly in another file", () => {
-      expect(() =>
-        parse(
-          [
-            "export default mergeConfig(",
-            "  baseConfig,",
-            '  defineConfig({ resolve: { alias: { "~/": "./src/" } } }),',
-            ");",
-          ].join("\n"),
-        ),
-      ).toThrow(/mergeConfig/);
     });
   });
 });
