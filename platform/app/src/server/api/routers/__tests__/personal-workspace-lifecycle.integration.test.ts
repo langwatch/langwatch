@@ -141,8 +141,8 @@ describe("given a member with a personal workspace in an organization", () => {
 
   afterAll(async () => {
     await resetApp();
-    await prisma.project.deleteMany({ where: { teamId: personalTeamId } });
     await cleanupTestRows(prisma, [
+      ["project", { teamId: personalTeamId }],
       ["teamUser", { teamId: personalTeamId }],
       ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
