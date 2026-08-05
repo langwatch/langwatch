@@ -70,15 +70,34 @@
 -- and would have outlived its tenant's retention. It converges after that one
 -- write.
 --
--- Existing SENTINEL rows are not repaired by this migration, and that is stated
--- rather than implied. Their TTL deadline is already past, so the next TTL merge
--- deletes them. A sentinel-anchored trace that receives any further event heals
--- itself — the read-back decodes an unusable anchor, the next contribution
--- freezes a real one, and the row is rewritten into a real partition — while one
--- that receives no further event before the reap loses its summary row, because
--- this fold declares no `refoldOnStoreMiss`. Recovering those needs a bounded
--- operational replay from `event_log`, which is deliberately NOT created here.
--- See ADR-087 §Backfill and issue #6312.
+-- Existing SENTINEL rows are not repaired by this migration, and the mechanism
+-- is spelled out rather than gestured at, because the obvious reading of it is
+-- wrong. Their TTL deadline is already past, so the next TTL merge deletes them.
+--
+-- What happens to such a trace on its next event does NOT go through the
+-- read-back. This fold declares `readWindow` ±7 days and `trustAbsentMiss: true`
+-- and no `refoldOnStoreMiss`, so a row sitting in partition 196952 is outside
+-- every window a 2026 event produces, the windowed read misses, the executor
+-- takes that miss as authoritative (no unwindowed retry) and folds from
+-- `init()`. The trace escapes 196952 because the WRITE path anchors it —
+-- `firstUsableAnchor([storageAnchorMs, createdAt], now)`, every step validated —
+-- not because anything decoded the old row. Its accumulated totals do not
+-- survive that fold unless the Redis tier still holds the state.
+--
+-- That loss is pre-existing, not introduced here: before this migration the same
+-- cold-cache miss folded from `init()` and rewrote the row back into 196952, so
+-- a log-only trace re-lost its totals on EVERY such delivery, indefinitely. The
+-- anchor bounds that to at most one more occurrence — after the next write the
+-- row is in a real partition, inside the read window, and every later read-back
+-- finds it.
+--
+-- A trace that receives no further event before the reap simply loses its
+-- summary. Recovering those needs a bounded operational replay, which is
+-- deliberately NOT created here. It is feasible: `event_log` is in the same
+-- `traces` retention category as this table but its TTL anchors on
+-- `EventOccurredAt`, a real event time, so the source events outlive the
+-- epoch-filed summary derived from them. See ADR-087 §Backfill and issue #6312,
+-- which stays OPEN — this migration does not claim to close it.
 --
 -- Why the baseline needs a column of its own rather than being re-derived:
 -- `store.get()` decodes the fold's working state straight off this row (ADR-066).

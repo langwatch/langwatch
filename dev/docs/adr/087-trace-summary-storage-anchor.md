@@ -107,16 +107,22 @@ Unlike `trace_analytics`, no stamp is refused. `trace_analytics` refuses pre-000
 
 *Existing sentinel rows are already expired.* Their TTL deadline is `1970 + retention`, so the next TTL merge deletes them. This is not a new consequence of this change; it is the state the table has been in.
 
-*A sentinel-anchored trace that receives any further event heals itself.* The read-back decodes `storageAnchorMs = 0`, which fails `isUsableAnchorMs`, so the next contribution freezes a real anchor; and even with no new contribution the write's `firstUsableAnchor([storageAnchorMs, createdAt], now)` chain guarantees a real time. The row is rewritten into a real partition. The sentinel row is **not** collapsed into it - the RMT only collapses within a partition and these two are in different ones - but its TTL is already past, so it is reaped rather than left as a duplicate.
+*A sentinel-anchored trace that receives a further event escapes 196952 - but not via the read-back, and not with its totals.* This is worth stating precisely, because the intuitive account is wrong and the review of #6430 caught a sibling of exactly that error. The fold declares `readWindow` ±7 days, `trustAbsentMiss: true`, and no `refoldOnStoreMiss`. A row in partition 196952 is outside every window a present-day event produces, so the windowed read misses; `trustAbsentMiss` makes that miss authoritative with no unwindowed retry; and the fold proceeds from `init()`. Nothing decodes the old row. What moves the trace into a real partition is the **write** path - `firstUsableAnchor([storageAnchorMs, createdAt], now)`, every step validated - and the accumulated totals survive only if the Redis tier still holds the state.
+
+That loss is **pre-existing rather than introduced here**, and the anchor is what bounds it. Before this change the same cold-cache miss folded from `init()` and rewrote the row straight back into 196952, so a log-only trace re-lost its totals on *every* such delivery, indefinitely. After it, the loss can happen at most once more: the next write lands the row in a real partition, inside the read window, where every later read-back finds it.
 
 *A sentinel-anchored trace that receives no further event before the reap loses its summary row.* This fold declares no `refoldOnStoreMiss`, so nothing rebuilds it. The trace's spans and log records remain in `stored_spans` and the canonical log store; what is lost is the derived summary - its accumulated cost, tokens and span count.
+
+*The source events for that loss are still there, which is what makes a repair feasible.* `event_log` sits in the same `traces` retention category as `trace_summaries` (`RETENTION_TABLE_CATEGORY_MAP`), but its TTL anchors on `EventOccurredAt` - a real event time - while the summary derived from those same events was filed at the epoch. So the derived row dies years before its inputs do, and any affected trace still inside the tenant's trace-retention window is reconstructible from `event_log`. That asymmetry is the argument both for the loss being real and for a repair being possible; it is not an argument about which repair to run.
 
 **No repair ships here, and that is a decision rather than an oversight.** Two options exist and both are bigger than this change:
 
 1. **Turn on `refoldOnStoreMiss`** so a later event rebuilds the aggregate from `event_log`. That is what [#6430](https://github.com/langwatch/langwatch/pull/6430) proposes. It also requires dropping `trustAbsentMiss`, whose docblock records what it bought when it landed: the unwindowed retry it removed was proving non-existence at roughly 100 unpruned scans a minute. Trading that back is a cost decision about read load, independent of the anchor, and it should be priced on its own.
 2. **A bounded operational replay** from `event_log`, keyed on the traces whose summary is missing. That is a population-scale job in ADR-069's territory and needs its own sizing and its own failure budget.
 
-Neither is bundled with the anchor, because the anchor is correct and shippable without either, and bundling would make an already load-bearing migration depend on an unrelated read-cost trade. Tracked on [#6312](https://github.com/langwatch/langwatch/issues/6312).
+Neither is bundled with the anchor, because the anchor is correct and shippable without either, and bundling would make an already load-bearing migration depend on an unrelated read-cost trade.
+
+**#6312 therefore stays open, and this change does not claim to close it.** That is the reviewer-sanctioned branch rather than a convenience: the P1 raised twice against #6430 asked for a bounded repair "**or** keep the issue open and do not claim it is closed". #6430 claims `Closes #6312` while shipping only forward-only recovery, which is what drew the finding a second time. The anchor and the repair are separable, so they are separated, and the issue tracks the half that is not done.
 
 ## Consequences
 
@@ -124,6 +130,7 @@ Neither is bundled with the anchor, because the anchor is correct and shippable 
 - The joined span read can no longer emit an empty time predicate. The 2 GiB `max_memory_usage` cap from #6602 stays as a belt to these braces - a page of very wide traces inside one legitimate window is still a lot of bytes.
 - The retention floor is a bound of last resort and can exclude spans filed in `stored_spans`' own epoch partition (a trace whose every span carried an unusable start time). Reading those is precisely the full-partition scan the floor exists to prevent, and no bounded read was ever going to return them.
 - `trace_analytics` and `trace_summaries` now share one implementation of the anchor rule. `evaluation_analytics` and `coding_agent_sessions` step 3 remain recorded-only in ADR-071's inventory and are the next adopters of `services/storage-anchor.ts`.
+- The span-seeded-zero defect is now closed everywhere it existed. Reviewing #6430, `langwatch-agent` traced the same question across the folds and found that `evaluation_analytics` has a mutable-anchor concern of its own but does **not** share this span-seeded-zero path, and `trace_analytics` already carries its own `EarliestSpanStartMs` from 00061. So `trace_summaries` was the last table where a contribution that is not a span could file a row at the epoch; what remains on ADR-071's list is the milder mutable-anchor class, not this one.
 
 ## References
 

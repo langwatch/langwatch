@@ -172,3 +172,39 @@ describe("given a trace-summary fold that anchors its storage time", () => {
     });
   });
 });
+
+/**
+ * Migration 00072 and ADR-087 §Backfill both state, in prose that becomes
+ * immutable on merge, what the anchor does NOT recover: a row already in
+ * partition 196952 is outside this fold's read window, `trustAbsentMiss` makes
+ * that miss authoritative, and with no `refoldOnStoreMiss` the fold proceeds
+ * from `init()` — so the trace escapes the epoch partition via the WRITE path,
+ * not by decoding its old row, and its totals do not survive that fold.
+ *
+ * That account is only true while these three options hold together. Flipping
+ * any one of them changes what the migration promises an operator, so they are
+ * pinned here rather than left to the next reader to re-derive. Reviewing #6430,
+ * CodeRabbit raised precisely this class of defect against its sibling: docs
+ * asserting a recovery path the fold contract did not actually provide.
+ */
+describe("given the migration's account of what the anchor does not recover", () => {
+  it("holds the three fold options that account depends on", () => {
+    const options = projection.options as {
+      trustAbsentMiss?: boolean;
+      refoldOnStoreMiss?: boolean;
+      readWindow?: { widthMs: number };
+    };
+
+    // An absent windowed read is final — no unwindowed retry that could find
+    // the epoch row.
+    expect(options.trustAbsentMiss).toBe(true);
+    // And no event_log rebuild behind that miss. Turning this on is the
+    // deferred data-loss decision (#6312), not a silent change.
+    expect(options.refoldOnStoreMiss).toBeUndefined();
+    // A window far narrower than the ~56 years between the epoch partition and
+    // a present-day event, which is why the miss happens at all.
+    expect(options.readWindow?.widthMs).toBeLessThan(
+      Date.now() - new Date(0).getTime(),
+    );
+  });
+});
