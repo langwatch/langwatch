@@ -18,7 +18,9 @@ import { brotliCompressSync, deflateSync, gzipSync } from "node:zlib";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { describe, expect, it } from "vitest";
 
+import { OtlpBodyTooLargeError } from "./errors";
 import {
+  OTLP_MAX_DECOMPRESSED_BYTES,
   parseOtlpLogs,
   parseOtlpMetrics,
   parseOtlpTraces,
@@ -176,6 +178,71 @@ describe("readOtlpBody", () => {
       });
       await expect(readOtlpBody(req)).rejects.toThrow(
         /Unsupported Content-Encoding/,
+      );
+    });
+  });
+
+  describe("when a small body decompresses to an enormous one", () => {
+    // The compressed cap the routes advertise cannot see this: `bodyLimit`
+    // weighs the bytes on the wire and the sender picks the ratio, so a
+    // request comfortably inside 10 MiB expands past it in memory.
+    const bomb = (bytes: number) => gzipSync(Buffer.alloc(bytes, 0));
+
+    it("refuses it rather than holding the expanded body", async () => {
+      const compressed = bomb(OTLP_MAX_DECOMPRESSED_BYTES + 1024);
+      const req = makeRequest(compressed, { "content-encoding": "gzip" });
+
+      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(
+        OtlpBodyTooLargeError,
+      );
+    });
+
+    it("asks the sender for smaller batches with a 413", async () => {
+      const compressed = bomb(OTLP_MAX_DECOMPRESSED_BYTES + 1024);
+      const req = makeRequest(compressed, { "content-encoding": "gzip" });
+
+      await expect(readOtlpBody(req)).rejects.toMatchObject({
+        code: "ERR_PAYLOAD_TOO_LARGE",
+        httpStatus: 413,
+      });
+    });
+
+    it("costs a fraction of the wire budget to send", async () => {
+      // Worth stating as a number: this is why the compressed limit alone was
+      // never a defence.
+      expect(bomb(OTLP_MAX_DECOMPRESSED_BYTES + 1024).byteLength).toBeLessThan(
+        OTLP_MAX_DECOMPRESSED_BYTES / 100,
+      );
+    });
+
+    it.each([
+      "gzip",
+      "deflate",
+      "br",
+    ])("applies the cap to %s as well", async (encoding) => {
+      const payload = Buffer.alloc(OTLP_MAX_DECOMPRESSED_BYTES + 1024, 0);
+      const compressed =
+        encoding === "gzip"
+          ? gzipSync(payload)
+          : encoding === "deflate"
+            ? deflateSync(payload)
+            : brotliCompressSync(payload);
+      const req = makeRequest(compressed, { "content-encoding": encoding });
+
+      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(
+        OtlpBodyTooLargeError,
+      );
+    });
+
+    it("still accepts a body that sits just under the cap", async () => {
+      const payload = Buffer.alloc(OTLP_MAX_DECOMPRESSED_BYTES - 1024, 0);
+      const req = makeRequest(gzipSync(payload), {
+        "content-encoding": "gzip",
+      });
+
+      await expect(readOtlpBody(req)).resolves.toHaveProperty(
+        "byteLength",
+        payload.byteLength,
       );
     });
   });
