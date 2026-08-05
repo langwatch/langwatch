@@ -36,19 +36,14 @@
  * integration test issues real HTTP requests.
  */
 import { timingSafeEqual } from "node:crypto";
-import { createLogger } from "@langwatch/observability";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import {
   buildExplainQuery,
-  CLICKHOUSE_GUARDRAILS,
-  consumeMissingOpsUrlWarning,
   explainBodySchema,
-  getOpsClickHouseClient,
   redactQueryForAudit,
 } from "~/server/ops/explain-core";
-
-const logger = createLogger("langwatch:ops:clickhouse:explain");
+import { OpsExplainService } from "~/server/ops/opsExplain.service";
 
 function bearerTokenMatches(
   headerValue: string | undefined,
@@ -107,18 +102,16 @@ secured
       return c.json({ message: built.reason }, 400);
     }
 
-    // Prefer the dedicated langwatch_ops user (no SOURCES grant, so url/s3/
-    // remote/file/postgresql table functions are refused at the access-check
-    // layer). In PRODUCTION, fail closed when CLICKHOUSE_OPS_URL is unset.
-    let client = getOpsClickHouseClient();
-    let usingFallback = false;
-    if (!client) {
-      if (process.env.NODE_ENV === "production") {
-        logger.error(
-          "CLICKHOUSE_OPS_URL is not set in production — refusing to fall back to the default-user client. " +
-            "Provision a langwatch_ops ClickHouse user with a readonly=1 profile " +
-            "and no SOURCES grant, then set CLICKHOUSE_OPS_URL to it.",
-        );
+    const service = new OpsExplainService(getApp().opsExplain.repository);
+    const outcome = await service.explain({
+      wrappedQuery: built.wrapped!,
+      type: built.type!,
+      isProduction: process.env.NODE_ENV === "production",
+      auditFields: redactQueryForAudit(parsed.data.query),
+    });
+
+    switch (outcome.status) {
+      case "not_configured_in_production":
         return c.json(
           {
             message:
@@ -126,52 +119,15 @@ secured
           },
           503,
         );
-      }
-      if (consumeMissingOpsUrlWarning()) {
-        logger.warn(
-          "CLICKHOUSE_OPS_URL is not set — /ops/clickhouse/explain is falling back to the default-user client. " +
-            "Provision a langwatch_ops ClickHouse user with a readonly=1 profile " +
-            "and no SOURCES grant, then set CLICKHOUSE_OPS_URL to it to remove this fallback.",
+      case "unavailable":
+        return c.json(
+          { message: "ClickHouse is not configured on this instance" },
+          503,
         );
-      }
-      usingFallback = true;
-      client = getSharedClickHouseClient();
-    }
-    if (!client) {
-      return c.json(
-        { message: "ClickHouse is not configured on this instance" },
-        503,
-      );
-    }
-
-    logger.info(
-      {
-        type: built.type,
-        usingFallback,
-        ...redactQueryForAudit(parsed.data.query),
-      },
-      "ops explain",
-    );
-
-    try {
-      // Only send guardrails when we fell back to the default-user client.
-      // The langwatch_ops user runs under the `readonly_safe` profile
-      // (readonly=1), which forbids client-side setting modifications —
-      // sending guardrails here would 400 every request. The profile
-      // already enforces the same caps server-side.
-      const result = await client.query({
-        query: built.wrapped!,
-        format: "JSONEachRow",
-        ...(usingFallback
-          ? { clickhouse_settings: CLICKHOUSE_GUARDRAILS }
-          : {}),
-      });
-      const rows = await result.json();
-      return c.json({ type: built.type, rows });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.warn({ err: msg }, "ops explain failed");
-      return c.json({ message: `ClickHouse error: ${msg}` }, 502);
+      case "error":
+        return c.json({ message: `ClickHouse error: ${outcome.message}` }, 502);
+      case "ok":
+        return c.json({ type: built.type, rows: outcome.rows });
     }
   });
 

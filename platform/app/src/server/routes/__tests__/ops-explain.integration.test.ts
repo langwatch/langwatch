@@ -17,10 +17,24 @@
  * create a stub table inside, a developer's real `langwatch` database on a
  * shared native server.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createApiRouter } from "~/server/api-router";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import { _resetOpsClickHouseClientForTesting } from "~/server/ops/explain-core";
 import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
+
+// The route takes its repository from `getApp()`; standing in for the App
+// keeps this suite testing the route against a real ClickHouse without
+// booting the rest of the application (redis, postgres, event sourcing).
+// The repository itself reads `getOpsClickHouseClient()` /
+// `getSharedClickHouseClient()` fresh on every call, so a single instance
+// built here behaves exactly like one built per request would.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    opsExplain: { repository: new OpsExplainClickHouseRepository() },
+  }),
+}));
+
+import { createApiRouter } from "~/server/api-router";
 
 const API_KEY = "integration-test-key";
 /** This suite's database, resolved in beforeAll and templated into every query. */

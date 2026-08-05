@@ -3,6 +3,7 @@ import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelin
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
+import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
@@ -18,9 +19,11 @@ import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import {
   type ClickHouseClientResolver,
   clearCustomClientCache,
+  getAllClickHouseInstances,
   getClickHouseClientForOrganization,
   getClickHouseClientForProject,
   getSharedClickHouseClient,
@@ -47,6 +50,7 @@ import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
@@ -785,6 +789,9 @@ export function initializeDefaultApp(options?: {
   const gatewayVirtualKeySpendRepository = clickhouseEnabled
     ? new GatewayVirtualKeySpendRepository(resolveClickHouseClient)
     : undefined;
+  const gatewayWebhookEventsRepository = clickhouseEnabled
+    ? new WebhookEventsClickHouseRepository(resolveClickHouseClient)
+    : undefined;
 
   // Gateway budget debits ride the spend pipeline and share its ClickHouse
   // gate: the ledger is the only store spend accrues in.
@@ -1327,6 +1334,8 @@ export function initializeDefaultApp(options?: {
     gateway: {
       budgets: gatewayBudgetRepository,
       virtualKeySpend: gatewayVirtualKeySpendRepository,
+      spendEvents: gatewaySpend?.repository,
+      webhookEvents: gatewayWebhookEventsRepository,
     },
     filters: {
       options: new FilterService(
@@ -1344,6 +1353,14 @@ export function initializeDefaultApp(options?: {
         ),
         "CodingAgentSessionService",
       ),
+    },
+    storedObjects: {
+      crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(
+        getAllClickHouseInstances,
+      ),
+    },
+    opsExplain: {
+      repository: new OpsExplainClickHouseRepository(),
     },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
@@ -1551,7 +1568,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
       topics: new TopicService(new PrismaTopicRepository(testPrisma)),
     },
-    gateway: { budgets: undefined, virtualKeySpend: undefined },
+    gateway: {
+      budgets: undefined,
+      virtualKeySpend: undefined,
+      spendEvents: undefined,
+      webhookEvents: undefined,
+    },
     filters: { options: new FilterService(null) },
     codingAgents: {
       sessions: new CodingAgentSessionService(
@@ -1559,6 +1581,14 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         new NullCodingAgentTraceSessionRepository(),
         new NullSessionMetricSeriesRepository(),
       ),
+    },
+    storedObjects: {
+      crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(
+        async () => [],
+      ),
+    },
+    opsExplain: {
+      repository: new OpsExplainClickHouseRepository(),
     },
     langy: {
       conversations: LangyConversationService.create(

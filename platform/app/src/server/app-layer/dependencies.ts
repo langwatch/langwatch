@@ -1,7 +1,10 @@
+import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import type Stripe from "stripe";
 import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
@@ -40,6 +43,7 @@ import type { ManagerExplorerService } from "./ops/manager-explorer.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
 import type { ReplayService } from "./ops/replay.service";
+import type { OpsExplainClickHouseRepository } from "./ops/repositories/ops-explain.clickhouse.repository";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PresenceService } from "./presence/presence.service";
@@ -136,6 +140,13 @@ export interface AppDependencies {
   gateway: {
     budgets: GatewayBudgetClickHouseRepository | undefined;
     virtualKeySpend: GatewayVirtualKeySpendRepository | undefined;
+    /** Reconciliation reads for the spend-events pull API and its tRPC
+     *  ledger-screen counterpart (ADR-072). */
+    spendEvents: GatewaySpendEventsRepository | undefined;
+    /** The webhook platform's emitted-events log (`gateway_spend` read
+     *  through the webhook envelope shape), shared by the REST events
+     *  list/get endpoints and spend-events replay. */
+    webhookEvents: WebhookEventsClickHouseRepository | undefined;
   };
   /** The values a filter can offer, read from the trace store. */
   filters: {
@@ -144,6 +155,17 @@ export interface AppDependencies {
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {
     sessions: CodingAgentSessionService;
+  };
+  /** Cross-tenant stored-object lookups — the documented, project-filter-free
+   *  exception `/api/files/:id` uses to resolve an id's owning project before
+   *  every subsequent read switches back to a project-scoped client. */
+  storedObjects: {
+    crossTenantOwnerLookup: StoredObjectOwnerClickHouseRepository;
+  };
+  /** The operator-only `/api/ops/clickhouse/explain` endpoint's repository —
+   *  no tenant scoping, by design (see the repository's own doc comment). */
+  opsExplain: {
+    repository: OpsExplainClickHouseRepository;
   };
   /** ADR-046: Langy conversations as an event-sourced projection. */
   langy: {
