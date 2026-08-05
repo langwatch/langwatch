@@ -117,16 +117,7 @@ function mayResolveByLocation(path: string): boolean {
  * is done. Do not add one.
  */
 const RESOLVES_DIRECTLY_BACKLOG = new Set([
-  "ee/billing/services/billableEventsQuery.ts",
-  "ee/governance/routers/governance.ts",
   "ee/governance/services/activity-monitor/activityMonitor.service.ts",
-  "ee/governance/services/cliBootstrap.service.ts",
-  "ee/governance/services/governanceOcsfExport.service.ts",
-  "ee/governance/services/personalUsage.service.ts",
-  "ee/governance/services/pullers/pullerWorker.ts",
-  "ee/governance/services/quarantineFillEvaluator.service.ts",
-  "ee/governance/services/setupState.service.ts",
-  "ee/governance/services/spendSpikeAnomalyEvaluator.service.ts",
   "src/app/api/gateway-spend/[[...route]]/app.ts",
   "src/app/api/webhooks/[[...route]]/app.ts",
   "src/server/api/routers/gatewaySpendEvents.ts",

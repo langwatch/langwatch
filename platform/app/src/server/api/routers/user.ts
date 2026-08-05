@@ -9,6 +9,7 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   Auth0ApiError,
@@ -697,7 +698,9 @@ export const userRouter = createTRPCRouter({
             }
           : undefined;
 
-      const usage = new PersonalUsageService();
+      const usage = PersonalUsageService.create(
+        getApp().governance.personalUsage,
+      );
 
       // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
       // the org's hidden Governance Project tenant. Resolve it read-only
@@ -890,7 +893,10 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
-      const service = CliBootstrapService.create(ctx.prisma);
+      const service = CliBootstrapService.create(
+        ctx.prisma,
+        getApp().gateway.budgets,
+      );
       return await service.resolve({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,

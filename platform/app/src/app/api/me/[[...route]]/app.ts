@@ -9,6 +9,7 @@ import {
   type SecuredApp,
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
@@ -124,7 +125,9 @@ function registerUsageRoute(
           })
         : null;
 
-      const usage = new PersonalUsageService();
+      const usage = PersonalUsageService.create(
+        getApp().governance.personalUsage,
+      );
       const input = {
         personalProjectId: project.id,
         userId: project.ownerUserId,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BillableEventsClickHouseRepository } from "../billable-events.clickhouse.repository";
+import { BillableEventsMeterClickHouseRepository } from "../billable-events.clickhouse.repository";
 
 function record() {
   return {
@@ -24,7 +24,7 @@ describe("BillableEventsClickHouseRepository", () => {
     it("inserts the row into billable_events", async () => {
       resolveClient.mockResolvedValue({ insert: mockClickHouseInsert });
       mockClickHouseInsert.mockResolvedValue(undefined);
-      const repository = new BillableEventsClickHouseRepository(resolveClient);
+      const repository = new BillableEventsMeterClickHouseRepository(resolveClient);
 
       await repository.insert(record(), "org-1");
 
@@ -49,7 +49,7 @@ describe("BillableEventsClickHouseRepository", () => {
   describe("given the resolver returns no client (ClickHouse not configured)", () => {
     it("skips the insert without throwing", async () => {
       resolveClient.mockResolvedValue(null);
-      const repository = new BillableEventsClickHouseRepository(resolveClient);
+      const repository = new BillableEventsMeterClickHouseRepository(resolveClient);
 
       await repository.insert(record(), "org-1");
 
@@ -63,7 +63,7 @@ describe("BillableEventsClickHouseRepository", () => {
       mockClickHouseInsert.mockRejectedValue(
         new Error("ClickHouse connection timeout"),
       );
-      const repository = new BillableEventsClickHouseRepository(resolveClient);
+      const repository = new BillableEventsMeterClickHouseRepository(resolveClient);
 
       await expect(repository.insert(record(), "org-1")).rejects.toThrow(
         "ClickHouse connection timeout",

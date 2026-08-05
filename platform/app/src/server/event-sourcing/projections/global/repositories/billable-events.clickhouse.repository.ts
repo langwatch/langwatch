@@ -21,7 +21,7 @@ export interface BillableEventsRepository {
  * signature rather than the tenant-keyed `ClickHouseClientResolver` most
  * repositories take.
  */
-export class BillableEventsClickHouseRepository
+export class BillableEventsMeterClickHouseRepository
   implements BillableEventsRepository
 {
   constructor(

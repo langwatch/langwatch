@@ -166,66 +166,19 @@ describe("OCSF schema-version forward-compat", () => {
       });
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Patch the export service's CH resolver via a subclass-like
-      // lambda — easiest is to call the repo directly + run the same
-      // SELECT shape the service issues. The service routes through
-      // `getClickHouseClientForOrganization` which we don't easily
-      // override in a unit-style test. Use the service path
-      // end-to-end by patching its private getClickhouse, OR drive
-      // the SELECT directly. The directly-driven SELECT is closer
-      // to what the prod service does: same column list, same
-      // dedup pattern, same DTO shape.
-      const result = await ch.query({
-        query: `
-          SELECT
-            EventId,
-            OcsfSchemaVersion,
-            TraceId,
-            SourceId,
-            SourceType,
-            ClassUid,
-            CategoryUid,
-            ActivityId,
-            TypeUid,
-            SeverityId,
-            toString(toUnixTimestamp64Milli(EventTime)) AS EventTimeMs,
-            ActorUserId,
-            ActorEmail,
-            ActorEnduserId,
-            ActionName,
-            TargetName,
-            AnomalyAlertId,
-            RawOcsfJson
-          FROM governance_ocsf_events
-          WHERE TenantId = {tenantId:String} AND EventId = {eventId:String}
-          LIMIT 1
-        `,
-        query_params: { tenantId: govProjectId, eventId },
-        format: "JSONEachRow",
+      // The export service now takes its ClickHouse repository as a
+      // constructor argument (ADR: repositories reached from the App, not
+      // resolved ad hoc), so it can be pointed at the test client directly
+      // instead of driving the SELECT by hand.
+      const service = GovernanceOcsfExportService.create(prisma, repo);
+      const page = await service.list({
+        organizationId,
+        sinceMs: 0,
+        limit: 10,
       });
-      const rows = (await result.json()) as Array<{
-        EventId: string;
-        OcsfSchemaVersion: string;
-      }>;
-      expect(rows).toHaveLength(1);
-      expect(rows[0]?.OcsfSchemaVersion).toBe("1.1.0");
 
-      // The service-layer DTO shape itself: assert the type carries
-      // the field. (Pure type-narrowing — no runtime work needed
-      // beyond the import.)
-      const _service = GovernanceOcsfExportService.create(prisma);
-      type ExportRow =
-        ReturnType<
-          typeof GovernanceOcsfExportService.prototype.list
-        > extends Promise<infer P>
-          ? P extends { events: Array<infer E> }
-            ? E
-            : never
-          : never;
-      const _typeCheck: ExportRow extends { ocsfSchemaVersion: string }
-        ? true
-        : false = true;
-      expect(_typeCheck).toBe(true);
+      const event = page.events.find((e) => e.eventId === eventId);
+      expect(event?.ocsfSchemaVersion).toBe("1.1.0");
     });
   });
 

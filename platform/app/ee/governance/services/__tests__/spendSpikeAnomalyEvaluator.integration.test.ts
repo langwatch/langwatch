@@ -31,6 +31,7 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { GovernanceKpisClickHouseRepository } from "../governanceKpis.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 import { SpendSpikeAnomalyEvaluator } from "../spendSpikeAnomalyEvaluator.service";
 
@@ -72,6 +73,7 @@ async function insertGovernanceKpiRow(
 describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis + AnomalyAlert", () => {
   const namespace = `spend-spike-${nanoid(8)}`;
   let ch: ClickHouseClient;
+  let kpisRepository: GovernanceKpisClickHouseRepository;
   let org: Organization;
   let govProject: Project;
   let primarySourceId: string;
@@ -85,6 +87,7 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
       throw new Error("ClickHouse test container not available");
     }
     ch = maybeCh;
+    kpisRepository = new GovernanceKpisClickHouseRepository(async () => ch);
 
     org = await prisma.organization.create({
       data: {
@@ -177,7 +180,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         },
       });
 
-      const evaluator = SpendSpikeAnomalyEvaluator.create(prisma);
+      const evaluator = SpendSpikeAnomalyEvaluator.create(
+        prisma,
+        kpisRepository,
+      );
       // evaluator.evaluateAll() iterates ALL active spend_spike rules in PG,
       // so its bulk counters reflect global state (other orgs' rules from
       // dogfood fixtures may be present). Assertions stay scoped to MY rule's
@@ -208,7 +214,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
 
     describe("dedup invariant — re-running on the same window", () => {
       it("does not create a second AnomalyAlert for the same rule + window", async () => {
-        const evaluator = SpendSpikeAnomalyEvaluator.create(prisma);
+        const evaluator = SpendSpikeAnomalyEvaluator.create(
+          prisma,
+          kpisRepository,
+        );
         await evaluator.evaluateAll({ now: NOW });
 
         const alerts = await prisma.anomalyAlert.findMany({
@@ -241,7 +250,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         },
       });
 
-      const evaluator = SpendSpikeAnomalyEvaluator.create(prisma);
+      const evaluator = SpendSpikeAnomalyEvaluator.create(
+        prisma,
+        kpisRepository,
+      );
       await evaluator.evaluateAll({ now: NOW });
 
       // The source-scoped rule has zero matching governance_kpis rows
@@ -273,7 +285,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         },
       });
 
-      const evaluator = SpendSpikeAnomalyEvaluator.create(prisma);
+      const evaluator = SpendSpikeAnomalyEvaluator.create(
+        prisma,
+        kpisRepository,
+      );
       await evaluator.evaluateAll({ now: NOW });
 
       // Archived rule is filtered out by the findMany WHERE clause in
