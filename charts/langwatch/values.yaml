@@ -1612,6 +1612,17 @@ clickhouse:
   ## @param clickhouse.chartManaged [default: true] Manage ClickHouse via this chart using the clickhouse-serverless subchart (false = external).
   chartManaged: true
 
+  # The server's max_concurrent_queries, which is what the app and worker pods
+  # divide across the fleet to size their connection pools. This does NOT
+  # configure the server; it tells the clients what the server will accept, so
+  # change it here only when the server itself is tuned away from the ClickHouse
+  # default. Applies to chart-managed and external ClickHouse alike. Each pod
+  # receives its own Deployment's replica count alongside this number, so the
+  # pools stay inside the budget as app.replicaCount and workers.replicaCount
+  # grow.
+  ## @param clickhouse.serverMaxConcurrentQueries [default: 300] The ClickHouse server's max_concurrent_queries. App and worker pods size their connection pools from this, split across their replicas. Set it to match a server tuned away from the ClickHouse default; it does not change the server setting.
+  serverMaxConcurrentQueries: 300
+
   # ---------------------------------------------------------------------------
   # External ClickHouse (when chartManaged: false)
   # ---------------------------------------------------------------------------

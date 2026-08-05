@@ -608,6 +608,45 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/* ============================================================ */}}
+{{/* ClickHouse client pool sizing                                 */}}
+{{/* ============================================================ */}}
+{{/*
+     Per-Deployment inputs for the ClickHouse client's pool sizing.
+
+     The client derives its pool size from the server's concurrent-query budget
+     divided across the fleet (resolvePoolSize in @langwatch/clickhouse-client).
+     A pod that is not told how many siblings it has cannot divide by anything,
+     so the derivation is skipped and the client keeps a fixed 64 connections
+     per pool - the sizing that let a fleet of app and worker pods, each holding
+     two client instances, ask for far more connections than the server's
+     max_concurrent_queries allows, and had ClickHouse reject tens of thousands
+     of queries with TOO_MANY_SIMULTANEOUS_QUERIES on 2026-07-31. Rendering
+     these two variables is what turns the derivation on.
+
+     The replica count cannot come from the downward API: fieldRef exposes
+     pod-level fields only, and the replica count belongs to the Deployment, so
+     a pod cannot read its own. It is templated from the same value that sets
+     `spec.replicas` on the Deployment, so the two can never disagree in a
+     rendered release. An operator who scales outside Helm (`kubectl scale`, or
+     an autoscaler) must keep the value in step, otherwise the pods keep sizing
+     for the old count.
+
+     CLICKHOUSE_CLIENTS_PER_PROCESS is deliberately not rendered. How many
+     client instances a process constructs is a property of the application
+     code, not of the deployment, so the chart has no honest value for it and
+     the package's own default (2, one raw client plus one app-layer factory)
+     is the right answer.
+
+     Usage: include with (dict "replicas" .Values.app.replicaCount "ctx" .)
+*/}}
+{{- define "langwatch.clickhousePoolSizingEnv" -}}
+- name: CLICKHOUSE_CLIENT_REPLICAS
+  value: {{ .replicas | default 1 | quote }}
+- name: CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES
+  value: {{ ((.ctx.Values.clickhouse).serverMaxConcurrentQueries) | default 300 | quote }}
+{{- end }}
+
+{{/* ============================================================ */}}
 {{/* Shared Environment Variables                                  */}}
 {{/* ============================================================ */}}
 {{/* Common env vars shared between app and workers deployments */}}

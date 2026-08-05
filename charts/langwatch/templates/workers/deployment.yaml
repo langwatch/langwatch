@@ -124,6 +124,12 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
+            # ClickHouse connection-pool sizing, from this Deployment's own
+            # replica count. Workers are usually the larger half of the fleet,
+            # so a workers pod left on the fixed default is the whole problem
+            # the derivation exists to solve.
+            {{- include "langwatch.clickhousePoolSizingEnv" (dict "replicas" .Values.workers.replicaCount "ctx" .) | nindent 12 }}
+
             # See the app deployment — named per role so worker telemetry is
             # separable from the app's.
             - name: OTEL_SERVICE_NAME
