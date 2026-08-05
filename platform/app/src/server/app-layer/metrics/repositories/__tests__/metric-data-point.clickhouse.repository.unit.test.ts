@@ -532,7 +532,8 @@ describe("MetricDataPointClickHouseRepository", () => {
 
       expect(new Set(parameterNames).size).toBe(1);
       // Every per-point value rides inside an array, so the count is the
-      // whole contract: nine, whatever the chunk holds.
+      // whole contract: eleven, whatever the chunk holds. Seven arrays, the
+      // tenant, and the three constant bounds the read prunes partitions with.
       expect(parameterNames[0]!.split(",")).toEqual(
         [
           "fromNanos",
@@ -540,6 +541,8 @@ describe("MetricDataPointClickHouseRepository", () => {
           "fromTimes",
           "scanFrom",
           "seriesIds",
+          "spanEnd",
+          "spanStart",
           "tenantId",
           "toNanos",
           "toPoints",
@@ -664,10 +667,20 @@ describe("MetricDataPointClickHouseRepository", () => {
               row.timeUnixMs >= (params.scanFrom as number),
           )
           .sort(order);
+        // The constant partition bounds each branch adds are applied here too,
+        // so a bound that wrongly excluded a row would surface as a successor
+        // this read failed to return rather than as a silent scan difference.
         const withinSpan = inSeries.filter(
-          (row) => order(row, from) > 0 && order(row, to) < 0,
+          (row) =>
+            row.timeUnixMs <= (params.spanEnd as number) &&
+            order(row, from) > 0 &&
+            order(row, to) < 0,
         );
-        const pastSpan = inSeries.find((row) => order(row, to) > 0);
+        const pastSpan = inSeries.find(
+          (row) =>
+            row.timeUnixMs >= (params.spanStart as number) &&
+            order(row, to) > 0,
+        );
         return pastSpan ? [...withinSpan, pastSpan] : withinSpan;
       });
     }

@@ -76,9 +76,28 @@ const SEEKS_PER_QUERY = 64;
  * row per point cannot change which successor a point resolves to.
  *
  * SEEK_SELECT appears exactly once, in the `series_points` CTE, and that CTE
- * carries the tenant, series and lower-bound predicates itself - the branches
- * add only the comparisons that need the joined span. The index seek therefore
- * does not depend on predicate pushdown; the CTE is already the seek.
+ * carries the tenant, series and lower-bound predicates itself - TenantId
+ * first, matching the table's sort key - so the branches add only the
+ * comparisons that need the joined span. Correctness therefore does not depend
+ * on predicate pushdown; the CTE is already the seek.
+ *
+ * Each branch does add the one constant bound its own half can prove, because
+ * a bound reached only through the join cannot prune partitions and
+ * `metric_data_points` partitions by `toYearWeek(TimeUnixMs)`. A span row sits
+ * below its series' far end, so it sits below `spanEnd`, the furthest of them;
+ * a row past the far end sits above `spanStart`, the nearest. Both are pure
+ * upside: pushed down they prune, left in place they are a cheap filter over
+ * rows the branch discards anyway. Range-filtering TimeUnixMs under FINAL is
+ * safe here because it is part of the dedup key - a different TimeUnixMs is a
+ * different row, never a later version of this one, so no version can drift
+ * out of the window (the movable-column trap in
+ * dev/docs/best_practices/clickhouse-queries.md).
+ *
+ * The `LIMIT 1 BY` is the narrow kind that doc permits, not the kind it bans:
+ * the branch selects the six sequence columns and nothing heavy, so a granule
+ * costs nothing to materialise. Do not let it grow a payload, attribute or
+ * bucket column - at that point it becomes the anti-pattern and wants the
+ * IN-tuple form instead.
  */
 const SUCCESSOR_SEEK_QUERY = `
   WITH spans AS (
@@ -108,11 +127,13 @@ const SUCCESSOR_SEEK_QUERY = `
   SELECT * FROM (
     (SELECT series_points.*
      FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
-     WHERE ${orderedAfter("From")} AND ${orderedBefore("To")})
+     WHERE series_points.SeekTime <= fromUnixTimestamp64Milli({spanEnd:Int64})
+       AND ${orderedAfter("From")} AND ${orderedBefore("To")})
     UNION ALL
     (SELECT series_points.*
      FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
-     WHERE ${orderedAfter("To")}
+     WHERE series_points.SeekTime >= fromUnixTimestamp64Milli({spanStart:Int64})
+       AND ${orderedAfter("To")}
      ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC,
        series_points.TimeUnixNano ASC, series_points.PointId ASC
      LIMIT 1 BY SeriesId)
@@ -241,14 +262,16 @@ function seriesSpans(
 }
 
 /**
- * Nine parameters, whatever the chunk holds - eight of them arrays the server
+ * Eleven parameters, whatever the chunk holds - seven of them arrays the server
  * zips back into one row per series.
  *
- * `scanFrom` is the earliest span start and exists purely so the read prunes
- * partitions: `metric_data_points` partitions by `toYearWeek(TimeUnixMs)`, and
- * a predicate that only reaches the column through the join cannot prune.
- * Nanosecond values travel as strings because they exceed what a JSON number
- * carries exactly; the statement casts them back with `toUInt64`.
+ * Three are the constant time bounds the statement prunes partitions with, and
+ * they are the widest each scope can prove: `scanFrom` the earliest span start
+ * for the shared CTE, `spanEnd` the latest span end for the branch that reads
+ * within the spans, `spanStart` the earliest span end for the branch that
+ * reads past them. Nanosecond values travel as strings because they exceed
+ * what a JSON number carries exactly; the statement casts them back with
+ * `toUInt64`.
  */
 function successorSeekParams({
   tenantId,
@@ -267,6 +290,8 @@ function successorSeekParams({
     toNanos: spans.map((span) => span.last.timeUnixNano),
     toPoints: spans.map((span) => span.last.pointId),
     scanFrom: Math.min(...spans.map((span) => span.first.timeUnixMs)),
+    spanStart: Math.min(...spans.map((span) => span.last.timeUnixMs)),
+    spanEnd: Math.max(...spans.map((span) => span.last.timeUnixMs)),
   };
 }
 
