@@ -91,12 +91,21 @@ export function assetBaseOrigin(base: string): string | null {
  * resolver is defined before the entry chunk's dynamic imports evaluate.
  */
 export function assetBaseBootstrapScript(base: string): string {
+  return `<script>${assetBaseBootstrapBody(base)}</script>`;
+}
+
+/**
+ * The bootstrap's JS on its own, without the surrounding `<script>` element, so
+ * tests can execute exactly the code the browser runs instead of regexing it
+ * back out of the rendered tag.
+ */
+export function assetBaseBootstrapBody(base: string): string {
   // `base` is already URL-validated (no raw "<"), but escape "<" for defence in
   // depth so the JSON string literal can never terminate the <script> element.
   const json = JSON.stringify(base).replace(/</g, "\\u003c");
   return (
-    `<script>window.${ASSET_BASE_GLOBAL}=${json};` +
-    `window.${ASSET_URL_GLOBAL}=function(p){return window.${ASSET_BASE_GLOBAL}+p};</script>`
+    `window.${ASSET_BASE_GLOBAL}=${json};` +
+    `window.${ASSET_URL_GLOBAL}=function(p){return window.${ASSET_BASE_GLOBAL}+p};`
   );
 }
 

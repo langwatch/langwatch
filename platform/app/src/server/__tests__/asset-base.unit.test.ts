@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ASSET_URL_GLOBAL,
-  assetBaseBootstrapScript,
+  assetBaseBootstrapBody,
   assetBaseOrigin,
   injectAssetBaseIntoHtml,
   normalizeAssetBase,
@@ -16,13 +16,9 @@ const CDN = "https://cdn.langwatch.ai/abc123/";
  * runs rather than a re-implementation of it.
  */
 function evalResolver(base: string): (p: string) => string {
-  const inner = /<script>([\s\S]*?)<\/script>/.exec(
-    assetBaseBootstrapScript(base),
-  )?.[1];
-  if (!inner) throw new Error("bootstrap script had no body");
   const win: Record<string, unknown> = {};
   // eslint-disable-next-line @typescript-eslint/no-implied-eval
-  new Function("window", inner)(win);
+  new Function("window", assetBaseBootstrapBody(base))(win);
   return win[ASSET_URL_GLOBAL] as (p: string) => string;
 }
 
