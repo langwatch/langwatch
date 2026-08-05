@@ -11,7 +11,6 @@
  *   AC3 — Covered by a test proving an over-threshold span IO opens
  *         full in prompt studio.
  *
- * BDD structure: given/when nested describes, action-based it() names.
  */
 import { createLogger } from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,10 +25,6 @@ import type { Protections } from "~/server/traces/protections";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 import { resolveOffloadedTracesBatch } from "../resolve-offloaded-traces-batch";
-
-// ---------------------------------------------------------------------------
-// Hoisted mock — only the raw CH SQL boundary
-// ---------------------------------------------------------------------------
 
 const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
@@ -55,10 +50,6 @@ vi.mock("langwatch", () => ({
     },
   }),
 }));
-
-// ---------------------------------------------------------------------------
-// Constants / helpers
-// ---------------------------------------------------------------------------
 
 const LARGE_BYTE_COUNT = 400_000;
 const FULL_OUTPUT = "x".repeat(LARGE_BYTE_COUNT);
@@ -153,10 +144,6 @@ function buildService(blobStore: BlobStore): ClickHouseTraceService {
 beforeEach(() => {
   vi.clearAllMocks();
 });
-
-// ---------------------------------------------------------------------------
-// AC1 + AC2 + AC3 — over-threshold span IO opens full in prompt studio
-// ---------------------------------------------------------------------------
 
 describe("ClickHouseTraceService.getSpanForPromptStudio — #5753 blob resolution", () => {
   describe("given a >64 KB offloaded LLM span read via getSpanForPromptStudio", () => {
