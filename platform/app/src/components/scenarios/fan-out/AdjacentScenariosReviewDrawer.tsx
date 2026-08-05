@@ -382,7 +382,9 @@ function VariantRow({
           disabled={isDecided}
           size="sm"
         >
-          <Checkbox.HiddenInput />
+          <Checkbox.HiddenInput
+            aria-label={`Select ${variant.scenario?.name ?? variant.lens}`}
+          />
           <Checkbox.Control />
         </Checkbox.Root>
       </Box>

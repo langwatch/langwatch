@@ -195,6 +195,76 @@ describe("FanOutRunService", () => {
     });
   });
 
+  describe("given one variant fails to reach the queue", () => {
+    it("counts only what was queued", async () => {
+      const queueSimulationRun = vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("queue unavailable"));
+      const { service } = makeService(queueSimulationRun);
+
+      const result = await service.startRun({
+        ...baseParams,
+        seedScenarioId: null,
+        approvedVariants: [
+          variant({ id: "v1", scenarioId: "scenario_1" }),
+          variant({ id: "v2", scenarioId: "scenario_2" }),
+        ],
+      });
+
+      expect(result.itemCount).toBe(1);
+    });
+
+    it("takes back the run id it reserved for the item that never queued", async () => {
+      const queueSimulationRun = vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("queue unavailable"));
+      const { service, fanOutRepository } = makeService(queueSimulationRun);
+
+      await service.startRun({
+        ...baseParams,
+        seedScenarioId: null,
+        approvedVariants: [
+          variant({ id: "v1", scenarioId: "scenario_1" }),
+          variant({ id: "v2", scenarioId: "scenario_2" }),
+        ],
+      });
+
+      // A run id pointing at a run that will never exist keeps the variant in
+      // totalVariants and out of finishedVariants forever, so the blast radius
+      // would carry a denominator it can never meet.
+      const cleared = fanOutRepository.setVariantScenarioRunId.mock.calls
+        .map((call) => call[0] as { id: string; scenarioRunId: string | null })
+        .filter((input) => input.scenarioRunId === null);
+      expect(cleared).toHaveLength(1);
+      expect(cleared[0]!.id).toBe("v2");
+    });
+
+    it("leaves the run id of the variant that did queue in place", async () => {
+      const queueSimulationRun = vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("queue unavailable"));
+      const { service, fanOutRepository } = makeService(queueSimulationRun);
+
+      await service.startRun({
+        ...baseParams,
+        seedScenarioId: null,
+        approvedVariants: [
+          variant({ id: "v1", scenarioId: "scenario_1" }),
+          variant({ id: "v2", scenarioId: "scenario_2" }),
+        ],
+      });
+
+      const clearedIds = fanOutRepository.setVariantScenarioRunId.mock.calls
+        .map((call) => call[0] as { id: string; scenarioRunId: string | null })
+        .filter((input) => input.scenarioRunId === null)
+        .map((input) => input.id);
+      expect(clearedIds).not.toContain("v1");
+    });
+  });
+
   describe("given the seed is a real scenario", () => {
     /** @scenario "The seed itself runs alongside the variants as a baseline" */
     it("runs the seed alongside the variants as a baseline", async () => {

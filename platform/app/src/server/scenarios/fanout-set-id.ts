@@ -12,12 +12,8 @@
 
 import { INTERNAL_SET_PREFIX } from "./internal-set-id";
 
-/** Suffix that identifies a fan-out set ID */
 export const FANOUT_SET_SUFFIX = "__fanout";
 
-/**
- * Checks if a set ID belongs to a fan-out batch.
- */
 export function isFanOutSetId(setId: string): boolean {
   // Length guard, not just prefix and suffix: without it a string where the
   // two overlap satisfies both checks and extraction returns an empty batch id.
@@ -28,17 +24,10 @@ export function isFanOutSetId(setId: string): boolean {
   );
 }
 
-/**
- * Generates the set ID for a given fan-out batch.
- */
 export function getFanOutSetId(batchId: string): string {
   return `${INTERNAL_SET_PREFIX}${batchId}${FANOUT_SET_SUFFIX}`;
 }
 
-/**
- * Extracts the batch ID from a fan-out set ID.
- * Returns null if the set ID is not a fan-out set ID.
- */
 export function extractFanOutBatchId(setId: string): string | null {
   if (!isFanOutSetId(setId)) return null;
   return setId.slice(INTERNAL_SET_PREFIX.length, -FANOUT_SET_SUFFIX.length);

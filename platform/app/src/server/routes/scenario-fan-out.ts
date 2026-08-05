@@ -14,6 +14,7 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { MalformedRequestError } from "~/server/api/validation";
 import { ProjectPermissionDeniedError } from "~/server/app-layer/permissions/errors";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -51,6 +52,22 @@ const requestSchema = z.object({
   ]),
 });
 
+/**
+ * A body that never parsed is a different failure from one that parsed and
+ * failed the schema, and the customer can act on both. Letting the decode
+ * reject would surface a bare SyntaxError as generic server copy.
+ */
+async function readJsonBody(c: { req: { json: () => Promise<unknown> } }) {
+  try {
+    return await c.req.json();
+  } catch (error) {
+    throw new MalformedRequestError({
+      target: "json",
+      detail: error instanceof Error ? error.message : "unparseable body",
+    });
+  }
+}
+
 const secured = createServiceApp({ basePath: "/api/scenario/fan-out" });
 
 secured
@@ -67,7 +84,7 @@ secured
       throw new FanOutUnauthenticatedError();
     }
 
-    const parsed = requestSchema.safeParse(await c.req.json());
+    const parsed = requestSchema.safeParse(await readJsonBody(c));
     if (!parsed.success) {
       throw ValidationError.fromZodError(parsed.error);
     }

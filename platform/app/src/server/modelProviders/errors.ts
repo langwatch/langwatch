@@ -26,6 +26,53 @@ export class ModelProviderNotFoundError extends HandledError {
   }
 }
 
+/**
+ * The model a request resolved to names a provider this project has not set
+ * up. Something is connected, it is just not the thing this model needs, which
+ * is the distinction `missing_provider` already draws against the Go-side
+ * `no_provider_configured` ("nothing connected at all").
+ *
+ * Thrown from `getVercelAIModel` rather than left as a plain `Error`: the cause
+ * is known and the caller can act on it, so it is the ADR-045 test passing
+ * rather than an infra failure being dressed up. The remediation sentence that
+ * used to ride inside the message now lives in the presentation registry,
+ * which is where the words a customer reads belong.
+ */
+export class ModelProviderNotConfiguredError extends HandledError {
+  declare readonly code: "missing_provider";
+
+  constructor(providerKey: string) {
+    super(
+      "missing_provider",
+      `Model provider "${providerKey}" is not configured for this project.`,
+      { meta: { providerKey }, httpStatus: 400, fault: "customer" },
+    );
+    this.name = "ModelProviderNotConfiguredError";
+  }
+}
+
+/**
+ * The provider behind the resolved model exists but is switched off.
+ *
+ * Deliberately lighter than {@link ModelProviderDisabledError}, which carries
+ * the whole cascade context (feature, role, scope, alternate) so the frontend
+ * can offer a one-click swap. This one is reached on the explicit-model path,
+ * where none of that context exists. Same code, so the customer reads the same
+ * copy either way.
+ */
+export class ModelProviderNotEnabledError extends HandledError {
+  declare readonly code: "model_provider_disabled";
+
+  constructor(providerKey: string) {
+    super(
+      "model_provider_disabled",
+      `Model provider "${providerKey}" is configured but disabled.`,
+      { meta: { providerKey }, httpStatus: 400, fault: "customer" },
+    );
+    this.name = "ModelProviderNotEnabledError";
+  }
+}
+
 /** What the call was missing. Drives the copy; never rendered raw. */
 export type ModelProviderAnchorRequirement =
   /** Either handle identifies the tenant, so either one will do. */

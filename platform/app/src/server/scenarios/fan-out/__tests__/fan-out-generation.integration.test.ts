@@ -12,7 +12,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 const generateObjectMock = vi.hoisted(() => vi.fn());
 vi.mock("ai", () => ({ generateObject: generateObjectMock }));
 vi.mock("~/server/modelProviders/utils", () => ({
-  getVercelAIModel: vi.fn().mockResolvedValue({ modelId: "test-model" }),
+  getVercelAIModel: vi.fn().mockResolvedValue({ modelId: "gpt-5-mini" }),
 }));
 
 import { getTestUser } from "../../../../utils/testUtils";
@@ -30,7 +30,11 @@ function variantFixture(lens: string, index: number) {
     lens,
     name: `Variant ${index}`,
     situation: `Situation for ${lens}`,
-    criteria: [`Criterion for ${lens}`],
+    criteria: [
+      `First criterion for ${lens}`,
+      `Second criterion for ${lens}`,
+      `Third criterion for ${lens}`,
+    ],
     rationale: `Why ${lens} is a distinct adjacent case`,
   };
 }

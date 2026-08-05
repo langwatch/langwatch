@@ -202,6 +202,25 @@ export class FanOutRunService {
       occurredAt: now,
     });
 
+    // A run id written for an item that never made it onto the queue is worse
+    // than no id at all: the report would look for a run that will never
+    // exist, so the variant sits in totalVariants and never reaches
+    // finishedVariants, and the blast radius keeps a denominator it can never
+    // meet. Take those ids back.
+    const seedOffset = seedItem ? 1 : 0;
+    const abandoned = variantItems.filter(
+      (_, index) => settled[index + seedOffset]?.status === "rejected",
+    );
+    await Promise.all(
+      abandoned.map((item) =>
+        this.fanOutRepository.setVariantScenarioRunId({
+          id: item.variantId,
+          projectId: params.projectId,
+          scenarioRunId: null,
+        }),
+      ),
+    );
+
     const queuedCount = settled.filter(
       (outcome) => outcome.status === "fulfilled",
     ).length;

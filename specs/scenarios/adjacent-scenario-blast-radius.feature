@@ -95,10 +95,17 @@ Feature: Blast Radius Execution and Reporting
     Then the report is refused with a named error
 
   @unit
-  Scenario: Blast radius is the ratio of failed to total variants
+  Scenario: Blast radius is the ratio of failed to finished variants
     Given a batch run has finished with 3 of 7 variants failing
     When the blast radius report is computed
     Then the reported blast radius is 3/7
+
+  @unit
+  Scenario: Blast radius ignores variants that have not finished
+    Given a batch of 7 variants where only 4 have finished and 3 of those failed
+    When the blast radius report is computed
+    Then the reported blast radius is 3/4
+    And it is not 3/7, because a variant still running is not a variant that passed
 
   # ============================================================================
   # Library

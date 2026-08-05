@@ -29,13 +29,14 @@ import { ScenarioRepository } from "../scenario.repository";
 import { FanOutSeedScenarioNotFoundError } from "./errors";
 import { FanOutRepository } from "./fan-out.repository";
 
-/** Generates a fan-out batch id. */
 function generateFanOutBatchId(): string {
   return generate(KSUID_RESOURCES.FAN_OUT_BATCH).toString();
 }
 
 const logger = createLogger("langwatch:scenarios:fan-out:generation");
 
+const MIN_CRITERIA = 3;
+const MAX_CRITERIA = 6;
 const MIN_VARIANTS = 5;
 const MAX_VARIANTS = 8;
 const DEFAULT_VARIANT_COUNT = 6;
@@ -61,9 +62,16 @@ const variantSchema = z.object({
     .describe(
       "The context and setup for this variant: user persona, emotional state, background, and goal",
     ),
+  // Bounded, not just described: the prompt asks for 3-6, but a model that
+  // returns none would put a variant with nothing to judge in front of a
+  // reviewer, and the schema is what actually holds.
   criteria: z
     .array(z.string())
-    .describe("3-6 specific, observable success criteria for this variant"),
+    .min(MIN_CRITERIA)
+    .max(MAX_CRITERIA)
+    .describe(
+      `${MIN_CRITERIA}-${MAX_CRITERIA} specific, observable success criteria for this variant`,
+    ),
   rationale: z
     .string()
     .describe(
@@ -90,7 +98,7 @@ const SEED_DRAFT_SYSTEM_PROMPT = `You are a scenario-seed drafting assistant for
 
 const seedDraftSchema = z.object({
   situation: z.string(),
-  criteria: z.array(z.string()),
+  criteria: z.array(z.string()).min(MIN_CRITERIA).max(MAX_CRITERIA),
 });
 
 export type FanOutTarget = {

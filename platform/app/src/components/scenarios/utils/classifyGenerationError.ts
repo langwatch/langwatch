@@ -77,6 +77,10 @@ function recoveryFor(code: string | undefined): {
     case "no_provider_configured":
     case "model_not_allowed":
     case "llm_model_not_set":
+    case "model_not_configured":
+    // Switched off rather than absent, but the fix is the same trip to
+    // settings and retrying as-is cannot work.
+    case "model_provider_disabled":
       return { tier: "config", cta: "configure" };
 
     // A credential the customer owns was refused. Same destination as `config`,
@@ -125,7 +129,8 @@ function explain(error: unknown): ErrorExplanation {
       meta: error.meta,
       httpStatus: 0,
       fault: "customer",
-      traceId: undefined,
+      traceId:
+        error instanceof FanOutGenerationError ? error.traceId : undefined,
       spanId: undefined,
       reasons: [],
     });
@@ -149,6 +154,10 @@ export function classifyGenerationError(error: unknown): GenerationErrorClass {
     cta,
     title: explanation.title,
     copy: explanation.description,
-    traceId: handled?.traceId,
+    // The generation clients strip the envelope, so the handled payload is not
+    // readable off the error; take the id they carried instead.
+    traceId:
+      handled?.traceId ??
+      (error instanceof FanOutGenerationError ? error.traceId : undefined),
   };
 }

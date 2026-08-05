@@ -71,7 +71,7 @@ const baseParams = {
 describe("FanOutReportService", () => {
   describe("given every variant run has finished", () => {
     describe("when 3 of 7 failed", () => {
-      /** @scenario "Blast radius is the ratio of failed to total variants" */
+      /** @scenario "Blast radius is the ratio of failed to finished variants" */
       it("reports a blast radius of 3/7", async () => {
         const variants = Array.from({ length: 7 }, (_, i) =>
           variant({ id: `variant_${i}`, scenarioRunId: `run_${i}` }),
@@ -92,6 +92,44 @@ describe("FanOutReportService", () => {
         expect(report.totalVariants).toBe(7);
         expect(report.failedVariants).toBe(3);
         expect(report.blastRadius).toBeCloseTo(3 / 7);
+      });
+    });
+
+    describe("when only some of the batch has finished", () => {
+      /** @scenario "Blast radius ignores variants that have not finished" */
+      it("divides by what finished, not by the whole batch", async () => {
+        const variants = Array.from({ length: 7 }, (_, i) =>
+          variant({ id: `variant_${i}`, scenarioRunId: `run_${i}` }),
+        );
+        // 3 failed, 1 passed, 3 never reported.
+        const runs = [
+          run({ scenarioRunId: "run_0", status: ScenarioRunStatus.FAILED }),
+          run({ scenarioRunId: "run_1", status: ScenarioRunStatus.FAILED }),
+          run({ scenarioRunId: "run_2", status: ScenarioRunStatus.FAILED }),
+          run({ scenarioRunId: "run_3", status: ScenarioRunStatus.SUCCESS }),
+          run({
+            scenarioRunId: "run_4",
+            status: ScenarioRunStatus.IN_PROGRESS,
+          }),
+          run({
+            scenarioRunId: "run_5",
+            status: ScenarioRunStatus.IN_PROGRESS,
+          }),
+          run({ scenarioRunId: "run_6", status: ScenarioRunStatus.PENDING }),
+        ];
+
+        const report = await serviceReturning(runs).getBlastRadiusReport({
+          ...baseParams,
+          variants,
+        });
+
+        // This is the case that tells the two definitions apart: a
+        // total-variants denominator would report 3/7 and quietly count three
+        // unfinished runs as passes.
+        expect(report.totalVariants).toBe(7);
+        expect(report.finishedVariants).toBe(4);
+        expect(report.blastRadius).toBeCloseTo(3 / 4);
+        expect(report.blastRadius).not.toBeCloseTo(3 / 7);
       });
     });
 

@@ -34,7 +34,7 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
 export interface AdjacentScenariosGenerateModalProps {
   open: boolean;
   onClose: () => void;
-  /** Which agent/prompt the generated scenarios will run against. */
+  /** Which target the generated scenarios will run against. */
   target: FanOutTarget;
   /**
    * Pre-filled seed. Omit for the free-text path, where the description the

@@ -45,13 +45,32 @@ export type FanOutGenerationResult = z.infer<typeof responseSchema>;
  * code-keyed registry, so nothing user-facing is authored here.
  */
 export class FanOutGenerationError extends Error {
-  constructor(
-    message: string,
-    public readonly kind: string,
-    public readonly meta: Record<string, unknown> = {},
-  ) {
+  readonly kind: string;
+  readonly meta: Record<string, unknown>;
+  /**
+   * The support handle from the response envelope. Carried because this is a
+   * plain client error that `readHandledError` cannot recognise, so without it
+   * the trace id the server went to the trouble of attaching is dropped before
+   * anything can show it.
+   */
+  readonly traceId: string | undefined;
+
+  constructor({
+    message,
+    kind,
+    meta = {},
+    traceId,
+  }: {
+    message: string;
+    kind: string;
+    meta?: Record<string, unknown>;
+    traceId?: string;
+  }) {
     super(message);
     this.name = "FanOutGenerationError";
+    this.kind = kind;
+    this.meta = meta;
+    this.traceId = traceId;
   }
 }
 
@@ -101,7 +120,12 @@ export async function generateAdjacentScenarios({
     // spread alongside it.
     const handled = readHandledError(payload);
     if (handled) {
-      throw new FanOutGenerationError(handled.code, handled.code, handled.meta);
+      throw new FanOutGenerationError({
+        message: handled.code,
+        kind: handled.code,
+        meta: handled.meta,
+        traceId: handled.traceId,
+      });
     }
     throw new Error("Could not generate adjacent scenarios");
   }

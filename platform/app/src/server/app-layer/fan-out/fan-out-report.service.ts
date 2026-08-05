@@ -18,16 +18,28 @@ import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 /**
- * A run counts against the blast radius when it did not demonstrate the agent
- * handling the case. STALLED belongs here with the rest: it finished without
- * meeting the criteria, and scoring it as a pass would quietly shrink the
- * blast radius every time a run wedged.
+ * A run counts against the blast radius when it finished without demonstrating
+ * the agent handling the case. STALLED belongs here with the rest: it finished
+ * without meeting the criteria, and scoring it as a pass would quietly shrink
+ * the blast radius every time a run wedged.
  */
 const FAILING_STATUSES = new Set<ScenarioRunStatus>([
   ScenarioRunStatus.FAILED,
   ScenarioRunStatus.ERROR,
   ScenarioRunStatus.CANCELLED,
   ScenarioRunStatus.STALLED,
+]);
+
+/**
+ * Every status that means the run is over. Derived from FAILING_STATUSES
+ * rather than listed again: two hand-maintained lists is what let STALLED be
+ * finished-but-not-failing, which scored a wedged run as a pass. A new
+ * terminal status now has exactly one place to be added, and the only question
+ * to answer about it is whether it is a failure.
+ */
+const FINISHED_STATUSES = new Set<ScenarioRunStatus>([
+  ...FAILING_STATUSES,
+  ScenarioRunStatus.SUCCESS,
 ]);
 
 export type VariantReportEntry = {
@@ -160,11 +172,5 @@ export class FanOutReportService {
 }
 
 function isFinished(status: ScenarioRunStatus): boolean {
-  return (
-    status === ScenarioRunStatus.SUCCESS ||
-    status === ScenarioRunStatus.FAILED ||
-    status === ScenarioRunStatus.ERROR ||
-    status === ScenarioRunStatus.CANCELLED ||
-    status === ScenarioRunStatus.STALLED
-  );
+  return FINISHED_STATUSES.has(status);
 }

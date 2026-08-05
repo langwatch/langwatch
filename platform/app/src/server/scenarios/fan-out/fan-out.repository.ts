@@ -298,11 +298,14 @@ export class FanOutRepository {
   /**
    * Records the run id a variant was dispatched under, so the blast-radius
    * report can join the variant to its ClickHouse verdict.
+   *
+   * `null` takes the id back, for a run that was reserved an id and then
+   * failed to reach the queue.
    */
   async setVariantScenarioRunId(input: {
     id: string;
     projectId: string;
-    scenarioRunId: string;
+    scenarioRunId: string | null;
   }): Promise<void> {
     await this.prisma.fanOutVariant.updateMany({
       where: { id: input.id, batch: { projectId: input.projectId } },
