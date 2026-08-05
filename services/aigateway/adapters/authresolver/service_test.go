@@ -429,8 +429,6 @@ func TestClassifyRefreshError(t *testing.T) {
 	}
 }
 
-// --- A negative HardGrace disables stale-while-error (legacy mode) ----------
-
 // @scenario "a negative hard grace disables stale-while-error"
 func TestResolve_StaleEntry_NegativeHardGrace_DisablesStaleWhileError(t *testing.T) {
 	transportErr := herr.New(context.Background(), domain.ErrAuthUpstream, nil)

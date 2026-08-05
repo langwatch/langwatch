@@ -194,6 +194,9 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	}
 	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
 	applyLegacyEnvAliases(&cfg)
+	if err := validateRetiredEnvVars(); err != nil {
+		return Config{}, err
+	}
 	if err := validateHostedEgressSecurity(cfg); err != nil {
 		return Config{}, err
 	}
@@ -223,26 +226,65 @@ func LoadConfig(ctx context.Context) (Config, error) {
 const MaxConfigurableSeconds = 10 * 365 * 24 * 60 * 60
 
 // validateSecondsFields rejects out-of-range time spans before anything
-// converts them to a time.Duration. Negative values stay legal: several of
-// these fields use a negative number as an explicit "disabled" signal.
+// converts them to a time.Duration. Negative values stay legal on the fields
+// whose consumer reads a negative number as an explicit "disabled" signal.
 func validateSecondsFields(cfg Config) error {
 	for _, f := range []struct {
 		env   string
 		value int64
+		// rejectNegative marks a field that is spent waiting rather than
+		// consulted. Neither one reads a negative as "disabled": the
+		// shutdown budget becomes a context deadline that is already
+		// expired, so SIGTERM drops every in-flight request at once instead
+		// of draining, and the drain delay is skipped without a word. Zero
+		// already says "no wait", so a negative can only be a mistake, and
+		// one nothing in the running process would report.
+		rejectNegative bool
 	}{
-		{"SERVER_GRACEFUL_SECONDS", int64(cfg.Server.GracefulSeconds)},
-		{"SERVER_DRAIN_DELAY_SECONDS", int64(cfg.Server.DrainDelaySeconds)},
-		{"NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS", cfg.NonStreamingHeartbeatIntervalSeconds},
-		{"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS", cfg.AuthCache.SoftBumpSeconds},
-		{"LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", cfg.AuthCache.HardGraceSeconds},
-		{"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS", cfg.AuthCache.ConfigTTLSeconds},
-		{"LW_GATEWAY_CIRCUIT_WINDOW_S", cfg.Circuit.WindowS},
-		{"LW_GATEWAY_CIRCUIT_COOLDOWN_S", cfg.Circuit.CooldownS},
-		{"LW_GATEWAY_SPEND_FLUSH_INTERVAL_SECONDS", cfg.SpendEmitter.FlushIntervalSeconds},
+		{env: "SERVER_GRACEFUL_SECONDS", value: int64(cfg.Server.GracefulSeconds), rejectNegative: true},
+		{env: "SERVER_DRAIN_DELAY_SECONDS", value: int64(cfg.Server.DrainDelaySeconds), rejectNegative: true},
+		{env: "NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS", value: cfg.NonStreamingHeartbeatIntervalSeconds},
+		{env: "LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS", value: cfg.AuthCache.SoftBumpSeconds},
+		{env: "LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", value: cfg.AuthCache.HardGraceSeconds},
+		{env: "LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS", value: cfg.AuthCache.ConfigTTLSeconds},
+		{env: "LW_GATEWAY_CIRCUIT_WINDOW_S", value: cfg.Circuit.WindowS},
+		{env: "LW_GATEWAY_CIRCUIT_COOLDOWN_S", value: cfg.Circuit.CooldownS},
+		{env: "LW_GATEWAY_SPEND_FLUSH_INTERVAL_SECONDS", value: cfg.SpendEmitter.FlushIntervalSeconds},
 	} {
 		if f.value > MaxConfigurableSeconds || f.value < -MaxConfigurableSeconds {
 			return fmt.Errorf("%s is %d seconds, which is outside the supported range of +/-%d seconds (10 years); values are seconds, not milliseconds or nanoseconds", f.env, f.value, int64(MaxConfigurableSeconds))
 		}
+		if f.rejectNegative && f.value < 0 {
+			return fmt.Errorf("%s is %d seconds; it is a wait, so it must be zero or positive. Use 0 for no wait at all", f.env, f.value)
+		}
+	}
+	return nil
+}
+
+// retiredEnvVars are the duration-string variables the _SECONDS names
+// replaced. Nothing reads them any more, so a deployment that still carries
+// one would boot on the default instead: an operator who set
+// LW_GATEWAY_AUTH_CACHE_HARD_GRACE=0s to hard-fail at JWT exp, as the
+// runbook once told them to, would come back up serving stale bundles for
+// six hours with no signal that their setting had stopped applying.
+// Refusing to boot is what makes an upgrade reach whoever set it. Same
+// reasoning, and same wording, as the chart's guard on the retired
+// shutdown.preDrainWait / shutdown.timeout keys.
+var retiredEnvVars = []struct{ old, replacement string }{
+	{"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP", "LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS"},
+	{"LW_GATEWAY_AUTH_CACHE_HARD_GRACE", "LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS"},
+	{"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL", "LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS"},
+}
+
+// validateRetiredEnvVars stops startup when a retired duration-string
+// variable is still set, naming the variable that replaced it.
+func validateRetiredEnvVars() error {
+	for _, v := range retiredEnvVars {
+		value := os.Getenv(v.old)
+		if value == "" {
+			continue
+		}
+		return fmt.Errorf("%s=%q is no longer read. Set %s instead, as a plain count of seconds (a negative value disables, 0 takes the default)", v.old, value, v.replacement)
 	}
 	return nil
 }

@@ -193,18 +193,14 @@ jobs:
             echo "NetworkPolicy should NOT render by default"; exit 1
           fi
 
-      # Regression guard: shutdown.preDrainWaitSeconds / timeoutSeconds are
-      # only real if the ConfigMap carries them to the env vars serve.go
-      # reads. Without this, a rename on either side leaves values.yaml
-      # advertising drain timing the container never receives.
-      - name: Assert shutdown timing values reach the ConfigMap
-        run: |
-          if ! grep -q 'SERVER_DRAIN_DELAY_SECONDS: "5"' /tmp/defaults.yaml; then
-            echo "SERVER_DRAIN_DELAY_SECONDS missing/wrong in rendered ConfigMap (expected shutdown.preDrainWaitSeconds default of 5)"; exit 1
-          fi
-          if ! grep -q 'SERVER_GRACEFUL_SECONDS: "60"' /tmp/defaults.yaml; then
-            echo "SERVER_GRACEFUL_SECONDS missing/wrong in rendered ConfigMap (expected shutdown.timeoutSeconds default of 60)"; exit 1
-          fi
+      # The drain-timing suite: the two values reaching the container as the
+      # env vars serve.go reads, the retired duration-string keys being
+      # refused, and a drain budget wider than the pod's grace period being
+      # refused. It lives beside the chart, as a shell suite, so its cases
+      # can carry `@scenario` bindings that specs/ai-gateway feature files
+      # resolve against; inline YAML steps bind nothing.
+      - name: Assert shutdown values render as the pod needs them
+        run: ./charts/gateway/tests/shutdown-values.sh
 
       # The chart's graceful window has to stay above the gateway's 45s
       # non-streaming heartbeat interval (pkg/config.DefaultNonStreamingHeartbeatInterval),
@@ -218,37 +214,6 @@ jobs:
           if [ "$graceful" -le "$heartbeat" ]; then
             echo "shutdown.timeoutSeconds ($graceful) must exceed the ${heartbeat}s non-streaming heartbeat interval"; exit 1
           fi
-
-      # values.yaml's own comment states terminationGracePeriodSeconds "is
-      # computed from preDrainWaitSeconds + timeoutSeconds + 10s slack", but
-      # it is a static literal, so only this step holds the three in step.
-      # Violating it means the kubelet force-kills the pod mid-drain.
-      - name: Assert terminationGracePeriodSeconds covers drain + timeout + slack
-        run: |
-          drain=$(grep -oP 'SERVER_DRAIN_DELAY_SECONDS: "\K[0-9]+' /tmp/defaults.yaml)
-          graceful=$(grep -oP 'SERVER_GRACEFUL_SECONDS: "\K[0-9]+' /tmp/defaults.yaml)
-          grace_period=$(grep -oP 'terminationGracePeriodSeconds: \K[0-9]+' /tmp/defaults.yaml)
-          slack=10
-          required=$((drain + graceful + slack))
-          if [ "$grace_period" -lt "$required" ]; then
-            echo "terminationGracePeriodSeconds ($grace_period) must be >= preDrainWaitSeconds + timeoutSeconds + ${slack}s slack ($required)"; exit 1
-          fi
-
-      # An operator carrying the duration-string keys forward would otherwise
-      # install a release whose drain timing silently ignores their values.
-      # The template refuses the render instead, and this holds it to that.
-      - name: Assert legacy shutdown keys are refused
-        working-directory: charts/gateway
-        run: |
-          for legacy in preDrainWait=5s timeout=15s; do
-            key="${legacy%%=*}"
-            if helm template gateway . --set "shutdown.${legacy}" --dry-run > /dev/null 2>&1; then
-              echo "shutdown.${key} rendered instead of failing; the legacy-key guard is gone"; exit 1
-            fi
-            if ! helm template gateway . --set "shutdown.${legacy}" --dry-run 2>&1 | grep -q "shutdown.${key}Seconds"; then
-              echo "the shutdown.${key} failure message must name shutdown.${key}Seconds"; exit 1
-            fi
-          done
 
       - name: helm dependency update (umbrella)
         working-directory: charts/langwatch

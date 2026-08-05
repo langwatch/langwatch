@@ -254,10 +254,13 @@ containerSecurityContext:
 shutdown:
   preDrainWaitSeconds: 5
   timeoutSeconds: 60
-# terminationGracePeriodSeconds is computed from preDrainWaitSeconds +
-# timeoutSeconds + 10s slack (5 + 60 + 10 = 75). Operators with slow LB
-# propagation can override this directly AND bump preDrainWaitSeconds
-# accordingly.
+# terminationGracePeriodSeconds is the kubelet's SIGKILL clock. 75 is a plain
+# default that happens to cover the drain settings above (5 + 60 + 10s slack),
+# not a value derived from them: raising preDrainWaitSeconds or timeoutSeconds
+# means raising this as well. The chart refuses to render when it falls short,
+# rather than installing a release the kubelet kills mid-drain. Operators with
+# slow load-balancer propagation can raise it further, along with
+# preDrainWaitSeconds.
 terminationGracePeriodSeconds: 75
 
 # Edge protection. Caps request body size so a misconfigured (or

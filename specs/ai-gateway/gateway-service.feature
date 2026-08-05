@@ -220,6 +220,46 @@ Feature: Gateway service — public HTTP surface and operational basics
       When the gateway loads its configuration
       Then AuthCache.HardGraceSeconds is 31536000
 
+    @unit @regression
+    Scenario: the largest in-range seconds value is accepted and the next one is not
+      Given a seconds-valued env var is set to the largest supported value
+      When the gateway loads its configuration
+      Then it starts, and the value is still a positive time span
+      But one second more is refused
+
+    # A wait cannot be run backwards. Where other seconds fields read a
+    # negative number as "disabled", the shutdown budget and the drain delay
+    # are time the gateway spends waiting, so a negative there would answer
+    # SIGTERM by dropping every in-flight request at once. Zero already says
+    # "do not wait".
+    @unit @regression
+    Scenario: a negative shutdown budget is refused instead of draining nothing
+      Given SERVER_GRACEFUL_SECONDS or SERVER_DRAIN_DELAY_SECONDS is negative
+      When the gateway loads its configuration
+      Then it refuses to start and names the offending variable
+
+    @unit @regression
+    Scenario: zero is accepted as an explicit no-wait
+      Given SERVER_DRAIN_DELAY_SECONDS is 0
+      When the gateway loads its configuration
+      Then it starts with no drain delay at all
+
+  Rule: The retired duration-string variables stop a boot rather than being ignored
+
+    # Nothing reads LW_GATEWAY_AUTH_CACHE_SOFT_BUMP / _HARD_GRACE / _CONFIG_TTL
+    # any more. A deployment that still carries one would boot on the default
+    # instead, so an operator who had set the hard grace to hard-fail at JWT
+    # exp would come back up serving stale bundles for six hours with nothing
+    # to tell them their setting had stopped applying.
+    # Bindings: services/aigateway/config_test.go
+
+    @unit @regression
+    Scenario: a retired duration-string variable stops startup and names its replacement
+      Given LW_GATEWAY_AUTH_CACHE_HARD_GRACE is still set in the environment
+      When the gateway loads its configuration
+      Then it refuses to start
+      And the error names LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS as the variable to use
+
   Rule: Request body size cap (iter 23, `79b46bf`)
 
     # The gateway enforces a per-request body size limit BEFORE auth / dispatch
@@ -335,10 +375,9 @@ Feature: Gateway service — public HTTP surface and operational basics
 
     # Four-phase shutdown guarantees in-flight requests complete before pod exit.
     # Preserves streaming connections (no mid-stream 5xx from drain).
-    # Bindings: .github/workflows/go-services.yaml's `helm` job ("Assert shutdown
-    # timing values reach the ConfigMap", "Assert the graceful window outlasts
-    # the heartbeat interval", "Assert terminationGracePeriodSeconds covers
-    # drain + timeout + slack", "Assert legacy shutdown keys are refused")
+    # Bindings: charts/gateway/tests/shutdown-values.sh, run by the `helm` job
+    # in .github/workflows/go-services.yaml. The phase scenarios below describe
+    # the running gateway's own drain behaviour and are not covered there.
 
     Scenario: SIGTERM phase 1 — readiness probe flips to 503 draining
       When the gateway receives SIGTERM
@@ -363,15 +402,30 @@ Feature: Gateway service — public HTTP surface and operational basics
       And structured log "gateway_shutting_down" is emitted at shutdown start
       And structured log "gateway_stopped" is emitted when drain completes
 
+    @unit @regression
     Scenario: preDrainWaitSeconds + timeoutSeconds MUST be within terminationGracePeriodSeconds
       Given Helm values.shutdown.preDrainWaitSeconds = 5 + timeoutSeconds = 60 + slack = 10
       Then terminationGracePeriodSeconds must be ≥ 75 (5+60+10)
       And chart helm-template validation asserts this invariant
 
+    @unit @regression
     Scenario: the duration-string shutdown keys are refused by the chart
       Given a values file sets shutdown.preDrainWait or shutdown.timeout
       Then helm template fails and names the Seconds-suffixed key to use instead
       And no release installs with drain timing that silently ignores those values
+
+    @unit @regression
+    Scenario: the drain timing an operator sets is what the pod runs with
+      Given a values file sets shutdown.preDrainWaitSeconds and shutdown.timeoutSeconds
+      When the release is rendered
+      Then the pod receives exactly those two numbers as its drain delay and shutdown budget
+      And a release that took the defaults receives the defaults
+
+    @unit @regression
+    Scenario: a drain budget wider than the pod's grace period is refused
+      Given a values file widens the drain past what terminationGracePeriodSeconds allows
+      Then helm template fails and names the grace period the drain would need
+      And raising terminationGracePeriodSeconds to that number renders
 
     Scenario: stuck handler beyond timeout is force-killed
       Given a handler that blocks past the shutdown timeout

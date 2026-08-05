@@ -70,7 +70,7 @@ func TestHydrate_Error_NonPointer(t *testing.T) {
 	assert.Error(t, Hydrate(cfg{}))
 }
 
-// @scenario "an env-tagged time.Duration field is refused"
+// @scenario "a service declaring a duration-typed time span fails to start"
 func TestHydrate_Duration_FieldIsRefused(t *testing.T) {
 	type cfg struct {
 		SoftBump time.Duration `env:"SOFT_BUMP"`
@@ -86,7 +86,7 @@ func TestHydrate_Duration_FieldIsRefused(t *testing.T) {
 	assert.Contains(t, err.Error(), "_SECONDS")
 }
 
-// @scenario "an env-tagged time.Duration field is refused even when its variable is unset"
+// @scenario "the refusal does not wait for anyone to set the variable"
 func TestHydrate_Duration_FieldIsRefusedWhenEnvUnset(t *testing.T) {
 	type cfg struct {
 		HardGrace time.Duration `env:"HARD_GRACE_UNSET"`
@@ -100,7 +100,7 @@ func TestHydrate_Duration_FieldIsRefusedWhenEnvUnset(t *testing.T) {
 	assert.Zero(t, c.HardGrace)
 }
 
-// @scenario "a time.Duration field nested in a sub-struct is refused with its full prefixed name"
+// @scenario "a nested time span is named by the variable an operator would set"
 func TestHydrate_Duration_NestedFieldIsRefused(t *testing.T) {
 	type inner struct {
 		ConfigTTL time.Duration `env:"CONFIG_TTL"`
@@ -116,7 +116,7 @@ func TestHydrate_Duration_NestedFieldIsRefused(t *testing.T) {
 	assert.Contains(t, err.Error(), "LW_GATEWAY_AUTH_CACHE_CONFIG_TTL")
 }
 
-// @scenario "a plain int64 field is unaffected by the time.Duration refusal"
+// @scenario "a plain whole-number setting is unaffected"
 func TestHydrate_Int64_StillParsesAsPlainInteger(t *testing.T) {
 	type cfg struct {
 		Count int64 `env:"COUNT"`

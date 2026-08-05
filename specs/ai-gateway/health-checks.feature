@@ -103,5 +103,6 @@ Feature: Gateway health checks
       When kubernetes starts replacing pod 1 with a new version
       Then pod 1's /readyz returns 503 during SIGTERM grace period
       And pods 2 and 3 continue serving
-      And no in-flight requests on pod 1 are dropped (60s shutdown timeout)
+      And in-flight requests on pod 1 that finish within the 60s shutdown timeout are not dropped
+      And one still running when that budget expires is terminated, not waited for
       And the new pod 1 only takes traffic after /startupz → 200

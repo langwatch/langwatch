@@ -2,6 +2,8 @@ package aigateway
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -295,6 +297,93 @@ func TestLoadConfig_RefusesOutOfRangeSecondsValues(t *testing.T) {
 	}
 }
 
+// @scenario "the largest in-range seconds value is accepted and the next one is not"
+func TestLoadConfig_SecondsRangeBoundary(t *testing.T) {
+	t.Run("at the maximum", func(t *testing.T) {
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		t.Setenv("LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", strconv.FormatInt(MaxConfigurableSeconds, 10))
+
+		cfg, err := LoadConfig(context.Background())
+		if err != nil {
+			t.Fatalf("LoadConfig at the maximum: %v", err)
+		}
+		// The value the guard exists to protect: the conversion deps.go
+		// performs has to stay a positive duration at the boundary.
+		if got := time.Duration(cfg.AuthCache.HardGraceSeconds) * time.Second; got <= 0 {
+			t.Errorf("HardGrace converted to %v, want a positive duration", got)
+		}
+	})
+
+	t.Run("one second past the maximum", func(t *testing.T) {
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		t.Setenv("LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", strconv.FormatInt(MaxConfigurableSeconds+1, 10))
+
+		if _, err := LoadConfig(context.Background()); err == nil {
+			t.Fatal("expected the first out-of-range value to be refused")
+		}
+	})
+}
+
+// @scenario "a negative shutdown budget is refused instead of draining nothing"
+func TestLoadConfig_RefusesNegativeWaits(t *testing.T) {
+	for _, envVar := range []string{"SERVER_GRACEFUL_SECONDS", "SERVER_DRAIN_DELAY_SECONDS"} {
+		t.Run(envVar, func(t *testing.T) {
+			clearGatewayEnv(t)
+			t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+			t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+			t.Setenv(envVar, "-1")
+
+			_, err := LoadConfig(context.Background())
+			if err == nil {
+				t.Fatalf("expected %s=-1 to be refused", envVar)
+			}
+			if !strings.Contains(err.Error(), envVar) {
+				t.Errorf("error %q does not name %s", err, envVar)
+			}
+		})
+	}
+}
+
+// @scenario "zero is accepted as an explicit no-wait"
+func TestLoadConfig_AcceptsZeroWaits(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+	t.Setenv("SERVER_DRAIN_DELAY_SECONDS", "0")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Server.DrainDelaySeconds != 0 {
+		t.Errorf("Server.DrainDelaySeconds = %d, want 0", cfg.Server.DrainDelaySeconds)
+	}
+}
+
+// @scenario "a retired duration-string variable stops startup and names its replacement"
+func TestLoadConfig_RefusesRetiredDurationEnvVars(t *testing.T) {
+	for _, v := range retiredEnvVars {
+		t.Run(v.old, func(t *testing.T) {
+			clearGatewayEnv(t)
+			t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+			t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+			t.Setenv(v.old, "6h")
+
+			_, err := LoadConfig(context.Background())
+			if err == nil {
+				t.Fatalf("expected %s to be refused", v.old)
+			}
+			if !strings.Contains(err.Error(), v.replacement) {
+				t.Errorf("error %q does not name the replacement %s", err, v.replacement)
+			}
+		})
+	}
+}
+
 // @scenario "a legitimate large seconds value is still accepted"
 func TestLoadConfig_AcceptsLargeButSaneSecondsValues(t *testing.T) {
 	clearGatewayEnv(t)
@@ -348,6 +437,9 @@ func clearGatewayEnv(t *testing.T) {
 		"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS",
 		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS",
 		"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS",
+		"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP",
+		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE",
+		"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL",
 		"CUSTOMER_TRACE_BRIDGE_BASE_URL",
 		"LW_GATEWAY_SPEND_ENABLED",
 		"LW_GATEWAY_SPEND_SPOOL_DIR",
