@@ -23,6 +23,7 @@ import {
   mapClickHouseEvaluationToTraceEvaluation,
   mapTraceEvaluationsToLegacyEvaluations,
 } from "~/server/evaluations/evaluation-run.mappers";
+import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type {
   NormalizedSpan,
   NormalizedSpanKind,
@@ -142,23 +143,47 @@ const MAX_SPANS_PER_TRACE = 10_000;
  * server's total budget.
  *
  * This read selects every heavy column (`SpanAttributes`, `ResourceAttributes`,
- * `Events.Attributes`, `Links.*`), and its `fallback: "none"` window means a
- * page of traces whose summaries carry no usable `OccurredAt` scans every
- * partition, cold S3 tiers included. Uncapped, the pathological tail was
- * stopped by the server's OvercommitTracker, which picks a victim across the
- * whole cluster - so one bad trace read degraded unrelated queries.
+ * `Events.Attributes`, `Links.*`). Uncapped, the pathological tail was stopped
+ * by the server's OvercommitTracker, which picks a victim across the whole
+ * cluster - so one bad trace read degraded unrelated queries.
  *
  * With an explicit cap the offending read fails on its own and surfaces as a
  * query error on that request. Mirrors the single-trace read path in
  * `app-layer/traces/repositories/span-storage.clickhouse.repository.ts`.
  *
- * The durable fix is upstream: anchor `OccurredAt` on trace_summaries so the
- * window is never null (#6306 did this for trace_analytics only).
+ * The upstream fix has since landed (ADR-087, migration 00072): `OccurredAt` on
+ * trace_summaries is a frozen storage anchor, and this read's window falls back
+ * through the caller's paging range to a retention floor, so the time filter is
+ * never empty and the scan is never the whole table. The cap stays as the belt
+ * to that braces - a page of ten thousand wide traces inside one window is still
+ * a lot of bytes.
  */
 const JOINED_SPAN_READ_SETTINGS = {
   // ClickHouse settings are string-typed over the wire.
   max_memory_usage: String(2 * 1024 * 1024 * 1024), // 2 GiB
 } as const;
+
+/**
+ * The floor the joined span read bounds itself to when nothing else can supply a
+ * window: no caller paging range, and not one matched summary carrying a usable
+ * `OccurredAt`. The read then runs `now - this … now + 2d` instead of no time
+ * predicate at all.
+ *
+ * A bound of last resort has to be justified on what it could exclude, so:
+ * after ADR-087 the only rows that reach here are pre-anchor sentinel rows, and
+ * a sentinel row is one whose fold never saw a usable span start. Overwhelmingly
+ * that is a log-only trace, which has no spans for this read to find. The
+ * residue is a trace whose every span carried an unusable start time - those
+ * spans are themselves filed in `stored_spans`' epoch partition, so no bounded
+ * read was ever going to return them, and reading them is precisely the
+ * full-partition scan (cold S3 tiers included) that this constant exists to
+ * stop.
+ *
+ * 90 days rather than the 49-day platform retention default: it covers the
+ * default with room for a longer tenant policy, and matches the floor the log
+ * read already uses (`log-record-storage.clickhouse.repository.ts`).
+ */
+const SPAN_READ_FLOOR_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 /** Per-trace cap on projected events (events are a small subset of spans). */
 const MAX_EVENTS_PER_TRACE = 1_000;
 /** Bounds the bounded events stored_spans scan to the page's occurrence weeks. */
@@ -2023,6 +2048,8 @@ export class ClickHouseTraceService {
             ${computedOutputExpr} AS ts_ComputedOutput,
             ts.Attributes AS ts_Attributes,
             ts.TraceName AS ts_TraceName,
+            ts.Version AS ts_Version,
+            ts.EarliestSpanStartMs AS ts_EarliestSpanStartMs,
             toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
             toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
             toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
@@ -2382,7 +2409,7 @@ export class ClickHouseTraceService {
       traceName: row.ts_TraceName ?? "",
       attributes: row.ts_Attributes,
       LastEventOccurredAt: 0,
-      occurredAt: row.ts_OccurredAt,
+      ...traceSummaryTimesFromRow(row),
       createdAt: row.ts_CreatedAt,
       updatedAt: row.ts_UpdatedAt,
     };
@@ -2684,6 +2711,11 @@ export class ClickHouseTraceService {
    * partitions. Returns undefined when no rows match (min/max default to epoch),
    * so the caller keeps its previous unbounded behaviour rather than guessing.
    *
+   * Pre-anchor sentinel rows (`OccurredAt = 0`, ADR-087) are excluded in SQL
+   * rather than allowed to collapse the whole range: `min()` over a batch with
+   * one sentinel in it returned the epoch, which failed the `> 0` check below and
+   * discarded a range every other trace in the batch could have supplied.
+   *
    * @internal
    */
   private async resolveOccurredAtRange({
@@ -2706,6 +2738,7 @@ export class ClickHouseTraceService {
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
           AND TraceId IN ({traceIds:Array(String)})
+          AND OccurredAt > fromUnixTimestamp64Milli(0)
       `,
       query_params: { tenantId: projectId, traceIds },
       format: "JSONEachRow",
@@ -2859,6 +2892,8 @@ export class ClickHouseTraceService {
           AnnotationIds AS ts_AnnotationIds,
           Attributes AS ts_Attributes,
           TraceName AS ts_TraceName,
+          Version AS ts_Version,
+          EarliestSpanStartMs AS ts_EarliestSpanStartMs,
           toUnixTimestamp64Milli(OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
@@ -2925,30 +2960,62 @@ export class ClickHouseTraceService {
 
           // Bound the stored_spans scan to the weeks the matched traces occurred
           // in (the cold-scan cost driver). Same range->window mapping as the
-          // summary read above: centre on the matched summaries' OccurredAt
-          // midpoint, half-width = half that range + the ±2-day margin, so the
-          // fragment lands on exactly [min - 2d, max + 2d]. Fallback "none": no
-          // matched OccurredAts -> hint null -> unbounded scan (the old
-          // hasWindow=false branch); a hinted-but-empty span read is
-          // authoritative and never widened.
+          // summary read above: centre on the range midpoint, half-width = half
+          // that range + the ±2-day margin, so the fragment lands on exactly
+          // [min - 2d, max + 2d].
+          //
+          // Three sources, in order, and the last one cannot fail — which is the
+          // point (ADR-087). This used to be one source: the matched summaries'
+          // positive OccurredAts. When none survived, `hasWindow` was false, the
+          // hint was null, `fallback: "none"` produced a null fragment and BOTH
+          // filter strings rendered empty — so this read pulled every heavy span
+          // column with no partition predicate at all, over every weekly part
+          // including cold S3. That is the read prod died on with
+          // MEMORY_LIMIT_EXCEEDED (code 241).
+          //
+          //   1. The matched summaries' own anchors. Post-ADR-087 every row has
+          //      one; this stays the tightest window and the normal path.
+          //   2. `effectiveOccurredAt` — the caller's own paging range, or the
+          //      range resolved from trace_summaries for callers that only have
+          //      trace ids. Preferred over a floor because it is derived from
+          //      the traces actually being read.
+          //   3. A retention floor ({@link SPAN_READ_FLOOR_LOOKBACK_MS}), via the
+          //      `{ lookbackMs }` fallback, which renders `now - 90d … now + 2d`.
+          //      Never null, so the filter string is never empty.
+          //
+          // `fallback: "none"` still applies whenever there IS a hint: a
+          // hinted-but-empty span read is authoritative and must not be widened.
           const occurredAts = summaryRows
             .map((r) => r.ts_OccurredAt)
             .filter((t): t is number => typeof t === "number" && t > 0);
-          const hasWindow = occurredAts.length > 0;
-          const spanMinMs = hasWindow ? Math.min(...occurredAts) : 0;
-          const spanMaxMs = hasWindow ? Math.max(...occurredAts) : 0;
-          const spanHintMs = hasWindow ? (spanMinMs + spanMaxMs) / 2 : null;
-          const spanWindowMs = hasWindow
-            ? (spanMaxMs - spanMinMs) / 2 + DEFAULT_PARTITION_WINDOW_MS
+          const spanRange =
+            occurredAts.length > 0
+              ? {
+                  from: Math.min(...occurredAts),
+                  to: Math.max(...occurredAts),
+                }
+              : hasSummaryWindow
+                ? effectiveOccurredAt
+                : undefined;
+          const spanHintMs = spanRange
+            ? (spanRange.from + spanRange.to) / 2
+            : null;
+          const spanWindowMs = spanRange
+            ? (spanRange.to - spanRange.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
             : DEFAULT_PARTITION_WINDOW_MS;
 
           const spanRows = await queryWindowed<SpanRow[]>({
             table: "stored_spans",
             hintMs: spanHintMs,
             windowMs: spanWindowMs,
-            fallback: "none",
+            fallback: spanRange
+              ? "none"
+              : { lookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS },
             isEmpty: (rows) => rows.length === 0,
             run: async (window) => {
+              // Always present now: a hint yields the hinted fragment, and the
+              // hint-less path yields the retention floor's fragment. The null
+              // arm is kept only because the shared contract permits it.
               const spanTimeFilterOuter = window
                 ? window.sqlFor("t.StartTime")
                 : "";
@@ -3132,7 +3199,7 @@ export class ClickHouseTraceService {
       traceName: row.ts_TraceName ?? "",
       attributes: row.ts_Attributes,
       LastEventOccurredAt: 0,
-      occurredAt: row.ts_OccurredAt,
+      ...traceSummaryTimesFromRow(row),
       createdAt: row.ts_CreatedAt,
       updatedAt: row.ts_UpdatedAt,
     };
@@ -3254,9 +3321,40 @@ interface TraceSummaryRow {
   ts_AnnotationIds: string[];
   ts_Attributes: Record<string, string>;
   ts_TraceName?: string | null;
+  /**
+   * The row's projection stamp. Read only to tell a pre-anchor row's `OccurredAt`
+   * (which was `min(span start)`) from a post-anchor one's (which is the frozen
+   * storage anchor). See {@link traceSummaryTimesFromRow}.
+   */
+  ts_Version?: string;
+  /** The span timing baseline column added by migration 00072; absent on older rows. */
+  ts_EarliestSpanStartMs?: number | string;
   ts_OccurredAt: number;
   ts_CreatedAt: number;
   ts_UpdatedAt: number;
+}
+
+/**
+ * Split a summary row's two times back apart (ADR-087).
+ *
+ * `OccurredAt` is the frozen storage anchor - the partition and TTL address, and
+ * the column the list read pages on. `occurredAt` on `TraceSummaryData` is the
+ * span timing baseline, which is what the trace reports as its start. Before
+ * migration 00072 one column carried both, so a row at the pre-anchor stamp
+ * yields the same value for each; after it, the baseline has its own column and
+ * reading it off the anchor would report an accept time as a span start.
+ */
+function traceSummaryTimesFromRow(row: TraceSummaryRow): {
+  storageAnchorMs: number;
+  occurredAt: number;
+} {
+  const isAnchored = row.ts_Version === TRACE_SUMMARY_PROJECTION_VERSION_LATEST;
+  return {
+    storageAnchorMs: row.ts_OccurredAt,
+    occurredAt: isAnchored
+      ? Number(row.ts_EarliestSpanStartMs ?? 0)
+      : row.ts_OccurredAt,
+  };
 }
 
 /**

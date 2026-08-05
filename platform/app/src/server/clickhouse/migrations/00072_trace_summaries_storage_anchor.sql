@@ -1,0 +1,139 @@
+-- +goose Up
+-- +goose ENVSUB ON
+
+-- ============================================================================
+-- trace_summaries — split the span timing baseline out of the storage anchor
+-- (ADR-071's rule, applied to this table by ADR-087).
+--
+-- `OccurredAt` on this table does two storage jobs (00002:179 and
+-- ttlReconciler.ts):
+--
+--   PARTITION BY toYearWeek(OccurredAt)
+--   TTL toDateTime(OccurredAt) + toIntervalDay(_retention_days) DELETE
+--
+-- and it was ALSO the fold's span timing baseline: `min(span.startTimeUnixMs)`,
+-- the value `TotalDurationMs` is measured from. Only SPANS ever set it. A trace
+-- whose only signal is a log record — Claude Code / Codex "Path B", which emit
+-- no spans at all — folded it as 0, was accepted by the store's
+-- persistable-signal gate on its log-record count, and committed with
+-- `OccurredAt = 1970-01-01`. `toYearWeek` in its default mode puts 1970-01-01, a
+-- Thursday, in the last week of 1969, so that is partition `196952`, with a TTL
+-- deadline of `1970 + retention` which is already years past.
+--
+-- The sentinel had two blast radii, and the second is why this migration is not
+-- a duplicate of 00061:
+--
+--   1. The FOLD read-back. `resolveOccurredAtMs` reports such a row as found
+--      without a usable timestamp, so the single-trace heavy read runs
+--      unbounded on every delivery
+--      (`clickhouse_windowed_read_total{table='trace_summaries',outcome='unwindowed'}`).
+--   2. The JOINED SPAN read. `fetchTracesWithSpansJoined` derives its
+--      `stored_spans` window from the matched summaries' `OccurredAt`, keeping
+--      only positive values. When none survive, BOTH the inner and the outer
+--      time filters render as empty strings and the read pulls
+--      `ResourceAttributes`, `SpanAttributes`, `Events.Attributes` and `Links.*`
+--      `FROM stored_spans WHERE TenantId = … AND TraceId IN (…)` with no
+--      partition predicate at all — every weekly part, cold S3 tiers included.
+--      That is the source of the production `MEMORY_LIMIT_EXCEEDED` (code 241)
+--      OvercommitTracker kills on trace detail views. #6602 capped that one query
+--      at 2 GiB, which contains the symptom; this is the upstream fix its comment
+--      points at.
+--
+-- The fix is ADR-071's rule: a storage anchor is written ONCE. `OccurredAt` now
+-- carries `storageAnchorMs` — the first business time the fold observed from ANY
+-- contribution (span, log record, metric correlation, annotation, topic, origin,
+-- rename), frozen thereafter — and this column carries the span timing baseline
+-- that was sharing it.
+--
+-- For a trace whose spans arrive in start order the anchor is the first span's
+-- start, which is exactly what the column already held, so those traces do not
+-- move at all. Where the two differ is a trace that received an earlier-starting
+-- span LATE: the column used to hold `min(span start)` and now holds the start of
+-- the first span folded, which is later. That is the anchor doing its job — the
+-- old value moved backwards on every late span, dragging the TTL deadline towards
+-- the row — but it does mean such a trace can land in a different week partition
+-- than it would have before.
+--
+-- Existing rows are NOT re-anchored by the stamp change. The pre-split projection
+-- stamp (`2026-05-07`) is DECODED rather than refused: on such a row `OccurredAt`
+-- is `min(span start)`, which is at once a valid anchor (it is what the row is
+-- already partitioned and TTL'd on) and the correct timing baseline (it is what
+-- this column was split out to carry), so both fields are read off that one
+-- column and the row heals in place on its next ordinary write. No population
+-- refold, no backfill (see TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR).
+--
+-- One existing row DOES move, deliberately. The anchor is validated on every
+-- write, not only when it is first frozen, so a row whose committed OccurredAt is
+-- more than a day ahead of fold time — reachable today, because ingest bounds only
+-- the PAST edge — fails the new bound on its next write and is rewritten at fold
+-- time. Such a row was filed in a future partition with a TTL deadline to match
+-- and would have outlived its tenant's retention. It converges after that one
+-- write.
+--
+-- Existing SENTINEL rows are not repaired by this migration, and that is stated
+-- rather than implied. Their TTL deadline is already past, so the next TTL merge
+-- deletes them. A sentinel-anchored trace that receives any further event heals
+-- itself — the read-back decodes an unusable anchor, the next contribution
+-- freezes a real one, and the row is rewritten into a real partition — while one
+-- that receives no further event before the reap loses its summary row, because
+-- this fold declares no `refoldOnStoreMiss`. Recovering those needs a bounded
+-- operational replay from `event_log`, which is deliberately NOT created here.
+-- See ADR-087 §Backfill and issue #6312.
+--
+-- Why the baseline needs a column of its own rather than being re-derived:
+-- `store.get()` decodes the fold's working state straight off this row (ADR-066).
+-- Without the column the baseline reads back as 0 — "no span yet" — on a
+-- POST-SPLIT trace that HAS spans, and the next span measures the whole trace's
+-- duration from itself, taking TokensPerSecond (completion tokens over that
+-- duration) with it.
+--
+-- Epoch ms as UInt64, not DateTime64: the fold compares this numerically (min
+-- against each span's start, subtraction for the duration), and a DateTime64
+-- format-parse round-trip on a non-UTC host would be a real bug rather than a
+-- cosmetic one. Same reasoning, same type, as 00056 and 00061.
+--
+-- The DEFAULT is not optional. An `ADD COLUMN` without one leaves the column
+-- unmaterialised in every part written before the ALTER; 00057 exists because
+-- 00056 omitted it on the Array columns and reads then tried to allocate whatever
+-- the absent size header decoded as. A UInt64 is fixed-width so it does not carry
+-- that header, but the rule 00057 wrote down is unconditional and this column
+-- follows it: `DEFAULT 0` reads back as "no span folded yet", which is exactly
+-- what a row written before this column existed means.
+--
+-- Cluster note: no ON CLUSTER. When CLICKHOUSE_CLUSTER is set the database uses
+-- the Replicated engine (00001), which propagates DDL to every node on its own;
+-- ON CLUSTER against a Replicated database is rejected.
+--
+-- Additive only: the partition key, the sort key and the TTL expression are all
+-- untouched. This migration changes what is WRITTEN into the anchor column, not
+-- the column's role.
+--
+-- Unlike trace_analytics, this table's sort key is `(TenantId, TraceId)` and
+-- excludes OccurredAt, so a trace's versions collapse under the RMT regardless of
+-- the anchor's value — within a partition. A healed row and the sentinel row it
+-- supersedes sit in DIFFERENT partitions, so they do not collapse into each
+-- other; the sentinel is removed by its already-expired TTL instead.
+-- ============================================================================
+
+-- +goose StatementBegin
+-- Epoch ms as UInt64. 0 = "no span folded yet", which is both the state sentinel
+-- `SpanTimingService` reads and the value a pre-migration row means.
+ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
+  ADD COLUMN IF NOT EXISTS EarliestSpanStartMs UInt64 DEFAULT 0 CODEC(Delta(8), ZSTD(1));
+-- +goose StatementEnd
+
+-- +goose ENVSUB OFF
+
+-- +goose Down
+-- IRREVERSIBLE: dropping EarliestSpanStartMs discards persisted span-timing state
+-- that cannot be recovered from the remaining columns. Since the anchor split,
+-- OccurredAt carries the frozen storage anchor rather than min(span start), so
+-- the baseline is not re-derivable from the row — only by replaying the trace's
+-- whole history out of event_log, for every affected trace.
+--
+-- Down migrations are commented out to prevent accidental data loss. Dropping
+-- this column strands the span timing baseline on every row written since, and
+-- the fold — which reads it back rather than re-deriving it — restarts each
+-- trace's duration from its next span. To roll back, uncomment and run manually.
+--
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries DROP COLUMN IF EXISTS EarliestSpanStartMs;

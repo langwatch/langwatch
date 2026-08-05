@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import { firstUsableAnchor } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/storage-anchor";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
@@ -28,12 +29,47 @@ type ClickHouseSummaryWriteRecord = WithDateWrites<
   "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
 >;
 
+/**
+ * The value that lands in the `OccurredAt` partition / TTL column (ADR-087).
+ *
+ * The fallback chain is a last resort for a state nothing could anchor: one
+ * whose every event carried a zero `occurredAt` (the event schema permits it —
+ * `nonnegative`, not `positive`), or whose only candidate times were implausibly
+ * far in the future. It exists so the partition column can never be the epoch,
+ * and each step is validated rather than trusted — `parseClickHouseDateTimeMs`
+ * returns 0 on a parse failure, so an unchecked `createdAt` would put the row
+ * straight back in 196952, the one outcome this change exists to prevent.
+ *
+ * ADR-071 names `CreatedAt` as a trap for exactly this use, and it is right: it
+ * is fold time, so a rebuild re-stamps it. Accepted here on the same terms
+ * `trace_analytics` accepted it — it applies ONLY to a state with no business
+ * time at all, and the read-back promotes whatever landed in the column to the
+ * frozen anchor, so it stops drifting after the first write.
+ *
+ * `now` is read here rather than passed because the anchor is validated on every
+ * write, not only when first frozen: a row whose committed anchor is more than a
+ * day ahead of fold time fails the bound and is rewritten at fold time. That is
+ * the one case where an already-committed row changes partition, and it is
+ * deliberate.
+ */
+function storageAnchorForWrite(data: TraceSummaryData): number {
+  return firstUsableAnchor([data.storageAnchorMs, data.createdAt], Date.now());
+}
+
 interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   ProjectionId: string;
   Version: string;
   Attributes: Record<string, string>;
   HasAnnotation: number | null;
   LastEventOccurredAt: number;
+  /**
+   * The span timing baseline, epoch ms (migration 00072): the earliest start
+   * across the trace's non-synthetic spans, 0 while none has been folded.
+   * `OccurredAt` used to carry this as well as the storage anchor; ADR-087 split
+   * them. Absent on rows written before 00072, which the version gate in
+   * {@link TraceSummaryClickHouseRepository.fromClickHouseRecord} handles.
+   */
+  EarliestSpanStartMs?: number | string;
   _retention_days: number;
 }
 
@@ -276,6 +312,12 @@ export class TraceSummaryClickHouseRepository
    * the heavy read entirely. Rows that still carry the historical
    * `OccurredAt = 0` sentinel are reported as found without a usable timestamp
    * so the caller can preserve correctness with the legacy unbounded fallback.
+   *
+   * Since ADR-087 no NEW row can carry that sentinel — `OccurredAt` is the frozen
+   * storage anchor and every write validates it — so the unbounded arm below is
+   * a legacy-row path that drains as those rows are rewritten or reaped. It is
+   * kept because it is a single-trace read, unlike the batch span read that the
+   * same sentinel drove into `MEMORY_LIMIT_EXCEEDED`.
    */
   private async resolveOccurredAtMs({
     tenantId,
@@ -349,6 +391,7 @@ export class TraceSummaryClickHouseRepository
           t.Version AS Version,
           t.Attributes AS Attributes,
           toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
+          t.EarliestSpanStartMs AS EarliestSpanStartMs,
           toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
           toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
           t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
@@ -453,7 +496,25 @@ export class TraceSummaryClickHouseRepository
       annotationIds: record.AnnotationIds ?? [],
       traceName: record.TraceName ?? "",
       attributes: record.Attributes ?? {},
-      occurredAt: record.OccurredAt,
+      // The anchor comes back frozen: whatever the column holds is what the row
+      // was partitioned and TTL'd on, so re-deriving it would be free to move it.
+      storageAnchorMs: record.OccurredAt,
+      // …and the timing baseline comes back from its OWN column, never from the
+      // anchor. Reading it off `OccurredAt` would hand `SpanTimingService` a
+      // log-shaped accept time as a span start and inflate the trace's duration
+      // by the whole ingest lag — and for a log-only trace it would fabricate a
+      // span that never arrived.
+      //
+      // The one exception is a PRE-SPLIT row, where the two were the same column
+      // and `OccurredAt` is the `min(span start)` this field wants. Taking it
+      // there is what lets the population heal without a refold; taking it
+      // anywhere else is the inflation bug above. Anything not stamped at the
+      // current version predates the split, so the branch is a single equality
+      // (see TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR).
+      occurredAt:
+        record.Version === TRACE_SUMMARY_PROJECTION_VERSION_LATEST
+          ? Number(record.EarliestSpanStartMs ?? 0)
+          : record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
@@ -473,7 +534,11 @@ export class TraceSummaryClickHouseRepository
       TraceId: data.traceId,
       Version: version,
       Attributes: data.attributes,
-      OccurredAt: new Date(data.occurredAt),
+      // OccurredAt is the storage / partition / TTL anchor (ADR-087). The span
+      // timing baseline is persisted separately so a late earlier-starting span
+      // cannot move this address.
+      OccurredAt: new Date(storageAnchorForWrite(data)),
+      EarliestSpanStartMs: data.occurredAt,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
       LastEventOccurredAt: data.LastEventOccurredAt

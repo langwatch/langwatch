@@ -178,13 +178,57 @@ export const TRACE_NAME_MAX_LENGTH = 200;
 export type TraceProcessingCommandType =
   (typeof TRACE_PROCESSING_COMMAND_TYPES)[number];
 
-export const TRACE_SUMMARY_PROJECTION_VERSION_LATEST = "2026-05-07" as const;
+/**
+ * The stamp immediately before the storage-anchor split - DECODED, not refused.
+ *
+ * On a pre-split row `trace_summaries.OccurredAt` is `min(span start)`, which is
+ * simultaneously:
+ *
+ *   - a VALID ANCHOR - it is the value the row was actually partitioned and
+ *     TTL'd on, so adopting it moves nothing; and
+ *   - the CORRECT BASELINE - it is exactly what `EarliestSpanStartMs` was split
+ *     out to carry.
+ *
+ * So the repository reads both fields off that one column and the row heals in
+ * place on its next ordinary write: no refold, no re-anchoring, no backfill. A
+ * log-only pre-split row carries 0, which is the right answer twice over - no
+ * span has been folded, and an unusable anchor lets the next contribution freeze
+ * a real one, which is the `196952` escape ADR-087 exists to perform.
+ *
+ * Why the stamp had to move at all: once BOTH shapes exist,
+ * `EarliestSpanStartMs = 0` means either "pre-split row, baseline lives in
+ * OccurredAt" or "post-split log-only trace, baseline genuinely 0 and OccurredAt
+ * is an ACCEPT time". Reading the second as the first hands `SpanTimingService` a
+ * log-shaped time as a span start and inflates the trace's duration by the whole
+ * ingest lag. The version is what tells them apart.
+ *
+ * Rows older than this stamp (`2026-04-23`) took the same OccurredAt meaning, so
+ * the decoder's single "not the latest stamp" branch is correct for them too.
+ */
+export const TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR =
+  "2026-05-07" as const;
+
+/**
+ * Schema-snapshot version (calendar date). Bump when the trace-summary fold's
+ * derivation rules or row shape change so older versions can be told apart.
+ *
+ * 2026-08-06 - the storage-anchor split (ADR-087, migration 00072). BOTH halves
+ * of what this stamp records changed at once: the DERIVATION (`OccurredAt` is now
+ * the frozen first-observed business time rather than the running min of span
+ * starts) and the ROW SHAPE (`EarliestSpanStartMs` carries the span timing
+ * baseline that `OccurredAt` used to double as).
+ *
+ * This is NOT a refold trigger - see
+ * {@link TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR}.
+ */
+export const TRACE_SUMMARY_PROJECTION_VERSION_LATEST = "2026-08-06" as const;
 
 /** Reactors skip traces older than this threshold to avoid re-processing during resyncs. */
 export const STALE_TRACE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
 export const TRACE_SUMMARY_PROJECTION_VERSIONS = [
   "2026-04-23",
+  TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 ] as const;
 
