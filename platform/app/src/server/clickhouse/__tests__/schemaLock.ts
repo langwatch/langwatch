@@ -139,21 +139,28 @@ export function createSchemaLock({
     }
   }
 
-  function recoverIfAbandoned(): void {
+  /**
+   * The current owner, when it is one this process may remove. An owner whose
+   * process is still running is never returned: the lock file's mtime is the
+   * moment it was acquired and is never refreshed, so it measures how long
+   * the holder has had the lock rather than how long it has been idle, and
+   * recovering on age would evict a suite in the middle of the critical
+   * section this lock exists to protect.
+   */
+  function abandonedOwner(): { token: string } | undefined {
     const observed = readOwner(lockPath);
-    if (observed.state === "absent") return;
+    if (observed.state === "absent") return undefined;
     if (observed.state === "unreadable") {
       if (olderThanAbandonThreshold()) unlinkIfPresent(lockPath);
-      return;
+      return undefined;
     }
-    // A living owner keeps its lock however long it wants. The file's mtime
-    // is the moment it was acquired and is never refreshed, so it measures
-    // how long the holder has had the lock rather than how long it has been
-    // idle; recovering on age would evict a suite in the middle of its
-    // critical section, which is the thing this lock exists to prevent.
-    if (isProcessAlive(observed.pid)) return;
+    if (isProcessAlive(observed.pid)) return undefined;
+    return { token: observed.token };
+  }
 
-    const claimPath = claimPathFor(observed.token);
+  /** Claims the right to remove one specific owner, then removes it. */
+  function removeLockOwnedBy(token: string): void {
+    const claimPath = claimPathFor(token);
     onBeforeClaim?.();
     try {
       linkSync(lockPath, claimPath);
@@ -169,12 +176,28 @@ export function createSchemaLock({
       const claimed = readOwner(claimPath);
       // A different token means the lock changed hands before the link, so
       // the inode now at `lockPath` belongs to someone we never inspected.
-      if (claimed.state === "held" && claimed.token === observed.token) {
+      if (claimed.state === "held" && claimed.token === token) {
         unlinkIfPresent(lockPath);
       }
     } finally {
       unlinkIfPresent(claimPath);
     }
+  }
+
+  function recoverIfAbandoned(): void {
+    const abandoned = abandonedOwner();
+    if (abandoned) removeLockOwnedBy(abandoned.token);
+  }
+
+  function timedOutWaiting(): Error {
+    const owner = readOwner(lockPath);
+    const holder =
+      owner.state === "held"
+        ? `, held by pid ${owner.pid}. If that process is gone, a recovery claim may have been left at ${claimPathFor(owner.token)}; removing both files unblocks the run.`
+        : ".";
+    return new Error(
+      `timed out after ${waitTimeoutMs}ms waiting for the ClickHouse schema lock at ${lockPath}${holder}`,
+    );
   }
 
   async function acquire(): Promise<() => void> {
@@ -195,15 +218,7 @@ export function createSchemaLock({
 
       recoverIfAbandoned();
 
-      if (Date.now() > deadline) {
-        const owner = readOwner(lockPath);
-        throw new Error(
-          `timed out after ${waitTimeoutMs}ms waiting for the ClickHouse schema lock at ${lockPath}` +
-            (owner.state === "held"
-              ? `, held by pid ${owner.pid}. If that process is gone, a recovery claim may have been left at ${claimPathFor(owner.token)}; removing both files unblocks the run.`
-              : "."),
-        );
-      }
+      if (Date.now() > deadline) throw timedOutWaiting();
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     }
   }

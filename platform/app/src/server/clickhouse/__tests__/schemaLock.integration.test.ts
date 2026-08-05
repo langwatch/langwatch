@@ -51,18 +51,35 @@ function startContender({
 function overlappingHolders(journal: string): string[] {
   const overlaps: string[] = [];
   let inside: string | undefined;
-  for (const line of journal.trim().split("\n").filter(Boolean)) {
-    const [event, id] = line.split(" ");
-    if (event === "enter") {
-      if (inside !== undefined)
-        overlaps.push(`${id} entered while ${inside} held`);
-      inside = id;
-    } else if (event === "exit") {
-      if (inside !== id) overlaps.push(`${id} exited but ${inside} held`);
-      inside = undefined;
+
+  for (const line of journalEvents(journal)) {
+    if (line.event === "enter") {
+      if (inside !== undefined) {
+        overlaps.push(`${line.id} entered while ${inside} held`);
+      }
+      inside = line.id;
+      continue;
     }
+    if (inside !== line.id) {
+      overlaps.push(`${line.id} exited but ${inside ?? "nobody"} held`);
+    }
+    inside = undefined;
   }
+
   return overlaps;
+}
+
+function journalEvents(
+  journal: string,
+): Array<{ event: string; id: string | undefined }> {
+  return journal
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [event, id] = line.split(" ");
+      return { event: event ?? "", id };
+    });
 }
 
 beforeEach(() => {
