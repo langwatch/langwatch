@@ -13,7 +13,10 @@ permissions:
 
 concurrency:
   group: go-services-${{ github.ref_name }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -35,7 +38,7 @@ jobs:
               - 'cmd/**'
               - 'go.mod'
               - 'go.sum'
-              - 'Dockerfile.go_service'
+              - 'infra/docker/Dockerfile.go_service'
               - '.github/workflows/go-services.yaml'
             chart:
               - 'charts/gateway/**'
@@ -43,30 +46,30 @@ jobs:
             langyagent:
               # The langyagent image bakes in the langwatch CLI, and that CLI is
               # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
-              # typescript-sdk/ + skills/ + feature-map.json + a handful of
-              # langwatch/langevals source files (typescript-sdk/copy-types.sh +
+              # sdks/typescript/ + skills/ + feature-map.json + a handful of
+              # platform/app + services/langevals source files (sdks/typescript/copy-types.sh +
               # generate-skills-bundle.mjs). A change to any of those can break
-              # `docker build -f Dockerfile.langyagent` with no Go source
+              # `docker build -f infra/docker/Dockerfile.langyagent` with no Go source
               # touched — exactly the gap that shipped a broken build once
               # (a new copy-types.sh input was never COPYed into the image).
               # Validate the image build whenever any build input moves.
               - 'services/langyagent/**'
               - 'pkg/**'
               - 'cmd/**'
-              - 'sdk-go/**'
+              - 'sdks/go/**'
               - 'go.mod'
               - 'go.sum'
-              - 'Dockerfile.langyagent'
-              - 'typescript-sdk/**'
+              - 'infra/docker/Dockerfile.langyagent'
+              - 'sdks/typescript/**'
               - 'packages/langy/**'
               - 'skills/**'
               - 'feature-map.json'
-              - 'langwatch/src/server/tracer/types.ts'
-              - 'langwatch/src/server/filters/types.ts'
-              - 'langwatch/src/server/evaluations/types.ts'
-              - 'langwatch/src/server/modelProviders/llmModels.json'
-              - 'langwatch/src/app/api/openapiLangWatch.json'
-              - 'langevals/ts-integration/evaluators.generated.ts'
+              - 'platform/app/src/server/tracer/types.ts'
+              - 'platform/app/src/server/filters/types.ts'
+              - 'platform/app/src/server/evaluations/types.ts'
+              - 'platform/app/src/server/modelProviders/llmModels.json'
+              - 'platform/app/src/app/api/openapiLangWatch.json'
+              - 'services/langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 
   docker:
@@ -106,7 +109,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v6
         with:
           context: .
-          file: Dockerfile.go_service
+          file: infra/docker/Dockerfile.go_service
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           platforms: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           build-args: |
@@ -142,7 +145,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v6
         with:
           context: .
-          file: Dockerfile.langyagent
+          file: infra/docker/Dockerfile.langyagent
           push: false
           platforms: linux/amd64
           build-args: |
@@ -195,12 +198,53 @@ jobs:
 
       - name: Assert gateway subchart renders under the umbrella
         run: |
-          if ! grep -q "app.kubernetes.io/name: gateway" /tmp/umbrella.yaml; then
+          # Assert on the Source marker helm stamps on every rendered file, not on
+          # the gateway's pod label: sibling charts legitimately SELECT that label
+          # (langyagent's NetworkPolicy has an egress rule to the gateway), so a
+          # label grep answers "does anything mention the gateway", not "did the
+          # subchart render".
+          if ! grep -q "^# Source: langwatch/charts/gateway/" /tmp/umbrella.yaml; then
             echo "umbrella chart did NOT include the gateway subchart — dependency broken?"
             exit 1
           fi
           if ! grep -q "targetPort: 5563" /tmp/umbrella.yaml; then
             echo "gateway Service targetPort !=5563 under the umbrella"
+            exit 1
+          fi
+
+      - name: Assert the gateway follows the release name to the control plane
+        working-directory: charts/langwatch
+        run: |
+          # A fixed control-plane address resolves only on an install named the
+          # same as ours, and the failure is silent: every pod healthy, then
+          # every virtual-key request refused. Render under a release name that
+          # is deliberately NOT "langwatch" so a hardcoded default cannot pass.
+          helm template lw . --set autogen.enabled=true --dry-run > /tmp/umbrella-lw.yaml
+          if ! grep -q 'LW_GATEWAY_BASE_URL: "http://lw-app:5560"' /tmp/umbrella-lw.yaml; then
+            echo "gateway control-plane URL does not follow the release name:"
+            grep "LW_GATEWAY_BASE_URL" /tmp/umbrella-lw.yaml || echo "  (not rendered at all)"
+            exit 1
+          fi
+
+          # An address the operator set is theirs, not a starting point.
+          helm template lw . --set autogen.enabled=true \
+            --set gateway.controlPlane.baseUrl=http://elsewhere.internal:9000 --dry-run \
+            > /tmp/umbrella-cp-override.yaml
+          if ! grep -q 'LW_GATEWAY_BASE_URL: "http://elsewhere.internal:9000"' /tmp/umbrella-cp-override.yaml; then
+            echo "an explicit gateway.controlPlane.baseUrl was overridden by the derived one"
+            exit 1
+          fi
+
+          # The derivation can only assume the default app port, so an app moved
+          # off it has to be refused rather than silently dialled.
+          if helm template lw . --set autogen.enabled=true --set app.service.port=8080 --dry-run \
+            > /tmp/umbrella-cp-port.yaml 2>&1; then
+            echo "a non-default app.service.port with no gateway.controlPlane.baseUrl should fail to render"
+            exit 1
+          fi
+          if ! grep -q "gateway.controlPlane.baseUrl" /tmp/umbrella-cp-port.yaml; then
+            echo "the refusal does not name the value that fixes it:"
+            cat /tmp/umbrella-cp-port.yaml
             exit 1
           fi
 
@@ -211,7 +255,7 @@ jobs:
 
       - name: Assert opt-out drops the gateway
         run: |
-          if grep -q "app.kubernetes.io/name: gateway" /tmp/umbrella-no-gw.yaml; then
+          if grep -q "^# Source: langwatch/charts/gateway/" /tmp/umbrella-no-gw.yaml; then
             echo "gateway.chartManaged=false should suppress the subchart"
             exit 1
           fi

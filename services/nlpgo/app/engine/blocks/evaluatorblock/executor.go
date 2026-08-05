@@ -158,7 +158,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, err
 	}
 
-	// Coercion is scoped to the default langevals/* string-input path,
+	// Coercion is scoped to the default services/langevals/* string-input path,
 	// where the receiving Pydantic schema declares every field as `str`
 	// and would reject a raw bool/number with "Expected string, received
 	// boolean". Saved (`evaluators/*`) and workflow (`custom/*`)

@@ -66,7 +66,7 @@ When the primary returns a retryable error **before** any chunk has been sent to
 
 Guardrails with `direction: stream_chunk` run on **chunks with visible delta text** before emission. Frames without visible text, role-only (`{"delta":{"role":"assistant"}}`), tool-call deltas, terminal usage, skip the guardrail call entirely, so ~95% of stream frames are near-zero overhead. See [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas).
 
-- **Budget ≤50 ms per chunk.** Slow or errored guardrails **fail open**: the chunk passes through, `gateway_guardrail_verdicts_total{direction=stream_chunk,verdict=fail_open}` increments, and `langwatch.guardrail.stream_chunk_fail_open=<reason>` is set on the trace. Blocking the user's stream on a slow policy service is worse than occasional pass-through, but the metric surfaces degraded services.
+- **Budget ≤50 ms per chunk.** Slow or errored guardrails **fail open**: the chunk passes through and `langwatch.guardrail.stream_chunk_fail_open=<reason>` is set on the trace. Blocking the user's stream on a slow policy service is worse than occasional pass-through. Note that this path swallows the error internally, so it does **not** emit `gateway_guardrail_verdicts_total{verdict="fail_open"}`; the trace attribute is the signal for degraded policy services on stream chunks. Only the `request` and `response` directions count fail-open verdicts.
 - **Decision `block`** → terminal `event: error` frame with `type=guardrail_blocked`, `code=stream_chunk_blocked` (see [Terminal error shapes](#terminal-error-shapes)). Channel closed immediately.
 - **Decision `modify`** is **not implemented in v1**: chunk-level rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events differ). For v1, "redact on stream" = block + client-retry. A future iter can add provider-aware chunk rewriting.
 
@@ -184,7 +184,7 @@ const stream = await openai.chat.completions.create({
 In Prometheus, Grafana:
 
 ```promql
-rate(gateway_requests_total{usage_reported="false"}[5m]) > 0
+sum(rate(gateway_streaming_usage_missing_total[5m])) > 0
 ```
 
 After the gateway-side auto-injection landed, this should sit at zero in steady state for OpenAI, Azure streaming traffic. If it spikes, capture the request body via `LW_LOG_MESSAGE_BODY=1` (see [Self-hosting → Config → Debug knobs](/ai-gateway/self-hosting/config#debug-development-env-knobs)) and check whether the caller is opting out of usage explicitly.

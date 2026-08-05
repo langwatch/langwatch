@@ -32,7 +32,7 @@ export const langyConversationStartedEventDataSchema = z.object({
   /** Optional initial title (else derived from the first message). */
   title: z.string().nullable().optional(),
   /**
-   * The per-conversation `runToken` (LANGY_WORKER_REDESIGN_PLAN §0a): a 32-byte
+   * The per-conversation `runToken` (see `streaming/langyFrameAuth.ts`): a 32-byte
    * CSPRNG secret (hex) minted here, injected into the worker at spawn, and used
    * to HMAC every frame the worker streams back. SERVER-ONLY — it is folded into
    * a server-only state column (never a client-facing projection or the turn
@@ -244,7 +244,7 @@ export type LangyAgentResponseFailedEventData = z.infer<
  * `outcome` is the terminal discriminant on the ONE answer-carrying terminal:
  * `completed` (the agent finished), `failed` (it ran but ended in failure, still
  * with something to carry — distinct from `agent_response_failed`, which is the
- * no-answer stall), and `stopped` (the USER stopped the turn mid-answer, ADR-058).
+ * no-answer stall), and `stopped` (the USER stopped the turn mid-answer, ADR-078).
  * A stop is not a failure and carries the partial answer streamed so far, so it
  * rides this event and its `turn-terminal` idempotency slot rather than inventing
  * a parallel terminal.

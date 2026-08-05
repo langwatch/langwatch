@@ -6,13 +6,18 @@ package providers
 
 import (
 	"bytes"
+	"container/list"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -21,6 +26,8 @@ import (
 	"github.com/bytedance/sonic"
 	bifrost "github.com/maximhq/bifrost/core"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -38,6 +45,21 @@ type BifrostRouter struct {
 	// port exhaustion under embedding throughput.
 	voyageClient   *http.Client
 	endpointPolicy customerEndpointPolicy
+	// anthropicCompat is the bounded registry of self-hosted Anthropic
+	// endpoints behind derived provider keys; dispatch registers into it,
+	// eviction tears down the bifrost provider behind the evicted key.
+	anthropicCompat *anthropicCompatRegistry
+	// discoveryOnce lazily builds the /v1/models discovery client and
+	// cache. Lazy rather than constructor-built so a zero-value router
+	// (used by tests and by any caller that only needs discovery) works
+	// without a live Bifrost instance.
+	discoveryOnce   sync.Once
+	discoveryHTTP   *http.Client
+	discoveryModels *modelsDiscoveryCache
+	// hostedCatalogs overrides hostedModelCatalogs (tests only), pointing
+	// hosted providers' catalog probes at local servers. nil means the
+	// production table; an empty non-nil map disables hosted probes.
+	hostedCatalogs map[domain.ProviderID]catalogProbe
 	// codexClient streams against OpenAI's codex backend (no overall
 	// timeout — turns run for minutes; cancellation rides the context).
 	codexClient *http.Client
@@ -60,6 +82,12 @@ type BifrostOptions struct {
 	CodexRefresher domain.CodexTokenRefresher
 	// CodexBackendURL overrides the codex upstream (tests only).
 	CodexBackendURL string
+	// OpenAIBackendURL overrides OpenAI's upstream (tests only). A credential
+	// base_url reroutes to the vLLM chat-compat provider (see mapProvider);
+	// this override instead keeps the request on bifrost's native OpenAI
+	// provider, so tests can drive the real Responses stream pipeline against
+	// a local server.
+	OpenAIBackendURL string
 }
 
 // NewBifrostRouter creates a provider router backed by bifrost.
@@ -68,13 +96,33 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if pool <= 0 {
 		pool = 1000
 	}
+	compatEndpoints := newAnthropicCompatRegistry(anthropicCompatMaxEndpoints)
 	bf, err := bifrost.Init(ctx, bfschemas.BifrostConfig{
-		Account:         &account{},
+		Account: &account{
+			anthropicCompat: compatEndpoints,
+			openAIBaseURL:   opts.OpenAIBackendURL,
+		},
 		InitialPoolSize: pool,
 		Logger:          &bifrostLogger{logger: opts.Logger},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("bifrost init: %w", err)
+	}
+	// Assigned after Init because the callback needs the bifrost instance;
+	// safe because no dispatch (and therefore no eviction) can run before
+	// NewBifrostRouter returns. Teardown runs on its own goroutine:
+	// RemoveProvider waits for the evicted provider's in-flight requests
+	// (up to the 14m request ceiling), which must not stall the dispatch
+	// that triggered the eviction. RemoveProvider errors when the provider
+	// was registered but never dispatched to (no pool exists) — nothing to
+	// release, so only log it.
+	compatEndpoints.onEvict = func(key bfschemas.ModelProvider) {
+		go compatEndpoints.releaseEvicted(key, func(evictedKey bfschemas.ModelProvider) {
+			if rmErr := bf.RemoveProvider(evictedKey); rmErr != nil {
+				opts.Logger.Debug("anthropic-compat provider teardown skipped",
+					zap.String("provider", string(evictedKey)), zap.Error(rmErr))
+			}
+		})
 	}
 	codexURL := opts.CodexBackendURL
 	if codexURL == "" {
@@ -89,6 +137,7 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 			opts.RequireHTTPSCustomerEndpoints,
 			opts.AllowedEndpointHosts,
 		),
+		anthropicCompat: compatEndpoints,
 		codexClient:     newCodexClient(),
 		codexRefresher:  opts.CodexRefresher,
 		codexBackendURL: codexURL,
@@ -133,12 +182,12 @@ func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred do
 // + un-normalizes the response back to OpenAI shape.
 //
 // For /v1/messages (RequestTypeMessages) the inbound body is already
-// provider-native (Anthropic /v1/messages shape). Running it through
-// the OpenAI parser would silently drop Anthropic-specific fields like
-// `thinking`, so we opt into Bifrost's raw-forward mode and let it
-// passthrough. Downstream VKs for `/v1/messages` are expected to route
-// to an Anthropic-family provider; sending it to OpenAI is a caller
-// error and Bifrost/OpenAI will reject accordingly.
+// provider-native (Anthropic /v1/messages shape). Destinations that speak
+// the Anthropic wire format keep Bifrost's raw-forward mode so the bytes
+// pass through untouched; every other destination is translated through
+// the neutral Responses request (see anthropic_translation.go), because
+// forwarding an Anthropic body verbatim hands the provider JSON it
+// cannot parse.
 func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
 	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
 		return nil, err
@@ -159,11 +208,17 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	// Codex streams upstream always (the backend is SSE-only); the
 	// non-streaming path aggregates to the completed Response. See codex.go.
+	// The backend speaks the Responses dialect only, so /v1/messages is
+	// translated first (anthropic_codex.go): raw-forwarding an Anthropic body
+	// would be rejected before it ever left the gateway.
 	if cred.ProviderID == domain.ProviderOpenAICodex {
+		if req.Type == domain.RequestTypeMessages {
+			return r.dispatchMessagesTranslatedCodex(ctx, req, model, cred)
+		}
 		return r.dispatchCodex(ctx, req, model, cred)
 	}
 
-	provider := mapProvider(cred)
+	provider := r.mapProviderForDispatch(cred)
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponses(ctx, req, provider, model, cred)
@@ -173,8 +228,24 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchEmbeddings(ctx, req, provider, model, cred)
 	}
 
+	if req.Type == domain.RequestTypeSpeech {
+		return r.dispatchSpeech(ctx, req, provider, model, cred)
+	}
+
+	if req.Type == domain.RequestTypeTranscription {
+		return r.dispatchTranscription(ctx, req, provider, model, cred)
+	}
+
 	if req.Type == domain.RequestTypePassthrough {
 		return r.dispatchPassthrough(ctx, req, provider, model, cred)
+	}
+
+	// /v1/messages to a destination that does not speak the Anthropic wire
+	// format is translated rather than raw-forwarded. Forwarding verbatim
+	// hands the provider a body it cannot parse and surfaces its own
+	// "Unknown parameter: 'system'" back to the caller.
+	if req.Type == domain.RequestTypeMessages && !isAnthropicWireProvider(provider) {
+		return r.dispatchMessagesTranslated(ctx, req, provider, model, cred)
 	}
 
 	// Managed-Bedrock with a per-request runtime endpoint (the customer's
@@ -182,11 +253,11 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// client with BaseEndpoint pinned to that VPCE, so the request is
 	// SigV4-signed for and sent to that host instead of the public AWS
 	// endpoint. Without this, the customer's VPCE-conditioned IAM policy
-	// rejects the InvokeModel with a 403. Gated to RequestTypeChat only:
-	// /v1/messages must stay on the raw-forward path below (routing
-	// Anthropic-native bodies through Converse would drop messages-only
-	// fields like `thinking`); embeddings/responses/passthrough are handled
-	// above. A no-op for Bedrock credentials without a runtime endpoint.
+	// rejects the InvokeModel with a 403. Gated to RequestTypeChat here:
+	// /v1/messages took the translated lane above, which runs its own VPCE
+	// intercept (anthropic_bedrock_vpce.go); embeddings/responses/passthrough
+	// are handled above. A no-op for Bedrock credentials without a runtime
+	// endpoint.
 	if req.Type == domain.RequestTypeChat {
 		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
 			return nil, err
@@ -197,8 +268,9 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, err
+		return nil, classifyChatBuildError(ctx, err)
 	}
+	stampParamsDropped(ctx, paramsDroppedFrom(dispatchCtx))
 
 	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
 
@@ -238,11 +310,63 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	}
 
 	body, _ := sonic.Marshal(resp)
+	// Translated-lane response contract: a 200 must carry at least one
+	// choice, and a policy drop must be visible on the envelope. Scoped to
+	// the translated lanes: an OpenAI-compatible target can legitimately
+	// answer 200 with an empty choices array when its safety system blocks
+	// the output, and rewriting that into finish_reason "length" would
+	// report a truncation that never happened.
+	if _, translated := policyLaneFor(provider); translated {
+		body = ensureChoicesPresent(body)
+	}
+	body = injectParamsDropped(body, paramsDroppedFrom(dispatchCtx))
 	return &domain.Response{
 		Body:       body,
 		StatusCode: http.StatusOK,
 		Usage:      extractUsage(resp),
 	}, nil
+}
+
+// ensureChoicesPresent repairs a 200 whose choices came back null or
+// empty. The gemini translator skips candidates whose content has no
+// parts (providers/gemini/chat.go, the thinking-exhausted-cap case), so
+// a model that spent the whole completion budget on thinking produced an
+// HTTP 200 with "choices": null, usage billed, and no signal anywhere: an
+// empty success that also breaks strict OpenAI parsers. Synthesizing a
+// finish_reason "length" choice with empty content makes the outcome what
+// an OpenAI client understands: the cap truncated the answer.
+func ensureChoicesPresent(body []byte) []byte {
+	choices := gjson.GetBytes(body, "choices")
+	if choices.IsArray() && len(choices.Array()) > 0 {
+		return body
+	}
+	out, err := sjson.SetBytes(body, "choices", []map[string]any{{
+		"index": 0,
+		"message": map[string]any{
+			"role":    "assistant",
+			"content": "",
+		},
+		"finish_reason": "length",
+	}})
+	if err != nil {
+		return body
+	}
+	return out
+}
+
+// injectParamsDropped records the parameter-policy drop list on the
+// response envelope (extra_fields.params_dropped), alongside the
+// X-LangWatch-Params-Dropped header and the span attribute, so a dropped
+// parameter is observable from the response body alone.
+func injectParamsDropped(body []byte, dropped []string) []byte {
+	if len(dropped) == 0 {
+		return body
+	}
+	out, err := sjson.SetBytes(body, "extra_fields.params_dropped", dropped)
+	if err != nil {
+		return body
+	}
+	return out
 }
 
 // dispatchResponses routes /v1/responses traffic through Bifrost's
@@ -450,12 +574,18 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	}
 
 	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
-	// backend with OAuth + one-shot token refresh. See codex.go.
+	// backend with OAuth + one-shot token refresh. See codex.go. Its backend
+	// speaks the Responses dialect only, so /v1/messages goes through the
+	// translated codex lane (anthropic_codex.go) and comes back as the
+	// Anthropic SSE union.
 	if cred.ProviderID == domain.ProviderOpenAICodex {
+		if req.Type == domain.RequestTypeMessages {
+			return r.dispatchMessagesTranslatedCodexStream(ctx, req, model, cred)
+		}
 		return r.dispatchCodexStream(ctx, req, model, cred)
 	}
 
-	provider := mapProvider(cred)
+	provider := r.mapProviderForDispatch(cred)
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponsesStream(ctx, req, provider, model, cred)
@@ -466,14 +596,23 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	}
 
 	if req.Type == domain.RequestTypeMessages {
-		return r.dispatchMessagesStream(ctx, req, provider, model, cred)
+		// Anthropic-wire destinations keep the raw-forward passthrough so the
+		// provider's own SSE frames reach the client untouched. Everything
+		// else is translated: PassthroughStream would POST /v1/messages to a
+		// provider that has no such route, and the iterator would then block
+		// on a channel yielding neither chunk nor error.
+		if isAnthropicWireProvider(provider) {
+			return r.dispatchMessagesStream(ctx, req, provider, model, cred)
+		}
+		return r.dispatchMessagesTranslatedStream(ctx, req, provider, model, cred)
 	}
 
 	// Managed-Bedrock with a per-request runtime endpoint streams through the
 	// official Bedrock ConverseStream API over the customer's VPC endpoint —
-	// same rationale as the non-streaming Dispatch intercept above, and gated
-	// to RequestTypeChat for the same reason (/v1/messages stays raw-forward).
-	// A no-op for Bedrock credentials without a runtime endpoint.
+	// same rationale as the non-streaming Dispatch intercept above. Gated to
+	// RequestTypeChat because /v1/messages took its own lanes above, each
+	// with its own VPCE handling. A no-op for Bedrock credentials without a
+	// runtime endpoint.
 	if req.Type == domain.RequestTypeChat {
 		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
 			return nil, err
@@ -488,8 +627,10 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, err
+		return nil, classifyChatBuildError(ctx, err)
 	}
+	dropped := paramsDroppedFrom(dispatchCtx)
+	stampParamsDropped(ctx, dropped)
 
 	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
 
@@ -498,7 +639,33 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
-	return &bifrostStreamIterator{ch: ch}, nil
+	return &bifrostStreamIterator{ch: ch, paramsDropped: dropped}, nil
+}
+
+// classifyChatBuildError turns a buildChatRequest failure into the right
+// client-facing 400: parameter-policy refusals carry the policy's full
+// sentence under unsupported_parameter (the code OpenAI itself uses for
+// parameter rejections), everything else is a malformed client body.
+func classifyChatBuildError(ctx context.Context, err error) error {
+	var refusal *paramRefusalError
+	if errors.As(err, &refusal) {
+		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{"message": refusal.msg, "fault": "customer"})
+	}
+	// Everything else buildChatRequest can reject is a client-body problem
+	// (unparseable JSON, malformed params): classify it as a 400 the same
+	// way the embeddings lane does, not an internal error.
+	return herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
+}
+
+// stampParamsDropped records the policy drop list on the gateway's
+// request span so drops are visible on the trace, not only on the
+// response envelope. Parameter names are shape metadata, never content.
+func stampParamsDropped(ctx context.Context, dropped []string) {
+	if len(dropped) == 0 {
+		return
+	}
+	trace.SpanFromContext(ctx).SetAttributes(
+		attribute.StringSlice("langwatch.gateway.params_dropped", dropped))
 }
 
 // dispatchMessagesStream raw-forwards a streaming /v1/messages request
@@ -697,6 +864,25 @@ func rawForwardCtx(ctx context.Context) context.Context {
 	return ctx
 }
 
+// paramsDroppedCtxKey carries the parameter-policy drop list from the
+// parse layer to the response path, so the drop can be signaled on the
+// response envelope, header, and span.
+type paramsDroppedCtxKey struct{}
+
+func withParamsDropped(ctx context.Context, dropped []string) context.Context {
+	if len(dropped) == 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, paramsDroppedCtxKey{}, dropped)
+}
+
+// paramsDroppedFrom returns the drop list recorded by the parameter
+// policy, nil when nothing was dropped.
+func paramsDroppedFrom(ctx context.Context) []string {
+	dropped, _ := ctx.Value(paramsDroppedCtxKey{}).([]string)
+	return dropped
+}
+
 // rawResponseBytes extracts the provider's native chat-completion
 // response bytes from BifrostResponseExtraFields.RawResponse. Bifrost
 // populates this only when BifrostContextKeySendBackRawResponse is set
@@ -775,11 +961,6 @@ func rawResponseFromBifrostError(berr *bfschemas.BifrostError) ([]byte, int, boo
 	return body, status, true
 }
 
-// ListModels returns an empty list — model discovery is VK-config-driven.
-func (r *BifrostRouter) ListModels(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
-	return nil, nil
-}
-
 // --- Bifrost Account (multi-tenant credential provider) ---
 
 type credCtxKey struct{}
@@ -796,7 +977,15 @@ func credentialFromContext(ctx context.Context) domain.Credential {
 }
 
 // account implements bfschemas.Account for multi-tenant credential dispatch.
-type account struct{}
+type account struct {
+	// anthropicCompat resolves derived anthropic-compat provider keys to
+	// their endpoints. Shared with the router, which registers endpoints
+	// at dispatch time.
+	anthropicCompat *anthropicCompatRegistry
+	// openAIBaseURL redirects bifrost's native OpenAI provider to a local
+	// server in tests. Empty in production. See BifrostOptions.OpenAIBackendURL.
+	openAIBaseURL string
+}
 
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
 	return bfschemas.StandardProviders, nil
@@ -823,12 +1012,39 @@ const ProviderRequestTimeoutSeconds = 14 * 60
 
 func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
+	if strings.HasPrefix(string(provider), anthropicCompatPrefix) {
+		endpoint, ok := a.anthropicCompat.lookup(string(provider))
+		if !ok {
+			return nil, fmt.Errorf("no endpoint registered for anthropic-compatible provider %q", provider)
+		}
+		cfg.NetworkConfig.BaseURL = endpoint.baseURL
+		cfg.CustomProviderConfig = &bfschemas.CustomProviderConfig{
+			BaseProviderType: bfschemas.Anthropic,
+			IsKeyLess:        endpoint.keyless,
+		}
+		// Every compat endpoint gets its own bifrost worker pool, unlike the
+		// OpenAI-compat path where all customer endpoints share the single
+		// VLLM provider. Bifrost's defaults (1000 workers, 5000-slot queue)
+		// are sized for a hosted provider fronting the whole gateway; taking
+		// them per endpoint would let customer configuration multiply the
+		// process's goroutine count several times over. A self-hosted server
+		// saturates far below this, and a burst past the queue applies
+		// backpressure rather than failing: bifrost only drops queued
+		// requests under DropExcessRequests, which the gateway leaves off.
+		cfg.ConcurrencyAndBufferSize = bfschemas.ConcurrencyAndBufferSize{
+			Concurrency: anthropicCompatConcurrency,
+			BufferSize:  anthropicCompatBufferSize,
+		}
+	}
 	// Whole-gateway timeout ceiling. StreamIdleTimeoutInSeconds gets the
 	// same value: its 60s default is a per-chunk gap limit, and reasoning
 	// models can think for minutes before the first token without emitting
 	// anything.
 	cfg.NetworkConfig.DefaultRequestTimeoutInSeconds = ProviderRequestTimeoutSeconds
 	cfg.NetworkConfig.StreamIdleTimeoutInSeconds = ProviderRequestTimeoutSeconds
+	if provider == bfschemas.OpenAI && a.openAIBaseURL != "" {
+		cfg.NetworkConfig.BaseURL = a.openAIBaseURL
+	}
 	if proxyURL := os.Getenv("LW_GATEWAY_OUTBOUND_PROXY"); proxyURL != "" {
 		// Debug-only: route outbound provider traffic through an HTTP proxy
 		// (e.g. `http://localhost:8888` for mitmproxy). Lets operators
@@ -934,6 +1150,19 @@ func envVar(v string) bfschemas.EnvVar {
 
 // --- Provider mapping ---
 
+// mapProviderForDispatch maps the credential to its bifrost provider key
+// and, for Anthropic credentials with a base-URL override, records the
+// endpoint in the bounded registry so GetConfigForProvider can resolve it —
+// refreshing LRU recency on every dispatch so actively used endpoints are
+// never the ones evicted.
+func (r *BifrostRouter) mapProviderForDispatch(cred domain.Credential) bfschemas.ModelProvider {
+	provider := mapProvider(cred)
+	if strings.HasPrefix(string(provider), anthropicCompatPrefix) {
+		return r.anthropicCompat.register(cred)
+	}
+	return provider
+}
+
 func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 	switch cred.ProviderID {
 	case domain.ProviderAzure:
@@ -945,6 +1174,15 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 	case domain.ProviderGemini:
 		return bfschemas.Gemini
 	case domain.ProviderAnthropic:
+		// Anthropic with a base-URL override (self-hosted server speaking
+		// the Anthropic Messages API natively — vLLM >= 0.24, Claude-
+		// compatible proxies) must not hit api.anthropic.com. Bifrost's
+		// Anthropic key has no per-key URL slot, so derive a per-endpoint
+		// custom provider (base type Anthropic) whose config carries the
+		// URL; bifrost creates it lazily on first dispatch.
+		if credBaseURL(cred) != "" {
+			return anthropicCompatProviderKey(cred)
+		}
 		return bfschemas.Anthropic
 	case domain.ProviderDeepSeek:
 		// DeepSeek is not in Bifrost's ModelProvider enum; its API is
@@ -986,6 +1224,164 @@ func credBaseURL(cred domain.Credential) string {
 	return credExtra(cred, "base_url", "api_base")
 }
 
+// anthropicCompatPrefix namespaces the provider keys derived for Anthropic
+// credentials with a base-URL override. The prefix keeps the keys out of
+// Bifrost's ModelProvider enum, so each endpoint gets its own lazily-created
+// provider instance (base type Anthropic) instead of mutating the shared
+// stock Anthropic provider.
+const anthropicCompatPrefix = "anthropic-url-"
+
+type anthropicCompatEndpoint struct {
+	baseURL string
+	// keyless marks credentials without an API key (unauthenticated
+	// self-hosted servers). Bifrost's key selection filters out
+	// empty-value keys for base provider Anthropic and fails the
+	// dispatch; CustomProviderConfig.IsKeyLess skips selection entirely.
+	keyless bool
+}
+
+// anthropicCompatMaxEndpoints bounds the endpoint registry. Every distinct
+// endpoint behind a derived provider key costs a bifrost worker pool, so the
+// bound is what keeps endpoint rotation across tenants from leaking pools for
+// the life of the process. Sized well above the number of self-hosted
+// Anthropic endpoints a single gateway process realistically serves
+// concurrently; an endpoint that rotates out is torn down and transparently
+// re-created on its next dispatch.
+const anthropicCompatMaxEndpoints = 32
+
+// anthropicCompatConcurrency and anthropicCompatBufferSize size the worker
+// pool bifrost creates per compat endpoint. Together with the endpoint bound
+// they cap what customer configuration can cost the process: 32 endpoints of
+// 128 workers instead of the 32k goroutines bifrost's own per-provider
+// defaults would produce.
+const (
+	anthropicCompatConcurrency = 128
+	anthropicCompatBufferSize  = 1024
+)
+
+// anthropicCompatRegistry maps derived provider keys to their endpoints.
+// Bifrost resolves provider config by provider key alone — GetConfigForProvider
+// has no credential context — so dispatch records the endpoint here before
+// enqueueing, and config resolution looks it up.
+//
+// The registry is LRU-bounded: every dispatch refreshes its endpoint's
+// recency, and inserting beyond capacity evicts the least-recently-dispatched
+// endpoint, firing onEvict so the router can release the bifrost provider
+// (worker pool + queue) behind the evicted key. Without eviction, every base
+// URL ever dispatched to — including endpoints rotated away in the control
+// plane — would retain a live worker pool forever.
+type anthropicCompatRegistry struct {
+	mu      sync.Mutex
+	cap     int
+	entries map[string]*list.Element
+	order   *list.List // front = most recently dispatched
+	// onEvict releases the bifrost provider behind an evicted key. Assigned
+	// once in NewBifrostRouter before any dispatch can run; called outside
+	// the registry lock.
+	onEvict func(key bfschemas.ModelProvider)
+}
+
+type anthropicCompatEntry struct {
+	key      string
+	endpoint anthropicCompatEndpoint
+}
+
+func newAnthropicCompatRegistry(capacity int) *anthropicCompatRegistry {
+	return &anthropicCompatRegistry{
+		cap:     capacity,
+		entries: make(map[string]*list.Element),
+		order:   list.New(),
+	}
+}
+
+// register records the credential's endpoint under its derived provider key,
+// refreshes LRU recency, and returns the key. Evicts beyond capacity.
+func (reg *anthropicCompatRegistry) register(cred domain.Credential) bfschemas.ModelProvider {
+	endpoint, key := anthropicCompatEndpointForCred(cred)
+
+	reg.mu.Lock()
+	if el, ok := reg.entries[string(key)]; ok {
+		reg.order.MoveToFront(el)
+		reg.mu.Unlock()
+		return key
+	}
+	reg.entries[string(key)] = reg.order.PushFront(anthropicCompatEntry{
+		key:      string(key),
+		endpoint: endpoint,
+	})
+	var evicted []string
+	for len(reg.entries) > reg.cap {
+		back := reg.order.Back()
+		entry := back.Value.(anthropicCompatEntry)
+		reg.order.Remove(back)
+		delete(reg.entries, entry.key)
+		evicted = append(evicted, entry.key)
+	}
+	onEvict := reg.onEvict
+	reg.mu.Unlock()
+
+	if onEvict != nil {
+		for _, k := range evicted {
+			onEvict(bfschemas.ModelProvider(k))
+		}
+	}
+	return key
+}
+
+// releaseEvicted runs release for an evicted key, unless a dispatch put the
+// same endpoint back in the live set between the eviction and this call.
+// Releasing then would close the bifrost queue that dispatch is about to
+// enqueue on, and bifrost answers those requests with "provider is shutting
+// down" instead of routing them; leaving the provider alone costs nothing
+// because the next eviction of that key schedules the teardown again.
+func (reg *anthropicCompatRegistry) releaseEvicted(key bfschemas.ModelProvider, release func(bfschemas.ModelProvider)) {
+	if _, live := reg.lookup(string(key)); live {
+		return
+	}
+	release(key)
+}
+
+// lookup resolves a derived provider key to its endpoint. Nil-safe so an
+// account without a registry (bare unit-test construction) degrades to
+// "not registered" instead of panicking.
+func (reg *anthropicCompatRegistry) lookup(key string) (anthropicCompatEndpoint, bool) {
+	if reg == nil {
+		return anthropicCompatEndpoint{}, false
+	}
+	reg.mu.Lock()
+	defer reg.mu.Unlock()
+	el, ok := reg.entries[key]
+	if !ok {
+		return anthropicCompatEndpoint{}, false
+	}
+	return el.Value.(anthropicCompatEntry).endpoint, true
+}
+
+// anthropicCompatEndpointForCred derives the endpoint identity and provider
+// key for an Anthropic credential with a base-URL override. The key is a
+// hash of the endpoint identity (URL + keyless-ness), so the same endpoint
+// always lands on the same bifrost worker pool, distinct endpoints never
+// collide, and rotating the API key value alone does not spawn a new
+// provider. Pure derivation — registration happens at dispatch time via
+// anthropicCompatRegistry.register.
+func anthropicCompatEndpointForCred(cred domain.Credential) (anthropicCompatEndpoint, bfschemas.ModelProvider) {
+	endpoint := anthropicCompatEndpoint{
+		// Same "/v1"-stripping as the OpenAI-compat path: Bifrost's
+		// Anthropic provider appends the full "/v1/messages" path itself.
+		baseURL: normalizeOpenAICompatBaseURL(credBaseURL(cred)),
+		keyless: strings.TrimSpace(cred.APIKey) == "",
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|keyless=%t", endpoint.baseURL, endpoint.keyless)))
+	return endpoint, bfschemas.ModelProvider(anthropicCompatPrefix + hex.EncodeToString(sum[:8]))
+}
+
+// anthropicCompatProviderKey derives the provider key for an Anthropic
+// credential with a base-URL override.
+func anthropicCompatProviderKey(cred domain.Credential) bfschemas.ModelProvider {
+	_, key := anthropicCompatEndpointForCred(cred)
+	return key
+}
+
 // normalizeOpenAICompatBaseURL strips a trailing "/v1" (and trailing
 // slashes) from a customer-configured base URL. OpenAI-compatible
 // endpoints are conventionally configured as "http://host:8000/v1", but
@@ -1021,10 +1417,13 @@ func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError, respHeade
 		return classifyBifrostError(ctx, berr)
 	}
 	body, _ := extractRawResponseBytes(berr.ExtraFields.RawResponse)
+	errType, errCode := bfErrorTypeCode(berr)
 	return &domain.UpstreamError{
 		StatusCode: status,
 		Body:       body,
 		Message:    bfErrorMsg(berr),
+		ErrorType:  errType,
+		ErrorCode:  errCode,
 		Headers:    forwardableUpstreamHeaders(respHeaders),
 	}
 }
@@ -1096,6 +1495,69 @@ func bfErrorMsg(e *bfschemas.BifrostError) string {
 		return e.Error.Message
 	}
 	return fmt.Sprintf("bifrost error (status %v)", e.StatusCode)
+}
+
+// bfErrorTypeCode lifts the provider's own error discriminants (error.type /
+// error.code as parsed by Bifrost's provider adapter) off a BifrostError.
+// These carry the error's identity (insufficient_quota, overloaded_error,
+// ThrottlingException, ...) on lanes where the native body is not captured.
+func bfErrorTypeCode(e *bfschemas.BifrostError) (errType, errCode string) {
+	if e == nil || e.Error == nil {
+		return "", ""
+	}
+	if e.Error.Type != nil {
+		errType = *e.Error.Type
+	}
+	if e.Error.Code != nil {
+		errCode = *e.Error.Code
+	}
+	return errType, errCode
+}
+
+// upstreamStreamError converts a mid-stream BifrostError chunk into a
+// structured domain.UpstreamError the SSE writer can forward faithfully.
+//
+// Providers can fail a 200-established stream with an in-stream error event
+// whose detail nests under an `error` OBJECT (OpenAI Responses:
+// {"type":"error","error":{"type","code","message","param"}}). Bifrost's
+// stream schema maps only the legacy flat `message`/`code`/`param` fields, so
+// for the nested shape it hands over an ErrorField with an EMPTY message
+// but, on raw-forward paths (rawForwardCtx), the verbatim event body rides
+// ExtraFields.RawResponse. Recover the message from there, and keep the raw
+// body so the writer can forward the provider's own event bytes unchanged.
+func upstreamStreamError(e *bfschemas.BifrostError) *domain.UpstreamError {
+	ue := &domain.UpstreamError{Message: bfErrorMsg(e)}
+	if e == nil {
+		ue.Message = "provider stream error"
+		return ue
+	}
+	ue.ErrorType, ue.ErrorCode = bfErrorTypeCode(e)
+	if code := e.StatusCode; code != nil {
+		ue.StatusCode = *code
+	}
+	raw, ok := extractRawResponseBytes(e.ExtraFields.RawResponse)
+	if !ok {
+		if ue.Message == "" {
+			ue.Message = "provider stream error"
+		}
+		return ue
+	}
+	var event struct {
+		Error *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if sonic.Unmarshal(raw, &event) == nil && event.Error != nil {
+		// The raw body IS a provider error event, forward it verbatim.
+		ue.Body = raw
+		if ue.Message == "" {
+			ue.Message = event.Error.Message
+		}
+	}
+	if ue.Message == "" {
+		ue.Message = "provider stream error"
+	}
+	return ue
 }
 
 // --- Usage extraction ---
@@ -1171,6 +1633,15 @@ type bifrostStreamIterator struct {
 	// right parser at iterator-construction time. When nil, the
 	// iterator skips usage extraction (final Usage() reports zeros).
 	parseUsage func([]byte) (domain.Usage, bool)
+	// roleSeenByChoice tracks which chat choice indices have emitted their
+	// first delta, driving the leading-role repair in ensureLeadingRoleDelta
+	// (see chat_stream_role.go). Lazily allocated on the first chat chunk.
+	roleSeenByChoice map[int]bool
+	// paramsDropped is the parameter-policy drop list for this request;
+	// injected into the final usage-bearing chunk so streamed responses
+	// carry the same extra_fields.params_dropped signal as sync ones.
+	// Never set on raw-framing passthrough streams.
+	paramsDropped []string
 }
 
 func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
@@ -1188,16 +1659,21 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			return false
 		}
 		if chunk.BifrostError != nil {
-			it.err = fmt.Errorf("stream error: %s", bfErrorMsg(chunk.BifrostError))
+			it.err = upstreamStreamError(chunk.BifrostError)
 			it.done = true
 			return false
 		}
 		if chunk.BifrostChatResponse != nil {
+			it.ensureLeadingRoleDelta(chunk.BifrostChatResponse)
 			data, _ := sonic.Marshal(chunk.BifrostChatResponse)
-			it.current = data
 			if chunk.BifrostChatResponse.Usage != nil {
 				it.usage = extractUsage(chunk.BifrostChatResponse)
+				// The usage-bearing final chunk carries the policy drop
+				// signal, mirroring extra_fields.params_dropped on sync
+				// responses.
+				data = injectParamsDropped(data, it.paramsDropped)
 			}
+			it.current = data
 		} else if chunk.BifrostResponsesStreamResponse != nil {
 			// Responses API stream frames (response.created /
 			// response.output_text.delta / response.completed / ...).

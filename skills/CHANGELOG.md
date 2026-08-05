@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0](https://github.com/langwatch/langwatch/compare/skills@v0.7.0...skills@v1.0.0) (2026-07-24)
+
+
+### Features
+
+* agent issue reports, npx langwatch report at every access point ([#6101](https://github.com/langwatch/langwatch/issues/6101)) ([e881f8e](https://github.com/langwatch/langwatch/commit/e881f8e5ed5e24094e9c55e3f8d390c9ff2f43e4))
+* **skills:** graduate to 1.0.0 ([71956da](https://github.com/langwatch/langwatch/commit/71956da12bcee9ffa927a7ac416794e7e0555dab))
+
+
+### Bug Fixes
+
+* post-merge codex and Langy dogfood batch ([#6073](https://github.com/langwatch/langwatch/issues/6073)) ([a5a1e5a](https://github.com/langwatch/langwatch/commit/a5a1e5ac92854fc5a9619373ea57591f7b702539))
+
 ## [0.7.0](https://github.com/langwatch/langwatch/compare/skills@v0.6.1...skills@v0.7.0) (2026-07-23)
 
 

@@ -57,6 +57,7 @@ func paramsWithBodies() domain.AITraceParams {
 		RequestType:        domain.RequestType("chat"),
 		VirtualKeyID:       "vk-1",
 		GatewayRequestID:   "req-1",
+		ModelProviderID:    "mp-1",
 		Usage: domain.Usage{
 			PromptTokens:     120,
 			CompletionTokens: 34,
@@ -73,7 +74,7 @@ func TestStampInternalGenAI_OmitsPromptAndCompletionContent(t *testing.T) {
 	span := stampedSpan(t, paramsWithBodies())
 
 	for _, kv := range span.Attributes() {
-		value := kv.Value.Emit()
+		value := kv.Value.String()
 		for _, secret := range []string{secretPrompt, secretCompletion, secretSystem} {
 			assert.NotContains(t, value, secret,
 				"attribute %q leaked message content onto the gateway's own span", kv.Key)
@@ -107,7 +108,7 @@ func TestStampInternalGenAI_KeepsOperationalMetadata(t *testing.T) {
 
 	got := make(map[string]string, len(span.Attributes()))
 	for _, kv := range span.Attributes() {
-		got[string(kv.Key)] = kv.Value.Emit()
+		got[string(kv.Key)] = kv.Value.String()
 	}
 
 	assert.Equal(t, "chat", got[AttrGenAIOperationName])
@@ -119,6 +120,7 @@ func TestStampInternalGenAI_KeepsOperationalMetadata(t *testing.T) {
 	assert.Equal(t, "154", got[AttrGenAIUsageTotal])
 	assert.Equal(t, "vk-1", got[customertracebridge.AttrVirtualKeyID])
 	assert.Equal(t, "req-1", got[customertracebridge.AttrGatewayReqID])
+	assert.Equal(t, "mp-1", got[customertracebridge.AttrModelProviderID])
 }
 
 func TestStampInternalGenAI_OmitsUntrustedModelMetadata(t *testing.T) {
@@ -132,7 +134,7 @@ func TestStampInternalGenAI_OmitsUntrustedModelMetadata(t *testing.T) {
 
 	span := stampedSpan(t, params)
 	for _, kv := range span.Attributes() {
-		assert.NotContains(t, kv.Value.Emit(), secret,
+		assert.NotContains(t, kv.Value.String(), secret,
 			"attribute %q leaked a customer-controlled model value", kv.Key)
 	}
 }
@@ -146,7 +148,7 @@ func TestStampInternalGenAI_RecordsUpstreamFailure(t *testing.T) {
 
 	got := make(map[string]string, len(span.Attributes()))
 	for _, kv := range span.Attributes() {
-		got[string(kv.Key)] = kv.Value.Emit()
+		got[string(kv.Key)] = kv.Value.String()
 	}
 	assert.Equal(t, "provider_timeout", got[AttrErrorType])
 	assert.Equal(t, "504", got[AttrUpstreamStatusCode])
@@ -164,7 +166,7 @@ func TestStampInternalGenAI_ErrorTypeCarriesNoProviderText(t *testing.T) {
 		if string(kv.Key) != AttrErrorType {
 			continue
 		}
-		assert.NotContains(t, kv.Value.Emit(), " ",
+		assert.NotContains(t, kv.Value.String(), " ",
 			"error.type must stay a classifier token, not a message")
 	}
 }
@@ -191,6 +193,9 @@ func TestStampInternalGenAI_StampsOnlyTheAllowedKeySet(t *testing.T) {
 		customertracebridge.AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
 		customertracebridge.AttrGenAIUsageCacheRead, customertracebridge.AttrGenAIUsageCacheCreate, AttrCostUSD,
 		customertracebridge.AttrVirtualKeyID, customertracebridge.AttrGatewayReqID,
+		// The dispatched ModelProvider row id: a manager-owned identifier
+		// from gateway config, no content channel.
+		customertracebridge.AttrModelProviderID,
 		AttrErrorType, AttrUpstreamStatusCode,
 	}, got, "the internal span's key set changed — review whether the new key can carry content before extending this list")
 }

@@ -62,6 +62,55 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- .Values.secrets.existingSecret | default (.Values.autogen.secretNames.app | default "langwatch-app-secrets") -}}
 {{- end -}}
 
+{{/*
+  LW_GATEWAY_BASE_URL env entry for the pods that talk to the gateway from
+  inside the cluster (the app and the workers, which both resolve Langy's
+  credentials). Renders nothing when there is no gateway to point at.
+
+  gateway.internalUrl wins for non-standard topologies (a gateway run outside
+  this release, a service mesh address). Otherwise it is the Service this chart
+  renders, whose name follows the release like the other sibling Services and
+  whose port comes from the subchart's own value so the two cannot drift.
+*/}}
+{{- define "langwatch.gatewayBaseUrlEnv" -}}
+{{- $gw := .Values.gateway | default dict }}
+{{- $url := $gw.internalUrl | default "" }}
+{{- if and (not $url) $gw.chartManaged }}
+{{- $port := (($gw.service) | default dict).port | default 80 }}
+{{- $url = printf "http://%s-gateway:%v" .Release.Name $port }}
+{{- end }}
+{{- if $url }}
+- name: LW_GATEWAY_BASE_URL
+  value: {{ $url | quote }}
+{{- end }}
+{{- end -}}
+
+{{/*
+  LANGY_WORKER_CALLBACK_URL env entry — the origin the Langy agent's workers dial
+  back on: the relay frame push, the durable turn finalize, the session-key
+  revoke, and the LANGWATCH_ENDPOINT the langwatch CLI uses for every tool call.
+
+  Without it the app hands the worker its own PUBLIC base URL, which is the
+  wrong address for a pod on the same cluster to use. At best the traffic
+  leaves the cluster and comes back; at worst that hostname means something
+  else entirely inside the pod, and every callback fails while the model calls
+  keep succeeding — a turn that costs tokens, produces an answer, and then
+  never delivers it.
+
+  langyagent.controlPlane.callbackUrl overrides it for split topologies.
+*/}}
+{{- define "langwatch.langyCallbackUrlEnv" -}}
+{{- $langy := (index .Values "langyagent") | default dict }}
+{{- $cp := $langy.controlPlane | default dict }}
+{{- $url := $cp.callbackUrl | default "" }}
+{{- if not $url }}
+{{- $port := ((.Values.app).service | default dict).port | default 5560 }}
+{{- $url = printf "http://%s-app:%v" .Release.Name $port }}
+{{- end }}
+- name: LANGY_WORKER_CALLBACK_URL
+  value: {{ $url | quote }}
+{{- end -}}
+
 {{/* Secret validation function */}}
 {{- define "langwatch.validateSecrets" }}
 {{- $errors := list }}
@@ -186,6 +235,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{/* Validate dataset storage secrets */}}
 {{- if .Values.app.dataplane.enabled }}
+  {{/* A provider name outside this set silently configures NOTHING: no
+       credentials are emitted, no validation runs, and the app falls through
+       to whatever STORED_OBJECTS_BACKEND says — so a typo would look like a
+       working install until the first write. Reject it here instead. */}}
+  {{- if not (has .Values.app.dataplane.provider (list "awsS3" "azureBlob")) }}
+    {{- $errors = append $errors (printf "app.dataplane.provider is %q — must be one of awsS3, azureBlob" .Values.app.dataplane.provider) }}
+  {{- end }}
   {{- if eq .Values.app.dataplane.provider "awsS3" }}
     {{- if .Values.app.dataplane.providers.awsS3.endpoint.secretKeyRef.name }}
       {{- if empty .Values.app.dataplane.providers.awsS3.endpoint.secretKeyRef.key }}
@@ -209,6 +265,30 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       {{- if empty .Values.app.dataplane.providers.awsS3.keySalt.secretKeyRef.key }}
         {{- $errors = append $errors "app.dataplane.providers.awsS3.keySalt.secretKeyRef.name is set but key is empty" }}
       {{- end }}
+    {{- end }}
+  {{- else if eq .Values.app.dataplane.provider "azureBlob" }}
+    {{- if .Values.app.dataplane.providers.azureBlob.accountName.secretKeyRef.name }}
+      {{- if empty .Values.app.dataplane.providers.azureBlob.accountName.secretKeyRef.key }}
+        {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountName.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- else if empty .Values.app.dataplane.providers.azureBlob.accountName.value }}
+      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountName is not configured" }}
+    {{- end }}
+
+    {{- if .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
+      {{- if empty .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.key }}
+        {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- else if empty .Values.app.dataplane.providers.azureBlob.accountKey.value }}
+      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountKey is not configured" }}
+    {{- end }}
+
+    {{- if .Values.app.dataplane.providers.azureBlob.container.secretKeyRef.name }}
+      {{- if empty .Values.app.dataplane.providers.azureBlob.container.secretKeyRef.key }}
+        {{- $errors = append $errors "app.dataplane.providers.azureBlob.container.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- else if empty .Values.app.dataplane.providers.azureBlob.container.value }}
+      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.container is not configured" }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -383,6 +463,84 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if ne $gwSecretName $appSecretName }}
     {{- $errors = append $errors (printf "gateway.secrets.existingSecretName (%q) must equal the app Secret name (%q). this release collapsed gateway-auth into the app Secret so both langwatch-app and the gateway pod mount the same Secret. Either drop the secrets.existingSecret / autogen.secretNames.app override to use the langwatch-app-secrets default, or set gateway.secrets.existingSecretName to %q so both pods agree." $gwSecretName $appSecretName $appSecretName) }}
   {{- end }}
+
+  {{/* The gateway derives its route to the control plane as
+       `<release>-app:5560` when nothing is set. The release half always
+       matches, since the app Service is named after it. The port half is a
+       constant the subchart cannot see past, so an app moved to another port
+       would leave the gateway dialling a closed one — a install that comes up
+       entirely healthy and then refuses every request that carries a virtual
+       key. Stop instead, and name the value that fixes it. */}}
+  {{- $gwBaseUrl := (($gw.controlPlane) | default dict).baseUrl | default "" }}
+  {{- $appPort := ((.Values.app.service) | default dict).port | default 5560 }}
+  {{- if and (not $gwBaseUrl) (ne (int $appPort) 5560) }}
+    {{- $errors = append $errors (printf "app.service.port is %v, but the gateway works out where the control plane is on its own and can only assume the default port 5560. It would dial http://%s-app:5560 and get nothing, and the install would come up healthy while refusing every request that carries a virtual key. Set gateway.controlPlane.baseUrl to http://%s-app:%v." $appPort .Release.Name .Release.Name $appPort) }}
+  {{- end }}
+{{- end }}
+
+{{/* Validate Langy agent secret wiring.
+
+     Unlike the gateway, all three Langy consumers (app, workers, agent pod)
+     read the SAME langyagent.secrets.* values, so they cannot disagree with
+     each other and no name-match check is needed.
+
+     What can still go wrong: the chart materialises LANGY_INTERNAL_SECRET
+     into its own app Secret, which it only writes when autogen is on. An
+     operator who brings their own Secret (autogen off, or a Secret managed by
+     terraform / external-secrets) has to carry the key themselves, and the
+     failure mode without this check is three pods in
+     CreateContainerConfigError naming a key nothing told them to add.
+
+     `lookup` returns empty during `helm template` and on a dry run, so this
+     fires only against a real cluster, and only when the Secret is already
+     there and demonstrably missing the key — never on a first install where
+     it has yet to be created. */}}
+{{- $langy := (index .Values "langyagent") | default dict }}
+{{- if $langy.chartManaged }}
+  {{- $langySecrets := $langy.secrets | default dict }}
+  {{- $langySecretName := $langySecrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
+  {{- $langyKey := $langySecrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+  {{/* Subchart values are literal YAML, so langyagent.secrets.existingSecretName
+       is a static string while the app Secret's name resolves dynamically. An
+       operator who renames the app Secret and leaves this at its stock default
+       sends all three pods to a Secret that no longer exists. Pointing Langy at
+       a genuinely different Secret stays legitimate (external-secrets,
+       terraform); only the untouched default is treated as an oversight. */}}
+  {{- $appSecretName := include "langwatch.appSecretName" . }}
+  {{- if and (ne $appSecretName "langwatch-app-secrets") (eq ($langySecrets.existingSecretName | default "") "langwatch-app-secrets") }}
+    {{- $errors = append $errors (printf "langyagent.secrets.existingSecretName is still the default %q but the app Secret is named %q. The app, the workers, and the agent pod would all mount a Secret this install does not have. Set langyagent.secrets.existingSecretName to %q, or to whichever Secret holds %s (the same mirroring the gateway subchart needs). To run without the Langy assistant instead, set langyagent.chartManaged=false." "langwatch-app-secrets" $appSecretName $appSecretName $langyKey) }}
+  {{- end }}
+  {{/* A configured key that collides with one of the app Secret's own keys would
+       emit the same Secret.data entry twice, and the second write wins — Langy's
+       random value would silently become the session secret or the gateway
+       token. Refuse rather than quietly conflating two credentials whose blast
+       radii are meant to be separate. Only when both live in the same Secret;
+       an operator-owned Secret elsewhere may name its key whatever it likes. */}}
+  {{- if eq $langySecretName (include "langwatch.appSecretName" .) }}
+    {{- $reserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
+    {{- if (.Values.gateway).chartManaged }}
+      {{- $reserved = concat $reserved (list "LW_GATEWAY_INTERNAL_SECRET" "LW_GATEWAY_JWT_SECRET") }}
+    {{- end }}
+    {{- if has $langyKey $reserved }}
+      {{- $errors = append $errors (printf "langyagent.secrets.internalSecretKey is %q, which is already a key of the app Secret %q. Langy would overwrite that credential with its own value. Pick a distinct key name (the default is LANGY_INTERNAL_SECRET), or point langyagent.secrets.existingSecretName at a separate Secret." $langyKey $langySecretName) }}
+    {{- end }}
+  {{- end }}
+  {{- $chartWritesIt := and .Values.autogen.enabled (empty .Values.secrets.existingSecret) (eq $langySecretName (include "langwatch.appSecretName" .)) }}
+  {{- if not $chartWritesIt }}
+    {{- $found := lookup "v1" "Secret" .Release.Namespace $langySecretName }}
+    {{- $hint := printf "Either add the key to that Secret (kubectl -n %s create secret generic %s --from-literal=%s=$(openssl rand -hex 32), or patch it if it already exists), point langyagent.secrets.existingSecretName at the Secret that does hold it, or let the chart generate it by leaving autogen.enabled=true with no secrets.existingSecret override." .Release.Namespace $langySecretName $langyKey }}
+    {{- if not $found }}
+      {{/* Every lookup comes back empty during `helm template` and dry runs, so
+           "Secret not found" there means "we cannot see the cluster", not "it is
+           missing". Probe with an object every real cluster has: if kube-system
+           is invisible too, stay quiet rather than failing a plain render. */}}
+      {{- if lookup "v1" "Namespace" "" "kube-system" }}
+        {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q was not found in namespace %q, and this chart is not generating it. The app, the workers, and the agent pod all read %q from it to authenticate to each other, so all three would start into CreateContainerConfigError. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
+      {{- end }}
+    {{- else if not (index ($found.data | default dict) $langyKey) }}
+      {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q in namespace %q has no %q key. The app, the workers, and the agent pod all read that one key to authenticate to each other. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
+    {{- end }}
+  {{- end }}
 {{- end }}
 
 {{/* Output errors and warnings */}}
@@ -397,6 +555,35 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{- end }}
+
+{{/* ============================================================ */}}
+{{/* Email provider guard                                          */}}
+{{/* ============================================================ */}}
+
+{{/* Fail the render when app.email.provider names a gateway that nothing
+     configures. The app treats EMAIL_PROVIDER as authoritative and never falls
+     back to another gateway, so without this the mistake surfaces at the first
+     alert instead of at install time.
+
+     Skipped when extraEnvs or extraEnvFrom are in play: those can carry the
+     provider's settings (an SMTP_URL from a pre-existing Secret, AWS_REGION
+     alongside IRSA credentials) and the chart cannot see inside them. */}}
+{{- define "langwatch.emailProviderGuard" -}}
+{{- $providers := .Values.app.email.providers }}
+{{- $configured := dict
+      "sendgrid" (or $providers.sendgrid.apiKey.value $providers.sendgrid.apiKey.secretKeyRef.name)
+      "resend"   (or $providers.resend.apiKey.value $providers.resend.apiKey.secretKeyRef.name)
+      "smtp"     (or $providers.smtp.url.value $providers.smtp.url.secretKeyRef.name $providers.smtp.host)
+      "ses"      $providers.ses.region }}
+{{- $provider := .Values.app.email.provider }}
+{{- if not (hasKey $configured $provider) }}
+{{- fail (printf "app.email.provider is %q, which is not one of: sendgrid, ses, smtp, resend." $provider) }}
+{{- end }}
+{{- $escapeHatch := or .Values.app.extraEnvs .Values.app.extraEnvFrom .Values.workers.extraEnvs .Values.workers.extraEnvFrom }}
+{{- if and (not (get $configured $provider)) (not $escapeHatch) }}
+{{- fail (printf "app.email.enabled is true and app.email.provider is %q, but app.email.providers.%s is empty. Configure it, pick another provider, or supply its settings through app.extraEnvs / app.extraEnvFrom." $provider $provider) }}
+{{- end }}
+{{- end -}}
 
 {{/* ============================================================ */}}
 {{/* Shared Environment Variables                                  */}}
@@ -581,9 +768,35 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 # Dataplane Object Storage (shared between datasets and stored-objects;
 # emitted under the legacy `dataplane` value key for
-# backwards compatibility — bucket carries BOTH dataset uploads and
-# externalized scenario media in this release).
+# backwards compatibility — the bucket/container carries BOTH dataset
+# uploads and externalized scenario media in this release).
 {{- if .Values.app.dataplane.enabled }}
+{{- if eq .Values.app.dataplane.provider "azureBlob" }}
+# Azure Blob backend (AC37, issue #4133). STORED_OBJECTS_BACKEND is the
+# EXPLICIT toggle resolveProjectStorageDestination reads — AZURE_BLOB_* env
+# presence alone never selects this backend, only this value does.
+- name: STORED_OBJECTS_BACKEND
+  value: "azure"
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_NAME" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountName) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_KEY" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountKey) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_CONTAINER" "fieldValues" .Values.app.dataplane.providers.azureBlob.container) }}
+{{- if or .Values.app.dataplane.providers.azureBlob.endpoint.value .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.azureBlob.endpoint) }}
+{{- end }}
+{{- if .Values.app.dataplane.legacyS3ReadBucket }}
+# S3->Azure migration: new writes go to Azure, but objects written before the
+# switch still carry s3:// URIs / bucket+key spool refs. createS3Client keeps
+# serving this bucket for those reads (it fails loud only when no S3 bucket is
+# configured at all), so pre-migration media, datasets, and staged payloads
+# stay readable. Omit on a greenfield Azure install.
+- name: S3_BUCKET_NAME
+  value: {{ .Values.app.dataplane.legacyS3ReadBucket | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
+{{- end }}
+{{- else }}
 - name: USE_S3_STORAGE
   value: "true"
 # Emit S3_BUCKET_NAME — the app/server reads this name across all
@@ -593,7 +806,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # silent bug that this fix resolves by aligning on S3_BUCKET_NAME.
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.bucket | quote }}
-{{- if eq .Values.app.dataplane.provider "awsS3" }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
@@ -636,6 +848,73 @@ app.kubernetes.io/instance: {{ .Release.Name }}
     secretKeyRef:
       name: {{ include "langwatch.appSecretName" . }}
       key: nextAuthSecret
+{{- end }}
+
+# Enterprise license. Optional: without one the deployment runs the open
+# source edition, which caps nothing it stores on your own infrastructure.
+# Setting it here entitles the whole instance, so an operator does not have
+# to activate a license per organization through the UI.
+#
+# In sharedEnv rather than the app Deployment because plan resolution runs in
+# the workers too, and a worker that reads a different entitlement than the
+# app would enforce different limits on the same organization.
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
+
+# Email gateway. In sharedEnv rather than the app Deployment because scheduled
+# reports and alert notifications are dispatched by the workers, so a workers
+# pod without a gateway configured fails every send it is responsible for.
+{{- if .Values.app.email.enabled }}
+{{- include "langwatch.emailProviderGuard" . }}
+- name: EMAIL_DEFAULT_FROM
+  value: {{ .Values.app.email.defaultFrom | quote }}
+- name: EMAIL_PROVIDER
+  value: {{ .Values.app.email.provider | quote }}
+{{- if eq .Values.app.email.provider "sendgrid" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SENDGRID_API_KEY" "fieldValues" .Values.app.email.providers.sendgrid.apiKey) }}
+{{- end }}
+{{- if eq .Values.app.email.provider "ses" }}
+# USE_AWS_SES is what the mailer checks; credentials come from the pod's IAM
+# role (IRSA) unless AWS_* are supplied via app.extraEnvs.
+- name: USE_AWS_SES
+  value: "true"
+{{- /* Emitted only when set: an empty entry would shadow an AWS_REGION
+       supplied through app.extraEnvs / app.extraEnvFrom. */}}
+{{- if .Values.app.email.providers.ses.region }}
+- name: AWS_REGION
+  value: {{ .Values.app.email.providers.ses.region | quote }}
+{{- end }}
+{{- if .Values.app.email.providers.ses.endpoint }}
+- name: AWS_SES_ENDPOINT
+  value: {{ .Values.app.email.providers.ses.endpoint | quote }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.app.email.provider "smtp" }}
+{{- if or .Values.app.email.providers.smtp.url.value .Values.app.email.providers.smtp.url.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SMTP_URL" "fieldValues" .Values.app.email.providers.smtp.url) }}
+{{- else if .Values.app.email.providers.smtp.host }}
+- name: SMTP_HOST
+  value: {{ .Values.app.email.providers.smtp.host | quote }}
+{{- if .Values.app.email.providers.smtp.port }}
+- name: SMTP_PORT
+  value: {{ .Values.app.email.providers.smtp.port | quote }}
+{{- end }}
+{{- /* Emptiness, not truthiness: `secure: false` is a real setting
+       (force STARTTLS on 465) and must not be dropped. */}}
+{{- if ne (toString .Values.app.email.providers.smtp.secure) "" }}
+- name: SMTP_SECURE
+  value: {{ .Values.app.email.providers.smtp.secure | toString | quote }}
+{{- end }}
+{{- if .Values.app.email.providers.smtp.user }}
+- name: SMTP_USER
+  value: {{ .Values.app.email.providers.smtp.user | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SMTP_PASSWORD" "fieldValues" .Values.app.email.providers.smtp.password) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.app.email.provider "resend" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "RESEND_API_KEY" "fieldValues" .Values.app.email.providers.resend.apiKey) }}
+{{- end }}
 {{- end }}
 {{- end }}
 
@@ -723,6 +1002,47 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   would still create the RWO PVC and mount it into multiple replicas — only
   one would attach, the others crash-loop (Sergio review 2026-05-20).
 */}}
+{{/*
+  Worker-pool size for the evaluations service, derived from the CPU the
+  container is actually allowed to use.
+
+  The service sizes its gunicorn pool from its own get_cpu_count(), whose
+  "Kubernetes" branch reads /sys/fs/cgroup/cpu/cpu.shares — a cgroup **v1**
+  path. Every current node runs cgroup v2, where that file does not exist, so
+  the lookup raises and it falls through to sched_getaffinity(), which reports
+  the NODE's CPU count. A container limited to 500m therefore forks one worker
+  per node core: eight on an 8-vCPU node, sixty-four on a 64-vCPU one.
+
+  That matters because the pool is not cheap. Each worker lazily loads its OWN
+  copy of every local model it serves (PII detection, language detection), so
+  resident memory grows by roughly 2.1Gi per worker as traffic round-robins
+  across the pool, until every worker holds every model. Measured on a 1-CPU
+  container on an 8-vCPU node: 11Gi and still climbing, having OOM-killed at
+  the chart's own 8Gi default. Pinned to one worker, the same load holds flat
+  at 2.5Gi.
+
+  CPU_COUNT is the env var get_cpu_count() honours before any of that
+  detection, so setting it from the limit restores the relationship an operator
+  expects: ask for less CPU, get a smaller pool and a smaller footprint.
+
+  Emitted only when the operator has not set CPU_COUNT in extraEnvs, so an
+  explicit choice always wins.
+*/}}
+{{- define "langwatch.langevals.cpuCount" -}}
+{{- $cpu := "" -}}
+{{- with .Values.langevals.resources -}}
+{{- $cpu = (dig "limits" "cpu" (dig "requests" "cpu" "" .) .) -}}
+{{- end -}}
+{{- $cpu = $cpu | toString -}}
+{{- if eq $cpu "" -}}
+1
+{{- else if hasSuffix "m" $cpu -}}
+{{- max 1 (ceil (divf (float64 (trimSuffix "m" $cpu)) 1000.0)) -}}
+{{- else -}}
+{{- max 1 (ceil (float64 $cpu)) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "langwatch.storedObjects.localFilesystemIsActive" -}}
 {{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}
 true
@@ -761,4 +1081,93 @@ podAffinity:
   {{- else -}}
     {{- .Values.clickhouse.external.cluster -}}
   {{- end -}}
+{{- end -}}
+
+{{/*
+  Security contexts: a per-component override LAYERS onto the hardened global
+  default. The operator's key wins; every key they do not mention keeps its
+  default. Overriding one field is therefore never a way to drop the others.
+
+  Use mustMergeOverwrite, not coalesce: coalesce is all-or-nothing, taking the
+  component map whole as soon as it is non-empty, which makes a partial
+  override behave as a full replacement. deepCopy because mustMergeOverwrite
+  mutates its first argument and .Values.global is shared across every
+  component in the release.
+
+  Usage: {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) }}
+*/}}
+{{- define "langwatch.podSecurityContext" -}}
+{{- $global := .ctx.Values.global.podSecurityContext | default dict -}}
+{{- /* Three levels, lowest priority first: global, then the component's uid
+       "base", then the operator's override.
+
+       `base` USED TO REPLACE global entirely (`.base | default $global`),
+       which quietly defeated the whole point of a global default: an operator
+       who raised the bar globally — seccompProfile.type: Localhost,
+       supplementalGroups, fsGroupChangePolicy — got it on app/workers/nlp/
+       langevals while the bundled PostgreSQL and Redis silently stayed on
+       whatever `base` happened to name. The two workloads holding data were
+       the two exempt from the hardening.
+
+       Now `base` pins ONLY the keys it actually names (the uid the image
+       requires, which the datastores cannot change), and every other global
+       key survives underneath it.
+
+       To DROP an inherited key rather than change it — e.g. runAsUser on
+       OpenShift, where the SCC assigns one from a range — set it to null:
+       `postgresql.podSecurityContext.runAsUser: null`. mustMergeOverwrite
+       keeps the explicit null, which renders as no value. */ -}}
+{{- $override := .component.podSecurityContext | default dict -}}
+{{- toYaml (mustMergeOverwrite (deepCopy $global) (.base | default dict) $override) -}}
+{{- end -}}
+
+{{- define "langwatch.containerSecurityContext" -}}
+{{- $global := .ctx.Values.global.containerSecurityContext | default dict -}}
+{{- $override := .component.containerSecurityContext | default dict -}}
+{{- toYaml (mustMergeOverwrite (deepCopy $global) $override) -}}
+{{- end -}}
+
+{{/*
+Ingress: validated + normalised `ingress.blockedPaths`, as a JSON array.
+Consume with: {{- $blocked := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
+
+Validation is security-relevant: a trailing slash, a missing leading slash, a
+bare "/" or a non-list value each leave the block rendered but inert. Rejected
+here, once, by name, so both consuming templates agree.
+*/}}
+{{- define "langwatch.ingress.blockedPaths" -}}
+  {{- $normalised := list -}}
+  {{- $raw := .Values.ingress.blockedPaths -}}
+  {{- if $raw -}}
+    {{- if not (kindIs "slice" $raw) -}}
+      {{- fail (printf "ingress.blockedPaths must be a list, got %s (%v). With --set, a list literal is assigned as a string — use --set-json 'ingress.blockedPaths=[\"/api/internal\"]', or set it in a values file." (kindOf $raw) $raw) -}}
+    {{- end -}}
+    {{- range $entry := $raw -}}
+      {{- $path := toString $entry -}}
+      {{- if not (hasPrefix "/" $path) -}}
+        {{- fail (printf "ingress.blockedPaths entry %q must be an absolute path beginning with \"/\". As written it renders an Ingress the API server rejects, and blocks nothing in the meantime." $path) -}}
+      {{- end -}}
+      {{- /* Reject rather than normalise. `trimSuffix "/"` strips exactly ONE
+             character, so "/api/internal//" became "/api/internal/" and the
+             nested-path guard then compared against a prefix no real request
+             path can match — rendering a blackhole rule that blocks nothing
+             while an app rule for /api/internal/status out-matched it. Silently
+             repairing operator input is what made that reachable; a security
+             control should refuse input it cannot interpret exactly. */ -}}
+      {{- if ne $path (trim $path) -}}
+        {{- fail (printf "ingress.blockedPaths entry %q has leading or trailing whitespace. Kubernetes matches the path literally, so the block would never fire. Remove the whitespace." $path) -}}
+      {{- end -}}
+      {{- if contains "//" $path -}}
+        {{- fail (printf "ingress.blockedPaths entry %q contains an empty path segment (\"//\"). No request path matches it, so the block would render but never fire. Use a single slash between segments." $path) -}}
+      {{- end -}}
+      {{- if eq $path "/" -}}
+        {{- fail "ingress.blockedPaths may not contain \"/\" — that would route the whole site to the blackhole. Block a specific prefix, or set ingress.enabled: false." -}}
+      {{- end -}}
+      {{- if hasSuffix "/" $path -}}
+        {{- fail (printf "ingress.blockedPaths entry %q must not end in a slash — with pathType: Prefix, %q already covers every path beneath it, and the trailing form silently fails to match the prefix itself." $path (trimSuffix "/" $path)) -}}
+      {{- end -}}
+      {{- $normalised = append $normalised $path -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $normalised | uniq | toJson -}}
 {{- end -}}

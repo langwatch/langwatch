@@ -11,7 +11,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -75,24 +78,24 @@ jobs:
       - name: Setup pnpm + Node
         uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: |
-            langwatch/pnpm-lock.yaml
-            skills/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
+      # skills/ pulls node-pty, whose postinstall falls back to `node-gyp
+      # rebuild` on linux. The composite action above installs node-gyp only
+      # when it does the install itself, and here it does not, so it has to be
+      # installed explicitly before the install below reaches that lifecycle
+      # script — otherwise it ELIFECYCLEs with "node-gyp: not found".
+      - name: Install node-gyp (for node-pty postinstall)
+        run: npm install -g node-gyp@12.3.0
+
+      # One install for the app and the skills compiler. skills/ used to need
+      # `--ignore-workspace` to escape the root workspace it sat inside without
+      # being a member of; it is a member now. See ADR-076.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: langwatch
-
-      # `--ignore-workspace`: same gotcha as agentic-e2e-tests in e2e-ci.yml.
-      # The repo-root pnpm-workspace.yaml introduced by @langwatch/server in
-      # packages/ shadows skills/ unless we tell pnpm to ignore it. Without
-      # this, `pnpm install` here does "Scope: all N workspace projects"
-      # (only `packages/*`) and skills/node_modules never gets `unified`,
-      # `tsx` deps, etc. — the next sync-prompts.sh step then dies with
-      # ERR_MODULE_NOT_FOUND on `unified` from skills/_lib/mdx-inline.ts.
-      - name: Install skill tooling
-        run: pnpm install --frozen-lockfile --ignore-workspace
-        working-directory: skills
+        run: >
+          pnpm install --frozen-lockfile
+          --filter "@langwatch/web..."
+          --filter "@langwatch/skills..."
 
       - name: Regenerate docs/skills pages
         run: bash docs/scripts/sync-prompts.sh

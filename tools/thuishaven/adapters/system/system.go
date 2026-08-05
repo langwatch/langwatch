@@ -58,12 +58,46 @@ func (System) Terminate(pid int) {
 	}
 }
 
+// ownsGroup reports whether pid is the leader of its own process group, which
+// is the shape of everything haven starts: supervised children get Setpgid and
+// the detached launcher gets Setsid, so each leads the group it is signalled by.
+//
+// It is the identity check the group signals need. A recorded pid is only
+// evidence that a process was alive when it was written down; the kernel
+// recycles pids, so by the time `down` runs, that number may belong to an
+// unrelated process — and signalling ITS group would kill a stranger's process
+// tree, potentially the developer's shell. A recycled pid is overwhelmingly
+// unlikely to also lead its group, so requiring leadership turns a broadcast
+// into a signal we can only aim at ourselves. It also excludes the two
+// catastrophic targets by construction: kill(-1, …) would hit every process
+// this user can signal, and kill(-0, …) our own group.
+func ownsGroup(pid int) bool {
+	if pid <= 1 {
+		return false
+	}
+	pgid, err := syscall.Getpgid(pid)
+	return err == nil && pgid == pid
+}
+
+// KillGroup SIGKILLs pid's whole process group — the no-grace hard stop behind
+// `haven down -f`. When pid does not lead its group it is not the process we
+// recorded, so only that pid is signalled, never a group.
+func (s System) KillGroup(pid int) {
+	if ownsGroup(pid) {
+		_ = syscall.Kill(-pid, syscall.SIGKILL)
+		return
+	}
+	if p, err := os.FindProcess(pid); err == nil {
+		_ = p.Signal(syscall.SIGKILL)
+	}
+}
+
 // TerminateGroup SIGTERMs pid's whole process group — the shape every
 // supervised child has (Setpgid), so one signal takes the child and its tree.
-// Falls back to signalling just the pid when the group can't be resolved.
+// Falls back to signalling just the pid on the same identity check as KillGroup.
 func (System) TerminateGroup(pid int) {
-	if pgid, err := syscall.Getpgid(pid); err == nil && pgid > 1 {
-		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+	if ownsGroup(pid) {
+		_ = syscall.Kill(-pid, syscall.SIGTERM)
 		return
 	}
 	System{}.Terminate(pid)

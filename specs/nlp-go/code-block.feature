@@ -8,7 +8,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   See _shared/contract.md §7.
 
-  # The feature-parity checker (langwatch/scripts/check-feature-parity.ts) has a
+  # The feature-parity checker (platform/app/scripts/check-feature-parity.ts) has a
   # Go walker, so scenarios here bind to Go tests via a `@scenario` comment above
   # the test func. The execution-semantics scenarios are bound to
   # services/nlpgo/tests/integration (code_block_spec_test.go and
@@ -63,6 +63,10 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When I POST /go/studio/execute and read the SSE stream
       Then the node's "execution_state_change" event includes stderr containing "hello-stderr"
 
+  # The exception class belongs in the words, never in error.type. error.type is
+  # a closed set the product writes customer copy against; a Python class name
+  # is whatever the customer's code raised, so putting one there gave the client
+  # a code it had never heard of and no copy to show for it.
   Rule: Exceptions are surfaced as structured errors with the traceback
 
     @integration
@@ -71,7 +75,8 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When I POST /go/studio/execute_sync
       Then the response.result.status is "error"
       And the error.node_id matches the code node id
-      And the error.type is "ZeroDivisionError" and the error.message contains "division by zero"
+      And the error.type is "code_runner_error"
+      And the error.message names ZeroDivisionError and contains "division by zero"
       And the error.traceback contains "ZeroDivisionError: division by zero" and the offending user-code frame
 
     @integration
@@ -79,7 +84,8 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Given a code node whose body is "def execute(:" (invalid syntax)
       When I POST /go/studio/execute_sync
       Then the response.result.status is "error"
-      And the error.type is "SyntaxError" and the error.message contains "invalid syntax"
+      And the error.type is "code_runner_error"
+      And the error.message names SyntaxError and contains "invalid syntax"
 
   Rule: Wall-clock timeout terminates the subprocess
 

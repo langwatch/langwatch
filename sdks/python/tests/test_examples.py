@@ -1,0 +1,267 @@
+import importlib
+import inspect
+import json
+import os
+from collections.abc import Sequence
+from typing import Optional
+import httpx
+import pytest
+import asyncio
+
+# Chainlit's config bootstrap instantiates a pydantic dataclass at import time,
+# which currently explodes on the installed pydantic (>=2.12) with
+# `CodeSettings` is not fully defined. Skip the whole module rather than taking
+# down the rest of the suite at collection time.
+try:
+    # `cl` is referenced later in this module (e.g. `cl.Message(...)`), so
+    # the alias is intentional despite static analyzers flagging it as unused
+    # during the skip-on-import-failure probe.
+    import chainlit as cl  # noqa: F401
+    import chainlit.config  # noqa: F401
+    from chainlit.context import init_http_context  # noqa: F401
+except Exception as _chainlit_err:  # pragma: no cover - environment-dependent
+    pytest.skip(
+        f"chainlit import failed: {_chainlit_err!r}",
+        allow_module_level=True,
+    )
+
+import langwatch
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import (
+    SpanExportResult,
+    SpanExporter,
+    SimpleSpanProcessor,
+)
+from opentelemetry.sdk.trace import ReadableSpan
+import litellm
+
+trace_urls: dict[str, str] = {}
+
+EXTERNAL_SERVICE_ERROR_INDICATORS = (
+    "server_error",
+    "The server had an error",
+    "Rate limit",
+    "RateLimitError",
+    "insufficient_quota",
+    "API Error",
+    "Connection error",
+    "Timeout",
+    "Request timed out",
+    "read operation timed out",
+)
+
+
+def build_example_input(example_file: str) -> str:
+    if "span_evaluation" in example_file:
+        return "who is the oldest person?"
+    if "rag" in example_file:
+        return "what is LangWatch?"
+    if "function_call" in example_file:
+        # The function-call example offers a get_weather tool with
+        # tool_choice="auto"; a weather question is what makes the model
+        # actually pick it.
+        return "what is the weather in Amsterdam?"
+    return "what makes a good daily routine?"
+
+
+def is_external_service_error(error: Exception) -> bool:
+    return any(
+        indicator in str(error) for indicator in EXTERNAL_SERVICE_ERROR_INDICATORS
+    )
+
+
+class TraceIdCapturerExporter(SpanExporter):
+    def __init__(self):
+        self.captured_trace_id: Optional[str] = None
+
+    def export(self, spans: Sequence[ReadableSpan]):
+        if self.captured_trace_id is None and spans:
+            span = spans[0]
+            context = span.get_span_context()
+            if context and context.is_valid:
+                self.captured_trace_id = f"{context.trace_id:032x}"
+        return SpanExportResult.SUCCESS
+
+
+def get_example_files():
+    examples_dir = os.path.join(os.path.dirname(__file__), "..", "examples")
+    opentelemetry_dir = os.path.join(examples_dir, "opentelemetry")
+    return [
+        f"examples/{f}"
+        for f in os.listdir(examples_dir)
+        if f.endswith(".py") and not f.startswith("__")
+    ] + [
+        f"examples/opentelemetry/{f}"
+        for f in os.listdir(opentelemetry_dir)
+        if f.endswith(".py")
+    ]
+
+
+# @scenario "Example tests use deterministic local input"
+def test_example_input_is_local():
+    assert build_example_input("span_evaluation.py") == "who is the oldest person?"
+    assert build_example_input("langchain_rag_bot.py") == "what is LangWatch?"
+    assert build_example_input("openai_bot_function_call.py") == (
+        "what is the weather in Amsterdam?"
+    )
+    assert build_example_input("distributed_tracing.py") == (
+        "what makes a good daily routine?"
+    )
+
+
+# @scenario "Provider quota failures are classified as external service issues"
+def test_provider_quota_failure_is_external_service_issue():
+    assert is_external_service_error(
+        RuntimeError("request failed with insufficient_quota")
+    )
+
+
+@pytest.mark.parametrize("example_file", get_example_files())
+@pytest.mark.asyncio
+async def test_example(example_file: str):
+    # FIXME: Reset LiteLLM global cache to prevent conflicts between tests
+    # When running tests as a group, LiteLLM's global cache state gets polluted
+    # causing "Cache.get_cache() got multiple values for argument 'self'" errors.
+    # This doesn't happen when running individual tests (fresh Python process).
+    # The cache reset prevents state pollution between different example tests.
+    litellm.cache = None
+
+    example_file = example_file.replace("examples/", "")
+    if example_file.startswith("cli/"):
+        pytest.skip("CLI examples are tested separately via make cli-examples")
+    if example_file == "batch_evalutation.py":
+        pytest.skip("batch_evalutation.py is not a runnable example")
+    if example_file == "dataset_crud_example.py":
+        pytest.skip("dataset_crud_example.py requires a live LangWatch instance")
+    if example_file == "opentelemetry/openllmetry_anthropic_bot.py":
+        pytest.skip(
+            "openllmetry anthropic has a bug starting another async process inside"
+        )
+    if example_file == "opentelemetry/openllmetry_openai_bot.py":
+        pytest.skip(
+            "openllmetry openai has a bug starting another async process inside"
+        )
+    if example_file == "langchain_rag_bot_vertex_ai.py":
+        pytest.skip(
+            "langchain_rag_bot_vertex_ai.py is broken due to a bug in current langchain version of global state mutation when running together with other langchain"
+        )
+    if example_file == "litellm_bot.py":
+        pytest.skip(
+            "litellm_bot.py skipped — Cerebras API is unreliable (frequent rate limiting)"
+        )
+    if example_file in (
+        "streamlit_openai_assistants_api_bot.py",
+        "opentelemetry/openinference_openai_assistants_api_bot.py",
+    ):
+        pytest.skip(
+            "Assistants API examples: CI routes OpenAI traffic through the"
+            " LangWatch gateway, which does not proxy /v1/assistants or"
+            " /v1/threads (the Assistants API is deprecated upstream). Both"
+            " examples fire Assistants calls at import or on_chat_start, so"
+            " they must be skipped before import."
+        )
+    if (
+        example_file == "langgraph_rag_bot_with_threads.py"
+        or example_file == "langchain_rag_bot.py"
+        or example_file == "langchain_rag_bot_with_threads.py"
+    ):
+        pytest.skip("throwing memory issues with threads")
+
+    module_name = f"examples.{example_file[:-3].replace('/', '.')}"
+    module = importlib.import_module(module_name)
+    init_http_context()
+
+    main_func = getattr(module, "main", None)
+    if "fastapi" in example_file:
+        main_func = getattr(module, "call_fastapi_sample_endpoint", None)
+    if main_func is None:
+        pytest.skip(f"No main function found in {example_file}")
+
+    if "opentelemetry" in example_file:
+        tracer_provider = trace_sdk.TracerProvider()
+        # Capture trace id
+        tracer_provider.add_span_processor(
+            SimpleSpanProcessor(TraceIdCapturerExporter())
+        )
+
+    on_chat_start = getattr(module, "on_chat_start", None)
+    if on_chat_start is not None:
+        await on_chat_start()
+
+    content = build_example_input(example_file)
+    mock_message = content if "fastapi" in example_file else cl.Message(content=content)
+
+    # Build trace metadata, optionally tagging with parity run prefix
+    trace_metadata: dict = {}
+    parity_prefix = os.getenv("PARITY_RUN_PREFIX")
+    if parity_prefix:
+        trace_metadata["run_prefix"] = parity_prefix
+
+    # Call the main function
+    with langwatch.trace(metadata=trace_metadata if trace_metadata else None) as trace:
+        try:
+            # Check if main function takes parameters
+            sig = inspect.signature(main_func)
+            takes_parameters = len(sig.parameters) > 0
+
+            if takes_parameters:
+                if asyncio.iscoroutinefunction(main_func):
+                    await main_func(mock_message)
+                else:
+                    main_func(mock_message)
+            else:
+                if asyncio.iscoroutinefunction(main_func):
+                    await main_func()
+                else:
+                    main_func()
+        except Exception as e:
+            if str(e) != "This exception will be captured by LangWatch automatically":
+                # FIXME: Skip tests that depend on external ColBERTv2 service when it's unavailable
+                # This is a temporary workaround for the unreliable external service at
+                # http://20.102.90.50:2017/wiki17_abstracts which frequently fails due to
+                # rate limiting, service overload, or connectivity issues.
+                #
+                # Long-term solutions should include:
+                # 1. Setting up a reliable local ColBERTv2 instance
+                # 2. Mocking the ColBERTv2 service for tests
+                # 3. Using a different, more reliable retrieval service
+
+                # Check if this example file uses the problematic ColBERTv2 service
+                def uses_colbert_service(file_path: str) -> bool:
+                    try:
+                        with open(file_path, "r") as f:
+                            content = f.read()
+                            return "20.102.90.50:2017/wiki17_abstracts" in content
+                    except Exception:
+                        return False
+
+                examples_dir = os.path.join(os.path.dirname(__file__), "..", "examples")
+                full_file_path = os.path.join(examples_dir, example_file)
+
+                if uses_colbert_service(full_file_path):
+                    pytest.skip(
+                        f"Skipping {example_file} due to unreliable external ColBERTv2 service: {e}"
+                    )
+                elif is_external_service_error(e):
+                    pytest.skip(
+                        f"Skipping {example_file} due to external service issue: {e}"
+                    )
+                else:
+                    pytest.fail(f"Error running main function in {example_file}: {e!s}")
+        trace.send_spans()
+        if parity_prefix:
+            # In parity-check mode, record trace ID directly (avoids share API call
+            # which may fail if the trace hasn't been ingested yet)
+            trace_urls[example_file] = trace.trace_id or "unknown"
+        else:
+            try:
+                trace_urls[example_file] = trace.share()
+            except (
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                httpx.HTTPStatusError,
+            ):
+                # The share URL is a nice-to-have for the report; a flaky
+                # server response must not fail the example run itself.
+                trace_urls[example_file] = trace.trace_id or "share-failed"
+        print(json.dumps(trace_urls, indent=2))

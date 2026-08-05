@@ -102,9 +102,25 @@ const nextUpdatedAt = Math.max(Date.now(), prevUpdatedAt + 1);
 ```
 
 This means:
-- **No ties possible** — every fold bumps `UpdatedAt` to at least `prevUpdatedAt + 1`
-- **`max(UpdatedAt)` always identifies exactly one row** per dedup key
-- The IN-tuple pattern is safe without additional tie-breaking
+- **Within one state chain, no ties** — each fold bumps `UpdatedAt` to at least `prevUpdatedAt + 1`, so successive versions written by one writer strictly increase
+
+**It does NOT mean `max(UpdatedAt)` identifies exactly one row.** The bump is
+relative to the `prevUpdatedAt` the writer *loaded*, so two writers that both
+resume from the same committed version compute their next stamp from the same
+predecessor and can land on the same millisecond. Both then satisfy the
+IN-tuple, and a bare `LIMIT 1` picks between them arbitrarily — returning a
+stale version that the fold resumes from and rewrites, silently dropping the
+other version's contributions.
+
+So the IN-tuple narrows the candidates but does not order them. Give the outer
+scope a deterministic `ORDER BY … LIMIT 1` whenever a tie is reachable, ranked
+by whatever monotonically records how far each version's fold actually got
+(a progress watermark, a count that only increments), never by a value that can
+move in both directions. See `trace-analytics.clickhouse.repository.ts` and
+`evaluation-analytics.clickhouse.repository.ts` for worked examples, and note
+that the sort is cheap there precisely because the IN-tuple has already reduced
+the outer scope to one or two rows — it is not the "sort the whole table"
+anti-pattern below.
 
 ## Pagination with Dedup
 
@@ -196,5 +212,6 @@ When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service h
 - **`max(<column>)` used as a pagination cursor** instead of `argMax(<column>, UpdatedAt)` — pagination cursors derived from non-version columns can read stale values.
 - **Missing partition predicate** when a date range is available — every weekly-partitioned table (`trace_summaries`, `simulation_runs`, `stored_spans`, `evaluation_runs`, ...) needs a WHERE on its partition column to enable pruning.
 - **Heavy columns in dedup subqueries** — anything like `Messages.Content`, `Inputs`, `Details`, `ComputedInput`, `SpanAttributes`, `Examples`, `LlmCalls` belongs only in the outer SELECT, never in the dedup subquery.
+- **A range filter on a MOVABLE column inside a dedup subquery** — the previous check says to add a partition predicate; this one says where it may not go. If the partition column can change after the row is written (a fold taking `min`/`max` over business time — `coding_agent_sessions.StartedAt`, `trace_analytics.OccurredAt`, `evaluation_analytics.OccurredAt` all do), then range-filtering the inner `max(<version>)` scope drops the true latest version out of its own dedup group the moment it drifts past the window edge. The group resolves to a **stale in-window version** and the outer scope returns it — non-null, plausible, and no fallback catches it. **Bound the outer scope for pruning; leave the dedup scope unbounded on that column.** Not even an upper bound is safe: a read-back miss re-runs `init()` and can re-stamp the anchor *forwards*, so "the latest version holds the smallest value" does not hold. Only the **key** narrowing (`TenantId`) belongs in both scopes. Nothing else qualifies just by looking stable: `UserId` is written by the fold, is absent from spans, and returns to `null` whenever a read-back miss re-runs `init()`, so a later version can carry an empty value, hold `max(<version>)`, and hide the true latest from a `UserId`-filtered group — the same defect in a column that never moves in a range sense. Narrow on it in the outer scope only, and accept that a session whose newest version lost the value leaves the filtered list. See ADR-071 and `coding-agent-session.clickhouse.repository.ts` (`findManyRecent` / `findLatestRecord`), which document both the rule and its scan cost.
 
 These checks belong in code review because they're query-shape problems, not type problems — typecheck and unit tests will not catch them. CI integration tests will pass while production grinds to a halt under merge backlog.

@@ -348,6 +348,29 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     Then no "Create project" entry is rendered in team T's group
         (non-admins cannot create projects from this UI)
 
+  # A coding-usage (governance) signup provisions a personal workspace plus
+  # one shared team with no project. Empty teams are normally hidden as
+  # navigation dead-ends, but hiding the ONLY shared team removed the only
+  # create affordance in the dropdown, stranding these users on personal
+  # usage forever. The empty team therefore stays visible, with its "+"
+  # button, for viewers allowed to create a project on it. Personal teams
+  # stay excluded from the switcher and from ambient selection either way.
+  @bdd @ui @workspace-switcher @add-project @empty-team @integration
+  Scenario: A coding-usage signup can always create their first shared project from the workspace menu
+    Given the user signed up through the coding-usage path
+    And their organization has a personal workspace and one shared team with no projects
+    When the user opens the switcher
+    Then the empty shared team renders with its "Create project" button
+    And clicking it opens the CreateProject drawer scoped to that team
+    And the personal team still does not appear anywhere in the dropdown
+
+  @bdd @ui @workspace-switcher @add-project @empty-team @integration
+  Scenario: An empty team stays hidden from members who cannot create a project on it
+    Given the user is a regular member of a team with no projects
+    When the user opens the switcher
+    Then the empty team does not render
+        (it stays a navigation dead-end for non-creators)
+
   @bdd @ui @workspace-switcher @persistence @stage-2c
   Scenario: Picking a project from a non-project route persists selectedProjectSlug
     Given the user is on "/settings/teams/<team-slug>"

@@ -22,6 +22,26 @@ Feature: CI smoke + publish for `@langwatch/server`
       | ubuntu-22.04         |
       | ubuntu-22.04-arm     |
 
+  Scenario: Smoke proves the artifact npm users receive, never the checkout
+    Given the smoke job packed the npm tarball
+    When the smoke boots the server
+    Then everything that runs came from that tarball
+    And a file missing from the artifact fails the smoke even though the checkout has it
+    # A checkout boot masks packaging gaps: an over-broad exclusion breaks
+    # only the released artifact, which no CI step would otherwise execute.
+
+  Scenario: A fresh install from the published artifact boots with nothing missing
+    When a user installs from the published artifact
+    Then the server reaches healthy with every module the app imports present
+    And the publish job refuses to ship an artifact that would not
+
+  Scenario: An incomplete artifact fails at install time, not minutes later at boot
+    Given a published artifact missing packages the app needs
+    When the installer prepares the app
+    Then it fails during install, before any service starts
+    And the failure names the missing packages and says the artifact itself is at fault
+    And it points at the issue tracker instead of leaving the user to debug a bare module error
+
   Scenario: Smoke job uploads logs as artifact on failure
     Given a smoke job step fails
     Then "~/.langwatch/logs/" is uploaded as workflow artifact "logs-<runner>-<sha>.tar.gz"
@@ -30,12 +50,12 @@ Feature: CI smoke + publish for `@langwatch/server`
   Scenario: Smoke job triggers
     Given the smoke workflow file is "/.github/workflows/npx-server-smoke.yml"
     Then it triggers on:
-      | trigger                   | detail                                                                 |
-      | workflow_dispatch         | manual                                                                 |
-      | schedule                  | "0 4 * * *" (nightly, UTC)                                             |
-      | push paths                | package.json, pnpm-workspace.yaml, packages/server/**                   |
-      | push paths                | langwatch_nlp/pyproject.toml, langevals/**/pyproject.toml               |
-      | push paths                | services/aigateway/**, langwatch/package.json, langwatch/scripts/**     |
+      | trigger           | detail                                                                    |
+      | workflow_dispatch | manual                                                                    |
+      | schedule          | "0 4 * * *" (nightly, UTC)                                                |
+      | push paths        | package.json, pnpm-workspace.yaml, packages/server/**                     |
+      | push paths        | langwatch_nlp/pyproject.toml, services/langevals/**/pyproject.toml        |
+      | push paths        | services/aigateway/**, platform/app/package.json, platform/app/scripts/** |
 
   # =========================================================================
   # Publish job
@@ -48,7 +68,7 @@ Feature: CI smoke + publish for `@langwatch/server`
     And it publishes "@langwatch/server@3.1.1" to npm
 
   Scenario: Version-lock guard refuses mismatched tag and package version
-    Given "langwatch/package.json" version is "3.1.1"
+    Given "platform/app/package.json" version is "3.1.1"
     But the release tag is "v3.2.0"
     When the publish job runs
     Then the job fails fast with "version mismatch: tag=v3.2.0 package.json=3.1.1"
@@ -61,29 +81,36 @@ Feature: CI smoke + publish for `@langwatch/server`
   Scenario: Publish builds the langwatch app first
     Given a clean checkout
     When the publish job runs
-    Then "pnpm --filter langwatch build" runs before npm pack
-    And the resulting tarball contains "langwatch/.next/standalone/server.js"
-    And the tarball does NOT contain "langwatch/.next/cache" or "node_modules/.cache"
+    Then the app's production build runs before npm pack
+    And the resulting tarball contains the prebuilt client at "app/langwatch/dist/client/"
+    And the tarball does NOT contain "node_modules" or build caches
+    # `pnpm --filter langwatch build` would be WRONG now: since ADR-076 that
+    # filter selects the published TypeScript SDK. The app is @langwatch/web.
 
   Scenario: Tarball contains expected directories only
+    # Everything ships one level down, under app/ — npm deletes a lockfile at
+    # the package ROOT no matter what the manifest asks, and shipping the
+    # lockfile is what keeps the end-user install reproducible. See ADR-076.
     When the publish job builds the tarball
     Then the tarball contains:
       | path                                  |
-      | bin/langwatch-server.mjs              |
-      | dist/                                 |
-      | langwatch/.next/standalone/           |
-      | langwatch/public/                     |
-      | langwatch/prisma/                     |
-      | langwatch_nlp/                        |
-      | langevals/                            |
-      | scripts/clickhouse-migrations/        |
+      | app/packages/server/dist/             |
+      | app/pnpm-workspace.yaml               |
+      | app/pnpm-lock.yaml                    |
+      | app/langwatch/dist/client/            |
+      | app/langwatch/public/                 |
+      | app/langwatch/prisma/                 |
+      | app/langevals/                        |
+      | app/python-sdk/                       |
+      | app/mcp-server/dist/                  |
     And the tarball does NOT contain:
       | path                       |
-      | langwatch/node_modules     |
-      | langwatch_nlp/.venv        |
-      | langevals/**/.venv         |
-      | langwatch/.next/cache      |
+      | app/langwatch/node_modules |
+      | app/langevals/**/.venv     |
       | **/.env                    |
+      | **/.env.*                  |
+      | **/*.pem                   |
+      | **/.npmrc                  |
       | **/__pycache__             |
 
   Scenario: Tarball gzipped size is under 300 MB

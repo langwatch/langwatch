@@ -572,7 +572,7 @@ npx langwatch report --user-approved \
   --session ~/.claude/projects/<project-dir>/<session-id>.jsonl
 ```
 
-Agents must ask the user for permission first, then pass `--user-approved`. Secrets, API keys, emails, and phone numbers are redacted locally before anything is sent; the [redaction rules are auditable](https://github.com/langwatch/langwatch/blob/main/langwatch/packages/redaction/src/sessionReport.ts) and `--dry-run` previews the exact payload. See the [reporting guide](/support#reporting-issues-from-coding-agents) for transcript locations and details.
+Agents must ask the user for permission first, then pass `--user-approved`. Secrets, API keys, emails, and phone numbers are redacted locally before anything is sent; the [redaction rules are auditable](https://github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts) and `--dry-run` previews the exact payload. See the [reporting guide](/support#reporting-issues-from-coding-agents) for transcript locations and details.
 
 ## The background daemon
 

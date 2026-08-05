@@ -1,0 +1,95 @@
+import { describe, expect, it } from "vitest";
+import {
+  ENTERPRISE_TEMPLATE,
+  PRO_TEMPLATE,
+} from "../../../../ee/licensing/planTemplates";
+import {
+  getPlanDefaults,
+  PLAN_DEFAULTS,
+  type PlanType,
+} from "../planFormDefaults";
+
+describe("planFormDefaults", () => {
+  describe("getPlanDefaults", () => {
+    it("returns PRO template defaults for PRO plan", () => {
+      const defaults = getPlanDefaults("PRO");
+
+      expect(defaults).toEqual({
+        maxMembers: PRO_TEMPLATE.maxMembers,
+        maxMembersLite: PRO_TEMPLATE.maxMembersLite,
+        maxProjects: PRO_TEMPLATE.maxProjects,
+        maxMessagesPerMonth: PRO_TEMPLATE.maxMessagesPerMonth,
+        maxWorkflows: PRO_TEMPLATE.maxWorkflows,
+        maxPrompts: PRO_TEMPLATE.maxPrompts,
+        maxEvaluators: PRO_TEMPLATE.maxEvaluators,
+        maxScenarios: PRO_TEMPLATE.maxScenarios,
+        maxAgents: PRO_TEMPLATE.maxAgents,
+        canPublish: PRO_TEMPLATE.canPublish,
+        usageUnit: PRO_TEMPLATE.usageUnit,
+      });
+    });
+
+    it("returns ENTERPRISE template defaults for ENTERPRISE plan", () => {
+      const defaults = getPlanDefaults("ENTERPRISE");
+
+      expect(defaults).toEqual({
+        maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
+        maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite,
+        maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
+        maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
+        maxWorkflows: ENTERPRISE_TEMPLATE.maxWorkflows,
+        maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts,
+        maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators,
+        maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios,
+        maxAgents: ENTERPRISE_TEMPLATE.maxAgents,
+        canPublish: ENTERPRISE_TEMPLATE.canPublish,
+        usageUnit: ENTERPRISE_TEMPLATE.usageUnit,
+      });
+    });
+
+    it("returns empty object for CUSTOM plan", () => {
+      const defaults = getPlanDefaults("CUSTOM");
+
+      expect(defaults).toEqual({});
+    });
+  });
+
+  describe("PLAN_DEFAULTS", () => {
+    it("contains entries for all plan types", () => {
+      const planTypes: PlanType[] = ["PRO", "ENTERPRISE", "CUSTOM"];
+
+      planTypes.forEach((planType) => {
+        expect(PLAN_DEFAULTS).toHaveProperty(planType);
+      });
+    });
+
+    it("PRO defaults match PRO_TEMPLATE values without fallbacks", () => {
+      const proDefaults = PLAN_DEFAULTS.PRO;
+
+      expect(proDefaults.maxMembers).toBe(PRO_TEMPLATE.maxMembers);
+      expect(proDefaults.maxMembersLite).toBe(PRO_TEMPLATE.maxMembersLite);
+      expect(proDefaults.maxMessagesPerMonth).toBe(
+        PRO_TEMPLATE.maxMessagesPerMonth,
+      );
+    });
+
+    it("includes usageUnit in PRO and ENTERPRISE defaults", () => {
+      expect(PLAN_DEFAULTS.PRO.usageUnit).toBe("traces");
+      expect(PLAN_DEFAULTS.ENTERPRISE.usageUnit).toBe("traces");
+    });
+
+    it("ENTERPRISE defaults match ENTERPRISE_TEMPLATE values without fallbacks", () => {
+      const enterpriseDefaults = PLAN_DEFAULTS.ENTERPRISE;
+
+      expect(enterpriseDefaults.maxMembers).toBe(
+        ENTERPRISE_TEMPLATE.maxMembers,
+      );
+      expect(enterpriseDefaults.maxMembersLite).toBe(
+        ENTERPRISE_TEMPLATE.maxMembersLite,
+      );
+      expect(enterpriseDefaults.maxMessagesPerMonth).toBe(
+        ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
+      );
+    });
+  });
+});

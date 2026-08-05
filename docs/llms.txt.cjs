@@ -122,48 +122,12 @@ Always navigate to docs links using the .md extension for better readability.
 ${AGENT_REPORT_NOTE}
 `;
 
-  // Custom ordering: Documentation first, but split to insert Integrations after Observability
-  const docAnchor = anchors.find(a => a.anchor === 'Documentation');
-  const integrationsAnchor = anchors.find(a => a.anchor === 'Integrations');
-  const selfHostingAnchor = anchors.find(a => a.anchor === 'Self Hosting');
-  const apiRefAnchor = anchors.find(a => a.anchor === 'API Reference');
-
-  // Process Documentation anchor groups, but insert Integrations after Observability
-  if (docAnchor) {
-    docAnchor.groups.forEach((group, groupIndex) => {
-      content += `## ${group.group}\n\n`;
-      const lines = processNavigationPages(group.pages);
-      content += lines.join('\n');
-
-      // After Observability group, insert the entire Integrations section
-      if (group.group === 'Observability' && integrationsAnchor) {
-        content += '\n\n# Integrations\n\n';
-        integrationsAnchor.groups.forEach((intGroup, intGroupIndex) => {
-          content += `## ${intGroup.group}\n\n`;
-          const intLines = processNavigationPages(intGroup.pages);
-          content += intLines.join('\n');
-
-          if (intGroupIndex < integrationsAnchor.groups.length - 1) {
-            content += '\n\n';
-          }
-        });
-      }
-
-      // Add spacing between groups
-      if (groupIndex < docAnchor.groups.length - 1) {
-        content += '\n\n';
-      }
-    });
-  }
-
-  // Add remaining anchors (Self Hosting, API Reference)
-  const remainingAnchors = [selfHostingAnchor, apiRefAnchor].filter(Boolean);
-
-  if (remainingAnchors.length > 0) {
-    content += '\n\n';
-  }
-
-  remainingAnchors.forEach((anchor, anchorIndex) => {
+  // Emit every anchor in docs.json order. An earlier version hardcoded the
+  // anchor names ('Documentation', 'Integrations', ...) and silently dropped
+  // any anchor that was renamed or added since, which at one point left this
+  // index missing most of the docs. The navigation is the single source of
+  // truth; do not filter it here.
+  anchors.forEach((anchor, anchorIndex) => {
     if (anchor.anchor) {
       content += `# ${anchor.anchor}\n\n`;
     }
@@ -174,7 +138,7 @@ ${AGENT_REPORT_NOTE}
       content += lines.join('\n');
 
       const isLastGroup = groupIndex === anchor.groups.length - 1;
-      const isLastAnchor = anchorIndex === remainingAnchors.length - 1;
+      const isLastAnchor = anchorIndex === anchors.length - 1;
 
       if (!isLastGroup || !isLastAnchor) {
         content += '\n\n';

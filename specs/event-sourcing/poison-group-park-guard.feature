@@ -95,14 +95,17 @@ Feature: GroupQueue poison-group park guard
     Then the group is retried under the normal per-job budget instead of being quarantined
     And the group is never parked into the blocked set by the failure-streak guard
 
-  @unimplemented
-  # The clear-on-survival semantics is exercised by the completion/failure
-  # scenarios; a direct drain-mid-shutdown binding needs a close() harness.
   Scenario: graceful shutdown mid-job does not count as a poison strike
     Given a group whose job is in flight when the worker begins a graceful shutdown
     When the shutdown drains or abandons the in-flight job with the event loop alive
     Then the group's claim strike is cleared
     And the group is dispatched normally after the worker restarts
+
+  Scenario: a claim made during a graceful shutdown records no strike
+    Given a worker that has begun a graceful shutdown with jobs still queued
+    When the worker claims one of those jobs while draining
+    Then no claim strike is recorded for the job's group
+    And a group already at the strike threshold is parked by the next boot's claim, not during the drain
 
   Scenario: an oversized staged value is parked without being parsed
     Given a staged value whose serialized size exceeds the decode-side cap

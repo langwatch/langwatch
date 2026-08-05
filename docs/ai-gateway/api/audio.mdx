@@ -1,0 +1,91 @@
+---
+title: POST /v1/audio/*
+description: OpenAI-compatible text to speech and transcription through the LangWatch AI Gateway, for OpenAI and ElevenLabs voice models.
+sidebarTitle: Audio (TTS + STT)
+---
+
+OpenAI-compatible audio endpoints. Any client that speaks OpenAI's audio API (the official SDKs, LiveKit and Pipecat voice agents, [Scenario](https://scenario.langwatch.ai)'s voice testing harness) works with zero code change by pointing its `OPENAI_BASE_URL` at the gateway and its `OPENAI_API_KEY` at a LangWatch virtual key. Voice traffic gets the same governance as chat: virtual-key auth, model allowlists, budgets, rate limits, and per-call observability.
+
+Two providers ship today:
+
+| Provider | TTS (`/v1/audio/speech`) | STT (`/v1/audio/transcriptions`) |
+|---|---|---|
+| OpenAI | `openai/gpt-4o-mini-tts`, `openai/tts-1`, `openai/tts-1-hd` | `openai/gpt-4o-transcribe`, `openai/gpt-4o-mini-transcribe`, `openai/whisper-1` |
+| ElevenLabs | `elevenlabs/eleven_flash_v2`, `elevenlabs/eleven_turbo_v2_5`, `elevenlabs/eleven_multilingual_v2` | `elevenlabs/scribe_v1` |
+
+Configure the provider key once in **Settings → Model Providers** (OpenAI and ElevenLabs both take a plain API key); every virtual key routed to that provider can then call its voice models.
+
+## Text to speech
+
+```
+POST /v1/audio/speech
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: application/json
+```
+
+Body matches OpenAI's [speech schema](https://platform.openai.com/docs/api-reference/audio/createSpeech). For ElevenLabs models, put the ElevenLabs **voice id** in the same `voice` field.
+
+```json
+{
+  "model": "elevenlabs/eleven_flash_v2",
+  "voice": "cjVigY5qzO86Huf0OWal",
+  "input": "Hello! How can I help you today?",
+  "response_format": "mp3"
+}
+```
+
+The response body is the **raw audio bytes** with the matching `Content-Type` (`audio/mpeg`, `audio/wav`, `audio/pcm`, …) with no JSON envelope, exactly like OpenAI, so `client.audio.speech.create(...)` consumes it unchanged. `response_format: "pcm"` returns raw PCM16 for realtime consumers.
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key="vk-lw-...",
+)
+audio = client.audio.speech.create(
+    model="openai/gpt-4o-mini-tts",
+    voice="nova",
+    input="Hello from the gateway.",
+    response_format="pcm",
+)
+pcm_bytes = audio.read()
+```
+
+## Transcription
+
+```
+POST /v1/audio/transcriptions
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: multipart/form-data
+```
+
+Form matches OpenAI's [transcription schema](https://platform.openai.com/docs/api-reference/audio/createTranscription): a `file` part plus `model`, and optionally `language`, `prompt`, `response_format`, `temperature`. Uploads are capped at 25 MB (matching OpenAI's own limit); larger uploads get a `413` before any provider is contacted.
+
+```python
+transcript = client.audio.transcriptions.create(
+    model="elevenlabs/scribe_v1",
+    file=open("call-recording.wav", "rb"),
+)
+print(transcript.text)
+```
+
+The response is the standard JSON transcript with `text`, plus whatever the provider reports (duration, segments, token usage).
+
+## Observability and cost measures
+
+Every audio call lands as a gateway trace like chat does. Providers that report token usage (`gpt-4o-mini-tts`, `gpt-4o-transcribe`) fill the standard `gen_ai.usage.*` token attributes; character- and duration-priced providers are measured by two audio-specific attributes:
+
+| Attribute | Meaning |
+|---|---|
+| `gen_ai.usage.input_chars` | Characters synthesized by a TTS call |
+| `gen_ai.usage.audio_seconds` | Seconds of audio transcribed by an STT call |
+
+## Errors
+
+Same error surface as every other endpoint; see [Errors](/ai-gateway/api/errors). Provider rejections (an invalid ElevenLabs voice id, an unsupported format) pass through with the provider's own status code and body. A model outside the virtual key's allowlist returns the standard `model_not_allowed`; a provider with no key configured returns `no_provider_configured`.
+
+## Not yet supported
+
+- **Streaming TTS/STT** (`stream=true`): requests are served complete; streaming is a follow-up.
+- **Realtime voice websockets** (OpenAI Realtime, ElevenLabs ConvAI): connect directly to the provider for realtime sessions; the gateway serves the request/response audio endpoints.

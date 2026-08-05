@@ -1,5 +1,5 @@
 {{- if .Values.egress.cilium.enabled }}
-# Optional bypass-proof FQDN egress (ADR-043 rung 3, "Where FQDN enforcement
+# Optional bypass-proof FQDN egress (ADR-076 rung 3, "Where FQDN enforcement
 # lives"). The per-worker L7 egress adapter is authoritative for COOPERATING
 # clients but, within one pod netns, a prompt-injected worker can ignore
 # HTTPS_PROXY and connect() straight to an external IP:443 — the adapter cannot

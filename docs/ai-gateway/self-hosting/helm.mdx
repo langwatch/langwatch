@@ -150,8 +150,8 @@ See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation
 
 Two control-plane components must be running for the gateway to function fully:
 
-- **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/changes`, and `/budget/check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
-- **`langwatch-workers`** running the trace-processing pipeline. **Budget enforcement depends on this.** The gateway emits OTLP spans with cost attrs but does NOT debit budgets directly, the workers' trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans, computes cost, and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and `/budget/check` reads from that view. **If `workers.enabled: false`, gateway traces still flow but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
+- **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
+- **`langwatch-workers`** running the event-sourcing pipelines. **Budget enforcement depends on this.** The gateway does NOT debit budgets directly: it emits spend commands, and the workers' debits process prices them and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, the gateway still serves traffic but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
 
 ## Networking
 
@@ -324,8 +324,8 @@ gateway:
 
 **Ingress**:
 
-- `ingress-nginx` namespace → port `5590` (customer traffic via your Ingress).
-- `monitoring` namespace Prometheus pod → port `5590` `/metrics`.
+- `ingress-nginx` namespace → port `5563` (customer traffic via your Ingress).
+- `monitoring` namespace Prometheus pod → port `5563` `/metrics`.
 
 Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The pprof admin listener is loopback-bound on `127.0.0.1:6060` and is unaffected by `NetworkPolicy` because `kubectl port-forward` tunnels through the Kubernetes API server, not the pod network.
 
@@ -356,7 +356,7 @@ To confirm the policy is active at runtime:
 
 ```bash
 # Ingress check, should succeed from ingress-nginx, fail from elsewhere
-kubectl exec -n langwatch deploy/langwatch-gateway -- curl -sS http://localhost:5590/healthz
+kubectl exec -n langwatch deploy/langwatch-gateway -- curl -sS http://localhost:5563/healthz
 
 # Egress check, should succeed to api.openai.com, fail to a lateral pod
 kubectl exec -n langwatch deploy/langwatch-gateway -- \
@@ -400,8 +400,10 @@ gateway:
 
 Two gauges, always exported:
 
-- `gateway_draining{pod}`, 0 normally, 1 during shutdown. A stuck pod (draining but never dying) shows as this being 1 for > grace.
-- `gateway_in_flight_requests{pod}`, monotonic counter minus completions, so concretely the count of currently-executing handlers. During drain this should curve down to 0.
+- `gateway_draining`, 0 normally, 1 during shutdown. A stuck pod (draining but never dying) shows as this being 1 for > grace.
+- `gateway_in_flight_requests`, the count of currently-executing handlers. During drain this should curve down to 0.
+
+Both are unlabelled in the registry; per-pod series come from the `pod` target label your Prometheus attaches during Kubernetes service discovery.
 
 Pairing the two during drain gives two operationally distinct patterns:
 
@@ -414,7 +416,7 @@ See [Production runbook → Recipe 7](/ai-gateway/cookbooks/production-runbook#r
 
 ## Security
 
-Edge protection lives under a dedicated `security` stanza separate from per-upstream budgets or the debit outbox. First (and currently only) knob is the request body cap:
+Edge protection lives under a dedicated `security` stanza separate from per-upstream budgets or budget accounting. First (and currently only) knob is the request body cap:
 
 ```yaml
 gateway:
@@ -424,7 +426,7 @@ gateway:
 
 Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
 - `security`, edge, fails fast with 413, operator bumps when large base64 images are legitimate;
-- `budget`, accounting, fails async via outbox, operator investigates debit flow (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6--debit-outbox-backlog));
+- `budget`, accounting, reconciles asynchronously via the span-to-ledger path, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
 - `upstream`, per-provider, fails mid-flight with circuit-breaker trips.
 
 The chart's ConfigMap renders the int as `%d` (the chart's test render catches a YAML scientific-notation gotcha, Go's `ParseInt` rejects `1.048576e+07`). If you override this value in a custom `values.yaml`, write integer literals, not floats.
@@ -471,5 +473,5 @@ Gateway and control plane are versioned in **lockstep**: release-please bumps bo
 
 1. `helm diff upgrade langwatch langwatch/langwatch -f values.yaml --version <new>` to preview the change set.
 2. `helm upgrade langwatch langwatch/langwatch -f values.yaml --version <new>`. The umbrella's `langwatch-app` and gateway Deployments roll concurrently, both use Kubernetes' standard `RollingUpdate` strategy and the chart does not enforce ordering. Safety during the overlap window is handled by the dual-key signature contract documented under [Secret rotation](#secret-rotation): the new control-plane image accepts both old and new signatures, so a brief window where gateway pods on the new image talk to control-plane pods still on the old image (or vice versa) does not break authentication. If you want to enforce ordering for an extra-cautious rollout, run `helm upgrade ... --set gateway.enabled=false` first to roll the app alone, then re-enable the gateway in a second `helm upgrade`, but for the standard upgrade path the dual-key contract is what makes the concurrent roll safe.
-3. Monitor `gateway_provider_duration_seconds` and `gateway_requests_total{status!="2xx"}` for ~30 min.
+3. Monitor `gateway_provider_duration_seconds` and `gateway_http_requests_total{status=~"5.."}` for ~30 min.
 4. Roll back via `helm rollback langwatch <revision>` if anomalies appear, the gateway's cache survives restarts and requests resume immediately. Both sub-charts roll back together.

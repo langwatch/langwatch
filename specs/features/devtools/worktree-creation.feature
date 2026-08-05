@@ -5,7 +5,7 @@ Feature: Streamlined worktree creation
 
   # Parity status: 0 of 17 scenarios bound to existing tests.
   # Remaining @unimplemented scenarios (#3458):
-  #   16 HARNESS_GAP: scenarios describe shell script behavior (scripts/worktree.sh)
+  #   16 HARNESS_GAP: scenarios describe shell script behavior (dev/scripts/worktree.sh)
   #     covered by worktree.unit.bats and worktree.integration.bats — the TS-only
   #     parity checker cannot bind Bash test files
   #   1 UPDATE: "Truncates slug to 40 characters at word boundary"
