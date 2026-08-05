@@ -308,6 +308,18 @@ Feature: API Key Scope and Fine-Grained Permissions
   # ── Backend validation ──────────────────────────────────────
 
   @unit
+  Scenario: A key minted from legacy membership works at request time
+    Given my access comes from team membership predating the permissions rebuild
+    And a key has been minted mirroring that access
+    When the key is used for something that access covers
+    Then the request is permitted
+    # Minting and using a key are two separate ceiling checks. Teaching only
+    # the first one about legacy membership moved the failure rather than
+    # fixing it: the key was issued and then every request made with it was
+    # refused, so an agent turn began, streamed, and then had every tool call
+    # denied — worse than being told up front.
+
+  @unit
   Scenario: Service rejects permissions above creator ceiling
     Given a Member user tries to create a key with "secrets:manage"
     When the create request is processed

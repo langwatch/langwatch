@@ -14,10 +14,12 @@ Feature: Hot-trace fold amplification is bounded
   aggregate) then re-folds forever and never catches up. On 2026-07-10 a single
   trace held 112k staged fold jobs draining at ~0 for this reason.
 
-  These folds therefore set options.refoldOnOutOfOrder = false. A genuine store
-  miss still rebuilds full state (options.refoldOnStoreMiss), and events are
-  never dropped — the executor applies them in occurredAt order on top of the
-  state it loaded.
+  These folds therefore declare themselves order-insensitive: a late event is
+  applied on top of the loaded state, in occurredAt order — never dropped,
+  never a history replay. (ADR-066 has since retired out-of-order refolding
+  platform-wide. A store miss still rebuilds these folds' state from the event
+  log today; ADR-066 retires that too — they adopt its read-back store per its
+  sequencing.)
 
   Background:
     Given a trace fold with a persisted checkpoint at a known occurred-at

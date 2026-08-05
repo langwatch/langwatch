@@ -101,7 +101,7 @@ export function toCliToolResult({
 }): CliToolResult {
   // The name is the PRIOR; the payload's own shape may promote it to a richer
   // card, but only from a generic one and never over a deliberate `byVerb`
-  // binding. See promotion.ts and ADR-059.
+  // binding. See promotion.ts and ADR-079.
   const nominal = cardKindFor({ resource, verb });
   const card =
     promoteCard({ nominal, payload, probes: CARD_PROBES }) ?? nominal;

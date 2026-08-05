@@ -16,6 +16,7 @@ import (
 )
 
 func TestLLMProxy(t *testing.T) {
+	// @scenario "The manager injects the virtual key and the turn's trace context"
 	t.Run("when a worker makes an LLM call during a turn", func(t *testing.T) {
 		var gotAuth, gotTraceparent, gotPath, gotQuery string
 		gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -156,6 +157,7 @@ func TestLLMProxy(t *testing.T) {
 		})
 	})
 
+	// @scenario "Streaming LLM responses pass through unbuffered"
 	t.Run("when the response is a server-sent event stream", func(t *testing.T) {
 		// The gateway writes one event, then BLOCKS until the client has observed
 		// it, then writes the second. This only completes if the relay flushes
@@ -471,8 +473,12 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 				if string(e.Code) != string(llmUpstreamErrorCode) {
 					t.Errorf("captured code = %q, want %q", e.Code, llmUpstreamErrorCode)
 				}
-				if e.Meta["message"] != tc.want {
-					t.Errorf("captured message = %q, want %q", e.Meta["message"], tc.want)
+				// The provider's prose never reaches the frame — see
+				// decodeLLMErrorBody. `tc.want` is retained as the sentence
+				// that USED to be captured, so each case still names the body
+				// it is about and this assertion stays legible.
+				if _, hasMessage := e.Meta["message"]; hasMessage {
+					t.Errorf("captured message = %q, want the provider's prose dropped (was %q)", e.Meta["message"], tc.want)
 				}
 				if e.Meta["http_status"] != http.StatusBadRequest {
 					t.Errorf("captured http_status = %v, want 400", e.Meta["http_status"])
@@ -493,4 +499,164 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 			})
 		}
 	})
+}
+
+// The proxy ends a hopeless retry loop: a hard plan limit answers every retry
+// identically, and the worker SDK's ever-growing backoff otherwise leaves the
+// turn spinning silently for hours while the panel's plan-limit card never
+// gets its chance.
+
+const rateLimitUsageLimitBody = `{"error":{"type":"usage_limit_reached","message":"You've hit your usage limit.","resets_in_seconds":10000}}`
+const rateLimitBurstBody = `{"error":{"type":"rate_limit_exceeded","message":"Rate limit reached, retry shortly."}}`
+
+func rateLimitGateway(t *testing.T, status *int) *httptest.Server {
+	t.Helper()
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Retry-After", "2")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(*status)
+		switch *status {
+		case http.StatusTooManyRequests:
+			_, _ = w.Write([]byte(rateLimitBurstBody))
+		case http.StatusOK:
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		default:
+			_, _ = w.Write([]byte(`{"error":{"message":"upstream sad"}}`))
+		}
+	}))
+	t.Cleanup(gateway.Close)
+	return gateway
+}
+
+func rateLimitCall(t *testing.T, relay *Relay, token string) *http.Response {
+	t.Helper()
+	resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatalf("proxied LLM call: %v", err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	return resp
+}
+
+// @scenario "A provider that says its usage limit is reached fails the turn at once"
+func TestLLMProxyRateLimitCut_HardLimit(t *testing.T) {
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Retry-After", "600")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(rateLimitUsageLimitBody))
+	}))
+	defer gateway.Close()
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-hard-limit", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	resp := rateLimitCall(t, relay, token)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("first hard-limit call answered %d, want 400: the SDK must not retry into the same wall", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Retry-After"); got != "" {
+		t.Errorf("Retry-After %q survived the cut; no header may invite a retry", got)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != rateLimitUsageLimitBody {
+		t.Errorf("body was altered by the cut:\n got %s\nwant %s", body, rateLimitUsageLimitBody)
+	}
+
+	// The captured cause still tells the truth: upstream said 429, and the
+	// discriminant the panel promotes to the plan-limit card is intact.
+	e, ok := relay.LastLLMError(token)
+	if !ok {
+		t.Fatal("the cut call must still leave a captured cause")
+	}
+	if e.Meta["http_status"] != http.StatusTooManyRequests {
+		t.Errorf("captured http_status = %v, want the REAL upstream 429", e.Meta["http_status"])
+	}
+	var cause herr.E
+	if len(e.Reasons) != 1 || !errors.As(e.Reasons[0], &cause) || cause.Code != "usage_limit_reached" {
+		t.Errorf("captured reasons = %v, want the usage_limit_reached discriminant", e.Reasons)
+	}
+}
+
+// @scenario "A rate-limit burst keeps its normal retries, then is cut"
+func TestLLMProxyRateLimitCut_BurstThenCut(t *testing.T) {
+	status := http.StatusTooManyRequests
+	gateway := rateLimitGateway(t, &status)
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-burst", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	for i := 1; i <= 2; i++ {
+		resp := rateLimitCall(t, relay, token)
+		if resp.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("burst strike %d answered %d, want the 429 passed through for the SDK's own backoff", i, resp.StatusCode)
+		}
+		if resp.Header.Get("Retry-After") == "" {
+			t.Errorf("burst strike %d lost its Retry-After; a passed-through 429 keeps its headers", i)
+		}
+	}
+	if resp := rateLimitCall(t, relay, token); resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("third consecutive 429 answered %d, want 400: the loop must be cut", resp.StatusCode)
+	}
+
+	// A success starts the count over: the next 429 is a fresh strike one.
+	status = http.StatusOK
+	if resp := rateLimitCall(t, relay, token); resp.StatusCode != http.StatusOK {
+		t.Fatal("the scripted success must pass through")
+	}
+	status = http.StatusTooManyRequests
+	if resp := rateLimitCall(t, relay, token); resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatal("after a success the first 429 must pass through again: the count restarted")
+	}
+}
+
+// A mixed flap is not a deterministic limit: any non-429 answer, a 500
+// included, breaks the run and the count starts over, while the captured
+// cause keeps naming the most recent real failure.
+//
+// @scenario "A rate-limit burst keeps its normal retries, then is cut"
+func TestLLMProxyRateLimitCut_InterruptedRunResets(t *testing.T) {
+	status := http.StatusTooManyRequests
+	gateway := rateLimitGateway(t, &status)
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-flap", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	rateLimitCall(t, relay, token) // 429, strike one
+
+	status = http.StatusInternalServerError
+	if resp := rateLimitCall(t, relay, token); resp.StatusCode != http.StatusInternalServerError {
+		t.Fatal("the scripted 500 must pass through")
+	}
+	// The 500 resets the run but its capture survives as the latest cause.
+	if e, ok := relay.LastLLMError(token); !ok || e.Meta["http_status"] != http.StatusInternalServerError {
+		t.Errorf("after the 500 the captured cause = %v, want the 500 kept", e.Meta)
+	}
+
+	status = http.StatusTooManyRequests
+	for i := 1; i <= 2; i++ {
+		if resp := rateLimitCall(t, relay, token); resp.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("429 number %d after the 500 answered %d, want passthrough: the 500 restarted the count", i, resp.StatusCode)
+		}
+	}
+	if resp := rateLimitCall(t, relay, token); resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("third uninterrupted 429 answered %d, want 400: the fresh run reached the cut", resp.StatusCode)
+	}
+}
+
+// @scenario "A rate-limited conversation never blocks a healthy one"
+func TestLLMProxyRateLimitCut_ConversationIsolation(t *testing.T) {
+	status := http.StatusTooManyRequests
+	gateway := rateLimitGateway(t, &status)
+
+	relay := startRelay(t)
+	cutToken, _ := relay.Register(WorkerInfo{ConversationID: "conv-cut", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+	freshToken, _ := relay.Register(WorkerInfo{ConversationID: "conv-fresh", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	for i := 0; i < rateLimitCutAfter; i++ {
+		rateLimitCall(t, relay, cutToken)
+	}
+	if resp := rateLimitCall(t, relay, freshToken); resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("the fresh conversation's first 429 answered %d, want the passthrough of its own strike one", resp.StatusCode)
+	}
 }

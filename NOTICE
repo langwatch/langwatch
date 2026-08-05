@@ -4,10 +4,10 @@ Copyright 2024-2026 LangWatch (Reasoning Engine B.V.)
 This product is licensed under the Apache License, Version 2.0 (see LICENSE.md),
 with the following components separately licensed in their respective directories:
 
-  langwatch/ee/      LangWatch Enterprise License  (langwatch/ee/LICENSE.md)
-  typescript-sdk/    MIT                           (typescript-sdk/LICENSE)
-  python-sdk/        MIT                           (python-sdk/LICENSE)
-  mcp-server/        MIT                           (mcp-server/LICENSE)
+  platform/app/ee/      LangWatch Enterprise License  (platform/app/ee/LICENSE.md)
+  sdks/typescript/    MIT                           (sdks/typescript/LICENSE)
+  sdks/python/        MIT                           (sdks/python/LICENSE)
+  mcp/typescript/        MIT                           (mcp/typescript/LICENSE)
 
 This information is provided for informational purposes only, in accordance with
 section 4(d) of the Apache License 2.0, and does not modify the License.

@@ -399,6 +399,44 @@ Feature: GroupQueue content-addressed tiered payload store
     Then the blob is still readable
     And the runner reports it as eligible for reclaim
 
+  @integration @track6
+  # A sweep judges only so many blobs before it stops, and hands the rest to the
+  # next one. That only holds if each sweep takes over where the last left off. A
+  # runner that always begins again at the same place re-judges the same blobs
+  # forever, and the ones behind them keep their full backstop however often it
+  # runs — which looks like a healthy sweep in the totals.
+  Scenario: Successive sweeps reach the blobs the previous ones stopped short of
+    Given more unreferenced Redis-tier blobs than one sweep judges
+    When the reclaim runner sweeps enough times to cover them all
+    Then every blob has been put on the grace window
+    And none is left on its four-day backstop
+
+  @integration @track6
+  Scenario: Once every blob has been judged the runner begins again
+    Given the reclaim runner has judged every blob it can see
+    When a new unreferenced blob is written and the runner sweeps again
+    Then the new blob is put on the grace window
+
+  @integration @track6
+  # A dry run is an operator asking what would happen. If it counted the blobs it
+  # only looked at as judged, asking the question would silently cost the next
+  # real sweep the chance to act on them.
+  Scenario: A dry run leaves the blobs it inspected for the next real sweep
+    Given more unreferenced Redis-tier blobs than one sweep judges
+    When the runner sweeps in dry-run mode
+    Then it records no progress for the next sweep to resume from
+    And only a real sweep records any
+
+  @integration @track6
+  # How much a sweep costs is decided by how far it looks, not by how much it
+  # finds. Capping only what it finds leaves it unbounded whenever there is
+  # little to find, which is the state the runner is meant to reach.
+  Scenario: A sweep stays bounded even when it finds almost nothing to judge
+    Given a blob store holding almost nothing the runner can judge
+    When the reclaim runner sweeps
+    Then the sweep still stops at a limit of its own
+    And it reports itself unfinished so the next one carries on
+
   @scheduled @track6
   Scenario: The runner is driven by the schedule, not by a request
     Given the reclaim runner is on its cleanup schedule
@@ -480,6 +518,12 @@ Feature: GroupQueue content-addressed tiered payload store
   #     -> A dry run reports what it would reclaim without deleting anything
   #   AC6.6 "The sweep is scheduled and singly-executed"
   #     -> The runner is driven by the schedule, not by a request
+  #   AC6.7 "Each sweep resumes where the last one stopped"
+  #     -> Successive sweeps reach the blobs the previous ones stopped short of
+  #     -> Once every blob has been judged the runner begins again
+  #     -> A dry run leaves the blobs it inspected for the next real sweep
+  #   AC6.8 "A sweep is bounded by how far it looks, not by what it finds"
+  #     -> A sweep stays bounded even when it finds almost nothing to judge
   #
   # Count: 21 ADR-029 ACs -> 21 scenarios (@unimplemented pending the Outside-In
   # TDD pass), plus 6 Track 5 amendment ACs and 6 Track 6 reclaim ACs -> 12

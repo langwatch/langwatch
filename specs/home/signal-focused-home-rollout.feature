@@ -48,12 +48,20 @@ Feature: Signal-focused home rollout
     Then each attention-inbox row can hand its evidence to Langy
     And the ask row opens Langy with the composer focused
 
+  Scenario: The quiet invitation leads with sending the first trace
+    Given the signal-focused home is enabled for me
+    And the project is quiet
+    When the briefing sheet renders its invitation
+    Then a prominent action sends the first trace, landing on the trace surface
+    And the other first steps rotate below as a secondary typed invitation
+
   Scenario: The quiet invitation adapts to Langy's absence
     Given the signal-focused home is enabled for me
     But I do not have Langy
     And the project is quiet
     When the briefing sheet renders its invitation
-    Then the typed first step opens the feature surface that teaches it
+    Then the prominent send-a-trace action still opens the trace surface
+    And the typed first step opens the feature surface that teaches it
     And no action offers to do it with Langy
 
   # Which home a reader gets is decided by feature flags, and a flag that has

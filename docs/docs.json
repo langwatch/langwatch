@@ -75,6 +75,7 @@
             "pages": [
               "agent-simulations/introduction",
               "agent-simulations/getting-started",
+              "agent-simulations/authenticated-agents",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"
             ]
@@ -248,6 +249,7 @@
             "group": "Help",
             "pages": [
               "pricing",
+              "pricing/billable-events",
               "support",
               "status"
             ]
@@ -565,12 +567,22 @@
             ]
           },
           {
+            "group": "Billing & Metering",
+            "pages": [
+              "ai-gateway/billing-events",
+              "features/webhooks",
+              "ai-gateway/cookbooks/metering-and-rebilling",
+              "ai-gateway/demo-agent-platform"
+            ]
+          },
+          {
             "group": "Governance",
             "pages": [
               "ai-gateway/governance/overview",
               "ai-gateway/governance/personal-keys",
               "ai-gateway/governance/admin-setup",
-              "ai-gateway/governance/routing-policies"
+              "ai-gateway/governance/routing-policies",
+              "ai-gateway/governance/retention"
             ]
           },
           {
@@ -606,6 +618,7 @@
                 ]
               },
               "ai-gateway/model-naming",
+              "ai-gateway/parameter-mapping",
               "ai-gateway/model-aliases",
               {
                 "group": "Operations",
@@ -622,6 +635,7 @@
               "ai-gateway/api/chat-completions",
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
+              "ai-gateway/api/audio",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -663,6 +677,7 @@
             "pages": [
               "ai-governance/overview",
               "ai-governance/track-your-claude-code-usage",
+              "ai-governance/explore-your-usage-with-your-own-agent",
               "ai-governance/getting-started-developer",
               "ai-governance/getting-started-admin",
               "ai-governance/open-core-licensing"
@@ -682,7 +697,8 @@
             "pages": [
               "ai-governance/workspaces",
               "ai-governance/members-and-invites",
-              "ai-governance/roles-and-permissions"
+              "ai-governance/roles-and-permissions",
+              "ai-governance/audit-log"
             ]
           },
           {
@@ -743,6 +759,53 @@
         ]
       },
       {
+        "anchor": "Langy",
+        "icon": "robot",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "langy/overview",
+              "langy/getting-started",
+              "langy/how-langy-works"
+            ]
+          },
+          {
+            "group": "Using Langy",
+            "pages": [
+              "langy/chat",
+              "langy/scenario-tests-and-evals",
+              "langy/pull-requests",
+              "langy/insights"
+            ]
+          },
+          {
+            "group": "Models & Cost",
+            "pages": [
+              "langy/models",
+              "langy/codex",
+              "langy/token-usage-and-cost"
+            ]
+          },
+          {
+            "group": "Security & Control",
+            "pages": [
+              "langy/security/sandbox",
+              "langy/security/data-flow-and-privacy",
+              "langy/security/github-access"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "langy/reference/supported-models",
+              "langy/reference/limits",
+              "langy/reference/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
         "anchor": "Self Hosting",
         "icon": "server",
         "groups": [
@@ -750,6 +813,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "self-hosting/licensing",
               "hybrid-setup/overview",
               "self-hosting/troubleshooting"
             ]
@@ -762,7 +826,8 @@
               "self-hosting/configuration/backups",
               "self-hosting/configuration/sso",
               "self-hosting/configuration/observability",
-              "self-hosting/configuration/third-party-integrations"
+              "self-hosting/configuration/third-party-integrations",
+              "self-hosting/webhooks"
             ]
           },
           {
@@ -800,6 +865,16 @@
               "self-hosting/ops/projection-replay",
               "self-hosting/ops/dejaview",
               "self-hosting/ops/foundry"
+            ]
+          },
+          {
+            "group": "Langy",
+            "pages": [
+              "self-hosting/langy/overview",
+              "self-hosting/langy/setup",
+              "self-hosting/langy/github-app",
+              "self-hosting/langy/environment-variables",
+              "self-hosting/langy/networking-and-egress"
             ]
           }
         ]
@@ -1235,7 +1310,18 @@
       "x-twitter": "https://x.com/langwatchai",
       "linkedin": "https://www.linkedin.com/company/langwatch/",
       "youtube": "https://www.youtube.com/@LangWatch"
-    }
+    },
+    "links": [
+      {
+        "header": "For agents",
+        "items": [
+          {
+            "label": "For agents: report an issue using npx langwatch report",
+            "href": "https://langwatch.ai/docs/support"
+          }
+        ]
+      }
+    ]
   },
   "integrations": {
     "gtm": {
@@ -1244,7 +1330,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1784837696",
+      "source": "/ci/cache/busted/1785906645",
       "destination": "/"
     },
     {

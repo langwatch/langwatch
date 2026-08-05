@@ -1,0 +1,64 @@
+import { useMemo } from "react";
+import { useRouter } from "~/utils/compat/next-router";
+
+export interface MinimalProject {
+  id: string;
+  slug: string;
+  name: string;
+  apiKey?: string;
+  createdAt?: Date | string | null;
+}
+
+export interface MinimalTeam {
+  id: string;
+  projects?: MinimalProject[];
+}
+
+export interface MinimalOrganization {
+  id: string;
+  teams?: MinimalTeam[];
+}
+
+/**
+ * Get a project by slug (from router query `projectSlug`) or fallback to the
+ * latest-created project across all teams in the provided organization.
+ */
+export function useProjectBySlugOrLatest(organization?: MinimalOrganization) {
+  const router = useRouter();
+  const query = router.query.projectSlug;
+  const rawSlug = Array.isArray(query) ? query[0] : query;
+
+  const project = useMemo(() => {
+    if (!organization) return undefined;
+
+    const allProjects: MinimalProject[] = (organization.teams ?? [])
+      .flatMap((team) => team?.projects ?? [])
+      .filter(Boolean);
+
+    if (!allProjects.length) return undefined;
+
+    const normalizeDate = (value?: Date | string | null): number => {
+      if (!value) return 0;
+      if (value instanceof Date) return value.getTime();
+      const time = new Date(value).getTime();
+      return Number.isNaN(time) ? 0 : time;
+    };
+
+    if (rawSlug) {
+      const matching = allProjects
+        .filter((p) => p.slug === rawSlug)
+        .sort(
+          (a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt),
+        );
+      if (matching[0]) return matching[0];
+    }
+
+    return allProjects.sort(
+      (a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt),
+    )[0];
+  }, [organization, rawSlug]);
+
+  const slug = project?.slug ?? rawSlug ?? undefined;
+
+  return { project, slug };
+}

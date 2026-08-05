@@ -5,6 +5,8 @@ description: "Deploy LangWatch on your own infrastructure for full data control"
 
 LangWatch is an open-source LLM Ops platform for evaluation, observability, and optimization of AI agents and pipelines. You can self-host LangWatch for full data sovereignty, regulatory compliance (GDPR, SOC 2), or air-gapped environments. The self-hosted edition runs the same software that powers LangWatch Cloud -- there is no separate "community" or "enterprise" build.
 
+Without a license, self-hosted LangWatch is uncapped: unlimited members, teams, projects, and everything you create on your own infrastructure. An Enterprise license unlocks SSO, RBAC, SCIM, audit logs and support in the same deployment. See [Editions and licensing](/self-hosting/licensing).
+
 <Tip>
 **Get the entire LangWatch platform running with a single Helm install:**
 
@@ -14,10 +16,18 @@ helm repo update
 helm pull langwatch/langwatch --untar
 helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
-  -f langwatch/examples/values-local.yaml
+  --set autogen.enabled=true \
+  -f langwatch/examples/overlays/size-dev.yaml \
+  --wait --timeout 10m
 ```
 
-See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+That fits a small cluster at roughly 2.6 CPU and 6.7 Gi of requests, and generates its own secrets so there is nothing to prepare first. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+
+Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560`.
+
+`examples/values-local.yaml` is a different thing and is not the one to start with: it pins every image to a `local` tag with `pullPolicy: Never`, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
+
+Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks).
 </Tip>
 
 <Note>
@@ -44,6 +54,10 @@ graph LR
 ```
 
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
+
+<Note>
+Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional, gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting Langy](/self-hosting/langy/overview).
+</Note>
 
 ## Deployment Models
 

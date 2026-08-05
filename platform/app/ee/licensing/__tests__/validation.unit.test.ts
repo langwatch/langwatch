@@ -1,0 +1,437 @@
+import { describe, expect, it } from "vitest";
+import { LicensePlanLimitsSchema } from "../types";
+import {
+  isExpired,
+  parseLicenseKey,
+  validateLicense,
+  verifySignature,
+} from "../validation";
+import { TEST_PUBLIC_KEY, WRONG_PUBLIC_KEY } from "./fixtures/testKeys";
+import {
+  BASE_LICENSE,
+  EMPTY_SIGNATURE_KEY,
+  ENTERPRISE_LICENSE_KEY,
+  EXPIRED_LICENSE_KEY,
+  GARBAGE_DATA,
+  INVALID_JSON_BASE64,
+  MALFORMED_BASE64,
+  TAMPERED_LICENSE_KEY,
+  VALID_LICENSE_KEY,
+} from "./fixtures/testLicenses";
+
+describe("LicensePlanLimitsSchema", () => {
+  /** @scenario License schema accepts maxMembersLite as optional field */
+  it("accepts a license payload with maxMembersLite set to 5", () => {
+    const payload = {
+      type: "PRO",
+      name: "Pro",
+      maxMembers: 5,
+      maxMembersLite: 5,
+      maxProjects: 10,
+      maxMessagesPerMonth: 50000,
+      maxWorkflows: 25,
+      canPublish: true,
+    };
+
+    const result = LicensePlanLimitsSchema.safeParse(payload);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.maxMembersLite).toBe(5);
+    }
+  });
+});
+
+describe("parseLicenseKey", () => {
+  /** @scenario Parses valid base64-encoded license key */
+  it("parses valid base64-encoded license key", () => {
+    const result = parseLicenseKey(VALID_LICENSE_KEY);
+
+    expect(result).not.toBeNull();
+    expect(result?.data.organizationName).toBe("Acme Corp");
+    expect(result?.signature).toBeDefined();
+  });
+
+  /** @scenario Returns null for malformed base64 input */
+  it("returns null for malformed base64 input", () => {
+    const result = parseLicenseKey(MALFORMED_BASE64);
+
+    expect(result).toBeNull();
+  });
+
+  /** @scenario Returns null for valid base64 but invalid JSON */
+  it("returns null for valid base64 but invalid JSON", () => {
+    const result = parseLicenseKey(INVALID_JSON_BASE64);
+
+    expect(result).toBeNull();
+  });
+
+  /** @scenario Returns null for empty license key */
+  it("returns null for empty license key", () => {
+    const result = parseLicenseKey("");
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null for whitespace-only license key", () => {
+    const result = parseLicenseKey("   ");
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null for valid JSON but missing required fields", () => {
+    const invalidStructure = Buffer.from(
+      JSON.stringify({ foo: "bar" }),
+    ).toString("base64");
+
+    const result = parseLicenseKey(invalidStructure);
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("verifySignature", () => {
+  /** @scenario Verifies valid RSA-SHA256 signature */
+  it("verifies valid RSA-SHA256 signature", () => {
+    const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
+
+    expect(signedLicense).not.toBeNull();
+    if (!signedLicense) throw new Error("Expected signedLicense to be defined");
+    const result = verifySignature(signedLicense, TEST_PUBLIC_KEY);
+
+    expect(result).toBe(true);
+  });
+
+  /** @scenario Rejects tampered license data */
+  it("rejects tampered license data", () => {
+    const signedLicense = parseLicenseKey(TAMPERED_LICENSE_KEY);
+
+    expect(signedLicense).not.toBeNull();
+    if (!signedLicense) throw new Error("Expected signedLicense to be defined");
+    const result = verifySignature(signedLicense, TEST_PUBLIC_KEY);
+
+    expect(result).toBe(false);
+  });
+
+  it("rejects license verified with different public key", () => {
+    const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
+
+    expect(signedLicense).not.toBeNull();
+    if (!signedLicense) throw new Error("Expected signedLicense to be defined");
+    const result = verifySignature(signedLicense, WRONG_PUBLIC_KEY);
+
+    expect(result).toBe(false);
+  });
+
+  /** @scenario Rejects license with empty signature */
+  it("rejects license with empty signature", () => {
+    const signedLicense = parseLicenseKey(EMPTY_SIGNATURE_KEY);
+
+    expect(signedLicense).not.toBeNull();
+    if (!signedLicense) throw new Error("Expected signedLicense to be defined");
+    const result = verifySignature(signedLicense, TEST_PUBLIC_KEY);
+
+    expect(result).toBe(false);
+  });
+
+  describe("given the verification key as an operator actually supplies it", () => {
+    describe("when verifying a signature against it", () => {
+      /** @scenario A verification key pasted with escaped newlines still verifies */
+      it("verifies against a key carrying escaped newlines, the way a .env holds one", () => {
+        const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
+        if (!signedLicense)
+          throw new Error("Expected signedLicense to be defined");
+        // Exactly what `LANGWATCH_LICENSE_PUBLIC_KEY=...` in a .env file, a Helm
+        // value or a Kubernetes secret hands the process. Read as pasted,
+        // OpenSSL refuses the layout and reports it as a bad signature.
+        const escaped = TEST_PUBLIC_KEY.replace(/\n/g, "\\n");
+
+        expect(escaped).not.toContain("\n");
+        expect(verifySignature(signedLicense, escaped)).toBe(true);
+      });
+
+      it("still rejects a genuinely wrong key however it was pasted", () => {
+        const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
+        if (!signedLicense)
+          throw new Error("Expected signedLicense to be defined");
+
+        expect(
+          verifySignature(
+            signedLicense,
+            WRONG_PUBLIC_KEY.replace(/\n/g, "\\n"),
+          ),
+        ).toBe(false);
+      });
+    });
+  });
+});
+
+describe("isExpired", () => {
+  it("returns false when expiration is in the future", () => {
+    const futureDate = "2030-12-31T23:59:59Z";
+
+    const result = isExpired(futureDate);
+
+    expect(result).toBe(false);
+  });
+
+  it("returns true when expiration is in the past", () => {
+    const pastDate = "2020-01-01T00:00:00Z";
+
+    const result = isExpired(pastDate);
+
+    expect(result).toBe(true);
+  });
+
+  it("returns true at exactly the expiration time", () => {
+    const now = new Date("2024-06-15T12:00:00Z");
+    const expiresAt = "2024-06-15T12:00:00Z";
+
+    const result = isExpired(expiresAt, now);
+
+    expect(result).toBe(true);
+  });
+
+  it("returns false one millisecond before expiration", () => {
+    const now = new Date("2024-06-15T11:59:59.999Z");
+    const expiresAt = "2024-06-15T12:00:00Z";
+
+    const result = isExpired(expiresAt, now);
+
+    expect(result).toBe(false);
+  });
+
+  it("returns true for invalid date string (security fallback)", () => {
+    const result = isExpired("not-a-valid-date");
+
+    expect(result).toBe(true);
+  });
+});
+
+describe("validateLicense", () => {
+  /** @scenario Validates complete license successfully */
+  it("validates complete license successfully", () => {
+    const result = validateLicense({
+      licenseKey: VALID_LICENSE_KEY,
+      publicKey: TEST_PUBLIC_KEY,
+    });
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.planInfo.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
+    }
+  });
+
+  it("fails validation for invalid format", () => {
+    const result = validateLicense({
+      licenseKey: GARBAGE_DATA,
+      publicKey: TEST_PUBLIC_KEY,
+    });
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.error).toBe("Invalid license format");
+    }
+  });
+
+  it("fails validation for invalid signature", () => {
+    const result = validateLicense({
+      licenseKey: TAMPERED_LICENSE_KEY,
+      publicKey: TEST_PUBLIC_KEY,
+    });
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.error).toBe("Invalid signature");
+    }
+  });
+
+  it("fails validation for expired license", () => {
+    const result = validateLicense({
+      licenseKey: EXPIRED_LICENSE_KEY,
+      publicKey: TEST_PUBLIC_KEY,
+    });
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.error).toBe("License expired");
+    }
+  });
+
+  describe("extracts license fields correctly", () => {
+    it("extracts licenseId", () => {
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.licenseId).toBe(BASE_LICENSE.licenseId);
+      }
+    });
+
+    it("extracts organizationName", () => {
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.organizationName).toBe(
+          BASE_LICENSE.organizationName,
+        );
+      }
+    });
+
+    it("extracts email", () => {
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.email).toBe(BASE_LICENSE.email);
+      }
+    });
+
+    it("extracts plan.type", () => {
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.type).toBe(BASE_LICENSE.plan.type);
+      }
+    });
+
+    it("extracts plan.maxMembers", () => {
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.maxMembers).toBe(
+          BASE_LICENSE.plan.maxMembers,
+        );
+      }
+    });
+
+    it("extracts plan.maxProjects", () => {
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.maxProjects).toBe(
+          BASE_LICENSE.plan.maxProjects,
+        );
+      }
+    });
+
+    it("extracts plan.maxMessagesPerMonth", () => {
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.maxMessagesPerMonth).toBe(
+          BASE_LICENSE.plan.maxMessagesPerMonth,
+        );
+      }
+    });
+
+    it("validates old licenses that include evaluationsCredit (backward compat)", () => {
+      // VALID_LICENSE_KEY contains evaluationsCredit in the signed payload.
+      // After making the field optional, old licenses must still parse and
+      // pass signature verification without error.
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        // The field is declared as optional on the schema, so Zod preserves its value on parse.
+        expect(result.licenseData.plan.evaluationsCredit).toBe(
+          BASE_LICENSE.plan.evaluationsCredit,
+        );
+      }
+    });
+
+    it("extracts plan.maxWorkflows", () => {
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.maxWorkflows).toBe(
+          BASE_LICENSE.plan.maxWorkflows,
+        );
+      }
+    });
+
+    it("extracts plan.canPublish", () => {
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.canPublish).toBe(
+          BASE_LICENSE.plan.canPublish,
+        );
+      }
+    });
+  });
+});
+
+describe("backward compatibility: licenses issued before experimentation limits were removed", () => {
+  /** @scenario A pre-existing signed license that still encodes experimentation limits stays valid */
+  it("validates a pre-existing license that still encodes experimentation caps, and drops those caps", () => {
+    // ENTERPRISE_LICENSE_KEY was signed (with TEST_PRIVATE_KEY) with a payload
+    // that still carries maxPrompts/maxWorkflows/maxScenarios/maxAgents/... —
+    // exactly what a self-hosted customer's already-issued license contains.
+    // It MUST keep validating: LicensePlanLimitsSchema intentionally retains
+    // those fields so that verifySignature re-serializes byte-identical JSON
+    // and the signature still verifies (no re-issuance). The caps are then
+    // dropped from the active plan rather than enforced. If a future change
+    // strips those schema fields, Zod would discard them on parse, the
+    // re-serialized JSON would differ, and this test would fail — guarding
+    // every already-issued customer license.
+    const result = validateLicense({
+      licenseKey: ENTERPRISE_LICENSE_KEY,
+      publicKey: TEST_PUBLIC_KEY,
+    });
+
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+
+    // Tier + seat entitlements still come from the license.
+    expect(result.planInfo.type).toBe("ENTERPRISE");
+    expect(result.planInfo.maxMembers).toBe(100);
+
+    // Experimentation caps AND workspace-structure caps (projects/teams) are no
+    // longer part of the active plan — those resources are OSS/uncapped. The
+    // signed payload still carries them; plan resolution simply does not surface
+    // them, so existing licenses keep validating without re-issuance.
+    expect("maxPrompts" in result.planInfo).toBe(false);
+    expect("maxWorkflows" in result.planInfo).toBe(false);
+    expect("maxScenarios" in result.planInfo).toBe(false);
+    expect("maxProjects" in result.planInfo).toBe(false);
+    expect("maxTeams" in result.planInfo).toBe(false);
+  });
+});

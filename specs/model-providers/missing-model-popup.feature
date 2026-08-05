@@ -170,7 +170,11 @@ Feature: Missing-model toast when a feature can't resolve a model
     Then the global interceptor catches the AiCallFailedError
     And a toast appears titled "Workflow commit message failed"
     And the body says "Double-check your Fast model configuration in Model Providers"
-    And the original short provider error message is surfaced underneath the hint
+    # The provider's own sentence is a raw upstream string — deployment names,
+    # endpoint hosts, echoed response bodies. It stays in the server log,
+    # correlated by trace id; the toast reads the copy written for the
+    # ai_call_failed code.
+    And the provider's own error message is not shown to the user
 
   # The commit-message autogen (and AI search, ...) is assistive: it failing
   # does not break anything the user was doing, so a yellow warning is the

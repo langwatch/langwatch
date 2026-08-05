@@ -17,11 +17,11 @@ When using the Helm chart, you rarely need to set environment variables directly
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |, |
-| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes |, |
-| `REDIS_URL` | Redis connection string | Yes |, |
+| `DATABASE_URL` | PostgreSQL connection string | Yes | - |
+| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes | - |
+| `REDIS_URL` | Redis connection string | Yes | - |
 | `NODE_ENV` | Environment (`production`, `development`) | No | `production` |
-| `BASE_HOST` | Internal base URL for the application | Yes |, |
+| `BASE_HOST` | Internal base URL for the application | Yes | - |
 | `NEXTAUTH_URL` | Public URL for authentication callbacks | Yes | Same as `BASE_HOST` |
 | `START_WORKERS` | Run workers in-process (`true`/`false`) | No | `false` |
 
@@ -31,7 +31,7 @@ When using the Helm chart, you rarely need to set environment variables directly
 |----------|-------------|----------|
 | `API_TOKEN_JWT_SECRET` | JWT signing key for API tokens | Yes |
 | `CREDENTIALS_SECRET` | Encryption key for stored API keys and credentials | Yes |
-| `NEXTAUTH_SECRET` | Session encryption key for NextAuth.js | Yes |
+| `NEXTAUTH_SECRET` | Session encryption key | Yes |
 | `CRON_API_KEY` | API key for authenticating internal cron job HTTP calls | Yes |
 
 <Warning>
@@ -42,7 +42,7 @@ Never commit secrets to version control. In production, use a secrets manager (A
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azureAd`, `cognito`, `okta`, `auth0` | `email` |
+| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0`. Anything else, or a provider whose credentials are missing, starts in email mode. | `email` |
 
 ### SSO Provider Variables
 
@@ -63,14 +63,6 @@ Each SSO provider requires specific variables. See [SSO Configuration](/self-hos
 | `AZURE_AD_CLIENT_ID` | Azure AD application client ID |
 | `AZURE_AD_CLIENT_SECRET` | Azure AD application client secret |
 | `AZURE_AD_TENANT_ID` | Azure AD tenant ID |
-
-**AWS Cognito:**
-
-| Variable | Description |
-|----------|-------------|
-| `COGNITO_CLIENT_ID` | Cognito user pool client ID |
-| `COGNITO_CLIENT_SECRET` | Cognito user pool client secret |
-| `COGNITO_ISSUER` | Cognito issuer URL |
 
 **GitHub:**
 
@@ -134,24 +126,91 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 `LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart. Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely — the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.dataplane.enabled` toggle) for any horizontally-scaled deployment.
 </Warning>
 
+## Object Storage (Azure Blob)
+
+Azure Blob Storage is an alternative to S3 for the same dataplane consumers (stored objects + dataset uploads). It is selected **only** by the explicit `STORED_OBJECTS_BACKEND=azure` toggle — setting the `AZURE_BLOB_*` variables below by themselves has no effect. This is deliberate (issue #4133): deployment behavior must not depend on which env vars happen to be set, so a stray `AZURE_BLOB_ACCOUNT_KEY` left over from a decommissioned integration can never silently redirect writes.
+
+Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured for that project) beats the azure toggle; the azure toggle beats `S3_BUCKET_NAME`; `S3_BUCKET_NAME` beats the local-filesystem fallback. This azure backend covers datasets too — the destination resolver is shared by both write paths.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` selects nothing by itself — S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | — |
+| `AZURE_BLOB_ACCOUNT_NAME` | Azure Storage account name | — |
+| `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key (SharedKey auth) | — |
+| `AZURE_BLOB_CONTAINER` | Azure Blob container name | — |
+| `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
+
+<Warning>
+When `STORED_OBJECTS_BACKEND=azure` is set, all three of `AZURE_BLOB_ACCOUNT_NAME`, `AZURE_BLOB_ACCOUNT_KEY`, and `AZURE_BLOB_CONTAINER` are required together. An incomplete config fails loud when the destination is resolved, naming the missing variable — it never silently falls back to S3 or the local filesystem. During an S3→Azure migration, keep `S3_BUCKET_NAME` set: legacy S3 surfaces (persisted `s3://` objects, the trace spool, staged payloads) continue to read from and write to the S3 bucket, while new stored-objects and dataset writes target Azure. On an azure-only install (no `S3_BUCKET_NAME`), those legacy S3 surfaces are unavailable and fail with a clear error instead of writing to a bucket nobody reads. In the Helm chart, set `app.dataplane.legacyS3ReadBucket` to the pre-migration bucket (keeping the `awsS3` credential fields populated) to get exactly this state; leave it empty on a greenfield Azure install. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Authentication is SharedKey only; workload identity and per-project Azure BYOC are tracked separately (issues #6087, #6088).
+</Warning>
+
 ## Email
+
+Notification emails (alerts, invites, scheduled reports, password resets) are sent through one gateway, selected with `EMAIL_PROVIDER`.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `EMAIL_ENABLED` | Enable email notifications | `false` |
-| `EMAIL_PROVIDER` | Email provider (`sendgrid`) | `sendgrid` |
-| `SENDGRID_API_KEY` | SendGrid API key |, |
-| `EMAIL_DEFAULT_FROM` | Default "from" address |, |
+| `EMAIL_PROVIDER` | Gateway to send through: `sendgrid`, `ses`, `smtp` or `resend` | inferred |
+| `EMAIL_DEFAULT_FROM` | Default "from" address | - |
+
+When `EMAIL_PROVIDER` is not set, the gateway is inferred from whichever credentials are present (`USE_AWS_SES` first, then `SENDGRID_API_KEY`), so existing installs keep working untouched. `smtp` and `resend` must always be named explicitly.
+
+### SendGrid
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SENDGRID_API_KEY` | SendGrid API key | - |
+
+### AWS SES
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `USE_AWS_SES` | Set to `true` to send through SES | `false` |
+| `AWS_REGION` | AWS region for SES | - |
+| `AWS_SES_ENDPOINT` | Override the SES endpoint, for a VPC endpoint or an internal relay | public regional endpoint |
+
+Credentials come from the standard AWS chain (instance role, IRSA, or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`).
+
+### SMTP
+
+Use this for an internal relay, Azure Communication Services, Office 365, Google Workspace, Postmark, Mailgun, Brevo, or any other gateway that speaks SMTP.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SMTP_URL` | Full connection URL, e.g. `smtps://user:pass@relay.internal:465`. Takes precedence over the settings below | - |
+| `SMTP_HOST` | Relay hostname | - |
+| `SMTP_PORT` | Relay port | `587` |
+| `SMTP_SECURE` | `true` for implicit TLS, `false` for STARTTLS | `true` on port 465, otherwise `false` |
+| `SMTP_USER` | Username. Omit entirely for an unauthenticated internal relay | - |
+| `SMTP_PASSWORD` | Password | - |
+
+### Resend
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RESEND_API_KEY` | Resend API key | - |
+
+### Sending through an outbound proxy
+
+Deployments whose only egress is a corporate HTTP proxy can set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses`, `resend` and `sendgrid` gateways all route their API calls through it; `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
+
+The `smtp` gateway ignores these variables on purpose, because an SMTP relay is normally an internal host that must be reached directly. Point it at your relay's real address, or use a vendor's SMTP endpoint if that is what the proxy allows out.
+
+<Note>
+Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so LangWatch attaches the proxy to the SES and Resend clients itself. SendGrid's client is axios-based and reads the variables directly. Without this wiring, a proxied deployment fails with a `read ETIMEDOUT` reaching the provider.
+</Note>
+
 
 ## Evaluator Providers
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `AZURE_OPENAI_EVALUATOR_ENABLED` | Enable Azure OpenAI for evaluations | `false` |
-| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |, |
-| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |, |
+| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL | - |
+| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key | - |
 | `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
-| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON |, |
+| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | - |
 
 ## Feature Flags
 
@@ -165,8 +224,15 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
-| `SENTRY_DSN` | Sentry DSN for error tracking |, |
-| `METRICS_API_KEY` | API key for metrics collection |, |
+| `METRICS_API_KEY` | API key for metrics collection | - |
+
+## Langy (optional)
+
+Langy, the automated AI engineer, runs as a separate agent pod that is off by default. Enabling it adds a `langyagent.chartManaged` toggle and a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
+
+<Note>
+See [Langy environment variables](/self-hosting/langy/environment-variables) for the full `LANGY_*` and `GITHUB_LANGY_*` reference, and [Setup](/self-hosting/langy/setup) for the `langyagent.chartManaged` toggle and the `LANGY_INTERNAL_SECRET` secret.
+</Note>
 
 ## Helm Chart Mapping
 
@@ -184,14 +250,28 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.email.enabled` | `EMAIL_ENABLED` |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
+| `app.email.providers.ses.region` | `AWS_REGION` (with `USE_AWS_SES=true`) |
+| `app.email.providers.ses.endpoint` | `AWS_SES_ENDPOINT` |
+| `app.email.providers.smtp.url.value` | `SMTP_URL` |
+| `app.email.providers.smtp.host` | `SMTP_HOST` |
+| `app.email.providers.smtp.port` | `SMTP_PORT` |
+| `app.email.providers.smtp.secure` | `SMTP_SECURE` |
+| `app.email.providers.smtp.user` | `SMTP_USER` |
+| `app.email.providers.smtp.password.value` | `SMTP_PASSWORD` |
+| `app.email.providers.resend.apiKey.value` | `RESEND_API_KEY` |
 | `app.evaluators.azureOpenAI.enabled` | `AZURE_OPENAI_EVALUATOR_ENABLED` |
 | `app.evaluators.azureOpenAI.endpoint.value` | `AZURE_OPENAI_EVALUATOR_ENDPOINT` |
 | `app.evaluators.azureOpenAI.apiKey.value` | `AZURE_OPENAI_EVALUATOR_API_KEY` |
 | `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
 | `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.dataplane.enabled` | `USE_S3_STORAGE` |
+| `app.dataplane.enabled` | `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
 | `app.dataplane.bucket` | `S3_BUCKET_NAME` |
+| `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
+| `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` |
+| `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
+| `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
+| `app.dataplane.legacyS3ReadBucket` | `S3_BUCKET_NAME` — set during an S3→Azure migration so pre-migration objects stay readable; leave empty on a greenfield Azure install |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Inverse of `START_WORKERS` |

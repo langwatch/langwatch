@@ -24,11 +24,11 @@ var (
 
 // RelayClient pushes a turn's signed output frames to the control-plane relay
 // (POST /api/internal/langy/relay/frames) as ONE long-lived ndjson stream — the
-// self-drive successor to holding the /chat response open (LANGY_WORKER_REDESIGN
-// §0/§0b). The manager is the SOLE signer: it SIGNS each frame with the
-// conversation's runToken (frameauth) before it leaves the process, so the relay
-// can verify possession without the secret ever crossing the wire. opencode never
-// holds the runToken and never reaches the relay.
+// self-drive successor to holding the /chat response open (see app.go and the
+// rest of adapters/controlplane). The manager is the SOLE signer: it SIGNS each
+// frame with the conversation's runToken (frameauth) before it leaves the
+// process, so the relay can verify possession without the secret ever crossing
+// the wire. opencode never holds the runToken and never reaches the relay.
 //
 // One RelayClient is shared; each turn Opens its own RelayStream (the worker holds
 // one connection per turn — the load balancer pins it, keeping frames in order).

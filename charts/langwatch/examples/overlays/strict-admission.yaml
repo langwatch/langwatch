@@ -1,0 +1,83 @@
+# strict-admission.yaml - for clusters that enforce Pod Security Admission
+# "restricted" or an equivalent OPA Gatekeeper / Kyverno bundle.
+#
+# LangWatch's own pods (app, workers, nlp, langevals, gateway) and the bundled
+# datastores (PostgreSQL, Redis, ClickHouse, Keeper) already ship hardened:
+# read-only root, non-root, dropped capabilities, RuntimeDefault seccomp, no
+# automounted token, resource requests+limits. This overlay turns off the two
+# components that CANNOT comply, because their compliance is not a matter of
+# configuration:
+#
+#   - the bundled Prometheus, an upstream subchart we do not control;
+#   - the Langy agent, which must run as root by design (see below).
+#
+# It also drops the gateway HPA, which needs a custom metrics API rather than
+# an admission exemption.
+#
+# Usage (stack on a size + access overlay):
+#   helm install lw . \
+#     -f examples/overlays/size-prod.yaml \
+#     -f examples/overlays/access-ingress.yaml \
+#     -f examples/overlays/strict-admission.yaml
+#
+# For production, also stack the external-datastore overlays. Managed databases
+# give you backups and HA and deploy no datastore pods at all. (In-cluster
+# datastores do comply with read-only-root, but external is the better choice.)
+#   -f examples/overlays/postgres-external.yaml
+#   -f examples/overlays/redis-external.yaml
+#   -f examples/overlays/clickhouse-external.yaml
+
+# Bundled Prometheus is an upstream subchart we don't harden; bring your own.
+prometheus:
+  chartManaged: false
+
+# The ClickHouse subchart's preflight Job shells out to kubectl to check the
+# Secret's keys, so it needs both an automounted token and a writable root (for
+# kubectl's discovery cache). It only renders when you supply the Secret
+# yourself (clickhouse.auth.existingSecret) rather than using autogen, which is
+# the recommended production path — so pin it off here rather than leaving it to
+# chance. The umbrella already defaults it off; this keeps that true if a base
+# values file turns it on.
+clickhouse:
+  preflight:
+    enabled: false
+
+# The Langy assistant's manager process runs as UID 0 with CHOWN, DAC_OVERRIDE,
+# FOWNER, SETUID and SETGID, and carries no seccomp profile. That is deliberate
+# and load-bearing, NOT an oversight: the manager hands every opencode worker a
+# distinct UID via child_process.spawn({uid,gid}), which needs those exact
+# capabilities from a root-effective-uid process. Without them, sibling workers
+# share a UID and can read each other's project API keys and GitHub tokens off
+# disk (ADR-033; specs/langy/langy-deploy-hardening.feature).
+#
+# So on a restricted cluster the answer is to NOT deploy the agent, never to
+# "fix" it by forcing runAsNonRoot — that silently re-opens cross-worker
+# credential theft. Opting the whole pod out needs no acceptance value: with
+# nothing deployed there is no workload to sandbox.
+#
+# LangWatch runs fine without it; you lose the in-product assistant only.
+# Pinned here rather than deferred to examples/overlays/langy-disabled.yaml
+# (which sets the same key) so this overlay is self-contained: an operator who
+# applies only strict-admission.yaml must not silently keep a pod their cluster
+# will reject.
+langyagent:
+  chartManaged: false
+
+# The gateway's default HPA needs prometheus-adapter for its custom metric.
+# Run a fixed replica count instead unless you have a custom metrics API.
+gateway:
+  autoscaling:
+    enabled: false
+  replicaCount: 2
+
+app:
+  telemetry:
+    # Prometheus is off above, so don't expose app metrics either - nothing
+    # would scrape them. This is already the default; pinned here so the two
+    # stay coupled if a base values file turned metrics on.
+    metrics:
+      enabled: false
+    # Anonymous usage analytics phone home to LangWatch. Not an admission
+    # concern, but uncomment for an air-gapped / no-egress install.
+    # usage:
+    #   enabled: false

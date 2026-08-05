@@ -7,7 +7,7 @@
 ## Context
 
 Round 5 of the traces-v2 filter work tackles three papercuts in the facet
-sidebar (`langwatch/src/features/traces-v2/components/FilterSidebar/`). Two of
+sidebar (`platform/app/src/features/traces-v2/components/FilterSidebar/`). Two of
 them are pure tuning and need no architectural decision:
 
 - **Default value cap.** Each categorical facet currently lists its top

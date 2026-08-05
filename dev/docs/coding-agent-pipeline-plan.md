@@ -82,7 +82,7 @@ do not re-derive them.
    `claudeCodeSpanSync.reactor.ts`, `claude-code-log-to-span.ts`, their
    pipeline registration + tests, `specs/traces-v2/claude-code-log-conversion.feature`,
    and any `CLAUDE_CODE_LOG_RETENTION_DAYS` floor. Port dogfood matrix
-   (`scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts`)
+   (`dev/scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts`)
    and run it end-to-end. Release note: log-only installs must re-run
    `langwatch claude`. Close #5708, delete its branch.
 
@@ -115,14 +115,16 @@ files. Full dogfood only at slice 8.
   minus the `CLAUDE_CODE_KIND_ATTR` marking block
 - misc fixes: `scripts/seed-local-admin.ts`, `workers.ts` (`.env.portless`
   overlay), `.gitignore`, `sdk-javascript-ci.yml`,
-  `typescript-sdk` installer diffs (`install.ts`, `wrapper-mode.ts`)
+  `sdks/typescript` installer diffs (`install.ts`, `wrapper-mode.ts`)
 - specs to port into `specs/coding-agent/`:
   `coding-agent-terminal-view.feature`, `coding-agent-trace-fidelity.feature`
   (from old `specs/trace-processing/`), plus diffs to
-  `specs/claude/telemetry-turn-bounding.feature`,
+  `specs/claude/telemetry-turn-bounding.feature` (its `recordLog` sharding
+  mechanism is retired by the log-write-retirement PR; port its scenarios as the
+  behavioural contract only),
   `specs/ai-gateway/governance/ingestion-templates-catalog.feature`
 - docs: `dev/docs/claude-code-terminal-view.md`; media assets
-- dogfood: `scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts` (slice 8)
+- dogfood: `dev/scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts` (slice 8)
 
 ### ADAPT / REWRITE into the new pipeline (slices 1–4, 6)
 - `projections/services/coding-agent-normalization.ts` → pipeline services (slice 1)
@@ -139,9 +141,12 @@ files. Full dogfood only at slice 8.
 - `log-processing/canonicalLog.ts` + `schemas/logRecord.ts` diffs → slice 6
   (generic `synthesized` value; old values parse-accepted)
 - `trace-processing/pipeline.ts` / `recordSpanCommand.ts` /
-  `recordLogContributionCommand.ts` / `logCommandGroupKey.ts` /
-  `schemas/otlp.ts` diffs → take only what the new shape needs (span
-  contribution seam; link schema bits if not already on main)
+  `recordLogContributionCommand.ts` / `schemas/otlp.ts` diffs → take only what
+  the new shape needs (span contribution seam; link schema bits if not already
+  on main). `logCommandGroupKey.ts` and the `recordLog` write machinery
+  (recordLog command + `logRecordStorage` projection + append store) are retired
+  by the log-write-retirement PR — no longer port targets; canonical
+  `log_records` is the only log write path.
 - `pipelineRegistry.ts`, `app-layer/dependencies.ts`, `presets.ts` → new
   pipeline wiring (slice 1)
 - `components/me/*` + `pages/me/index.tsx` → slice 7

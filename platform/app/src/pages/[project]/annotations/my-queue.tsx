@@ -1,0 +1,263 @@
+import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import type { AnnotationQueueItem } from "@prisma/client";
+import { useEffect, useMemo, useState } from "react";
+import { Check, ChevronLeft, ChevronRight } from "react-feather";
+import AnnotationsLayout from "~/components/AnnotationsLayout";
+import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { DashboardLayout } from "../../../components/DashboardLayout";
+import { TasksDone } from "../../../components/icons/TasksDone";
+import { Conversation } from "../../../components/messages/Conversation";
+
+export default function TraceAnnotations() {
+  const router = useRouter();
+  const { "queue-item": queueItem } = router.query;
+  const { assignedQueueItems, queuesLoading } = useAnnotationQueues({
+    showQueueAndUser: true,
+    allQueueItems: true,
+  });
+  const { project } = useOrganizationTeamProject();
+  const queryClient = api.useContext();
+
+  const allQueueItems = useMemo(() => {
+    const items = [...(assignedQueueItems ?? [])];
+
+    // Filter out done items
+    return items.filter((item) => !item.doneAt);
+  }, [assignedQueueItems]);
+
+  // Force re-render when items change by creating a key
+  const queueItemsKey = useMemo(() => {
+    return allQueueItems.map((item) => `${item.id}-${item.doneAt}`).join(",");
+  }, [allQueueItems]);
+
+  let currentQueueItem = allQueueItems.find((item) => item.id === queueItem);
+
+  if (!currentQueueItem) {
+    currentQueueItem = allQueueItems[0];
+  }
+
+  const refetchQueueItems = async () => {
+    await queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
+    await queryClient.annotation.getPendingItemsCount.invalidate();
+    await queryClient.annotation.getAssignedItemsCount.invalidate();
+    await queryClient.annotation.getQueueItemsCounts.invalidate();
+  };
+
+  console.log("currentQueueItem", currentQueueItem);
+  const traceDetails = api.traces.getById.useQuery(
+    {
+      projectId: project?.id ?? "",
+      traceId: currentQueueItem?.trace?.trace_id ?? "",
+    },
+    {
+      enabled: !!project?.id && !!currentQueueItem?.trace?.trace_id,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  const [threadId, setThreadId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (traceDetails.data?.metadata.thread_id) {
+      setThreadId(traceDetails.data?.metadata.thread_id);
+    } else {
+      setThreadId(null);
+    }
+  }, [traceDetails.data?.metadata.thread_id, currentQueueItem?.id]);
+
+  if (queuesLoading) {
+    return <AnnotationsLayout />;
+  }
+
+  if (allQueueItems.length === 0 && !queuesLoading) {
+    return (
+      <AnnotationsLayout>
+        <VStack
+          height="100%"
+          width="full"
+          justify="center"
+          backgroundColor="bg.muted"
+          marginTop="-48px"
+        >
+          <TasksDone />
+          <Text fontSize="xl" fontWeight="500">
+            All tasks complete
+          </Text>
+          <Text>Nice work!</Text>
+        </VStack>
+      </AnnotationsLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout display="flex" flexDirection="column">
+      <VStack
+        height="100%"
+        width="full"
+        gap={0}
+        alignItems="stretch"
+        position="relative"
+        flex="1"
+      >
+        <Box
+          flex="1"
+          overflowY="auto"
+          padding={4}
+          paddingBottom={currentQueueItem?.trace ? "100px" : 4}
+          position="relative"
+        >
+          <Conversation
+            key={currentQueueItem?.trace?.trace_id ?? currentQueueItem?.id}
+            threadId={threadId ?? ""}
+            traceId={currentQueueItem?.trace?.trace_id ?? ""}
+          />
+        </Box>
+        {currentQueueItem?.trace && (
+          <Box
+            position="absolute"
+            bottom={0}
+            left={0}
+            right={0}
+            width="full"
+            backgroundColor="bg.panel"
+            borderTop="1px solid"
+            borderColor="border"
+            zIndex={10}
+          >
+            <AnnotationQueuePicker
+              key={queueItemsKey}
+              queueItems={allQueueItems}
+              currentQueueItem={currentQueueItem}
+              refetchQueueItems={refetchQueueItems}
+            />
+          </Box>
+        )}
+      </VStack>
+    </DashboardLayout>
+  );
+}
+
+const AnnotationQueuePicker = ({
+  queueItems,
+  currentQueueItem,
+  refetchQueueItems,
+}: {
+  queueItems: AnnotationQueueItem[];
+  currentQueueItem: AnnotationQueueItem;
+  refetchQueueItems: () => Promise<void>;
+}) => {
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  const currentQueueItemIndex = queueItems.findIndex(
+    (item) => item.id === currentQueueItem.id,
+  );
+
+  const navigateToQueue = async (queueId: string, traceId?: string) => {
+    setIsNavigating(true);
+    const url = traceId
+      ? `/${project?.slug}/annotations/my-queue?queue-item=${queueId}&trace=${traceId}`
+      : `/${project?.slug}/annotations/my-queue?queue-item=${queueId}`;
+
+    await router.push(url);
+    // Add a small delay to ensure the route has fully updated
+    setTimeout(() => setIsNavigating(false), 100);
+  };
+
+  const markQueueItemDone = api.annotation.markQueueItemDone.useMutation();
+
+  const markQueueItemDoneMoveToNext = async () => {
+    markQueueItemDone.mutate(
+      {
+        queueItemId: currentQueueItem.id,
+        projectId: project?.id ?? "",
+      },
+      {
+        onSuccess: async () => {
+          await refetchQueueItems();
+          const nextItem = queueItems[currentQueueItemIndex + 1];
+          if (nextItem) {
+            await navigateToQueue(nextItem.id);
+          } else {
+            setIsNavigating(true);
+            await router.replace(`/${project?.slug}/annotations/my-queue`);
+            setTimeout(() => setIsNavigating(false), 100);
+          }
+        },
+      },
+    );
+  };
+
+  return (
+    <Box shadow="md" padding={5} width="full" position="relative">
+      {isNavigating && (
+        <Box
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          backgroundColor="bg.panel/80"
+          zIndex={20}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Spinner />
+        </Box>
+      )}
+      <VStack>
+        <HStack gap={8}>
+          <HStack gap={2}>
+            <Button
+              variant="outline"
+              disabled={currentQueueItemIndex === 0 || isNavigating}
+              onClick={() => {
+                const previousItem = queueItems[currentQueueItemIndex - 1];
+                if (previousItem) {
+                  void navigateToQueue(previousItem.id);
+                }
+              }}
+            >
+              <ChevronLeft />
+            </Button>
+            <Button
+              variant="outline"
+              disabled={
+                currentQueueItemIndex === queueItems.length - 1 || isNavigating
+              }
+              onClick={() => {
+                const nextItem = queueItems[currentQueueItemIndex + 1];
+                if (nextItem) {
+                  void navigateToQueue(nextItem.id);
+                }
+              }}
+            >
+              <ChevronRight />
+            </Button>
+          </HStack>
+          <Text>
+            {currentQueueItemIndex + 1} of {queueItems.length}
+          </Text>
+          <Button
+            colorPalette="blue"
+            disabled={
+              currentQueueItem.doneAt !== null ||
+              markQueueItemDone.isLoading ||
+              isNavigating
+            }
+            onClick={() => {
+              void markQueueItemDoneMoveToNext();
+            }}
+          >
+            <Check /> Done
+          </Button>
+        </HStack>
+      </VStack>
+    </Box>
+  );
+};

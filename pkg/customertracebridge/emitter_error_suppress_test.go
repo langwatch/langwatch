@@ -83,7 +83,11 @@ func TestEmitter_ZeroCostNoOutputSuccess_MarkedForDrop(t *testing.T) {
 	span := recordSpanForParams(t, domain.AITraceParams{
 		ProviderID: domain.ProviderAnthropic,
 		Model:      "claude-opus-4-7",
-		Usage:      domain.Usage{PromptTokens: 6, CompletionTokens: 0, CostMicroUSD: 0},
+		// Probes are /v1/messages calls; the suppression is gated to
+		// chat-shaped request types so audio and embeddings spans (which
+		// structurally never carry completion tokens) stay visible.
+		RequestType: domain.RequestTypeMessages,
+		Usage:       domain.Usage{PromptTokens: 6, CompletionTokens: 0, CostMicroUSD: 0},
 		// no ResponseBody -> extractOutputMessages == ""
 	})
 
@@ -97,9 +101,10 @@ func TestEmitter_ZeroCostNoOutputSuccess_MarkedForDrop(t *testing.T) {
 func TestEmitter_RealGeneration_NotMarkedForDrop(t *testing.T) {
 	t.Run("has completion tokens", func(t *testing.T) {
 		span := recordSpanForParams(t, domain.AITraceParams{
-			ProviderID: domain.ProviderAnthropic,
-			Model:      "claude-opus-4-7",
-			Usage:      domain.Usage{PromptTokens: 6, CompletionTokens: 8, CostMicroUSD: 0},
+			ProviderID:  domain.ProviderAnthropic,
+			Model:       "claude-opus-4-7",
+			RequestType: domain.RequestTypeMessages,
+			Usage:       domain.Usage{PromptTokens: 6, CompletionTokens: 8, CostMicroUSD: 0},
 		})
 		_, dropped := hasBoolAttr(span, "langwatch.reserved.drop")
 		assert.False(t, dropped)
@@ -107,9 +112,10 @@ func TestEmitter_RealGeneration_NotMarkedForDrop(t *testing.T) {
 
 	t.Run("has cost", func(t *testing.T) {
 		span := recordSpanForParams(t, domain.AITraceParams{
-			ProviderID: domain.ProviderAnthropic,
-			Model:      "claude-opus-4-7",
-			Usage:      domain.Usage{PromptTokens: 6, CompletionTokens: 0, CostMicroUSD: 1200},
+			ProviderID:  domain.ProviderAnthropic,
+			Model:       "claude-opus-4-7",
+			RequestType: domain.RequestTypeMessages,
+			Usage:       domain.Usage{PromptTokens: 6, CompletionTokens: 0, CostMicroUSD: 1200},
 		})
 		_, dropped := hasBoolAttr(span, "langwatch.reserved.drop")
 		assert.False(t, dropped, "a span that cost money must always be visible")

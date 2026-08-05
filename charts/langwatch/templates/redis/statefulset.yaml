@@ -24,20 +24,32 @@ spec:
     spec:
       # Redis does not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      {{- with (coalesce .Values.redis.priorityClassName .Values.global.scheduling.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- with (coalesce .Values.redis.nodeSelector .Values.global.scheduling.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.redis.tolerations .Values.global.scheduling.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.redis.affinity .Values.global.scheduling.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # uid 999 is the redis image's own user, so this cannot inherit
+      # global.podSecurityContext (uid 1000). A per-component override
+      # layers on top rather than replacing, so a partial override cannot
+      # strip runAsNonRoot or the seccomp profile.
       securityContext:
-        runAsUser: 999
-        runAsGroup: 999
-        fsGroup: 999
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.redis "base" (dict "runAsUser" 999 "runAsGroup" 999 "fsGroup" 999)) | nindent 8 }}
       terminationGracePeriodSeconds: 30
       containers:
         - name: redis
           securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.redis) | nindent 12 }}
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
           imagePullPolicy: {{ .Values.redis.image.pullPolicy | default "IfNotPresent" }}
           {{- if $authEnabled }}
@@ -86,6 +98,16 @@ spec:
           volumeMounts:
             - name: redis-data
               mountPath: /data
+            # Writable /tmp so the container can run read-only root.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        # Bounded like every other scratch volume: an unbounded emptyDir is
+        # backed by node ephemeral storage, so a looping pod evicts neighbours
+        # instead of itself.
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.redis.scratchSizeLimit }}
   volumeClaimTemplates:
     - metadata:
         name: redis-data

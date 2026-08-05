@@ -1,9 +1,9 @@
 # Metadata facet — first-class filtering of metadata.* trace attributes
 #
 # Implementation:
-#   langwatch/src/server/app-layer/traces/facet-registry.ts          (TRACE_METADATA_FACET — dynamic_keys, metadata. prefix)
-#   langwatch/src/server/app-layer/traces/facets/metadata-keys.ts    (prefix-scoped discovery, reused)
-#   langwatch/src/features/traces-v2/components/FilterSidebar/        (Metadata sidebar section + grouping)
+#   platform/app/src/server/app-layer/traces/facet-registry.ts          (TRACE_METADATA_FACET — dynamic_keys, metadata. prefix)
+#   platform/app/src/server/app-layer/traces/facets/metadata-keys.ts    (prefix-scoped discovery, reused)
+#   platform/app/src/features/traces-v2/components/FilterSidebar/        (Metadata sidebar section + grouping)
 #
 # Related specs:
 #   specs/traces-v2/facet-perspectives.feature   — facet groups / sidebar perspectives

@@ -6,7 +6,7 @@ import { execAndPipe } from "./_pipe-to-bus.ts";
 /**
  * Run Prisma migrations against the embedded postgres + ClickHouse goose
  * migrations against the embedded clickhouse. Both binaries are bundled
- * with the langwatch app already (via langwatch/node_modules and goose in
+ * with the langwatch app already (via platform/app/node_modules and goose in
  * scripts/), so this is a thin shell-out.
  *
  * Idempotent — Prisma reports "Already in sync" and goose reports "no

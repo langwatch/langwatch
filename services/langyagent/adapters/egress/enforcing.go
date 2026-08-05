@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// EnforcingConfig is the operator-owned egress posture (ADR-043), resolved once
+// EnforcingConfig is the operator-owned egress posture (ADR-076), resolved once
 // from the manager config and shared by every worker. The per-project customer
 // allow-list is NOT here — it rides each worker's credentials envelope and
 // arrives via WorkerContext.EgressAllowlist.
@@ -30,7 +30,7 @@ type EnforcingConfig struct {
 	Logger *zap.Logger
 }
 
-// EnforcingGuard is the ADR-043 enforcement Guard. PrepareWorker stands up a
+// EnforcingGuard is the ADR-076 enforcement Guard. PrepareWorker stands up a
 // per-worker outbound forward proxy (egressAdapter) bound to an ephemeral
 // loopback port and returns that port so the pool points the worker's
 // HTTPS_PROXY at it; the proxy enforces require-TLS / throttle / floor ∪

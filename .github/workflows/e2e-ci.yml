@@ -18,7 +18,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -32,9 +35,16 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'langwatch/**'
-              - 'python-sdk/**'
-              - 'agentic-e2e-tests/**'
+              - 'platform/app/**'
+              - 'sdks/python/**'
+              - 'tests/agentic-e2e/**'
+              # The single lockfile, workspace definition, root manifest and
+              # hoist config live at the repo root since ADR-076; a dependency
+              # or override change touches only these.
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
               - '.github/workflows/e2e-ci.yml'
 
   e2e:
@@ -53,10 +63,10 @@ jobs:
       NEXTAUTH_URL: "http://localhost:5570"
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
       # Trust the in-repo TEST license keypair so the members suite
-      # (agentic-e2e-tests/tests/members/steps.ts withEnterpriseLicense()) can
+      # (tests/agentic-e2e/tests/members/steps.ts withEnterpriseLicense()) can
       # activate a test ENTERPRISE license and exercise member-invitation flows
       # above the free-tier maxMembers=1 cap. Public key only (safe to commit) — matches
-      # TEST_PUBLIC_KEY in langwatch/ee/licensing/__tests__/fixtures/testKeys.ts.
+      # TEST_PUBLIC_KEY in platform/app/ee/licensing/__tests__/fixtures/testKeys.ts.
       # Must be on the app process env before `pnpm start` boots — constants.ts
       # resolves PUBLIC_KEY from this var once at module load. gitleaks:allow
       LANGWATCH_LICENSE_PUBLIC_KEY: |
@@ -173,10 +183,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-          cache-dependency-path: |
-            langwatch/pnpm-lock.yaml
-            agentic-e2e-tests/pnpm-lock.yaml
-            mcp-server/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       # start.sh auto-starts the aigateway + nlpgo Go services via
       # `go run ./cmd/service`. Without a Go toolchain + warm caches, both
@@ -203,47 +210,38 @@ jobs:
       - name: Install node-gyp (for node-pty postinstall)
         run: npm install -g node-gyp@12.3.0
 
-      - name: Build mcp-server
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile && pnpm run build
-
-      - name: Install app dependencies
-        working-directory: langwatch
-        run: CI=true pnpm install --frozen-lockfile
-
-      # `--ignore-workspace` because agentic-e2e-tests sits one level under
-      # the repo-root pnpm-workspace.yaml introduced by the @langwatch/server
-      # CLI in packages/. Without the flag, pnpm walks up, finds the root
-      # workspace, scopes the install to `packages/*` only, and never lands
-      # @playwright/test in agentic-e2e-tests/node_modules — the next step
-      # then fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command
-      # "playwright" not found`. agentic-e2e-tests is intentionally a
-      # standalone pnpm project (see its self-contained pnpm-lock.yaml).
-      - name: Install E2E test dependencies
-        working-directory: agentic-e2e-tests
-        run: pnpm install --frozen-lockfile --ignore-workspace
+      # One install for the app, the MCP server (a workspace dependency of the
+      # app, so `...` pulls it in) and the Playwright suite. This used to be
+      # three separate installs against three lockfiles, one of which needed
+      # `--ignore-workspace` to escape a workspace agentic-e2e-tests was never
+      # a member of. See ADR-076.
+      - name: Install dependencies
+        run: >
+          CI=true pnpm install --frozen-lockfile
+          --filter "@langwatch/web..."
+          --filter "langwatch-e2e-tests"
 
       # No Playwright browser/ffmpeg download: the tests launch the runner's
       # preinstalled Google Chrome via channel (E2E_BROWSER_CHANNEL below) and
       # video recording is off in CI, so no ffmpeg binary is needed.
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       - name: Install goose
         run: bash .github/scripts/install-goose.sh
 
       - name: Setup database
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Setup ClickHouse
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm clickhouse:migrate
 
       - name: Build app
-        working-directory: langwatch
+        working-directory: platform/app
         run: NODE_ENV=test pnpm build
 
       - name: Run E2E tests
@@ -255,14 +253,14 @@ jobs:
           E2E_BROWSER_CHANNEL: chrome
         run: |
           # Start the app in background
-          cd langwatch && PORT=5570 pnpm start &
+          cd platform/app && PORT=5570 pnpm start &
           APP_PID=$!
 
           # Wait for app to be ready (global-setup.ts also checks, but this ensures the process is up)
           sleep 5
 
           # Run tests from the self-contained e2e package
-          cd agentic-e2e-tests && pnpm test
+          cd tests/agentic-e2e && pnpm test
           TEST_EXIT=$?
 
           # Cleanup
@@ -274,7 +272,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
-          path: agentic-e2e-tests/playwright-report/
+          path: tests/agentic-e2e/playwright-report/
           retention-days: 7
 
       - name: Upload test artifacts
@@ -282,7 +280,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results
-          path: agentic-e2e-tests/test-results/
+          path: tests/agentic-e2e/test-results/
           retention-days: 7
 
       - name: Notify Slack on failure

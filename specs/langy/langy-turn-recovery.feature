@@ -57,18 +57,33 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And Langy does not re-drive the turn on its own
     And the card never flickers away into a silent retry
 
-  # A rejected model call comes back with the provider's own explanation: an
-  # out-of-credits account, a model the plan does not include. That sentence is
-  # usually the whole fix, and hiding it behind "Something went wrong" leaves
-  # it unread, so the card names what the provider rejected.
+  # A rejected model call comes back with the provider's own explanation, and
+  # the card used to recite it: an out-of-credits account is a real fix that
+  # "Something went wrong" hides. It cost too much. A provider's error body is
+  # written for whoever holds the API key, and on a mediated call that is
+  # LangWatch — a rejected key comes back quoted inside that sentence, so the
+  # card was printing a platform credential to a customer. Masking it first is
+  # not a fix: matching credential shapes only catches the shapes enumerated.
   @unit
-  Scenario: A rejected model call shows the provider's own message on the card
+  Scenario: A rejected model call never recites the provider's own message
     Given Langy's model call is rejected by the provider
     When the turn fails and the error reaches the panel
     Then the card keeps the friendly reply-failed framing
-    And it includes the provider's own error message
+    And the provider's own sentence appears nowhere on it
     And it suggests trying again or picking a different model
-    But when no provider message was captured, the stock reply-failed copy stands
+
+  # Nothing actionable is lost, because the part a customer could act on was
+  # never the prose — it was which failure it was. The provider says that in a
+  # discriminant, a value from a set it enumerates, which cannot carry a key.
+  @unit
+  Scenario: An out-of-allowance model call is promoted by reason code, not by message
+    Given Langy's model call is rejected because the account has no allowance left
+      # "usage_limit_reached", "codex_plan_limit", "insufficient_quota" or
+      # "billing_hard_limit_reached", depending on which backend answered
+    When the turn fails and the error reaches the panel
+    Then the failure is promoted to the plan-limit card by its reason code
+    And the customer reads copy written by LangWatch for that case
+    And the provider's own sentence still appears nowhere
 
   # The flicker had a second cause independent of the worker-stopped loop: for the
   # kinds that DO auto-retry, the red card rendered for a single frame before the
@@ -184,3 +199,77 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When both try to terminate the same turn
     Then only the first terminal is recorded
     And the second is collapsed as a duplicate, like a tool call's terminals
+
+  # A provider rate limit is retryable by every SDK's book, and for a burst
+  # (tokens-per-minute) that is right: back off a little and the call lands.
+  # But a PLAN limit ("usage limit reached until next week") answers every
+  # retry identically, and the coding agent's ever-growing backoff turns that
+  # into an hours-long silent spinner: the turn never fails, so the plan-limit
+  # card the panel already knows how to draw never gets its chance. The relay
+  # sits between the agent and the gateway and is the one place that sees every
+  # rejected call, so it is the one that ends the loop: it converts the hard
+  # rate limit into a failure the agent's SDK treats as final, keeping the
+  # provider's own body so the turn's error frame still names the real cause.
+
+  @unit
+  Scenario: A provider that says its usage limit is reached fails the turn at once
+    Given the model provider rejects a relayed call with a rate limit that names its usage limit as reached
+    When the relay answers the coding agent
+    Then the answer is a failure the agent's SDK does not retry
+    And it carries the provider's own error body unchanged
+    And the turn fails with the plan-limit explanation instead of spinning
+
+  @unit
+  Scenario: A rate-limit burst keeps its normal retries, then is cut
+    Given the model provider rate-limits relayed calls without naming a deterministic limit
+    When the same conversation's calls keep being rate-limited without interruption
+    Then the first two rejections pass through for the SDK's own backoff
+    And the third uninterrupted rejection becomes a failure the SDK does not retry
+    But any other answer in between, a success or a different error, starts the count over
+
+  @unit
+  Scenario: A rate-limited conversation never blocks a healthy one
+    Given one conversation has been cut off at a hard rate limit
+    When a different conversation's calls are relayed
+    Then they pass through untouched with their own fresh count
+
+  # A provider can also fail AFTER answering 200: the stream opens, then an
+  # in-stream error event (OpenAI's insufficient_quota) ends it. Status-based
+  # cutting never sees these, every retry re-opens a fresh 200 stream and
+  # dies the same way, the same silent spinner with a different door.
+
+  @unit
+  Scenario: A hard limit delivered inside a 200 stream is cut like a rejected call
+    Given the model provider opens a 200 stream on a relayed call
+    And ends it with an in-stream error event naming exhausted quota
+    When the agent's SDK retries the call
+    Then the relay answers the retry with a failure the SDK does not retry
+    And it carries the provider's own error payload
+    And the turn fails with the provider's message instead of spinning
+
+  @unit
+  Scenario: A clean stream clears the in-stream failure capture
+    Given a conversation's relayed call previously ended with an in-stream error event
+    When a later relayed call streams to completion without an error event
+    Then the capture is cleared and later calls pass through untouched
+
+  # The turn stream's terminal error entry shares its `type: "error"`
+  # discriminant with the SSE transport's own protocol failure frame. The
+  # transport once claimed every such frame for itself, so the one entry that
+  # names the real failure killed the subscription instead: watching a turn
+  # fail LIVE showed the generic unknown card, while reloading the same
+  # conversation showed the correct one from the durable record. The live road
+  # and the reload road must end at the same card.
+  @unit
+  Scenario: A live-watched failure shows the same card a reload shows
+    Given the user is watching Langy answer when the turn fails
+    When the failure reaches the open conversation
+    Then the user sees the card that names what actually went wrong
+    And it is the same card a reload of the conversation would show
+    And the generic something-went-wrong card never appears in its place
+
+  @unit
+  Scenario: A genuinely dead stream still names the durable failure
+    Given the live connection drops before Langy can say what went wrong
+    When the turn's failure is already on the conversation's record
+    Then the user sees the card naming that recorded failure, not a generic apology

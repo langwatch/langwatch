@@ -101,3 +101,8 @@ prometheus:
 
 cronjobs:
   enabled: false
+
+# Langy ships enabled by default; the e2e kind clusters do not build the
+# langyagent image, so keep the agent out of scope here.
+langyagent:
+  chartManaged: false

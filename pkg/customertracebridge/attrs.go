@@ -6,10 +6,44 @@ package customertracebridge
 // The origin KEY lives in pkg/otelsetup (AttrLangWatchOrigin); origin VALUES
 // are service identity and are declared by each service, in its own Policy.
 const (
-	AttrVirtualKeyID          = "langwatch.virtual_key_id"
-	AttrGatewayReqID          = "langwatch.gateway_request_id"
+	AttrVirtualKeyID = "langwatch.virtual_key_id"
+	AttrGatewayReqID = "langwatch.gateway_request_id"
+	// AttrModelProviderID is the ModelProvider row id the request was
+	// dispatched to. The control plane's fold allowlists this exact key
+	// (trace-attribute-accumulation.service.ts) so usage views can break
+	// spend down by vendor. The same id travels on the spend commands as
+	// `model_provider_id`, which is what decides the provider-filtered
+	// budgets a debit belongs to; a dispatch without it debits unfiltered
+	// budgets only.
+	AttrModelProviderID       = "langwatch.model_provider_id"
 	AttrGenAIUsageIn          = "gen_ai.usage.input_tokens"
 	AttrGenAIUsageCacheRead   = "gen_ai.usage.cache_read.input_tokens"
 	AttrGenAIUsageCacheCreate = "gen_ai.usage.cache_creation.input_tokens"
 	AttrGenAIConversationID   = "gen_ai.conversation.id"
+
+	// Audio usage measures (no upstream semconv exists yet for either):
+	// characters synthesized by a TTS call and seconds of audio transcribed
+	// by an STT call, the units character- and duration-priced audio
+	// providers bill by. The cost pipeline prices audio spans from these.
+	AttrGenAIUsageInputChars   = "gen_ai.usage.input_chars"
+	AttrGenAIUsageAudioSeconds = "gen_ai.usage.audio_seconds"
+
+	// AttrLabels carries the VK's tags; the trace pipeline ingests this
+	// exact key into metadata.labels (otel.traces.ts), which the Trace
+	// Explorer filters as "Label".
+	AttrLabels = "langwatch.labels"
+
+	// AttrEndUserID is the caller's external end-user id (their customer's
+	// user, not a LangWatch principal), resolved from the
+	// x-langwatch-end-user-id header, its x-litellm-end-user-id migration
+	// alias, or the OpenAI `user` body param, in that order. The trace fold
+	// copies it into per-request spend events and the attributed-user
+	// budget buckets key on it.
+	AttrEndUserID = "langwatch.end_user_id"
+
+	// AttrRequestMetadata is the caller's x-langwatch-metadata echo: a raw
+	// JSON object (4KB cap, validated at the edge) round-tripped verbatim
+	// into billing spend events so the caller's billing system can join
+	// events back to its own entities without a lookup.
+	AttrRequestMetadata = "langwatch.reserved.request_metadata"
 )

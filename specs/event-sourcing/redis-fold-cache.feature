@@ -17,12 +17,16 @@ Feature: Redis write-through cache for fold state
   have been acked and its ids can never come back; a retry merges into it,
   because they still can.
 
-  Because the set lives in the cache entry, losing the entry loses the
-  protection. That leaves the cold path open, and closing it means making
-  the folds themselves idempotent, which this feature does not attempt. The
-  gap is measured rather than assumed: es_fold_dedup_unavailable_total counts
-  the reads that lost the record, es_fold_blind_reapply_events counts the
-  events re-applied without it.
+  For a fold that carries this set in the cache entry alone, losing the
+  entry loses the protection. That leaves the cold path open, and closing it
+  for those folds would mean making the folds themselves idempotent, which
+  this feature does not attempt. A read-back fold closes it a different way:
+  it persists the applied-event set durably next to its state (ADR-066), so
+  the set survives cache loss — that path is specced in
+  fold-read-back-store.feature. Where the set is cache-only the gap is
+  measured rather than assumed: es_fold_dedup_unavailable_total counts the
+  reads that lost the record, es_fold_blind_reapply_events counts the events
+  re-applied without it.
 
   Background:
     Given a fold projection with a cached store
@@ -71,9 +75,15 @@ Feature: Redis write-through cache for fold state
     And the fold is not failed, because the state is durable
     And the read is counted, because the record of applied events went with it
 
+  # The scenario below documents the measured limit of cache-only folds — it is
+  # not accepted retry behaviour. A fold that persists its applied-event set
+  # durably next to its state keeps exact dedup across cache loss instead
+  # (fold-read-back-store.feature).
   Scenario: Losing the cached entry loses the protection
-    Given a fold job failed after its state was stored
+    Given a fold that keeps its applied-event set in the cache entry only
+    And a fold job failed after its state was stored
     And its cached entry is evicted before the retry
     When the job is retried with the same events
     Then the events are applied again
     And the aggregate over-counts, as it did before the record existed
+    And the re-application is measured, not silent
