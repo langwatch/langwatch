@@ -150,9 +150,10 @@ Notification emails (alerts, invites, scheduled reports, password resets) are se
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `EMAIL_ENABLED` | Enable email notifications | `false` |
 | `EMAIL_PROVIDER` | Gateway to send through: `sendgrid`, `ses`, `smtp` or `resend` | inferred |
 | `EMAIL_DEFAULT_FROM` | Default "from" address | - |
+
+See [Email](/self-hosting/configuration/email) for choosing a gateway and setting one up.
 
 When `EMAIL_PROVIDER` is not set, the gateway is inferred from whichever credentials are present (`USE_AWS_SES` first, then `SENDGRID_API_KEY`), so existing installs keep working untouched. `smtp` and `resend` must always be named explicitly.
 
@@ -247,7 +248,6 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
 | `app.cronApiKey.value` | `CRON_API_KEY` |
 | `app.features.skipEnvValidation` | `SKIP_ENV_VALIDATION` |
-| `app.email.enabled` | `EMAIL_ENABLED` |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
 | `app.email.providers.ses.region` | `AWS_REGION` (with `USE_AWS_SES=true`) |

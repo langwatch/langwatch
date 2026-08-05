@@ -15,6 +15,7 @@
 import chalk from "chalk";
 import { loadConfig, saveConfig, configPath } from "@/cli/utils/governance/config";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
+import { normalizeEndpoint } from "@/internal/endpoint";
 
 type ConfigKey = "endpoint" | "gateway-url" | "daemon";
 
@@ -73,7 +74,7 @@ export const configSetCommand = async (
     return;
   }
 
-  const trimmed = value.replace(/\/+$/, "");
+  const trimmed = normalizeEndpoint(value);
   if (key === "endpoint") {
     cfg.control_plane_url = trimmed;
   } else if (key === "gateway-url") {

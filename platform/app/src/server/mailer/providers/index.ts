@@ -41,17 +41,16 @@ const isKnownProvider = (value: string): value is EmailProviderName =>
 
 /**
  * When the named gateway is unusable but another one is fully configured, the
- * likely cause is a name that was never reviewed: the helm chart has always
- * emitted `EMAIL_PROVIDER=sendgrid` by default, and installs that ran SES
- * through extra environment variables were silently inferred before this
- * setting was read. Naming the alternative lets that shape diagnose itself.
+ * likely cause is a name that disagrees with the settings actually supplied,
+ * which reads as a missing credential and is really a wrong gateway. Naming
+ * the alternative lets that shape diagnose itself.
  */
 const inferredProviderHint = (configured: EmailProviderName): string => {
   const alternative = EMAIL_PROVIDER_NAMES.find(
     (name) => name !== configured && isConfigured[name](),
   );
   return alternative
-    ? ` Settings for "${alternative}" are present — did you mean EMAIL_PROVIDER=${alternative}?`
+    ? ` Settings for "${alternative}" are present, did you mean EMAIL_PROVIDER=${alternative}?`
     : "";
 };
 
@@ -76,7 +75,7 @@ export const resolveEmailProvider = (): EmailProviderPort | null => {
     }
     if (!isConfigured[configured]()) {
       throw new EmailProviderConfigurationError(
-        `EMAIL_PROVIDER is "${configured}" but it is not configured — ${missingSettingHint[configured]}.${inferredProviderHint(configured)}`,
+        `EMAIL_PROVIDER is "${configured}" but it is not configured: ${missingSettingHint[configured]}.${inferredProviderHint(configured)}`,
       );
     }
     return providers[configured];
@@ -89,7 +88,7 @@ export const resolveEmailProvider = (): EmailProviderPort | null => {
   return null;
 };
 
-/** Whether any gateway is usable. Never throws — used to gate UI affordances. */
+/** Whether any gateway is usable. Never throws, so it can gate UI affordances. */
 export const hasEmailProvider = (): boolean => {
   try {
     return resolveEmailProvider() !== null;

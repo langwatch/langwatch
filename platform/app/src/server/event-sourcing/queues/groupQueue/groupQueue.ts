@@ -56,6 +56,7 @@ import {
   PayloadTooLargeError,
   readEnvelopeDescriptor,
   readJobAttempt,
+  readJobPayloadBytes,
   readJobRoutingMeta,
   withJobAttempt,
 } from "./jobEnvelope";
@@ -924,12 +925,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     if (maxBatch > 1 && this.processBatch) {
       // Byte bound (ADR-066 pillar 2): the drain also stops before a job that
       // would push the batch past maxBytes, counting the dispatched job's own
-      // stored size as the starting point. Whichever of the count/byte bound
+      // payload size as the starting point. Whichever of the count/byte bound
       // binds first wins; an oversized dispatched job (initialBytes already at
       // or over the budget) drains no siblings and processes on its own.
+      //
+      // Payload size, not `jobDataJson.length`: an offloaded body leaves a small
+      // reference in the stored value, so measuring the value would let 256
+      // megabyte-sized records through a 4 MiB budget untouched.
       const maxBytes =
         this.coalesceMaxBytes?.(payload) ?? DEFAULT_COALESCE_MAX_BYTES;
-      const initialBytes = Buffer.byteLength(jobDataJson);
+      const initialBytes = readJobPayloadBytes(jobDataJson);
       try {
         drainedSiblings = await this.scripts.drainGroupReady({
           groupId,

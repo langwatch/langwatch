@@ -133,8 +133,8 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: {{ .Values.app.otel.serviceName | default "langwatch-app" | quote }}
 
-            - name: NEXTAUTH_URL
-              value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
+            {{/* NEXTAUTH_URL comes from langwatch.sharedEnv: every process
+                 needs the same answer for what this installation is called. */}}
             - name: NEXTAUTH_URL_INTERNAL
               value: "http://localhost:{{ .Values.app.service.port | default 5560 }}"
 

@@ -250,6 +250,39 @@ span.setAttributes({
 });
 ```
 
+## Receiving Webhooks
+
+Verify a delivery before acting on it. Pass the RAW body, before any JSON
+middleware touches it, and every secret you currently accept.
+
+```ts
+import { verifyWebhookSignature, WebhookSignatureVerificationError } from "langwatch";
+
+try {
+  verifyWebhookSignature({
+    body: rawBody, // string or Buffer, exactly as received
+    header: request.headers["x-langwatch-signature"],
+    secret: [process.env.WEBHOOK_SECRET, process.env.WEBHOOK_SECRET_PREVIOUS],
+  });
+} catch (error) {
+  if (error instanceof WebhookSignatureVerificationError) {
+    // error.code is "malformed_header", "stale_timestamp" or "invalid_signature"
+    return reply.status(400).send(error.code);
+  }
+  throw error;
+}
+```
+
+Passing both secrets is what makes a rotation free: the header carries one
+signature per valid secret, and the delivery verifies against whichever one
+you hold. Freshness defaults to a five minute window, overridable with
+`toleranceSeconds`.
+
+`WEBHOOK_DELIVERY_ID_HEADER` names the header carrying the delivery attempt
+id, which is the natural key for making your handler idempotent: retries of
+the same batch repeat it. Automation deliveries use `WEBHOOK_EVENT_ID_HEADER`
+instead, so read whichever the delivery carries.
+
 ## Testing
 
 ## Unit and Integration Testing

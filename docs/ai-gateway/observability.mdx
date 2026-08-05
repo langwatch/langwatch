@@ -34,7 +34,7 @@ Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gatew
 | `langwatch.organization_id` | Owning organisation. |
 | `langwatch.principal_id` | User or service account that made the call. |
 | `langwatch.vk_display_prefix` | First 16 chars of the VK's display form (for correlation with 401 traces where the full VK isn't known). |
-| `langwatch.gateway_request_id` | The value of the `X-LangWatch-Request-Id` response header. |
+| `langwatch.gateway_request_id` | The value of the `X-LangWatch-Gateway-Request-Id` response header. |
 | `langwatch.model` | Final resolved model name dispatched to the provider. |
 | `langwatch.provider` | Provider name (`openai`, `anthropic`, `gemini`, etc.). |
 | `langwatch.model_source` | How the model was resolved: `alias`, `explicit_slash`, `implicit`. |
@@ -55,7 +55,7 @@ Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gatew
 - `langwatch.fallback.winning_credential`, credential ID of the winning provider slot.
 - `langwatch.thread_id`, thread/conversation ID when provided via `X-LangWatch-Thread-Id` header.
 
-<Info>The following attributes are **not yet emitted** (tracked for v1.1): `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `.warnings`, `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome`, `.forced_injected`. Operators looking for these signals should use the Prometheus counters documented below. Request-id correlation via the `X-LangWatch-Request-Id` header lets operators join metric spikes back to individual traces.</Info>
+<Info>The following attributes are **not yet emitted** (tracked for v1.1): `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `.warnings`, `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome`, `.forced_injected`. Operators looking for these signals should use the Prometheus counters documented below. Request-id correlation via the `X-LangWatch-Gateway-Request-Id` header lets operators join metric spikes back to individual traces.</Info>
 
 ## Filtering in the LangWatch UI
 
@@ -159,7 +159,7 @@ The gateway itself exports all spans, sampling is applied downstream at the coll
 
 ## Debugging a single request
 
-From a log line or an error at the client, grab the `X-LangWatch-Request-Id` (`grq_01HZX9K3M…`). Paste into the LangWatch search bar and you land on the full trace: every attempt span, upstream latency, guardrail decisions, cache outcome, budget deltas. No digging through provider-side logs.
+From a log line or an error at the client, grab the `X-LangWatch-Gateway-Request-Id` (`req_c2bf5df0b8449f1d1838c4b98dd850`). Paste into the LangWatch search bar and you land on the full trace: every attempt span, upstream latency, guardrail decisions, cache outcome, budget deltas. No digging through provider-side logs.
 
 ## Trace-id propagation: concrete handshake
 
@@ -170,7 +170,7 @@ Every gateway response carries the following headers for W3C traceparent propaga
 | `X-LangWatch-Trace-Id` | 32 hex chars | Equals the incoming `traceparent` trace id when the caller supplied one; otherwise a freshly-minted trace id |
 | `X-LangWatch-Span-Id` | 16 hex chars | The gateway's own span id for this request |
 | `traceparent` | `00-<trace-id>-<span-id>-01` | W3C traceparent re-injected for downstream stitching, forward to any further hop you call |
-| `X-LangWatch-Request-Id` | `grq_<ULID>` | Gateway-scoped id; use this in support tickets |
+| `X-LangWatch-Gateway-Request-Id` | `req_<30 hex characters>` | Gateway-scoped id; use this in support tickets |
 | `X-LangWatch-Gateway-Version` | semver or git-sha | Version of the gateway pod that handled this request. Present on every response, success and error, so "which deploy returned this 500?" is answerable without access-log correlation. SDKs can also version-gate on header presence |
 
 ### Client already has a trace

@@ -79,28 +79,51 @@ function makeCtx(
   };
 }
 
+/** `onChangeSpy` mirrors the Slack suite's harness: it sees every slice the
+ *  form emits, so a test can assert on what a save would serialise. */
 function Harness({
   ctx,
   initial,
+  onChangeSpy,
 }: {
   ctx: ConfigFormCtx<WebhookPreview>;
   initial?: WebhookSlice;
+  onChangeSpy?: (next: WebhookSlice) => void;
 }) {
   const [slice, setSlice] = useState<WebhookSlice>(
     initial ?? webhookClient.initialSlice(),
   );
   const Form = webhookClient.ConfigForm;
-  return <Form slice={slice} ctx={ctx} onChange={setSlice} />;
+  return (
+    <Form
+      slice={slice}
+      ctx={ctx}
+      onChange={(next) => {
+        setSlice(next);
+        onChangeSpy?.(next);
+      }}
+    />
+  );
 }
 
 const renderForm = ({
   ctx = makeCtx(),
   initial,
+  onChangeSpy,
 }: {
   ctx?: ConfigFormCtx<WebhookPreview>;
   initial?: WebhookSlice;
+  onChangeSpy?: (next: WebhookSlice) => void;
 } = {}) =>
-  render(<Harness ctx={ctx} initial={initial} />, { wrapper: Wrapper });
+  render(<Harness ctx={ctx} initial={initial} onChangeSpy={onChangeSpy} />, {
+    wrapper: Wrapper,
+  });
+
+function savedRowWith(
+  actionParams: Partial<WebhookActionParams>,
+): SavedTriggerRow {
+  return { actionParams } as SavedTriggerRow;
+}
 
 describe("WebhookConfigForm URL validation", () => {
   afterEach(() => cleanup());
@@ -167,12 +190,6 @@ describe("WebhookConfigForm URL validation", () => {
 });
 
 describe("webhookClient kept-header sentinel round-trip", () => {
-  function savedRowWith(
-    actionParams: Partial<WebhookActionParams>,
-  ): SavedTriggerRow {
-    return { actionParams } as SavedTriggerRow;
-  }
-
   describe("given a saved trigger row with a kept header value", () => {
     it("marks the header row as kept, dropping the sentinel from its value", () => {
       const slice = webhookClient.fromTriggerRow(
@@ -245,6 +262,118 @@ describe("webhookClient kept-header sentinel round-trip", () => {
       expect(
         screen.queryByPlaceholderText("•••••• (saved)"),
       ).not.toBeInTheDocument();
+    });
+  });
+});
+
+function signingSecretInput() {
+  return screen.getByTestId("webhook-signing-secret");
+}
+
+/** A saved row whose only secret is the signing one, so the masked placeholder
+ *  it renders cannot be confused with a kept header row's. */
+const savedSignedRow = savedRowWith({
+  url: "https://example.com/hooks",
+  method: "POST",
+  headers: {},
+  bodyTemplate: null,
+  signingSecret: WEBHOOK_HEADER_VALUE_KEPT,
+});
+
+describe("webhookClient signing secret", () => {
+  afterEach(() => cleanup());
+
+  describe("given a fresh webhook draft", () => {
+    it("renders an empty masked signing secret field", () => {
+      renderForm();
+
+      expect(signingSecretInput()).toHaveValue("");
+      expect(signingSecretInput()).toHaveAttribute("type", "password");
+    });
+
+    it("resolves signingSecret to null on toActionParams, leaving deliveries unsigned", () => {
+      const params = webhookClient.toActionParams(
+        webhookClient.initialSlice(),
+      ) as WebhookActionParams;
+
+      expect(params.signingSecret).toBeNull();
+    });
+  });
+
+  describe("when the author types a signing secret", () => {
+    it("sends the typed value on toActionParams", () => {
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      fireEvent.change(signingSecretInput(), {
+        target: { value: "whsec_typed" },
+      });
+
+      expect(signingSecretInput()).toHaveValue("whsec_typed");
+      const params = webhookClient.toActionParams(
+        onChangeSpy.mock.calls.at(-1)![0],
+      ) as WebhookActionParams;
+      expect(params.signingSecret).toBe("whsec_typed");
+    });
+  });
+
+  describe("given a saved trigger row with a kept signing secret", () => {
+    it("shows a secret is stored without exposing the sentinel", () => {
+      renderForm({ initial: webhookClient.fromTriggerRow(savedSignedRow) });
+
+      expect(signingSecretInput()).toHaveValue("");
+      expect(signingSecretInput()).toHaveAttribute(
+        "placeholder",
+        "•••••• (saved)",
+      );
+      expect(
+        screen.queryByDisplayValue(WEBHOOK_HEADER_VALUE_KEPT),
+      ).not.toBeInTheDocument();
+    });
+
+    it("re-sends the kept sentinel on toActionParams without further edits", () => {
+      const params = webhookClient.toActionParams(
+        webhookClient.fromTriggerRow(savedSignedRow),
+      ) as WebhookActionParams;
+
+      expect(params.signingSecret).toBe(WEBHOOK_HEADER_VALUE_KEPT);
+    });
+  });
+
+  describe("when the author removes a stored signing secret", () => {
+    it("sends null on toActionParams so deliveries go unsigned again", () => {
+      const onChangeSpy = vi.fn();
+      renderForm({
+        initial: webhookClient.fromTriggerRow(savedSignedRow),
+        onChangeSpy,
+      });
+
+      fireEvent.click(screen.getByLabelText("Remove signing secret"));
+
+      const params = webhookClient.toActionParams(
+        onChangeSpy.mock.calls.at(-1)![0],
+      ) as WebhookActionParams;
+      expect(params.signingSecret).toBeNull();
+      expect(
+        screen.queryByLabelText("Remove signing secret"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the author clears a typed signing secret", () => {
+    it("sends null on toActionParams so deliveries go unsigned again", () => {
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      fireEvent.change(signingSecretInput(), {
+        target: { value: "whsec_typed" },
+      });
+      fireEvent.change(signingSecretInput(), { target: { value: "" } });
+
+      const params = webhookClient.toActionParams(
+        onChangeSpy.mock.calls.at(-1)![0],
+      ) as WebhookActionParams;
+      expect(params.signingSecret).toBeNull();
     });
   });
 });

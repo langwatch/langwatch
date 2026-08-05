@@ -70,7 +70,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 The response is OpenAI-shaped. Response headers tell you what happened inside the gateway:
 
 ```
-X-LangWatch-Request-Id: grq_01HZX9K3M…
+X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
 X-LangWatch-Provider: openai
 X-LangWatch-Model: gpt-5-mini
 X-LangWatch-Cache: miss
@@ -166,3 +166,5 @@ See [Budgets](/ai-gateway/budgets) for full scoping details.
 - [Fallback chains](/ai-gateway/providers/fallback-chains): survive provider outages with no code change.
 - [Caching passthrough](/ai-gateway/caching-passthrough): the load-bearing rule for keeping your 90% Anthropic cache discount.
 - [CLI Integrations](/ai-gateway/cli/overview): ship the gateway to every developer's Claude Code, Codex, Cursor.
+- [Budgets](/ai-gateway/budgets): cap spend per organization, team, project, key, person, or end user.
+- [Billing and spend events](/ai-gateway/billing-events): the per-request record, for reconciliation and rebilling.

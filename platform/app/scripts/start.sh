@@ -83,18 +83,26 @@ if [[ "$NODE_ENV" = "development" ]]; then
   echo "  ✓ gateway: port=${GATEWAY_PORT_DERIVED} cp=${GATEWAY_CONTROL_PLANE_URL:-(unset, using LW_GATEWAY_BASE_URL)} public=${LW_GATEWAY_PUBLIC_URL}"
 fi
 
-# DOTENV_CONFIG_QUIET silences dotenv v17's promotional "injected env" banner
-# for lanes that load it via `import "dotenv/config"` (e.g. workers.ts, which
-# must keep that side-effect import first). server.mts / vite.config.ts pass
-# `quiet: true` explicitly.
-RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true DOTENV_CONFIG_QUIET=true"
+RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
+
+# Unset NODE_ENV means production. Export it — rather than prefixing it onto
+# individual lane commands — so every child observes the same value, including
+# `start:prepare:db` below, which runs outside RUNTIME_ENV.
 if [ -z "$NODE_ENV" ]; then
-  RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"
+  export NODE_ENV=production
 fi
 
 # `-s` silences pnpm's own `> pkg@ver script` lifecycle banner so each lane's
 # output starts with real logs, not the script header. Child stdout is untouched.
-START_APP_COMMAND="pnpm -s run start:app"
+#
+# Dev runs the app from source via tsx (hot reload); production runs the
+# pre-built bundle on plain node (start:app -> node dist/server/server.cjs), so
+# the prod image ships no tsx. Same split for the standalone workers lane below.
+if [[ "$NODE_ENV" = "development" ]]; then
+  START_APP_COMMAND="pnpm -s run start:app:dev"
+else
+  START_APP_COMMAND="pnpm -s run start:app"
+fi
 
 # Dev-only single-process mode: WORKERS_IN_PROCESS=1 hosts the worker stack
 # inside `start:app` (the app boots with the "all" role) instead of a separate
@@ -106,7 +114,15 @@ if [[ "$NODE_ENV" = "development" && ( "$WORKERS_IN_PROCESS" = "true" || "$WORKE
   export WORKERS_IN_PROCESS
   echo "  ✓ workers: in-process (WORKERS_IN_PROCESS=1) — no separate worker lane"
 elif [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
-  START_WORKERS_COMMAND="pnpm -s run start:workers && exit 1"
+  # Standalone workers lane (dev uses it via concurrently; prod normally runs
+  # workers as a separate deployment). Pick the entry point the same way as the
+  # app: tsx only for an explicit development env, the bundle otherwise — the
+  # prod image has no tsx, so START_WORKERS=1 there must not select it.
+  if [[ "$NODE_ENV" = "development" ]]; then
+    START_WORKERS_COMMAND="pnpm -s run start:workers:dev && exit 1"
+  else
+    START_WORKERS_COMMAND="pnpm -s run start:workers && exit 1"
+  fi
 fi
 
 # In development, Vite runs on PORT (default 5560) and proxies /api/* to PORT+1000.

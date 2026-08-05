@@ -20,7 +20,10 @@ import {
 } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
-import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
+import {
+  decryptWebhookHeaders,
+  decryptWebhookSigningSecrets,
+} from "~/server/app-layer/automations/providers/webhook/server";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -88,6 +91,11 @@ interface ActionParams {
   headersEncrypted?: string;
   headers?: Record<string, string>;
   bodyTemplate?: string | null;
+  /** Optional HMAC signing (ADR-040 §3), stored the same way as the header
+   *  values. Absent means the delivery goes out unsigned. */
+  signingSecretEncrypted?: string;
+  previousSigningSecretEncrypted?: string;
+  previousSigningSecretExpiresAt?: number;
 }
 
 /**
@@ -573,6 +581,7 @@ async function dispatchNotifyDigest({
         url: params.url,
         method: params.method,
         headers: decryptWebhookHeaders(params),
+        signingSecrets: decryptWebhookSigningSecrets(params),
         body: rendered.body,
         triggerName: trigger.name,
       });

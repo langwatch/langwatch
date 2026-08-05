@@ -3,6 +3,7 @@ import {
   type WebhookActionParams,
 } from "@langwatch/automations/providers/webhook";
 import { TriggerAction } from "@prisma/client";
+import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { InvalidActionParamsError } from "../../errors";
 import type { PersistActionParamsArgs, ServerDef } from "../types";
@@ -19,13 +20,51 @@ import type { PersistActionParamsArgs, ServerDef } from "../types";
  */
 
 /** The shape webhook actionParams take AT REST: the plaintext `headers`
- *  record is replaced by one ciphertext blob. */
-export type WebhookStoredActionParams = Omit<WebhookActionParams, "headers"> & {
+ *  record and the signing secret are replaced by ciphertext blobs. */
+export type WebhookStoredActionParams = Omit<
+  WebhookActionParams,
+  "headers" | "signingSecret"
+> & {
   headersEncrypted?: string;
   /** Legacy plain record — only ever present on rows saved before encryption
    *  landed; superseded by `headersEncrypted` on the next save. */
   headers?: Record<string, string>;
+  signingSecretEncrypted?: string;
+  /** The secret this one replaced, still signing until it expires, so a
+   *  receiver can swap on its own schedule instead of dropping deliveries
+   *  during the swap. */
+  previousSigningSecretEncrypted?: string;
+  /** Epoch ms. actionParams is JSON, so a Date would not survive the round
+   *  trip. */
+  previousSigningSecretExpiresAt?: number;
 };
+
+/**
+ * The secrets a dispatch signs with, newest first: the current one, plus the
+ * one it replaced while that is still inside its window. Empty when the
+ * trigger has no secret, which is the default and means unsigned.
+ */
+export function decryptWebhookSigningSecrets(
+  params: Pick<
+    WebhookStoredActionParams,
+    | "signingSecretEncrypted"
+    | "previousSigningSecretEncrypted"
+    | "previousSigningSecretExpiresAt"
+  >,
+  now: Date = new Date(),
+): string[] {
+  if (!params.signingSecretEncrypted) return [];
+  const previousIsValid =
+    params.previousSigningSecretEncrypted !== undefined &&
+    params.previousSigningSecretExpiresAt !== undefined &&
+    params.previousSigningSecretExpiresAt > now.getTime();
+  return [
+    decrypt(params.signingSecretEncrypted),
+    ...(previousIsValid
+      ? [decrypt(params.previousSigningSecretEncrypted as string)]
+      : []),
+  ];
+}
 
 /** Decrypt the stored header record for a dispatch or test fire. Empty when
  *  none are configured. Falls back to a legacy plaintext record if present. */
@@ -72,12 +111,70 @@ export function persistWebhookActionParams({
     }
     resolved[name] = value;
   }
-  const { headers: _drop, ...rest } = incoming;
+  const { headers: _drop, signingSecret: _dropSecret, ...rest } = incoming;
   return {
     ...rest,
     ...(Object.keys(resolved).length > 0
       ? { headersEncrypted: encrypt(JSON.stringify(resolved)) }
       : {}),
+    ...persistSigningSecret({ incoming, existing }),
+  };
+}
+
+/** The stored rotation window, carried forward untouched. */
+function keepRotationWindow(
+  existing?: WebhookStoredActionParams | null,
+): Partial<WebhookStoredActionParams> {
+  if (!existing?.previousSigningSecretEncrypted) return {};
+  return {
+    previousSigningSecretEncrypted: existing.previousSigningSecretEncrypted,
+    previousSigningSecretExpiresAt: existing.previousSigningSecretExpiresAt,
+  };
+}
+
+/** Everything about the stored secret, left exactly as it is. */
+function keepStoredSigningSecret(
+  existing?: WebhookStoredActionParams | null,
+): Partial<WebhookStoredActionParams> {
+  if (!existing?.signingSecretEncrypted) return {};
+  return {
+    signingSecretEncrypted: existing.signingSecretEncrypted,
+    ...keepRotationWindow(existing),
+  };
+}
+
+/**
+ * The signing-secret half of a save.
+ *
+ * The kept sentinel leaves the stored secret and any rotation window exactly
+ * as they are. An empty value clears signing, dropping the previous secret
+ * with it: an author turning signing off does not want the old secret to keep
+ * signing anything. A new value rotates, keeping the one it replaced valid for
+ * the same window the endpoints platform uses, so the author can paste the new
+ * secret here and deploy it to their receiver afterwards rather than in the
+ * same instant.
+ */
+function persistSigningSecret({
+  incoming,
+  existing,
+}: {
+  incoming: WebhookActionParams;
+  existing?: WebhookStoredActionParams | null;
+}): Partial<WebhookStoredActionParams> {
+  const submitted = incoming.signingSecret;
+  if (submitted === WEBHOOK_HEADER_VALUE_KEPT) {
+    return keepStoredSigningSecret(existing);
+  }
+  if (!submitted) return {};
+  const current = existing?.signingSecretEncrypted
+    ? decrypt(existing.signingSecretEncrypted)
+    : null;
+  if (current === submitted) return keepStoredSigningSecret(existing);
+  if (!current) return { signingSecretEncrypted: encrypt(submitted) };
+  return {
+    signingSecretEncrypted: encrypt(submitted),
+    previousSigningSecretEncrypted: existing?.signingSecretEncrypted,
+    previousSigningSecretExpiresAt: Date.now() + WEBHOOK_PREVIOUS_SECRET_TTL_MS,
   };
 }
 
@@ -87,12 +184,20 @@ export function redactWebhookActionParams(
   params: WebhookStoredActionParams,
 ): WebhookActionParams {
   const names = Object.keys(decryptWebhookHeaders(params));
-  const { headersEncrypted: _drop, headers: _dropLegacy, ...rest } = params;
+  const {
+    headersEncrypted: _drop,
+    headers: _dropLegacy,
+    signingSecretEncrypted,
+    previousSigningSecretEncrypted: _dropPrevious,
+    previousSigningSecretExpiresAt: _dropPreviousExpiry,
+    ...rest
+  } = params;
   return {
     ...rest,
     headers: Object.fromEntries(
       names.map((name) => [name, WEBHOOK_HEADER_VALUE_KEPT]),
     ),
+    signingSecret: signingSecretEncrypted ? WEBHOOK_HEADER_VALUE_KEPT : null,
   } as WebhookActionParams;
 }
 
@@ -103,10 +208,12 @@ const def: ServerDef = {
     loadExisting,
   }: PersistActionParamsArgs) => {
     const params = incoming as WebhookActionParams;
-    const hasKept = Object.values(params.headers ?? {}).includes(
-      WEBHOOK_HEADER_VALUE_KEPT,
-    );
-    const existing = hasKept
+    // The stored row is needed to resolve a kept header value, and equally to
+    // resolve a kept signing secret or to rotate the one it replaces.
+    const needsExisting =
+      Object.values(params.headers ?? {}).includes(WEBHOOK_HEADER_VALUE_KEPT) ||
+      (params.signingSecret ?? null) !== null;
+    const existing = needsExisting
       ? ((await loadExisting()) as WebhookStoredActionParams | undefined)
       : undefined;
     return persistWebhookActionParams({ incoming: params, existing });

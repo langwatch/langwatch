@@ -810,6 +810,202 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all non-archived teams for the organization (paginated) */
+        get: operations["getApiTeams"];
+        put?: never;
+        /** @description Create a new team that can group projects and members */
+        post: operations["postApiTeams"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a team by its id */
+        get: operations["getApiTeamsById"];
+        put?: never;
+        post?: never;
+        /** @description Archive a team (soft-delete) */
+        delete: operations["deleteApiTeamsById"];
+        options?: never;
+        head?: never;
+        /** @description Update a team by its id */
+        patch: operations["patchApiTeamsById"];
+        trace?: never;
+    };
+    "/api/teams/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a team */
+        get: operations["getApiTeamsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a team */
+        post: operations["postApiTeamsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a team */
+        delete: operations["deleteApiTeamsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List projects in a team */
+        get: operations["getApiTeamsByIdProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all groups for the organization */
+        get: operations["getApiGroups"];
+        put?: never;
+        /** @description Create a new group */
+        post: operations["postApiGroups"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a group with members and bindings */
+        get: operations["getApiGroupsById"];
+        put?: never;
+        post?: never;
+        /** @description Delete a group */
+        delete: operations["deleteApiGroupsById"];
+        options?: never;
+        head?: never;
+        /** @description Rename a group */
+        patch: operations["patchApiGroupsById"];
+        trace?: never;
+    };
+    "/api/groups/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a group */
+        get: operations["getApiGroupsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a group */
+        post: operations["postApiGroupsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a group */
+        delete: operations["deleteApiGroupsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List role bindings for a group */
+        get: operations["getApiGroupsByIdBindings"];
+        put?: never;
+        /** @description Add a role binding to a group */
+        post: operations["postApiGroupsByIdBindings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings/{bindingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a role binding from a group */
+        delete: operations["deleteApiGroupsByIdBindingsByBindingId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents": {
         parameters: {
             query?: never;
@@ -1212,7 +1408,7 @@ export interface paths {
         put?: never;
         /**
          * Create virtual key
-         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
         post: operations["postApiGatewayV1Virtual-keys"];
         delete?: never;
@@ -1237,7 +1433,7 @@ export interface paths {
         head?: never;
         /**
          * Update virtual key
-         * @description Partial update — send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
+         * @description Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
          */
         patch: operations["patchApiGatewayV1Virtual-keysById"];
         trace?: never;
@@ -1251,7 +1447,7 @@ export interface paths {
         };
         /**
          * Read a virtual key's spend
-         * @description Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
+         * @description Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
          */
         get: operations["getApiGatewayV1Virtual-keysByIdSpend"];
         put?: never;
@@ -1375,13 +1571,13 @@ export interface paths {
         };
         /**
          * List budgets
-         * @description Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.
+         * @description Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and `spent_nano_usd` are null because one allowance per person has no single total to report; each person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means spend could not be totalled at all, and both fields are null for that reason instead, rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.
          */
         get: operations["getApiGatewayV1Budgets"];
         put?: never;
         /**
          * Create budget
-         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.
+         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a retry safe.
          */
         post: operations["postApiGatewayV1Budgets"];
         delete?: never;
@@ -1399,21 +1595,21 @@ export interface paths {
         };
         /**
          * Get budget
-         * @description One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend.
+         * @description One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend. A per-person template reports null there too, because one allowance per person has no single total; each person's figure is in `GET /spend-summaries` and the seat buckets.
          */
         get: operations["getApiGatewayV1BudgetsById"];
         put?: never;
         post?: never;
         /**
          * Archive budget
-         * @description Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.
+         * @description Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.
          */
         delete: operations["deleteApiGatewayV1BudgetsById"];
         options?: never;
         head?: never;
         /**
          * Update budget
-         * @description Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.
+         * @description Partial update. Scope, window and cycle_anchor_at are immutable after create. Use explicit null to clear timezone / description.
          */
         patch: operations["patchApiGatewayV1BudgetsById"];
         trace?: never;
@@ -1477,7 +1673,7 @@ export interface paths {
         put?: never;
         /**
          * Create a cache rule
-         * @description Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.
+         * @description Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll. Send `Idempotency-Key` to make a retry safe.
          */
         post: operations["postApiGatewayV1Cache-rules"];
         delete?: never;
@@ -1502,7 +1698,7 @@ export interface paths {
         post?: never;
         /**
          * Archive a cache rule
-         * @description Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.
+         * @description Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.
          */
         delete: operations["deleteApiGatewayV1Cache-rulesById"];
         options?: never;
@@ -2268,10 +2464,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List the organization's webhook endpoints */
+        /**
+         * List webhook endpoints
+         * @description List the organization's webhook endpoints
+         */
         get: operations["getApiWebhooksV1Endpoints"];
         put?: never;
-        /** @description Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. */
+        /**
+         * Create a webhook endpoint
+         * @description Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         */
         post: operations["postApiWebhooksV1Endpoints"];
         delete?: never;
         options?: never;
@@ -2286,15 +2488,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Get one webhook endpoint */
+        /**
+         * Get a webhook endpoint
+         * @description Get one webhook endpoint
+         */
         get: operations["getApiWebhooksV1EndpointsById"];
         put?: never;
         post?: never;
-        /** @description Archive a webhook endpoint */
+        /**
+         * Archive a webhook endpoint
+         * @description Archive a webhook endpoint
+         */
         delete: operations["deleteApiWebhooksV1EndpointsById"];
         options?: never;
         head?: never;
-        /** @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it) */
+        /**
+         * Update a webhook endpoint
+         * @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)
+         */
         patch: operations["patchApiWebhooksV1EndpointsById"];
         trace?: never;
     };
@@ -2307,7 +2518,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately. */
+        /**
+         * Roll an endpoint's signing secret
+         * @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.
+         */
         post: operations["postApiWebhooksV1EndpointsByIdRoll-secret"];
         delete?: never;
         options?: never;
@@ -2324,7 +2538,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code. */
+        /**
+         * Send a test event to an endpoint
+         * @description Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.
+         */
         post: operations["postApiWebhooksV1EndpointsByIdTest"];
         delete?: never;
         options?: never;
@@ -2339,7 +2556,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error */
+        /**
+         * List an endpoint's delivery attempts
+         * @description The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
+         */
         get: operations["getApiWebhooksV1EndpointsByIdDeliveries"];
         put?: never;
         post?: never;
@@ -2356,7 +2576,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour. */
+        /**
+         * Read an endpoint's delivery health
+         * @description Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.
+         */
         get: operations["getApiWebhooksV1EndpointsByIdHealth"];
         put?: never;
         post?: never;
@@ -2373,7 +2596,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet */
+        /**
+         * List subscribable event types
+         * @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet
+         */
         get: operations["getApiWebhooksV1Event-types"];
         put?: never;
         post?: never;
@@ -2390,7 +2616,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly. */
+        /**
+         * List emitted events
+         * @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.
+         */
         get: operations["getApiWebhooksV1Events"];
         put?: never;
         post?: never;
@@ -2407,7 +2636,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids. */
+        /**
+         * Get one emitted event
+         * @description One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.
+         */
         get: operations["getApiWebhooksV1EventsById"];
         put?: never;
         post?: never;
@@ -2424,7 +2656,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. */
+        /**
+         * List spend summaries
+         * @description Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.
+         */
         get: operations["getApiGatewayV1Spend-summaries"];
         put?: never;
         post?: never;
@@ -2441,7 +2676,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill. */
+        /**
+         * List spend events
+         * @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill.
+         */
         get: operations["getApiGatewayV1Spend-events"];
         put?: never;
         post?: never;
@@ -2458,7 +2696,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then. */
+        /**
+         * Read one end user's spend
+         * @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then.
+         */
         get: operations["getApiGatewayV1End-usersByIdSpend"];
         put?: never;
         post?: never;
@@ -2477,7 +2718,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing. */
+        /**
+         * Replay spend events to an endpoint
+         * @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.
+         */
         post: operations["postApiGatewayV1Spend-eventsReplay"];
         delete?: never;
         options?: never;
@@ -3798,6 +4042,308 @@ export interface operations {
                 };
             };
         };
+    };
+    getApiTeams: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiTeamsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiTeamsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    userId: string;
+                    /**
+                     * @default MEMBER
+                     * @enum {string}
+                     */
+                    role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiTeamsByIdMembersByUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiTeamsByIdProjects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiGroups: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    bindings?: {
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId?: string;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                    memberIds?: string[];
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiGroupsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroupsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    userId: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiGroupsByIdMembersByUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiGroupsByIdBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroupsByIdBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                    /** @enum {string} */
+                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                    scopeId: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiGroupsByIdBindingsByBindingId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                bindingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
     };
     getApiAgents: {
         parameters: {
@@ -5521,7 +6067,10 @@ export interface operations {
     "postApiGatewayV1Virtual-keys": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key. */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5639,6 +6188,8 @@ export interface operations {
             /** @description Virtual key created */
             201: {
                 headers: {
+                    /** @description Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key. */
+                    "X-Idempotent-Replay"?: "true";
                     [name: string]: unknown;
                 };
                 content: {
@@ -5720,6 +6271,26 @@ export interface operations {
             };
             /** @description Caller lacks virtualKeys:manage at a requested scope */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7121,8 +7692,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7221,7 +7796,10 @@ export interface operations {
     postApiGatewayV1Budgets: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key. */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -7271,6 +7849,11 @@ export interface operations {
                     metadata?: {
                         [key: string]: string;
                     };
+                    /**
+                     * Format: date-time
+                     * @description Phases the budget's cycle off this instant instead of the calendar, so a `month` budget anchored 2026-01-17T09:00:00Z starts a fresh period every 17th at 09:00 UTC. Omit for calendar alignment, which is the default and unchanged behaviour. A month cycle anchored past the 28th clamps into shorter months and springs back: anchored on the 31st gives Feb 28, then Mar 31. Immutable after create, since moving it would redraw periods the budget has already reported and enforced on. Rejected with `gateway_budget_cycle_anchor_invalid` on `total` and `manual`, which do not cycle.
+                     */
+                    cycle_anchor_at?: string;
                 };
             };
         };
@@ -7278,6 +7861,8 @@ export interface operations {
             /** @description Budget created */
             201: {
                 headers: {
+                    /** @description Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key. */
+                    "X-Idempotent-Replay"?: "true";
                     [name: string]: unknown;
                 };
                 content: {
@@ -7308,8 +7893,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7362,6 +7951,26 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7446,8 +8055,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7605,8 +8218,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7758,8 +8375,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7905,8 +8526,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -8356,7 +8981,10 @@ export interface operations {
     "postApiGatewayV1Cache-rules": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key. */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -8390,6 +9018,8 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    /** @description Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key. */
+                    "X-Idempotent-Replay"?: "true";
                     [name: string]: unknown;
                 };
                 content: {
@@ -8461,6 +9091,26 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -16874,7 +17524,10 @@ export interface operations {
     postApiWebhooksV1Endpoints: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key. */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -16893,6 +17546,8 @@ export interface operations {
             /** @description The endpoint, with the signing secret this body alone carries */
             201: {
                 headers: {
+                    /** @description Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key. */
+                    "X-Idempotent-Replay"?: "true";
                     [name: string]: unknown;
                 };
                 content: {
@@ -16960,6 +17615,26 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
