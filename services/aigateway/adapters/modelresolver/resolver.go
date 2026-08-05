@@ -9,6 +9,19 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
+// missingModelMessage is what a caller sees when the request body carries no
+// model. It names the field AND the surfaces that require it, because the
+// operator reading it is looking at their own client code rather than at ours:
+// "missing model field" told them a field was missing without saying which
+// field, in which body, on which endpoint, so a client stuck in a retry loop
+// had nothing to correct. Resolution runs before the request is labeled with a
+// model, so a rejected request records model="unknown" on the request counter
+// and the message is the only thing that can carry the detail.
+const missingModelMessage = `the request body has no top-level "model" field. ` +
+	`Every completion endpoint (POST /v1/chat/completions, POST /v1/messages, ` +
+	`POST /v1/responses) requires "model" as a top-level JSON string naming the ` +
+	`model or the virtual key's alias for it, for example {"model": "claude-sonnet-4-5", ...}`
+
 // Resolver resolves model strings using aliases, provider prefixes, and allowlists.
 type Resolver struct{}
 
@@ -18,7 +31,13 @@ func New() *Resolver { return &Resolver{} }
 // Resolve applies alias resolution → provider/model parsing → allowlist checking.
 func (r *Resolver) Resolve(ctx context.Context, rawModel string, config domain.BundleConfig) (*domain.ResolvedModel, error) {
 	if rawModel == "" {
-		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"message": "missing model field"})
+		// Fault is stated rather than inferred, the same way
+		// errProviderNotAllowed states it: a malformed body is the caller's
+		// to fix, and an unannotated rejection reads as a platform problem.
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"message": missingModelMessage,
+			"fault":   "customer",
+		})
 	}
 
 	target := rawModel

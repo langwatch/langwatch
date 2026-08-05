@@ -114,6 +114,7 @@ type Recorder struct {
 	internalRTT    *prometheus.HistogramVec
 	controlPlane   *prometheus.CounterVec
 	rateLimits     *prometheus.CounterVec
+	clientRejects  *prometheus.CounterVec
 
 	draining      gaugeSource
 	authCacheSize gaugeSource
@@ -235,6 +236,11 @@ func New() *Recorder {
 		Help: "Requests denied by a gateway rate limit, by the dimension that tripped (rpm, rpd) and the virtual key.",
 	}, []string{"dimension", "vk_id"})
 
+	r.clientRejects = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_client_rejects_total",
+		Help: "Requests rejected as the caller's fault, by gateway error code and virtual key. gateway_http_requests_total cannot answer this: a request rejected before model resolution is counted with model=unknown and carries no caller identity at all, so one client looping on a malformed body is invisible per tenant. Deliberately carries no project or model label; see the package comment on cardinality.",
+	}, []string{"code", "vk_id"})
+
 	r.register(
 		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Name: "gateway_draining",
@@ -265,6 +271,7 @@ func New() *Recorder {
 		r.authHits, r.authMisses, r.authLookups,
 		r.budgetBlocks, r.cacheHits, r.cacheRuleHits,
 		r.guardrails, r.internalRTT, r.controlPlane, r.rateLimits,
+		r.clientRejects,
 	)
 	return r
 }
@@ -564,6 +571,24 @@ func (r *Recorder) RecordRateLimitDenied(dimension, vkID string) {
 		return
 	}
 	r.rateLimits.WithLabelValues(orUnknown(dimension), orUnknown(vkID)).Inc()
+}
+
+// RecordClientReject counts a request the gateway rejected as the caller's
+// fault, keyed by the error code and the virtual key that sent it.
+//
+// The label set is the whole point, so it is worth being explicit about what
+// is NOT here. Project and model are both omitted: project is redundant with
+// the key (a virtual key belongs to exactly one project, and the log line
+// already carries both), and model is caller-controlled on a key that permits
+// arbitrary names, which is the same unbounded-label trap modelLabel exists to
+// cap. Code is a closed enum of the gateway's own codes, and vk_id is minted
+// by the control plane and bounded by the keys a deployment has issued, which
+// is the pairing gateway_rate_limit_denied_total already uses.
+func (r *Recorder) RecordClientReject(code, vkID string) {
+	if r == nil {
+		return
+	}
+	r.clientRejects.WithLabelValues(orUnknown(code), orUnknown(vkID)).Inc()
 }
 
 // StreamOpened marks a streaming response as open.

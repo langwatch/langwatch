@@ -48,3 +48,31 @@ Feature: Gateway errors are logged with fault attribution
     Given an authenticated request fails
     When the failure is logged
     Then the log carries the project, organization and virtual key identifiers
+
+  # Logging customer faults at info is right, and it is also why they cannot be
+  # alerted on: one client looping on a body the gateway rejects can produce
+  # six figures of rejections in a week without moving anything an operator
+  # watches. gateway_http_requests_total cannot answer "who", either — a
+  # request rejected before model resolution is counted with model=unknown and
+  # no caller identity at all.
+  @unit
+  Scenario: A customer-fault rejection is counted against the key that sent it
+    Given an authenticated request is rejected as the caller's fault
+    When the error response is written
+    Then the rejection is counted against its error code and virtual key
+    And the count carries no project or model label, because those are
+      redundant with the key and caller-controlled respectively
+
+  @unit
+  Scenario: A provider or platform failure is not counted as a client rejection
+    Given a request fails upstream or through a gateway bug
+    When the error response is written
+    Then the client-rejection counter does not move
+    Because it exists to name a misbehaving client, not to double-count outages
+
+  @unit
+  Scenario: A rejection on an unmetered path is still written
+    Given a request that never passed through the metrics middleware fails
+    When the error response is written
+    Then the response and the log are unaffected
+    And nothing panics for want of a recorder

@@ -151,8 +151,8 @@ Feature: Gateway service — public HTTP surface and operational basics
     # user is signed in with an OpenAI account. Every stage past the transport
     # (model peek, stream detection, guardrails, the provider adapters) reads
     # JSON, so the compressed bytes have to be decoded at the edge. Reading
-    # them raw finds no top-level `model` and fails the turn with a 400
-    # "missing model field" before any provider is contacted.
+    # them raw finds no top-level `model` and fails the turn with a 400 for a
+    # missing model field before any provider is contacted.
 
     @integration
     Scenario Outline: a compressed body is decoded on every dispatch lane
@@ -217,6 +217,27 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then the response status is 413
       And error.type equals "payload_too_large"
       And no provider dispatch occurs
+
+  Rule: A request with no model says which field is missing and where
+
+    # This is the gateway's largest single source of 400s, and for five days it
+    # was one virtual key posting bodies with no top-level `model` round the
+    # clock, retrying against a rejection that read, in full, "missing model
+    # field". That names no field, no body and no endpoint, so the operator on
+    # the other end had nothing to correct and the loop never stopped. The
+    # message is the only place the detail can go: resolution runs before the
+    # request is labeled with a model, so the counter records model="unknown".
+    #
+    # Bindings: services/aigateway/adapters/modelresolver/resolver_test.go
+
+    @unit
+    Scenario: a body with no model is rejected with a message the client can act on
+      Given a valid VK
+      When a request arrives with no top-level "model" field
+      Then the rejection names the field, its type and where it belongs
+      And it names the endpoints that require it
+      And it shows what a correct body looks like
+      And the failure is attributed to the caller rather than to the platform
 
   Rule: Graceful SIGTERM drain (iter 24, `ea167ca`)
 

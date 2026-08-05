@@ -128,6 +128,43 @@ func TestResolve_EmptyModel(t *testing.T) {
 	assert.True(t, herr.IsCode(err, domain.ErrBadRequest))
 }
 
+// @scenario "a body with no model is rejected with a message the client can act on"
+func TestResolve_EmptyModelMessageIsActionable(t *testing.T) {
+	r := New()
+
+	_, err := r.Resolve(context.Background(), "", domain.BundleConfig{})
+	require.Error(t, err)
+
+	var e herr.E
+	require.ErrorAs(t, err, &e)
+	message, _ := e.Meta["message"].(string)
+
+	// Each substring is a question the old "missing model field" left the
+	// client operator to guess at. The assertions are on the substance rather
+	// than on the sentence, so the copy can be rewritten without a test edit,
+	// but it cannot quietly lose a piece.
+	tests := []struct {
+		name    string
+		mustSay string
+	}{
+		{"names the field", `"model"`},
+		{"says the field is top level", "top-level"},
+		{"says it belongs in the request body", "request body"},
+		{"names the chat completions surface", "/v1/chat/completions"},
+		{"names the messages surface", "/v1/messages"},
+		{"names the responses surface", "/v1/responses"},
+		{"gives a worked example", `{"model": "claude-sonnet-4-5"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Contains(t, message, tt.mustSay)
+		})
+	}
+
+	assert.Equal(t, "customer", e.Meta["fault"],
+		"a malformed body is the caller's to fix; an unannotated rejection reads as a platform problem")
+}
+
 func TestResolve_EmptyAllowlist_AllowsAll(t *testing.T) {
 	r := New()
 	cfg := domain.BundleConfig{

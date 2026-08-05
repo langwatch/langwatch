@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -84,14 +85,25 @@ func logRequestError(logger *zap.Logger, ctx context.Context, fault Fault, code 
 	if status > 0 {
 		fields = append(fields, zap.Int("status", status))
 	}
+	virtualKeyID := ""
 	if bundle := BundleFromContext(ctx); bundle != nil {
+		virtualKeyID = bundle.VirtualKeyID
 		fields = append(fields,
 			zap.String("project_id", bundle.ProjectID),
 			zap.String("organization_id", bundle.OrganizationID),
-			zap.String("virtual_key_id", bundle.VirtualKeyID),
+			zap.String("virtual_key_id", virtualKeyID),
 		)
 	}
 	logger.Log(fault.level(), "gateway_request_failed", fields...)
+
+	// Customer faults log at info, which is the right severity and also the
+	// reason they cannot be alerted on: a single key can produce six figures
+	// of rejections in a week without moving anything an operator watches.
+	// Count them here, at the one point that has already decided whose fault
+	// the failure is, so the counter can never drift from the log line.
+	if fault == FaultCustomer {
+		gatewaymetrics.RecorderFromContext(ctx).RecordClientReject(code, virtualKeyID)
+	}
 }
 
 // logWriteError classifies err and logs it; the single logging choke point
