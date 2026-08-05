@@ -121,7 +121,10 @@ describe("withStatementLimit", () => {
       it("holds its slot for the whole statement, not per attempt", async () => {
         let attempts = 0;
         let statementsStarted = 0;
-        let releaseAttempt: (() => void) | null = null;
+        // A queue rather than a single slot: TypeScript narrows a `let` that
+        // is only ever assigned inside a closure back to its initialiser at
+        // the call site, so the obvious shape does not type-check.
+        const releases: Array<() => void> = [];
 
         // Stands in for the resilient client: the FIRST statement retries
         // inside one call, every later one answers at once. Only the first
@@ -134,7 +137,7 @@ describe("withStatementLimit", () => {
             for (let attempt = 0; attempt < 3; attempt += 1) {
               attempts += 1;
               await new Promise<void>((resolve) => {
-                releaseAttempt = resolve;
+                releases.push(resolve);
               });
             }
             return { ok: true };
@@ -156,7 +159,7 @@ describe("withStatementLimit", () => {
         for (let attempt = 1; attempt <= 3; attempt += 1) {
           expect(attempts).toBe(attempt);
           expect(statementsStarted).toBe(1);
-          releaseAttempt?.();
+          releases.shift()?.();
           await settleMicrotasks();
         }
 
