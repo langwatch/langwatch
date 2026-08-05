@@ -539,13 +539,10 @@
         "supported": true,
         "parameterName": "reasoning_effort",
         "allowedValues": [
-          "none",
-          "low",
-          "medium",
           "high"
         ],
-        "defaultValue": "none",
-        "canDisable": true,
+        "defaultValue": "high",
+        "canDisable": false,
         "toolsIncompatibleOn": [
           "chat_completions"
         ]
@@ -645,13 +642,10 @@
         "supported": true,
         "parameterName": "reasoning_effort",
         "allowedValues": [
-          "none",
-          "low",
-          "medium",
           "high"
         ],
-        "defaultValue": "none",
-        "canDisable": true,
+        "defaultValue": "high",
+        "canDisable": false,
         "toolsIncompatibleOn": [
           "chat_completions"
         ]
@@ -751,13 +745,10 @@
         "supported": true,
         "parameterName": "reasoning_effort",
         "allowedValues": [
-          "none",
-          "low",
-          "medium",
           "high"
         ],
-        "defaultValue": "none",
-        "canDisable": true,
+        "defaultValue": "high",
+        "canDisable": false,
         "toolsIncompatibleOn": [
           "chat_completions"
         ]

@@ -20,7 +20,7 @@ var reasoningToolConflicts = map[string]reasoningToolConflict{
 	},
 	"openai/gpt-5.6-luna-pro": {
 		conflictEndpoints: []string{"chat_completions"},
-		canDisable:        true,
+		canDisable:        false,
 	},
 	"openai/gpt-5.6-sol": {
 		conflictEndpoints: []string{"chat_completions"},
@@ -28,7 +28,7 @@ var reasoningToolConflicts = map[string]reasoningToolConflict{
 	},
 	"openai/gpt-5.6-sol-pro": {
 		conflictEndpoints: []string{"chat_completions"},
-		canDisable:        true,
+		canDisable:        false,
 	},
 	"openai/gpt-5.6-terra": {
 		conflictEndpoints: []string{"chat_completions"},
@@ -36,6 +36,6 @@ var reasoningToolConflicts = map[string]reasoningToolConflict{
 	},
 	"openai/gpt-5.6-terra-pro": {
 		conflictEndpoints: []string{"chat_completions"},
-		canDisable:        true,
+		canDisable:        false,
 	},
 }

@@ -46,11 +46,42 @@ func TestEnforceReasoningToolCompat_DisablesReasoningForConflictingModel(t *test
 func TestEnforceReasoningToolCompat_ResolvesPrefixedAndBareIDs(t *testing.T) {
 	for _, modelID := range []string{
 		"openai/gpt-5.6-sol", "gpt-5.6-sol", "OpenAI/GPT-5.6-Sol",
-		"openai/gpt-5.6-luna-pro", "gpt-5.6-terra",
+		"openai/gpt-5.6-luna", "gpt-5.6-terra",
 	} {
 		body := toolsBody()
 		if got := EnforceReasoningToolCompat(modelID, EndpointChatCompletions, body); got != ReasoningToolsDisabled {
 			t.Errorf("EnforceReasoningToolCompat(%q) = %v; want ReasoningToolsDisabled", modelID, got)
+		}
+	}
+}
+
+// The -pro tier follows the registry's existing -pro precedent
+// (gpt-5-pro, gpt-5.2-pro): reasoning is pinned high and cannot be turned
+// off. So the conflict is real and unfixable there, and the honest answer
+// is to leave the request alone rather than send a value the model does
+// not accept. This also means the irreconcilable path is reachable from
+// real registry data rather than only from a fixture.
+//
+// @scenario "a model that cannot disable reasoning is passed through untouched"
+func TestEnforceReasoningToolCompat_ProTierIsIrreconcilable(t *testing.T) {
+	for _, modelID := range []string{
+		"openai/gpt-5.6-sol-pro", "openai/gpt-5.6-luna-pro",
+		"openai/gpt-5.6-terra-pro", "gpt-5.6-sol-pro",
+	} {
+		body := toolsBody()
+		before := maps.Clone(body)
+
+		outcome := EnforceReasoningToolCompat(modelID, EndpointChatCompletions, body)
+
+		if outcome != ReasoningToolsIrreconcilable {
+			t.Errorf("EnforceReasoningToolCompat(%q) = %v; want ReasoningToolsIrreconcilable",
+				modelID, outcome)
+		}
+		if _, present := body["reasoning_effort"]; present {
+			t.Errorf("%q: reasoning_effort was written on a model that cannot disable it", modelID)
+		}
+		if len(body) != len(before) {
+			t.Errorf("%q: body gained or lost keys: %v -> %v", modelID, before, body)
 		}
 	}
 }
@@ -134,7 +165,10 @@ func TestEnforceReasoningToolCompat_IsScopedToTheDeclaredEndpoint(t *testing.T) 
 	}
 }
 
-// @scenario "a model that cannot disable reasoning is passed through untouched"
+// The same guarantee as the -pro test above, but driven off a synthetic
+// entry so it keeps holding if the registry's -pro declarations ever
+// change. This one proves the mechanism; that one proves the mechanism is
+// reachable from real data.
 func TestEnforceReasoningToolCompat_ReportsIrreconcilableWithoutTouchingTheBody(t *testing.T) {
 	const modelID = "openai/gpt-5.6-fixture-locked"
 	restore := reasoningToolConflicts[modelID]
