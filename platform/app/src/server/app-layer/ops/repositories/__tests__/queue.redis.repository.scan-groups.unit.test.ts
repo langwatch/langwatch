@@ -65,6 +65,7 @@ class FakeRedis {
     return Object.fromEntries(this.hashes.get(key) ?? []);
   }
 
+  // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional zrange signature
   async zrange(
     key: string,
     start: number,
@@ -79,6 +80,7 @@ class FakeRedis {
     );
   }
 
+  // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional zrevrange signature
   async zrevrange(
     key: string,
     start: number,
@@ -104,6 +106,7 @@ class FakeRedis {
         commands.push(() => this.get(key));
         return chain;
       },
+      // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional zrange signature
       zrange: (key: string, start: number, stop: number, ws?: string) => {
         commands.push(() => this.zrange(key, start, stop, ws));
         return chain;
@@ -136,12 +139,17 @@ class FakeRedis {
   }
 }
 
-function stageGroup(
-  redis: FakeRedis,
-  groupId: string,
-  readyScore: number,
-  headJobId: string,
-): void {
+function stageGroup({
+  redis,
+  groupId,
+  readyScore,
+  headJobId,
+}: {
+  redis: FakeRedis;
+  groupId: string;
+  readyScore: number;
+  headJobId: string;
+}): void {
   const ready = redis.zsets.get(`${PREFIX}ready`) ?? [];
   ready.push({ member: groupId, score: readyScore });
   redis.zsets.set(`${PREFIX}ready`, ready);
@@ -162,10 +170,30 @@ describe("QueueRedisRepository.scanQueues — group summary", () => {
       const redis = new FakeRedis();
       const now = Date.now();
       // Ascending eligibility: oldest-due first, most-deferred last.
-      stageGroup(redis, "group-eligible-old", now - 86_400_000, "job-a");
-      stageGroup(redis, "group-mid-1", now - 5_000, "job-b");
-      stageGroup(redis, "group-mid-2", now - 1_000, "job-c");
-      stageGroup(redis, "group-deferred", now + 300_000, "job-d");
+      stageGroup({
+        redis,
+        groupId: "group-eligible-old",
+        readyScore: now - 86_400_000,
+        headJobId: "job-a",
+      });
+      stageGroup({
+        redis,
+        groupId: "group-mid-1",
+        readyScore: now - 5_000,
+        headJobId: "job-b",
+      });
+      stageGroup({
+        redis,
+        groupId: "group-mid-2",
+        readyScore: now - 1_000,
+        headJobId: "job-c",
+      });
+      stageGroup({
+        redis,
+        groupId: "group-deferred",
+        readyScore: now + 300_000,
+        headJobId: "job-d",
+      });
 
       const queue = await scan(redis, 1);
 
@@ -178,7 +206,12 @@ describe("QueueRedisRepository.scanQueues — group summary", () => {
   describe("when the head job has retried since ADR-080", () => {
     it("reads the retry count from the group's attempt key, not the job id", async () => {
       const redis = new FakeRedis();
-      stageGroup(redis, "group-retrying", Date.now() + 60_000, "evt-plain-id");
+      stageGroup({
+        redis,
+        groupId: "group-retrying",
+        readyScore: Date.now() + 60_000,
+        headJobId: "evt-plain-id",
+      });
       redis.strings.set(`${PREFIX}group:group-retrying:attempt`, "4");
 
       const queue = await scan(redis, 10);
@@ -191,7 +224,12 @@ describe("QueueRedisRepository.scanQueues — group summary", () => {
   describe("when only a pre-ADR-080 job id marker exists", () => {
     it("falls back to the legacy /r/<n> id parse", async () => {
       const redis = new FakeRedis();
-      stageGroup(redis, "group-legacy", Date.now(), "evt-1/r/2");
+      stageGroup({
+        redis,
+        groupId: "group-legacy",
+        readyScore: Date.now(),
+        headJobId: "evt-1/r/2",
+      });
 
       const queue = await scan(redis, 10);
 
@@ -203,7 +241,12 @@ describe("QueueRedisRepository.scanQueues — group summary", () => {
   describe("when the head job has never been retried", () => {
     it("reports no retry count", async () => {
       const redis = new FakeRedis();
-      stageGroup(redis, "group-fresh", Date.now(), "evt-fresh");
+      stageGroup({
+        redis,
+        groupId: "group-fresh",
+        readyScore: Date.now(),
+        headJobId: "evt-fresh",
+      });
 
       const queue = await scan(redis, 10);
 
