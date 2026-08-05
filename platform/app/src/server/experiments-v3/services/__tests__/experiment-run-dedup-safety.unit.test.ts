@@ -70,9 +70,9 @@ describe("experiment-run.service dedup OOM safety", () => {
       it("bounds both the outer read and the dedup subquery by tenant and OccurredAt", () => {
         // Partition pruning and tenant isolation must survive on both sides:
         // an unbounded subquery scans every weekly partition back to cold storage.
-        expect(
-          rendered.match(/TenantId = \{tenantId:String\}/g),
-        ).toHaveLength(2);
+        expect(rendered.match(/TenantId = \{tenantId:String\}/g)).toHaveLength(
+          2,
+        );
         expect(
           rendered.match(/OccurredAt >= \{minOccurredAt:DateTime64\(3\)\}/g),
         ).toHaveLength(2);

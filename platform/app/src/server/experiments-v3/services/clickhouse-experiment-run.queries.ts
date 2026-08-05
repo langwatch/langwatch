@@ -100,7 +100,9 @@ const RUN_ITEMS_SCOPE = `TenantId = {tenantId:String}
  */
 export function buildDedupedRunItemsWhere({
   extraFilters = [],
-}: { extraFilters?: string[] } = {}): string {
+}: {
+  extraFilters?: string[];
+} = {}): string {
   const extra = extraFilters
     .map((filter) => `\n          AND ${filter}`)
     .join("");
