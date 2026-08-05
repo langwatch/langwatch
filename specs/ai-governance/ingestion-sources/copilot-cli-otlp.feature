@@ -53,6 +53,12 @@ Feature: Copilot CLI OTLP spans canonicalize on the unified substrate
       Then the canonical span records the premium-request consumption
 
     @unit
+    Scenario: Copilot turn tokens are counted once across the agent rollup and its chat span
+      Given a copilot turn whose invoke_agent root span repeats its chat child's token usage
+      When both spans are canonicalized and folded into the trace summary
+      Then the trace totals count the turn's tokens exactly once
+
+    @unit
     Scenario: Captured content payloads survive canonicalisation as span input and output
       Given a copilot span whose attributes carry captured prompt and response content
       When the canonicalisation chain runs

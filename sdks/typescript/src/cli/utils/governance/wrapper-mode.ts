@@ -39,6 +39,7 @@ import { saveConfig } from "./config";
 import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
+import { SHELL_FUNCTION_TOOLS } from "./shell-rc";
 import {
 	type ClaudeProjectPinResult,
 	ensureClaudeProjectTelemetryPin,
@@ -385,7 +386,13 @@ export async function resolveWrapperMode(
 			() => ensureClaudeProjectTelemetryPin({ vars, cwd: process.cwd() }),
 			undefined,
 		);
-	} else if (tool === "gemini" || tool === "opencode") {
+	} else if (SHELL_FUNCTION_TOOLS.includes(tool)) {
+		// Every scoped-function tool (gemini/opencode/copilot) needs its
+		// persisted rc function re-synced per run: after a key re-mint the
+		// wrapped run gets the fresh token but the rc function would keep
+		// serving the old one to bare `<tool>` invocations — silent 401s
+		// forever (the #6202 class). Login-time refresh only fires on
+		// endpoint drift, not key drift.
 		refreshedWiring.push(
 			...tryRefresh(
 				`the ${tool} scoped shell function`,
