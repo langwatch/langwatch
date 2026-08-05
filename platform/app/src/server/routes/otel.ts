@@ -191,11 +191,15 @@ async function authenticate(
  * request through (same behaviour as before); the thrown limit error lives
  * outside that try block so it is never mistaken for a lookup failure.
  */
-async function enforcePlanLimit(
-  project: { id: string; teamId: string; team: { organizationId: string } },
-  customerTraceIds: string[],
-  logger: ReturnType<typeof createLogger>,
-): Promise<void> {
+async function enforcePlanLimit({
+  project,
+  customerTraceIds,
+  logger,
+}: {
+  project: { id: string; teamId: string; team: { organizationId: string } };
+  customerTraceIds: string[];
+  logger: ReturnType<typeof createLogger>;
+}): Promise<void> {
   let limitResult: UsageLimitResult;
   try {
     limitResult = await getApp().usage.checkLimit({
@@ -460,7 +464,11 @@ secured
           );
         }
 
-        await enforcePlanLimit(project, customerTraceIds, loggerTraces);
+        await enforcePlanLimit({
+          project,
+          customerTraceIds,
+          logger: loggerTraces,
+        });
 
         const emptyPartialSuccess = { rejectedSpans: 0, errorMessage: "" };
 
@@ -552,7 +560,11 @@ secured
         const { project, resolved } = authResult;
         span.setAttribute("langwatch.project.id", project.id);
 
-        await enforcePlanLimit(project, [], loggerLogs);
+        await enforcePlanLimit({
+          project,
+          customerTraceIds: [],
+          logger: loggerLogs,
+        });
 
         const body = await readOtlpBody(c.req.raw);
         const parsed = parseOtlpLogs(body, c.req.header("content-type"));
@@ -646,7 +658,11 @@ secured
         const { project, resolved } = authResult;
         span.setAttribute("langwatch.project.id", project.id);
 
-        await enforcePlanLimit(project, [], loggerMetrics);
+        await enforcePlanLimit({
+          project,
+          customerTraceIds: [],
+          logger: loggerMetrics,
+        });
 
         const body = await readOtlpBody(c.req.raw);
         const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
