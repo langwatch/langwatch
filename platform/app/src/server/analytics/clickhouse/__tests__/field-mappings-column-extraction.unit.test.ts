@@ -259,7 +259,9 @@ describe("narrowSpanAttributesColumns", () => {
   describe("when SpanAttributes is not selected", () => {
     it("returns the column set unchanged", () => {
       const columns = new Set(["DurationMs", "StatusCode"]);
-      const result = narrowSpanAttributesColumns(columns, ["ss.DurationMs > 0"]);
+      const result = narrowSpanAttributesColumns(columns, [
+        "ss.DurationMs > 0",
+      ]);
       expect(result).toBe(columns);
     });
   });

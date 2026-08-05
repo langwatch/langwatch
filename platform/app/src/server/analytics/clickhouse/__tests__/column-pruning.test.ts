@@ -294,7 +294,9 @@ describe("column-pruning", () => {
           "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
         );
         // The bare whole-map column is never selected into the subquery.
-        expect(result.sql).not.toMatch(/,\s*SpanAttributes\s+FROM stored_spans/);
+        expect(result.sql).not.toMatch(
+          /,\s*SpanAttributes\s+FROM stored_spans/,
+        );
         // Outer accesses still resolve against the reconstructed map.
         expect(result.sql).toContain(
           "ss.SpanAttributes['langwatch.span.type']",
