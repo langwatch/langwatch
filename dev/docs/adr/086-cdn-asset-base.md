@@ -16,7 +16,7 @@ browser fetches the HTML shell from build A, then a lazy `import()` of a build-A
 chunk is load-balanced to a build-B pod that does not have that hash — a hard
 `404 (Not Found)`. Reported symptom:
 
-```
+```text
 GET https://app.langwatch.ai/assets/dialog.anatomy-CGguCKQj.js net::ERR_ABORTED 404
 ```
 

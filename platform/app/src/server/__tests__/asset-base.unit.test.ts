@@ -73,6 +73,22 @@ describe("normalizeAssetBase", () => {
       ).toThrow(/http or https/);
     });
   });
+
+  describe("when the value carries a query or fragment", () => {
+    // The resolver concatenates, so these would swallow the asset path:
+    // "…/abc123?rev=1" + "assets/x.js" puts the path inside the query string.
+    it("throws on a query component", () => {
+      expect(() =>
+        normalizeAssetBase("https://cdn.langwatch.ai/abc123?rev=1"),
+      ).toThrow(/query or fragment/);
+    });
+
+    it("throws on a fragment component", () => {
+      expect(() =>
+        normalizeAssetBase("https://cdn.langwatch.ai/abc123#f"),
+      ).toThrow(/query or fragment/);
+    });
+  });
 });
 
 describe("assetBaseOrigin", () => {
@@ -119,7 +135,7 @@ describe("injectAssetBaseIntoHtml", () => {
 
   describe("when the base is same-origin", () => {
     it("injects the resolver bootstrap into the head", () => {
-      const out = injectAssetBaseIntoHtml(shell, "/");
+      const out = injectAssetBaseIntoHtml({ html: shell, base: "/" });
       expect(out).toContain(`window.${ASSET_URL_GLOBAL}`);
       // bootstrap lands inside <head>, before the entry script
       expect(out.indexOf(ASSET_URL_GLOBAL)).toBeLessThan(
@@ -129,7 +145,7 @@ describe("injectAssetBaseIntoHtml", () => {
 
     /** @scenario Same-origin rewriting is a no-op for the entry references */
     it("leaves the base-absolute entry references untouched", () => {
-      const out = injectAssetBaseIntoHtml(shell, "/");
+      const out = injectAssetBaseIntoHtml({ html: shell, base: "/" });
       expect(out).toContain('src="/assets/index-deadbeef.js"');
       expect(out).toContain('href="/assets/index-cafe.css"');
     });
@@ -137,31 +153,31 @@ describe("injectAssetBaseIntoHtml", () => {
 
   describe("when the base is a CDN", () => {
     it("rewrites the entry script and stylesheet to the CDN base", () => {
-      const out = injectAssetBaseIntoHtml(shell, CDN);
+      const out = injectAssetBaseIntoHtml({ html: shell, base: CDN });
       expect(out).toContain(`src="${CDN}assets/index-deadbeef.js"`);
       expect(out).toContain(`href="${CDN}assets/index-cafe.css"`);
       expect(out).not.toContain('src="/assets/');
     });
 
     it("still injects the resolver and points it at the CDN", () => {
-      const out = injectAssetBaseIntoHtml(shell, CDN);
+      const out = injectAssetBaseIntoHtml({ html: shell, base: CDN });
       expect(out).toContain(`window.${ASSET_URL_GLOBAL}`);
       expect(out).toContain(JSON.stringify(CDN));
     });
 
     it("does not rewrite same-origin public assets like the favicon", () => {
-      const withFavicon = injectAssetBaseIntoHtml(
-        '<html><head><link rel="icon" href="/favicon.ico"></head></html>',
-        CDN,
-      );
+      const withFavicon = injectAssetBaseIntoHtml({
+        html: '<html><head><link rel="icon" href="/favicon.ico"></head></html>',
+        base: CDN,
+      });
       expect(withFavicon).toContain('href="/favicon.ico"');
     });
 
     it("treats a $ in the base literally, not as a replacement token", () => {
-      const out = injectAssetBaseIntoHtml(
-        shell,
-        "https://cdn.example.com/a$1b/",
-      );
+      const out = injectAssetBaseIntoHtml({
+        html: shell,
+        base: "https://cdn.example.com/a$1b/",
+      });
       expect(out).toContain(
         'src="https://cdn.example.com/a$1b/assets/index-deadbeef.js"',
       );
@@ -170,19 +186,19 @@ describe("injectAssetBaseIntoHtml", () => {
 
   describe("when the shell lacks one of the injection anchors", () => {
     it("injects after the doctype when there is no head or html tag", () => {
-      const out = injectAssetBaseIntoHtml(
-        "<!doctype html><body><div id=root></div></body>",
-        "/",
-      );
+      const out = injectAssetBaseIntoHtml({
+        html: "<!doctype html><body><div id=root></div></body>",
+        base: "/",
+      });
       expect(out).toContain(`window.${ASSET_URL_GLOBAL}`);
       expect(out).toContain("<div id=root>");
     });
 
     it("injects after <html> when there is no <head>", () => {
-      const out = injectAssetBaseIntoHtml(
-        "<html><body><div id=root></div></body></html>",
-        "/",
-      );
+      const out = injectAssetBaseIntoHtml({
+        html: "<html><body><div id=root></div></body></html>",
+        base: "/",
+      });
       expect(out).toContain(`window.${ASSET_URL_GLOBAL}`);
       expect(out.indexOf(ASSET_URL_GLOBAL)).toBeLessThan(
         out.indexOf("<div id=root>"),
@@ -190,7 +206,10 @@ describe("injectAssetBaseIntoHtml", () => {
     });
 
     it("prepends the bootstrap when there is no doctype/html/head", () => {
-      const out = injectAssetBaseIntoHtml("<div id=root></div>", "/");
+      const out = injectAssetBaseIntoHtml({
+        html: "<div id=root></div>",
+        base: "/",
+      });
       expect(out.startsWith("<script>")).toBe(true);
       expect(out).toContain("<div id=root>");
     });

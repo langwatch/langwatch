@@ -54,6 +54,16 @@ export function normalizeAssetBase(raw: string | undefined): string {
       `LANGWATCH_ASSET_BASE must use http or https; got ${JSON.stringify(raw)}`,
     );
   }
+  // The resolver concatenates the asset path onto this base, so a query or
+  // fragment would swallow it — "…/build?rev=1" + "assets/x.js" resolves to
+  // "…/build?rev=1/assets/x.js", where the path is part of the query. Same
+  // silent 404 the scheme check above exists to prevent.
+  if (url.search || url.hash) {
+    throw new Error(
+      `LANGWATCH_ASSET_BASE must not carry a query or fragment; ` +
+        `got ${JSON.stringify(raw)}`,
+    );
+  }
   return url.href.endsWith("/") ? url.href : `${url.href}/`;
 }
 
@@ -97,8 +107,17 @@ export function assetBaseBootstrapScript(base: string): string {
  * a no-op when the base is same-origin; the resolver bootstrap is always
  * injected (the built bundle references `window.__lwAssetUrl` regardless of base).
  */
-export function injectAssetBaseIntoHtml(html: string, base: string): string {
-  const withBootstrap = insertBootstrap(html, assetBaseBootstrapScript(base));
+export function injectAssetBaseIntoHtml({
+  html,
+  base,
+}: {
+  html: string;
+  base: string;
+}): string {
+  const withBootstrap = insertBootstrap({
+    html,
+    snippet: assetBaseBootstrapScript(base),
+  });
   if (base === "/") return withBootstrap;
   // Whitespace-anchored so it rewrites the `src`/`href` of Vite's entry
   // `<script>` / `modulepreload` / stylesheet tags but never a `data-src` etc.
@@ -115,7 +134,13 @@ export function injectAssetBaseIntoHtml(html: string, base: string): string {
  * Vite's injected entry scripts), else after `<html>`, else after the doctype,
  * else at the very start.
  */
-function insertBootstrap(html: string, snippet: string): string {
+function insertBootstrap({
+  html,
+  snippet,
+}: {
+  html: string;
+  snippet: string;
+}): string {
   for (const anchor of [/<head[^>]*>/i, /<html[^>]*>/i, /<!doctype[^>]*>/i]) {
     const match = anchor.exec(html);
     if (match) {

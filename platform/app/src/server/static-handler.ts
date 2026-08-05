@@ -154,7 +154,7 @@ function tryServeHtml({
     const html = fs.readFileSync(fd, "utf8");
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
-    res.end(injectAssetBaseIntoHtml(html, getAssetBase()));
+    res.end(injectAssetBaseIntoHtml({ html, base: getAssetBase() }));
     return true;
   } finally {
     fs.closeSync(fd);
