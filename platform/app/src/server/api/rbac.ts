@@ -721,6 +721,58 @@ export const checkProjectPermission =
   };
 
 /**
+ * Permit when the caller holds ANY ONE of `permissions` on the project.
+ *
+ * For resources a caller can legitimately reach from more than one feature.
+ * Stored objects are the case in point: the same object is trace media for one
+ * viewer and scenario media for another, `traces:view` and `scenarios:view`
+ * are separate categories a custom role can hold one of, and the file route
+ * itself already accepts either. A single-permission gate on a sibling
+ * surface (the existence probe) refuses viewers the bytes are served to.
+ *
+ * The refusal names the FIRST permission, so list the one the surface is
+ * primarily reached through first: granting it resolves the denial whichever
+ * feature the caller came from.
+ */
+export const checkProjectPermissionAny =
+  (...permissions: [Permission, ...Permission[]]) =>
+  async ({
+    ctx,
+    input,
+    next,
+  }: PermissionMiddlewareParams<{ projectId: string }>) => {
+    let organizationRole: OrganizationUserRole | null = null;
+
+    for (const permission of permissions) {
+      const result = await resolveProjectPermission(
+        ctx,
+        input.projectId,
+        permission,
+      );
+      organizationRole = result.organizationRole;
+      if (result.permitted) {
+        ctx.organizationRole = organizationRole;
+        ctx.permissionChecked = true;
+        return next();
+      }
+    }
+
+    const named = permissions[0];
+    if (organizationRole === OrganizationUserRole.EXTERNAL) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "This feature is not available for your account",
+        cause: new LiteMemberRestrictedError(named.split(":")[0] ?? "unknown"),
+      });
+    }
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "You do not have permission to access this project resource",
+      cause: new ProjectPermissionDeniedError(named),
+    });
+  };
+
+/**
  * Check if user has permission for a team
  */
 export const checkTeamPermission =

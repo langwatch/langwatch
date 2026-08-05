@@ -149,8 +149,8 @@ describe("Media rendering in trace views", () => {
       );
 
       const audio = await screen.findByTestId("media-part-audio");
-      // Until the wrap resolves the element has no src; afterwards it plays
-      // from the wrapped blob, never from the raw unplayable bytes.
+      // A placeholder holds the space until the wrap resolves; the player then
+      // plays from the wrapped blob, never from the raw unplayable bytes.
       await vi.waitFor(() => {
         expect(audio).toHaveAttribute("src", "blob:wrapped-audio");
       });

@@ -182,6 +182,50 @@ describe("TraceIOAccumulationService — preferText behaviour", () => {
   });
 });
 
+describe("TraceIOAccumulationService — media refs", () => {
+  const audioPart = (id: string) => ({
+    type: "input_audio",
+    input_audio: { url: `/api/files/p1/${id}`, mimeType: "audio/wav" },
+  });
+
+  describe("given a voice turn whose transcript holds both sides", () => {
+    /** @scenario "A media ref remembers the role of the message it came from" */
+    it("records which side of the conversation each recording came from", () => {
+      // A voice agent's span input is the whole transcript, so the caller's
+      // recording and the agent's reply both ride the input attribute.
+      const extractor = stubExtractor({
+        input: {
+          raw: [
+            { role: "user", content: [audioPart("spoken")] },
+            { role: "assistant", content: [audioPart("reply")] },
+          ],
+          text: "shipment 4417?",
+          source: "langwatch",
+        },
+        output: {
+          raw: [{ role: "assistant", content: [audioPart("reply")] }],
+          text: "it arrives tomorrow",
+          source: "langwatch",
+        },
+      });
+      const accumulator = new TraceIOAccumulationService(extractor);
+
+      const result = accumulator.accumulateIO({
+        state: emptyState(),
+        span: rootSpan(),
+      });
+
+      expect(JSON.parse(result.inputMediaRefs!)).toEqual([
+        { kind: "audio", url: "/api/files/p1/spoken", role: "user" },
+        { kind: "audio", url: "/api/files/p1/reply", role: "assistant" },
+      ]);
+      expect(JSON.parse(result.outputMediaRefs!)).toEqual([
+        { kind: "audio", url: "/api/files/p1/reply", role: "assistant" },
+      ]);
+    });
+  });
+});
+
 describe("TraceIOAccumulationService — claude utility spans", () => {
   const utilityOutput = stubExtractor({
     output: {

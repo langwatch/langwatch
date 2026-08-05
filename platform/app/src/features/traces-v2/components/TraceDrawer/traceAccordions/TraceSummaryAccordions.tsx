@@ -9,10 +9,13 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import { changedTraceMetadataKeys } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
 import {
+  mediaRefBelongsToSide,
   parseMediaRefs,
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
+  type TraceMediaSide,
 } from "~/shared/traces/media-refs";
 import { mediaRefToMediaData } from "~/shared/traces/mediaParts";
 import { useAppliedTraceEditPatch } from "../../../hooks/useTraceEditOverlay";
@@ -26,7 +29,9 @@ import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
 import { ExceptionsContent } from "../ExceptionsContent";
 import { CorrectedFieldFrame } from "../editMode/CorrectedField";
+import { TraceEditableInput } from "../editMode/TraceEditableInput";
 import { TraceEditableOutput } from "../editMode/TraceEditableOutput";
+import { useTraceMetadataEditing } from "../editMode/useTraceMetadataEditing";
 import { EvalsList } from "../evalCards";
 import { IOViewer } from "../IOViewer";
 import { PromptsPanel } from "../PromptsPanel";
@@ -49,18 +54,24 @@ export function TraceSummaryAccordions({
   onSelectSpan?: (spanId: string) => void;
 }) {
   const isEditing = useDrawerStore((s) => s.isEditing);
-  // The trace's own output is the one trace-level field a correction can
-  // replace, so it is the only one that carries the corrected treatment here.
+  // The trace's own input, output and metadata are what a correction can
+  // replace at trace level, so they are the fields that carry the corrected
+  // treatment here.
   const appliedPatch = useAppliedTraceEditPatch();
+  const inputCorrected = appliedPatch?.trace?.input !== undefined;
   const outputCorrected = appliedPatch?.trace?.output !== undefined;
+  const metadataCorrected = changedTraceMetadataKeys(appliedPatch).length > 0;
   const canonicalHeader = useTraceHeaderCanonical().data;
   // `keepPreviousData` leaves the previous trace's header in place until the
   // new read lands, so the captured value is only this trace's while the two
   // agree on which trace it belongs to.
-  const capturedOutput =
-    canonicalHeader?.traceId === trace.traceId
-      ? canonicalHeader.output
-      : undefined;
+  const isCanonicalThisTrace = canonicalHeader?.traceId === trace.traceId;
+  const capturedInput = isCanonicalThisTrace
+    ? canonicalHeader.input
+    : undefined;
+  const capturedOutput = isCanonicalThisTrace
+    ? canonicalHeader.output
+    : undefined;
   const hasIO = !!(trace.input || trace.output);
   // A restrict privacy rule hides content the viewer may not see — the server
   // nulls `input`/`output` and sets these flags. The IO section then reads as a
@@ -73,6 +84,17 @@ export function TraceSummaryAccordions({
     () => filterReservedMediaRefAttributes(trace.attributes ?? {}),
     [trace.attributes],
   );
+  const capturedAttributes = useMemo(
+    () =>
+      isCanonicalThisTrace
+        ? filterReservedMediaRefAttributes(canonicalHeader.attributes ?? {})
+        : undefined,
+    [isCanonicalThisTrace, canonicalHeader],
+  );
+  const metadataEditing = useTraceMetadataEditing({
+    capturedAttributes: traceAttributes,
+    enabled: isEditing,
+  });
   // Trace-level events are read as their own query (like evaluations), not off
   // the header: the fold no longer carries them, so they're derived from
   // stored_spans on demand. Includes legacy `/track-event` payloads, which the
@@ -258,17 +280,33 @@ export function TraceSummaryAccordions({
                     redacted={trace.inputRedacted ?? false}
                     visibleTo={trace.inputVisibleTo}
                   >
-                    {trace.input ? (
-                      <IOViewer
-                        label="Input"
-                        content={trace.input}
-                        traceId={trace.traceId}
-                      />
+                    {isEditing ? (
+                      <TraceEditableInput capturedText={trace.input ?? null} />
+                    ) : trace.input ? (
+                      inputCorrected ? (
+                        <CorrectedFieldFrame
+                          label="Input"
+                          original={capturedInput}
+                        >
+                          <IOViewer
+                            label="Input"
+                            content={trace.input}
+                            traceId={trace.traceId}
+                          />
+                        </CorrectedFieldFrame>
+                      ) : (
+                        <IOViewer
+                          label="Input"
+                          content={trace.input}
+                          traceId={trace.traceId}
+                        />
+                      )
                     ) : (
                       <MissingIORow label="Input" mode="input" />
                     )}
                     <SummaryMediaStrip
                       refsJson={trace.attributes?.[RESERVED_INPUT_MEDIA_REFS]}
+                      side="input"
                     />
                   </RedactedField>
                   <RedactedField
@@ -306,6 +344,7 @@ export function TraceSummaryAccordions({
                     )}
                     <SummaryMediaStrip
                       refsJson={trace.attributes?.[RESERVED_OUTPUT_MEDIA_REFS]}
+                      side="output"
                     />
                   </RedactedField>
                 </VStack>
@@ -340,19 +379,23 @@ export function TraceSummaryAccordions({
                 value="attributes"
                 title="Metadata"
                 count={attrCount}
-                empty={!hasAttributes && !resources.isLoading}
+                empty={!hasAttributes && !isEditing && !resources.isLoading}
                 isFirst={isFirst}
                 open={isOpen}
               >
-                {hasAttributes ? (
+                {hasAttributes || isEditing ? (
                   <AttributeTable
-                    attributes={traceAttributes}
+                    attributes={metadataEditing.baselineAttributes}
                     resourceAttributes={
                       hasResourceAttributes
                         ? resources.resourceAttributes
                         : undefined
                     }
                     title="Trace Attributes"
+                    editing={metadataEditing.editing}
+                    correctedFrom={
+                      metadataCorrected ? capturedAttributes : undefined
+                    }
                   />
                 ) : resources.isLoading ? (
                   <EmptyHint>Loading metadata…</EmptyHint>
@@ -570,13 +613,25 @@ export function filterReservedMediaRefAttributes(
  * attachments below an email body; items keep their natural size
  * (align="flex-start" — stretching would blow a small image up to panel
  * width).
+ *
+ * `side` splits a voice turn: one span payload carries the caller's recording
+ * and the agent's reply, so without it both players stack under INPUT. Refs
+ * with no role recorded render on both sides, as they did before roles.
  */
 export function SummaryMediaStrip({
   refsJson,
+  side,
 }: {
   refsJson: string | undefined;
+  side: TraceMediaSide;
 }): React.JSX.Element | null {
-  const refs = useMemo(() => parseMediaRefs(refsJson), [refsJson]);
+  const refs = useMemo(
+    () =>
+      parseMediaRefs(refsJson).filter((ref) =>
+        mediaRefBelongsToSide(ref, side),
+      ),
+    [refsJson, side],
+  );
   if (refs.length === 0) return null;
   return (
     <VStack align="flex-start" gap={2} paddingTop={2}>

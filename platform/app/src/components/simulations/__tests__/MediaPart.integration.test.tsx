@@ -26,6 +26,10 @@ const mockHeadByIdData = vi.fn(
   () => undefined as undefined | HeadByIdProbeResult,
 );
 
+// Whether the probe query itself fails — the shape tRPC reports when the
+// caller is refused or the request never lands.
+const mockHeadByIdFails = vi.fn(() => false);
+
 // Records every input the component passes to the existence probe. The probe
 // input is rebuilt on each render with the stored-object id extracted from the
 // media URL, so these capture how the id is parsed out of the URL — including
@@ -39,8 +43,8 @@ vi.mock("~/utils/api", () => ({
         useQuery: (input: unknown, opts: { enabled?: boolean } | undefined) => {
           headByIdInputs.push(input as { projectId: string; id: string });
           // Only return data when the query is enabled (i.e. after an error event).
-          if (!opts?.enabled) return { data: undefined };
-          return { data: mockHeadByIdData() };
+          if (!opts?.enabled) return { data: undefined, isError: false };
+          return { data: mockHeadByIdData(), isError: mockHeadByIdFails() };
         },
       },
     },
@@ -63,6 +67,8 @@ describe("<MediaPart/>", () => {
     mockHeadByIdData.mockReset();
     // Default: no data (probe not yet completed)
     mockHeadByIdData.mockReturnValue(undefined);
+    mockHeadByIdFails.mockReset();
+    mockHeadByIdFails.mockReturnValue(false);
     headByIdInputs.length = 0;
   });
 
@@ -273,15 +279,19 @@ describe("<MediaPart/>", () => {
       });
 
       expect(screen.getByTestId("media-part-missing")).toHaveTextContent(
-        "audio",
+        "This audio is no longer available",
       );
       expect(screen.getByTestId("media-part-missing")).toHaveTextContent(
         "missing",
       );
+      // The dead player is gone — a lost recording must not look like a
+      // silent one.
+      expect(screen.queryByTestId("media-part-audio")).not.toBeInTheDocument();
     });
   });
 
   describe("when the tRPC probe returns status: 'not_found' (row never existed)", () => {
+    /** @scenario "A recording whose bytes are gone shows an unavailable state, not a dead player" */
     it("renders a missing-badge placeholder (same UX as blob-gone)", async () => {
       // Row never existed (e.g. id was made up / deleted). The renderer
       // collapses 'not_found' into 'missing' since the user-visible state
@@ -344,11 +354,113 @@ describe("<MediaPart/>", () => {
         expect(screen.getByTestId("media-part-error")).toBeInTheDocument();
       });
 
-      expect(screen.getByTestId("media-part-error")).toHaveTextContent("audio");
+      expect(screen.getByTestId("media-part-error")).toHaveTextContent(
+        "This audio could not be loaded",
+      );
       expect(screen.getByTestId("media-part-error")).toHaveTextContent("error");
       // The "missing" placeholder must NOT be shown — that's a different state.
       expect(
         screen.queryByTestId("media-part-missing"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the probe itself fails (the viewer may not run it)", () => {
+    /** @scenario "A media probe the viewer cannot run still leaves the unavailable state" */
+    it("holds a placeholder during the probe and then states the media could not be loaded", async () => {
+      // The probe is refused, so nothing ever answers whether the bytes are
+      // there. Before, status stayed "loading" and the player sat at zero
+      // seconds forever.
+      mockHeadByIdFails.mockReturnValue(true);
+
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "audio",
+            source: {
+              type: "url",
+              value: "/api/files/proj/forbidden-probe-id",
+              mimeType: "audio/wav",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      audio.dispatchEvent(new Event("error"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("media-part-error")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("media-part-error")).toHaveTextContent(
+        "This audio could not be loaded",
+      );
+      expect(screen.queryByTestId("media-part-audio")).not.toBeInTheDocument();
+      // No status code, url, or probe failure text reaches the viewer.
+      expect(screen.getByTestId("media-part-error").textContent).not.toMatch(
+        /forbidden|FORBIDDEN|api\/files|40\d/,
+      );
+    });
+
+    /** @scenario "A media probe the viewer cannot run still leaves the unavailable state" */
+    it("shows a placeholder while the probe is still in flight", async () => {
+      // Probe enabled, no answer yet: the failed element is already gone and
+      // its place is held.
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "audio",
+            source: {
+              type: "url",
+              value: "/api/files/proj/slow-probe-id",
+              mimeType: "audio/wav",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      audio.dispatchEvent(new Event("error"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("media-part-probing")).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId("media-part-audio")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a url that is not a stored object fails to load", () => {
+    it("states the failure straight away, with no probe to wait for", async () => {
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "image",
+            source: {
+              type: "url",
+              value: "https://cdn.example/photo.png",
+              mimeType: "image/png",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const img = screen.getByTestId("media-part-image") as HTMLImageElement;
+      img.dispatchEvent(new Event("error"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("media-part-error")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("media-part-error")).toHaveTextContent(
+        "This image could not be loaded",
+      );
+      expect(
+        screen.queryByTestId("media-part-probing"),
       ).not.toBeInTheDocument();
     });
   });

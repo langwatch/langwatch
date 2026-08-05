@@ -4,14 +4,28 @@
  * Handles three shapes:
  *  - URL source (source.type="url" or binary with url set): renders native HTML5 element.
  *  - Inline data (source.type="data" or binary with data set): renders with a data: URI (legacy back-compat).
- *  - Missing: when the URL returns a 404/missing status, renders a placeholder badge.
+ *  - Unavailable: when the bytes are gone, or we cannot even find out, the
+ *    element is replaced by a stated placeholder rather than left mounted.
  *
  * Uses native HTML5 <audio>, <img>, <video> — no third-party player library.
  * Non-media binary parts (documents) render as an attachment chip that opens
  * the stored file in a new tab.
+ *
+ * Every path out of loading is visible. A player that stays at zero seconds
+ * with no explanation is indistinguishable from a silent recording, so a
+ * failed element goes to a placeholder while the existence probe runs and
+ * lands on a named state whether the probe answers or fails.
  */
-import { Badge, Box, Icon, Text, VStack } from "@chakra-ui/react";
-import { ExternalLink, File, FileText } from "lucide-react";
+import {
+  Badge,
+  Box,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { AlertTriangle, ExternalLink, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 import { isSafeMediaUrl, type MediaPartData } from "~/shared/traces/mediaParts";
@@ -56,11 +70,72 @@ function resolveMediaCategory(
   return "binary";
 }
 
+/** Word the placeholder copy uses for the media kind. */
+function mediaNoun(category: "audio" | "image" | "video" | "binary"): string {
+  return category === "binary" ? "file" : category;
+}
+
+/**
+ * The one placeholder both unavailable states render. Says what kind of media
+ * is gone and why, in the viewer's terms — never a status code, a URL, or a
+ * probe failure message.
+ */
+function MediaUnavailable({
+  category,
+  state,
+}: {
+  category: "audio" | "image" | "video" | "binary";
+  state: "missing" | "error";
+}) {
+  return (
+    <HStack
+      data-testid={
+        state === "missing" ? "media-part-missing" : "media-part-error"
+      }
+      display="inline-flex"
+      gap={2}
+      paddingX={3}
+      paddingY={2}
+      borderRadius="md"
+      bg="bg.subtle"
+      border="1px solid"
+      borderColor="border"
+    >
+      <Icon as={AlertTriangle} boxSize={3.5} color="fg.muted" />
+      <Text fontSize="xs" color="fg.muted">
+        {state === "missing"
+          ? `This ${mediaNoun(category)} is no longer available`
+          : `This ${mediaNoun(category)} could not be loaded`}
+      </Text>
+      <Badge
+        colorPalette={state === "missing" ? "gray" : "red"}
+        size="sm"
+        variant="outline"
+      >
+        {state}
+      </Badge>
+    </HStack>
+  );
+}
+
+/** Placeholder held while we are still finding out what happened to the bytes. */
+function MediaProbing() {
+  return (
+    <Skeleton
+      data-testid="media-part-probing"
+      height="38px"
+      width="100%"
+      maxWidth="400px"
+      borderRadius="md"
+    />
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-type LoadStatus = "loading" | "ok" | "missing" | "error";
+type LoadStatus = "loading" | "ok" | "probing" | "missing" | "error";
 
 interface MediaPartProps {
   part: MediaPartData;
@@ -134,10 +209,11 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
 
   // Server-side existence probe via tRPC — replaces the native fetch HEAD probe.
   // Inherits session auth automatically; no CORS / credential issues.
-  const { data: probeData } = api.storedObjects.headById.useQuery(
-    { projectId, id: storedObjectId ?? "" },
-    { enabled: probeEnabled && !!storedObjectId && !!projectId },
-  );
+  const { data: probeData, isError: probeFailed } =
+    api.storedObjects.headById.useQuery(
+      { projectId, id: storedObjectId ?? "" },
+      { enabled: probeEnabled && !!storedObjectId && !!projectId },
+    );
 
   // When the probe result arrives, map the tri-state to a load status:
   //   not_found → "missing"   (row was deleted / never existed — placeholder)
@@ -152,6 +228,14 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
       setStatus("missing");
     }
   }, [probeData]);
+
+  // The probe itself can fail — the caller may not hold the permission it
+  // needs, or the request may not land at all. We then know the element failed
+  // and nothing more, so the viewer gets the same "could not be loaded" answer
+  // rather than a player parked at zero seconds forever.
+  useEffect(() => {
+    if (probeFailed) setStatus("error");
+  }, [probeFailed]);
 
   // When the src changes (parent swaps to a different file id or switches from
   // URL-based to inline-data), reset both the load status and the probe guard
@@ -172,6 +256,17 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
     if (probedRef.current === src) return;
     probedRef.current = src;
 
+    // Nothing to probe — an external URL, or no project context — so there is
+    // no second source of truth to wait for and the failure is stated now.
+    if (!storedObjectId || !projectId) {
+      setStatus("error");
+      return;
+    }
+
+    // The element has already failed, so it comes down now: leaving it mounted
+    // is what made a lost recording look like a silent one. The placeholder
+    // holds its place until the probe says which unavailable state it is.
+    setStatus("probing");
     // Enable the tRPC probe to distinguish "missing" (row absent) from
     // "error" (transient network/decode failure). The probe result is
     // handled in the useEffect above.
@@ -241,64 +336,32 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
 
   // Missing or error placeholder
   if (unsafeSrc || status === "missing" || (status === "error" && src === "")) {
-    return (
-      <Box
-        data-testid="media-part-missing"
-        display="inline-flex"
-        alignItems="center"
-        gap={2}
-        paddingX={3}
-        paddingY={2}
-        borderRadius="md"
-        bg="bg.subtle"
-        border="1px solid"
-        borderColor="border"
-      >
-        <Text fontSize="xs" color="fg.muted">
-          {category} / {mimeType ?? "unknown"}
-        </Text>
-        <Badge colorPalette="gray" size="sm" variant="outline">
-          missing
-        </Badge>
-      </Box>
-    );
+    return <MediaUnavailable category={category} state="missing" />;
   }
 
   if (status === "error") {
-    return (
-      <Box
-        data-testid="media-part-error"
-        display="inline-flex"
-        alignItems="center"
-        gap={2}
-        paddingX={3}
-        paddingY={2}
-        borderRadius="md"
-        bg="bg.subtle"
-        border="1px solid"
-        borderColor="border"
-      >
-        <Text fontSize="xs" color="fg.muted">
-          {category} / {mimeType ?? "unknown"}
-        </Text>
-        <Badge colorPalette="red" size="sm" variant="outline">
-          error
-        </Badge>
-      </Box>
-    );
+    return <MediaUnavailable category={category} state="error" />;
+  }
+
+  // The element failed and the probe has not answered yet.
+  if (status === "probing") {
+    return <MediaProbing />;
   }
 
   // Render native HTML5 element
   if (category === "audio") {
+    // Legacy raw-PCM URLs are unplayable until the client-side WAV wrap
+    // resolves; hold the placeholder rather than mounting a player with no
+    // source, which reads as a broken recording.
+    if (rawUrlFormat && !wrappedSrc) {
+      return <MediaProbing />;
+    }
     return (
       <VStack align="flex-start" width="100%">
         {/* Captions are not available for dynamically stored audio. */}
         <audio
           data-testid="media-part-audio"
           controls
-          // Legacy raw-PCM URLs wait for the client-side WAV wrap; an <audio>
-          // without src renders a disabled shell instead of firing a decode
-          // error for bytes the browser can never play.
           src={rawUrlFormat ? (wrappedSrc ?? undefined) : src}
           // `onLoad` does not fire on <audio>/<video>; the right hook is
           // `onLoadedData` (metadata + first frame ready) — fires only
