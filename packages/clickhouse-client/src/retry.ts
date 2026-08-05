@@ -129,14 +129,31 @@ export async function runWithRetry<T>(
         maxDelayMs,
         ...(random === undefined ? {} : { random }),
       });
-      onRetry?.({
-        attempt,
-        maxAttempts,
-        delayMs,
-        error,
-        level: retryNoticeLevel(attempt),
-      });
+      // Guarded because `onRetry` is host code - a logger, a counter - and it
+      // runs inside the catch. An exception from it would propagate in place of
+      // `error`, so the caller would be handed a logging failure and never
+      // learn which ClickHouse error actually happened, and the remaining
+      // attempts would be cancelled by the reporting of the failure rather than
+      // the failure. Observability must not change what it observes.
+      try {
+        onRetry?.({
+          attempt,
+          maxAttempts,
+          delayMs,
+          error,
+          level: retryNoticeLevel(attempt),
+        });
+      } catch {
+        // Deliberately swallowed. There is nowhere better to put it: the only
+        // channel for reporting it is the thing that just threw.
+      }
+
       await sleep(delayMs);
+
+      // Checked again after the wait, not only before it. A backoff can be
+      // tens of seconds, and a caller that gave up during it is not waiting for
+      // the answer any more, so another attempt is pure load.
+      if (isAborted?.() === true) throw error;
     }
   }
 

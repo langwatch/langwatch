@@ -37,7 +37,15 @@ export class UnknownTenantError extends Error {
 
 /** Raised when two env vars claim the same organisation. */
 export class DuplicateRouteError extends Error {
-  constructor(organizationId: string, first: string, second: string) {
+  constructor({
+    organizationId,
+    first,
+    second,
+  }: {
+    organizationId: string;
+    first: string;
+    second: string;
+  }) {
     super(
       `Two ClickHouse routes are configured for organisation "${organizationId}" ("${first}" and "${second}"). ` +
         "Refusing to guess which instance holds their data.",
@@ -112,7 +120,11 @@ export function parseRoutingTable(
 
     const existing = source.get(organizationId);
     if (existing !== undefined) {
-      throw new DuplicateRouteError(organizationId, existing, envVar);
+      throw new DuplicateRouteError({
+        organizationId,
+        first: existing,
+        second: envVar,
+      });
     }
 
     routes.set(organizationId, value.trim());
@@ -162,9 +174,22 @@ export function createTenantRouter({
   directory,
   maxCacheEntries = DEFAULT_MAX_CACHE_ENTRIES,
 }: TenantRouterOptions): TenantRouter {
+  // `NaN` and `Infinity` both make `cache.size >= maxCacheEntries` false
+  // forever, which removes the bound this option exists to impose and lets a
+  // long-lived worker grow the map for the life of the process.
+  if (!Number.isInteger(maxCacheEntries) || maxCacheEntries < 1) {
+    throw new RangeError("maxCacheEntries must be a positive integer");
+  }
+
   const cache = new Map<string, string>();
 
-  const remember = (tenantId: string, organizationId: string): void => {
+  const remember = ({
+    tenantId,
+    organizationId,
+  }: {
+    tenantId: string;
+    organizationId: string;
+  }): void => {
     // Map preserves insertion order, so the first key is the oldest write.
     if (cache.size >= maxCacheEntries) {
       const oldest = cache.keys().next();
@@ -184,7 +209,7 @@ export function createTenantRouter({
       // would make a newly created project unroutable until eviction.
       throw new UnknownTenantError(tenantId);
     }
-    remember(tenantId, resolved);
+    remember({ tenantId, organizationId: resolved });
     return resolved;
   };
 

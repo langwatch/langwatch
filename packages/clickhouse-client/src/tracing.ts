@@ -88,6 +88,25 @@ export const SPAN_ATTRIBUTES = {
   bytesRead: "db.response.read_bytes",
 } as const;
 
+/**
+ * Runs host observability code without letting it change the outcome.
+ *
+ * Everything this middleware calls - the tracer, the span, the completion
+ * counter - is supplied by the host and runs on the query's own path. An
+ * exception from any of it would surface to the caller as though the query had
+ * failed, or would replace a real ClickHouse error with a telemetry one. A
+ * span exporter that is misconfigured is a reporting problem; it must not
+ * become an outage.
+ */
+function quietly(report: () => void): void {
+  try {
+    report();
+  } catch {
+    // Deliberately swallowed. The only channel for reporting a telemetry
+    // failure is the telemetry that just failed.
+  }
+}
+
 export function trace({
   tracer,
   spanName = "clickhouse.query",
@@ -96,42 +115,55 @@ export function trace({
 }: TraceOptions): QueryMiddleware {
   return (next) =>
     async <Row>(request: QueryRequest): Promise<QueryResult<Row>> => {
-      const span = tracer.startSpan(spanName);
+      let span: SpanPort | undefined;
+      quietly(() => {
+        span = tracer.startSpan(spanName);
+      });
       const startedAt = now();
 
-      span.setAttribute(SPAN_ATTRIBUTES.system, "clickhouse");
-      span.setAttribute(SPAN_ATTRIBUTES.tenant, request.tenantId);
-      span.setAttribute(SPAN_ATTRIBUTES.operation, request.kind ?? "read");
-      if (request.table !== undefined) {
-        span.setAttribute(SPAN_ATTRIBUTES.table, request.table);
-      }
-      // Recorded so an audit can enumerate every statement that opted out of
-      // the tenant predicate, and why, without reading the code.
-      if (request.unscoped !== undefined) {
-        span.setAttribute(
-          SPAN_ATTRIBUTES.unscopedReason,
-          request.unscoped.reason,
-        );
-      }
+      quietly(() => {
+        if (span === undefined) return;
+        span.setAttribute(SPAN_ATTRIBUTES.system, "clickhouse");
+        span.setAttribute(SPAN_ATTRIBUTES.tenant, request.tenantId);
+        span.setAttribute(SPAN_ATTRIBUTES.operation, request.kind ?? "read");
+        if (request.table !== undefined) {
+          span.setAttribute(SPAN_ATTRIBUTES.table, request.table);
+        }
+        // Recorded so an audit can enumerate every statement that opted out of
+        // the tenant predicate, and why, without reading the code.
+        if (request.unscoped !== undefined) {
+          span.setAttribute(
+            SPAN_ATTRIBUTES.unscopedReason,
+            request.unscoped.reason,
+          );
+        }
+      });
 
       try {
         const result = await next<Row>(request);
-        span.setAttribute(SPAN_ATTRIBUTES.rows, result.rows.length);
-        if (result.stats?.bytesRead !== undefined) {
-          span.setAttribute(SPAN_ATTRIBUTES.bytesRead, result.stats.bytesRead);
-        }
-        onComplete?.({
-          request,
-          durationMs: now() - startedAt,
-          rowCount: result.rows.length,
+        quietly(() => {
+          span?.setAttribute(SPAN_ATTRIBUTES.rows, result.rows.length);
+          if (result.stats?.bytesRead !== undefined) {
+            span?.setAttribute(
+              SPAN_ATTRIBUTES.bytesRead,
+              result.stats.bytesRead,
+            );
+          }
+          onComplete?.({
+            request,
+            durationMs: now() - startedAt,
+            rowCount: result.rows.length,
+          });
         });
         return result;
       } catch (error) {
-        span.recordError(describeQueryError(error));
-        onComplete?.({ request, durationMs: now() - startedAt, error });
+        quietly(() => {
+          span?.recordError(describeQueryError(error));
+          onComplete?.({ request, durationMs: now() - startedAt, error });
+        });
         throw error;
       } finally {
-        span.end();
+        quietly(() => span?.end());
       }
     };
 }

@@ -68,6 +68,12 @@ export function createConcurrencyLimiter({
   if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) {
     throw new RangeError("maxConcurrent must be a positive integer");
   }
+  // Zero is a real setting - never queue, shed the moment the slots are gone.
+  // A non-integer is not: `waiting.length >= NaN` is false forever, which
+  // unbounds the queue and quietly removes the only thing this module is for.
+  if (!Number.isInteger(maxQueued) || maxQueued < 0) {
+    throw new RangeError("maxQueued must be a non-negative integer");
+  }
 
   let inFlight = 0;
   const waiting: { release: () => void; abort: (error: Error) => void }[] = [];

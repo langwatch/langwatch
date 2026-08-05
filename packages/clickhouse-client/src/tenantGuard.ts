@@ -13,13 +13,19 @@
  * normal query and forgetting a WHERE clause. Real isolation is enforced by the
  * routing in ./tenancy.ts and by the credentials the server was given.
  *
+ * A disjunction is refused rather than merely noted. `WHERE TenantId = {t} OR
+ * Status = 'x'` contains the predicate and still returns every tenant's rows,
+ * and it is not an exotic statement - it is what operator precedence produces
+ * when somebody writes `WHERE TenantId = {t} AND A OR B` meaning `AND (A OR
+ * B)`. Any `OR` at or above the predicate's parenthesis depth can weaken it, so
+ * that is the rule: an `OR` nested deeper is inside a group and harmless, one
+ * at the same depth or shallower is refused. Putting brackets round the
+ * disjunction both satisfies the guard and fixes the query.
+ *
  * Known and accepted limits, each pinned by a test in ./tenantGuard.test.ts so
  * they stay documented rather than becoming folklore. One match anywhere in the
- * statement satisfies the whole statement, so all of these pass:
+ * statement satisfies the whole statement, so these still pass:
  *
- *   - a disjunction: `WHERE TenantId = {t:String} OR Status = 'x'` matches, and
- *     returns every tenant's rows. This is the one a regex cannot see, and the
- *     reason this check is a backstop rather than the isolation mechanism.
  *   - a UNION whose second arm is unscoped.
  *   - a JOIN where only one side is scoped.
  *   - a scoped subquery or CTE beneath an unscoped outer query.
@@ -38,6 +44,7 @@ import type { QueryMiddleware, QueryRequest } from "./pipeline";
 export type TenantScopeViolation =
   | { kind: "missing-predicate" }
   | { kind: "literal-predicate" }
+  | { kind: "weakening-disjunction" }
   | { kind: "missing-param"; param: string }
   | {
       kind: "param-mismatch";
@@ -61,14 +68,133 @@ const LITERAL_TENANT_PREDICATE =
  * driver, a server, or a pipeline.
  */
 /**
- * Removes `--` line comments and block comments before matching.
+ * Blanks out comment bodies and string-literal bodies, keeping every other
+ * character at its original index.
  *
- * Without this the guard misses the case it most exists for: someone debugging
- * comments the WHERE clause out, and the statement then reads every tenant's
- * rows while still visibly "containing" the predicate.
+ * Comments have to go before matching or the guard misses the case it most
+ * exists for: someone debugging comments the WHERE clause out, and the
+ * statement then reads every tenant's rows while still visibly "containing" the
+ * predicate. String bodies go too, so that a literal containing `OR`, `--` or
+ * `/*` cannot steer any of the checks below.
+ *
+ * Written as one pass rather than a pair of replaces because the obvious
+ * `/\/\*[\s\S]*?\*\//` backtracks: against a long run of unterminated `/*` each
+ * start position rescans to the end of the input, which is quadratic in the
+ * length of the statement and reachable from any caller that builds SQL from
+ * input it did not write. Here every character is visited once.
+ *
+ * Length is preserved so the returned indices still address the original text.
  */
-function withoutComments(sql: string): string {
-  return sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
+function maskNonCode(sql: string): string {
+  const out = [...sql];
+
+  const blank = (from: number, to: number): void => {
+    for (let i = from; i < to && i < out.length; i++) {
+      if (out[i] !== "\n") out[i] = " ";
+    }
+  };
+
+  let cursor = 0;
+  while (cursor < sql.length) {
+    const pair = sql.slice(cursor, cursor + 2);
+
+    if (pair === "/*") {
+      const close = sql.indexOf("*/", cursor + 2);
+      const end = close === -1 ? sql.length : close + 2;
+      blank(cursor, end);
+      cursor = end;
+      continue;
+    }
+
+    if (pair === "--") {
+      const newline = sql.indexOf("\n", cursor);
+      const end = newline === -1 ? sql.length : newline;
+      blank(cursor, end);
+      cursor = end;
+      continue;
+    }
+
+    const quote = sql[cursor];
+    if (quote === "'" || quote === '"' || quote === "`") {
+      let scan = cursor + 1;
+      while (scan < sql.length) {
+        if (sql[scan] === "\\") {
+          scan += 2;
+          continue;
+        }
+        if (sql[scan] === quote) {
+          // A doubled quote is an escaped quote, not the end of the literal.
+          if (sql[scan + 1] === quote) {
+            scan += 2;
+            continue;
+          }
+          break;
+        }
+        scan += 1;
+      }
+      // The delimiters stay, so `TenantId = 'x'` is still recognisably a
+      // literal predicate rather than becoming a bare `TenantId =`.
+      blank(cursor + 1, Math.min(scan, sql.length));
+      cursor = Math.min(scan + 1, sql.length);
+      continue;
+    }
+
+    cursor += 1;
+  }
+
+  return out.join("");
+}
+
+const isWordCharacter = (character: string | undefined): boolean =>
+  character !== undefined && /[A-Za-z0-9_]/.test(character);
+
+/**
+ * Reports an `OR` that can disjoin the tenant predicate away.
+ *
+ * Depth is the test. An `OR` nested inside a bracketed group cannot weaken a
+ * predicate outside it, so only one at the predicate's own depth or shallower
+ * counts. That accepts `TenantId = {t} AND (a OR b)` and refuses both
+ * `TenantId = {t} OR a` and `(TenantId = {t}) OR a`.
+ *
+ * One pass, so this cannot become the quadratic thing `maskNonCode` just
+ * stopped being.
+ */
+function hasWeakeningDisjunction({
+  masked,
+  predicateIndex,
+}: {
+  masked: string;
+  predicateIndex: number;
+}): boolean {
+  const disjunctionDepths: number[] = [];
+  let depth = 0;
+  let predicateDepth = 0;
+
+  for (let i = 0; i < masked.length; i++) {
+    if (i === predicateIndex) predicateDepth = depth;
+
+    const character = masked[i];
+    if (character === "(") {
+      depth += 1;
+      continue;
+    }
+    if (character === ")") {
+      depth -= 1;
+      continue;
+    }
+
+    // `\bOR\b` by hand, so `ORDER BY` and a column called `colour` are not ORs.
+    if (
+      (character === "o" || character === "O") &&
+      (masked[i + 1] === "r" || masked[i + 1] === "R") &&
+      !isWordCharacter(masked[i - 1]) &&
+      !isWordCharacter(masked[i + 2])
+    ) {
+      disjunctionDepths.push(depth);
+    }
+  }
+
+  return disjunctionDepths.some((each) => each <= predicateDepth);
 }
 
 export function checkTenantScope({
@@ -80,13 +206,19 @@ export function checkTenantScope({
   params?: Record<string, unknown> | undefined;
   tenantId: string;
 }): TenantScopeViolation | null {
-  const statement = withoutComments(sql);
+  const statement = maskNonCode(sql);
   const bound = BOUND_TENANT_PREDICATE.exec(statement);
 
   if (bound === null) {
     return LITERAL_TENANT_PREDICATE.test(statement)
       ? { kind: "literal-predicate" }
       : { kind: "missing-predicate" };
+  }
+
+  if (
+    hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })
+  ) {
+    return { kind: "weakening-disjunction" };
   }
 
   const param = bound[1] as string;
@@ -120,6 +252,8 @@ function describe(violation: TenantScopeViolation): string {
       return "Statement has no `TenantId = {param:String}` predicate. No other id in this schema is unique across tenants, so this would read another tenant's rows. Add the predicate, or declare `unscoped: { reason }` if the statement genuinely spans tenants.";
     case "literal-predicate":
       return "Statement inlines the tenant as a literal instead of binding a parameter. Bind it, so it can be checked against the caller's tenant and cannot be built by concatenation.";
+    case "weakening-disjunction":
+      return "Statement has an `OR` that can disjoin the tenant predicate away, which would return every tenant's rows. Bracket the disjunction so it cannot weaken the tenant scoping, or declare `unscoped: { reason }` if the statement genuinely spans tenants.";
     case "missing-param":
       return `Statement binds tenant parameter "${violation.param}" but no such parameter was supplied.`;
     case "param-mismatch":

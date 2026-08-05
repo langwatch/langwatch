@@ -72,11 +72,13 @@ export interface QueryRequest {
 export interface QueryResult<Row> {
   rows: Row[];
   /** Whatever the driver knows about the execution. All fields optional. */
-  stats?: {
-    rowsRead?: number | undefined;
-    bytesRead?: number | undefined;
-    durationMs?: number | undefined;
-  };
+  stats?:
+    | {
+        rowsRead?: number | undefined;
+        bytesRead?: number | undefined;
+        durationMs?: number | undefined;
+      }
+    | undefined;
 }
 
 /** The one function type every layer of this package speaks. */
