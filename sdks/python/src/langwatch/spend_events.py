@@ -1,15 +1,19 @@
 """
-API facade for the gateway billing surfaces: per-request spend events,
-reconciliation summaries, replay, end-user spend with applicable caps,
-budget period resets, and reversible virtual-key disable and enable.
+API facade for the gateway billing reads: per-request spend events,
+reconciliation summaries, replay, and end-user spend with the applicable
+caps.
+
+There is no eager whole-collection method on spend events or spend
+summaries because both are unbounded ledger reads: walk them with
+``iterate`` and ``iter_summaries``, or page them deliberately with
+``list_page`` and ``summaries_page``.
 
 All routes are organization-anchored: authenticate with an organization
 API key (``sk-lw-...``) via ``langwatch.setup``. Uses httpx via the
 generated REST API client for HTTP transport.
 """
 
-import urllib.parse
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, Optional
 
 import httpx
 
@@ -17,46 +21,24 @@ from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
 from langwatch.state import get_instance
-from langwatch.utils.exceptions import extract_api_error_detail
+from langwatch.utils.gateway_http import (
+    quote_path_segment,
+    raise_for_status,
+    walk_cursor_pages,
+)
 from langwatch.utils.initialization import ensure_setup
 
 
-def _raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
-    if response.is_success:
-        return
-    status = response.status_code
-    detail = ""
-    try:
-        body = response.json()
-        detail = extract_api_error_detail(body)
-    except Exception:
-        detail = response.text or ""
-    label = f"{operation}: " if operation else ""
-    if status == 404:
-        raise ValueError(f"{label}not found" + (f": {detail}" if detail else ""))
-    if status == 400 or status == 422:
-        raise ValueError(f"{label}bad request" + (f": {detail}" if detail else ""))
-    if status == 401 or status == 403:
-        raise RuntimeError(f"{label}authentication failed" + (f": {detail}" if detail else ""))
-    if status == 402:
-        raise RuntimeError(f"{label}plan does not include this surface" + (f": {detail}" if detail else ""))
-    if status >= 500:
-        raise RuntimeError(f"{label}server error ({status})" + (f": {detail}" if detail else ""))
-    raise RuntimeError(f"{label}unexpected status {status}" + (f": {detail}" if detail else ""))
-
-
-def _quote(value: str) -> str:
-    return urllib.parse.quote(value, safe="")
-
-
 class SpendEventsFacade:
-    """Facade for spend events, reconciliation, and the billing controls."""
+    """Facade for spend events and reconciliation."""
 
     def __init__(self, rest_api_client: LangWatchRestApiClient) -> None:
         self._client = rest_api_client
 
     @classmethod
     def from_global(cls) -> "SpendEventsFacade":
+        """Build the facade on the process-wide LangWatch client, setting it
+        up first if nothing has yet."""
         ensure_setup()
         instance = get_instance()
         if instance is None:
@@ -68,7 +50,7 @@ class SpendEventsFacade:
 
     # ── spend events (the ledger read) ────────────────────────────────
 
-    def list(
+    def list_page(
         self,
         *,
         from_ms: int,
@@ -77,10 +59,12 @@ class SpendEventsFacade:
         limit: Optional[int] = None,
         virtual_key_id: Optional[str] = None,
         end_user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        model: Optional[str] = None,
         status: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Cursor-paged spend event envelopes over the 13-month ledger.
-        Returns {data, next_cursor}: diff by gateway_request_id."""
+        """One page of spend event envelopes over the 13-month ledger, as
+        {data, next_cursor}: diff by gateway_request_id."""
         params: Dict[str, Any] = {"from": from_ms, "to": to_ms}
         if cursor is not None:
             params["cursor"] = cursor
@@ -90,11 +74,47 @@ class SpendEventsFacade:
             params["virtual_key_id"] = virtual_key_id
         if end_user_id is not None:
             params["end_user_id"] = end_user_id
+        if project_id is not None:
+            params["project_id"] = project_id
+        if model is not None:
+            params["model"] = model
         if status is not None:
             params["status"] = status
         response = self._http().get("/api/gateway/v1/spend-events", params=params)
-        _raise_for_status(response, operation="list spend events")
+        raise_for_status(response, operation="list spend events")
         return response.json()
+
+    def iterate(
+        self,
+        *,
+        from_ms: int,
+        to_ms: int,
+        limit: Optional[int] = None,
+        virtual_key_id: Optional[str] = None,
+        end_user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        model: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> Iterator[Dict[str, Any]]:
+        """Every spend event in the window, one envelope at a time, fetching
+        a page only when the previous one runs out.
+
+        Lazy on purpose: the window is a ledger range, so collecting it into
+        a list first is a memory bound nobody chose."""
+        for page in walk_cursor_pages(
+            lambda cursor: self.list_page(
+                from_ms=from_ms,
+                to_ms=to_ms,
+                cursor=cursor,
+                limit=limit,
+                virtual_key_id=virtual_key_id,
+                end_user_id=end_user_id,
+                project_id=project_id,
+                model=model,
+                status=status,
+            )
+        ):
+            yield from page["data"]
 
     def summaries_page(
         self,
@@ -124,36 +144,8 @@ class SpendEventsFacade:
         if project_id is not None:
             params["project_id"] = project_id
         response = self._http().get("/api/gateway/v1/spend-summaries", params=params)
-        _raise_for_status(response, operation="spend summaries")
+        raise_for_status(response, operation="spend summaries")
         return response.json()
-
-    def summaries(
-        self,
-        *,
-        group_by: str,
-        from_ms: int,
-        to_ms: int,
-        cursor: Optional[str] = None,
-        limit: Optional[int] = None,
-        virtual_key_id: Optional[str] = None,
-        project_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """Reconciliation checksums per key: event_count, settled_count,
-        token classes, and integer nano-USD cost. Compare a closed
-        period's counts and sums first; walk list() only on divergence.
-        group_by: "virtual_key" or "end_user".
-
-        Returns one page's rows. Use summaries_page() when you need
-        next_cursor, or iter_summaries() to walk every page."""
-        return self.summaries_page(
-            group_by=group_by,
-            from_ms=from_ms,
-            to_ms=to_ms,
-            cursor=cursor,
-            limit=limit,
-            virtual_key_id=virtual_key_id,
-            project_id=project_id,
-        )["data"]
 
     def iter_summaries(
         self,
@@ -168,10 +160,11 @@ class SpendEventsFacade:
         """Every rollup row in the window, walking the cursor for you.
 
         The whole-window read a reconciler actually wants, so getting the
-        totals right does not depend on remembering to page."""
-        cursor: Optional[str] = None
-        while True:
-            page = self.summaries_page(
+        totals right does not depend on remembering to page. Each row
+        carries event_count, settled_count, the token classes, and integer
+        nano-USD cost."""
+        for page in walk_cursor_pages(
+            lambda cursor: self.summaries_page(
                 group_by=group_by,
                 from_ms=from_ms,
                 to_ms=to_ms,
@@ -180,10 +173,8 @@ class SpendEventsFacade:
                 virtual_key_id=virtual_key_id,
                 project_id=project_id,
             )
+        ):
             yield from page["data"]
-            cursor = page.get("next_cursor")
-            if not cursor:
-                return
 
     def replay(
         self,
@@ -193,13 +184,13 @@ class SpendEventsFacade:
         endpoint_id: str,
     ) -> Dict[str, Any]:
         """Re-deliver a window of spend events to one webhook endpoint.
-        Downstream dedup windows are finite; prefer list() + diff for old
+        Downstream dedup windows are finite; prefer iterate() + diff for old
         ranges."""
         response = self._http().post(
             "/api/gateway/v1/spend-events/replay",
             json={"from": from_ms, "to": to_ms, "endpoint_id": endpoint_id},
         )
-        _raise_for_status(response, operation="replay spend events")
+        raise_for_status(response, operation="replay spend events")
         return response.json()["data"]
 
     def end_user_spend(
@@ -224,52 +215,8 @@ class SpendEventsFacade:
         if virtual_key_id is not None:
             params["virtual_key_id"] = virtual_key_id
         response = self._http().get(
-            f"/api/gateway/v1/end-users/{_quote(end_user_id)}/spend",
+            f"/api/gateway/v1/end-users/{quote_path_segment(end_user_id)}/spend",
             params=params,
         )
-        _raise_for_status(response, operation="end-user spend")
+        raise_for_status(response, operation="end-user spend")
         return response.json()["data"]
-
-    # ── period close ──────────────────────────────────────────────────
-
-    def reset_budget(
-        self,
-        budget_id: str,
-        *,
-        end_user_id: Optional[str] = None,
-        reason: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Move a budget's period boundary to now. Recorded spend is never
-        mutated; with end_user_id only that end user's bucket boundary
-        moves (attributed-user templates)."""
-        path = f"/api/gateway/v1/budgets/{_quote(budget_id)}/reset"
-        if end_user_id is not None:
-            path += f"?end_user_id={_quote(end_user_id)}"
-        response = self._http().post(
-            path, json={"reason": reason} if reason else {}
-        )
-        _raise_for_status(response, operation="reset budget")
-        return response.json()["budget"]
-
-    # ── tenant kill switch ────────────────────────────────────────────
-
-    def disable_virtual_key(
-        self, virtual_key_id: str, *, reason: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Reversible stop: requests get the distinct virtual_key_disabled
-        error until enable; budgets, scopes, key material, and rotation
-        grace stay intact."""
-        response = self._http().post(
-            f"/api/gateway/v1/virtual-keys/{_quote(virtual_key_id)}/disable",
-            json={"reason": reason} if reason else {},
-        )
-        _raise_for_status(response, operation="disable virtual key")
-        return response.json()["virtual_key"]
-
-    def enable_virtual_key(self, virtual_key_id: str) -> Dict[str, Any]:
-        """Reverse of disable: the key returns exactly as it was."""
-        response = self._http().post(
-            f"/api/gateway/v1/virtual-keys/{_quote(virtual_key_id)}/enable"
-        )
-        _raise_for_status(response, operation="enable virtual key")
-        return response.json()["virtual_key"]

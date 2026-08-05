@@ -14,10 +14,12 @@ if TYPE_CHECKING:
     from ..models.get_api_prompts_by_id_response_200_inputs_item import GetApiPromptsByIdResponse200InputsItem
     from ..models.get_api_prompts_by_id_response_200_messages_item import GetApiPromptsByIdResponse200MessagesItem
     from ..models.get_api_prompts_by_id_response_200_outputs_item import GetApiPromptsByIdResponse200OutputsItem
+    from ..models.get_api_prompts_by_id_response_200_parameters import GetApiPromptsByIdResponse200Parameters
     from ..models.get_api_prompts_by_id_response_200_prompting_technique import (
         GetApiPromptsByIdResponse200PromptingTechnique,
     )
     from ..models.get_api_prompts_by_id_response_200_response_format import GetApiPromptsByIdResponse200ResponseFormat
+    from ..models.get_api_prompts_by_id_response_200_tags_item import GetApiPromptsByIdResponse200TagsItem
 
 
 T = TypeVar("T", bound="GetApiPromptsByIdResponse200")
@@ -42,6 +44,8 @@ class GetApiPromptsByIdResponse200:
         inputs (list[GetApiPromptsByIdResponse200InputsItem]):
         outputs (list[GetApiPromptsByIdResponse200OutputsItem]):
         model (str):
+        tags (list[GetApiPromptsByIdResponse200TagsItem]):
+        parameters (GetApiPromptsByIdResponse200Parameters):
         author_id (None | str | Unset):
         commit_message (None | str | Unset):
         temperature (float | Unset):
@@ -66,6 +70,8 @@ class GetApiPromptsByIdResponse200:
     inputs: list[GetApiPromptsByIdResponse200InputsItem]
     outputs: list[GetApiPromptsByIdResponse200OutputsItem]
     model: str
+    tags: list[GetApiPromptsByIdResponse200TagsItem]
+    parameters: GetApiPromptsByIdResponse200Parameters
     author_id: None | str | Unset = UNSET
     commit_message: None | str | Unset = UNSET
     temperature: float | Unset = UNSET
@@ -116,6 +122,13 @@ class GetApiPromptsByIdResponse200:
 
         model = self.model
 
+        tags = []
+        for tags_item_data in self.tags:
+            tags_item = tags_item_data.to_dict()
+            tags.append(tags_item)
+
+        parameters = self.parameters.to_dict()
+
         author_id: None | str | Unset
         if isinstance(self.author_id, Unset):
             author_id = UNSET
@@ -163,6 +176,8 @@ class GetApiPromptsByIdResponse200:
                 "inputs": inputs,
                 "outputs": outputs,
                 "model": model,
+                "tags": tags,
+                "parameters": parameters,
             }
         )
         if author_id is not UNSET:
@@ -190,12 +205,14 @@ class GetApiPromptsByIdResponse200:
         from ..models.get_api_prompts_by_id_response_200_inputs_item import GetApiPromptsByIdResponse200InputsItem
         from ..models.get_api_prompts_by_id_response_200_messages_item import GetApiPromptsByIdResponse200MessagesItem
         from ..models.get_api_prompts_by_id_response_200_outputs_item import GetApiPromptsByIdResponse200OutputsItem
+        from ..models.get_api_prompts_by_id_response_200_parameters import GetApiPromptsByIdResponse200Parameters
         from ..models.get_api_prompts_by_id_response_200_prompting_technique import (
             GetApiPromptsByIdResponse200PromptingTechnique,
         )
         from ..models.get_api_prompts_by_id_response_200_response_format import (
             GetApiPromptsByIdResponse200ResponseFormat,
         )
+        from ..models.get_api_prompts_by_id_response_200_tags_item import GetApiPromptsByIdResponse200TagsItem
 
         d = dict(src_dict)
         id = d.pop("id")
@@ -247,6 +264,15 @@ class GetApiPromptsByIdResponse200:
             outputs.append(outputs_item)
 
         model = d.pop("model")
+
+        tags = []
+        _tags = d.pop("tags")
+        for tags_item_data in _tags:
+            tags_item = GetApiPromptsByIdResponse200TagsItem.from_dict(tags_item_data)
+
+            tags.append(tags_item)
+
+        parameters = GetApiPromptsByIdResponse200Parameters.from_dict(d.pop("parameters"))
 
         def _parse_author_id(data: object) -> None | str | Unset:
             if data is None:
@@ -307,6 +333,8 @@ class GetApiPromptsByIdResponse200:
             inputs=inputs,
             outputs=outputs,
             model=model,
+            tags=tags,
+            parameters=parameters,
             author_id=author_id,
             commit_message=commit_message,
             temperature=temperature,

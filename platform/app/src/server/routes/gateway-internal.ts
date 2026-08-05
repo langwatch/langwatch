@@ -37,10 +37,8 @@ import {
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
-import {
-  bucketPeriodFloorMs,
-  GatewayBudgetClickHouseRepository,
-} from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { bucketPeriodFloorMs } from "~/server/gateway/budgetPeriod";
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,

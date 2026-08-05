@@ -153,6 +153,8 @@ Two control-plane components must be running for the gateway to function fully:
 - **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
 - **`langwatch-workers`** running the event-sourcing pipelines. **Budget enforcement depends on this.** The gateway does NOT debit budgets directly: it emits spend commands, and the workers' debits process prices them and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, the gateway still serves traffic but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
 
+  The gateway side of that pipeline is `spend.enabled`, on by default. It is what writes each request's spend record to the on-disk spool a background drainer ships to the control plane, so **turning it off leaves the gateway serving traffic that costs money and debits nothing**: budgets sit at zero and stop enforcing. Turn it off only while running a gateway newer than a control plane that has no spend ingest route yet, and even then leaving it on is the safer degraded state, because the drainer retries on backoff and the spool is bounded. Watch `gateway_spend_spool_dropped_total`: every drop is spend nobody bills.
+
 ## Networking
 
 The gateway needs to reach:
@@ -426,7 +428,7 @@ gateway:
 
 Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
 - `security`, edge, fails fast with 413, operator bumps when large base64 images are legitimate;
-- `budget`, accounting, reconciles asynchronously via the span-to-ledger path, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
+- `budget`, accounting, reconciles asynchronously from the spend commands the gateway emits, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
 - `upstream`, per-provider, fails mid-flight with circuit-breaker trips.
 
 The chart's ConfigMap renders the int as `%d` (the chart's test render catches a YAML scientific-notation gotcha, Go's `ParseInt` rejects `1.048576e+07`). If you override this value in a custom `values.yaml`, write integer literals, not floats.

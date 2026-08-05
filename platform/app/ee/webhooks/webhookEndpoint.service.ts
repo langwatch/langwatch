@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { randomBytes } from "node:crypto";
+import type { WebhookUrlProblemCode } from "@langwatch/automations/providers/webhook";
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type {
@@ -8,7 +10,12 @@ import type {
   WebhookDeliveryOutcome,
   WebhookEndpoint,
 } from "@prisma/client";
+import { pruneWebhookDeliveries } from "~/server/webhooks/deliveryLog";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
+import {
+  allowsInsecureLocalUrls,
+  inspectWebhookUrl,
+} from "~/server/webhooks/urlPolicy";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { isValidEventSelector } from "./eventRegistry";
@@ -17,8 +24,6 @@ const logger = createLogger("langwatch:webhooks:endpoint-service");
 
 /** 72 hours of unbroken failures auto-disables an endpoint. */
 export const WEBHOOK_AUTO_DISABLE_AFTER_MS = 72 * 60 * 60 * 1000;
-/** Delivery-log retention, mirroring the automations webhook log. */
-export const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const WEBHOOK_DISABLED_REASON_AUTO = "auto_failures_72h";
 export const WEBHOOK_DISABLED_REASON_MANUAL = "manual";
@@ -81,10 +86,40 @@ export function assertValidDeliveryControls(
   }
 }
 
-export class WebhookEndpointValidationError extends Error {}
-export class WebhookEndpointNotFoundError extends Error {
+/**
+ * The endpoint as asked for cannot be saved: the URL is refused by the
+ * admission policy, an event name is not in the catalog, or a delivery
+ * control is out of bounds. The message names which, because every one of
+ * them is something the caller can correct on the next attempt.
+ */
+export class WebhookEndpointValidationError extends HandledError {
+  declare readonly code: "webhook_endpoint_invalid";
+
+  constructor(message: string) {
+    super("webhook_endpoint_invalid", message, {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "WebhookEndpointValidationError";
+  }
+}
+
+/**
+ * No live endpoint in this organization has that id.
+ *
+ * Archived endpoints answer the same as ids that never existed and as ids
+ * belonging to another organization: telling those apart would confirm the
+ * existence of another tenant's rows.
+ */
+export class WebhookEndpointNotFoundError extends HandledError {
+  declare readonly code: "webhook_endpoint_not_found";
+
   constructor() {
-    super("Webhook endpoint not found");
+    super("webhook_endpoint_not_found", "Webhook endpoint not found", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "WebhookEndpointNotFoundError";
   }
 }
 
@@ -126,25 +161,34 @@ function toView(endpoint: WebhookEndpoint): WebhookEndpointView {
   };
 }
 
-function assertValidUrl(url: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new WebhookEndpointValidationError("url must be a valid URL");
-  }
-  if (parsed.protocol === "https:") return;
-  // Operator opt-in for local development and internal receivers: plain
-  // http is accepted only when the deployment explicitly set the unsafe
-  // flag. The delivery path relaxes its local-address fence on the same
-  // flag; everything else about the sender stays strict.
-  if (parsed.protocol === "http:" && allowsInsecureLocalUrls()) return;
-  throw new WebhookEndpointValidationError("url must use https");
-}
+/**
+ * This surface's wording for each admission rule. The rule itself lives in the
+ * shared `urlPolicy`, which both webhook channels run; only the sentence is
+ * local, because a REST integrator reading `url must use https` and a trigger
+ * author reading "The webhook URL must use https." want different registers.
+ */
+const URL_PROBLEM_MESSAGES: Record<WebhookUrlProblemCode, string> = {
+  invalid_url: "url must be a valid URL",
+  scheme: "url must use https",
+  host: "url must have a host",
+  port: "url must use the default https port (443)",
+  credentials: "url must not carry credentials",
+};
 
-/** True only when the operator set WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1. */
-export function allowsInsecureLocalUrls(): boolean {
-  return process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS === "1";
+function assertValidUrl(url: string): void {
+  // Same policy the sender enforces at dispatch, so an endpoint that saves is
+  // an endpoint that can deliver. Operator opt-in for local development and
+  // internal receivers relaxes the origin here exactly as it relaxes the
+  // local-address fence on the send.
+  const problem = inspectWebhookUrl({
+    url,
+    allowInsecureLocal: allowsInsecureLocalUrls(),
+  });
+  if (problem) {
+    throw new WebhookEndpointValidationError(
+      URL_PROBLEM_MESSAGES[problem.code],
+    );
+  }
 }
 
 function assertValidEvents(enabledEvents: string[]): void {
@@ -464,6 +508,7 @@ export class WebhookEndpointService {
     sampleLimit: number;
   }): Promise<{ attempted: number; delivered: number; latencies: number[] }> {
     const where = {
+      channel: "platform" as const,
       organizationId: params.organizationId,
       endpointId: params.endpointId,
       firedAt: { gt: params.since },
@@ -559,6 +604,7 @@ export class WebhookEndpointService {
 
     await this.deps.prisma.webhookEndpointDelivery.create({
       data: {
+        channel: "platform",
         organizationId: params.organizationId,
         endpointId: params.endpointId,
         dispatchId: params.dispatchId,
@@ -717,6 +763,11 @@ export class WebhookEndpointService {
     const limit = Math.min(params.limit ?? 25, 200);
     const rows = await this.deps.prisma.webhookEndpointDelivery.findMany({
       where: {
+        // The log is shared with the automations channel now. Those rows carry
+        // no organizationId or endpointId so they could not match anyway, but
+        // saying so keeps this reader's scope in the query rather than in a
+        // reader's head.
+        channel: "platform",
         organizationId: params.organizationId,
         endpointId: params.endpointId,
         // Strictly after the cursor row in (firedAt desc, id desc) order,
@@ -742,8 +793,12 @@ export class WebhookEndpointService {
       deliveries: page.map((r) => ({
         id: r.id,
         dispatchId: r.dispatchId,
-        attempt: r.attempt,
-        eventCount: r.eventCount,
+        // Nullable in the shared table because the automations channel records
+        // neither; every platform row carries both, and the query above only
+        // returns platform rows, so the fallbacks describe an unreachable row
+        // rather than a value this reader invents.
+        attempt: r.attempt ?? 1,
+        eventCount: r.eventCount ?? 0,
         outcome: r.outcome,
         responseStatus: r.responseStatus,
         latencyMs: r.latencyMs,
@@ -778,15 +833,10 @@ export class WebhookEndpointService {
     };
   }
 
-  /** 30-day delivery-log prune; returns the deleted count. */
+  /** 30-day delivery-log prune; returns the deleted count. Runs the shared
+   *  sweep, so it clears both channels' rows from the one table. */
   async pruneDeliveries(now: Date = new Date()): Promise<number> {
-    const before = new Date(now.getTime() - WEBHOOK_DELIVERY_RETENTION_MS);
-    const deleted = await this.deps.prisma.$executeRaw`
-      DELETE FROM "WebhookEndpointDelivery"
-      WHERE "firedAt" < ${before}
-      -- @tenancy: webhook delivery-log retention sweep (system-owned maintenance)
-    `;
-    return deleted;
+    return await pruneWebhookDeliveries({ prisma: this.deps.prisma, now });
   }
 
   private async requireEndpoint(params: {

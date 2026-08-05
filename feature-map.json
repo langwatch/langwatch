@@ -928,7 +928,7 @@
                 "webhooks update",
                 "webhooks enable",
                 "webhooks disable",
-                "webhooks delete",
+                "webhooks archive",
                 "webhooks roll-secret",
                 "webhooks test",
                 "webhooks deliveries",

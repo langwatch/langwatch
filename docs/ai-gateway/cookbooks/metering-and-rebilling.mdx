@@ -64,7 +64,8 @@ curl -sS $LW/api/gateway/v1/budgets \
 
 Choices worth making deliberately:
 
-- **`manual` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use calendar windows (`month`, aligned UTC) instead if you bill on calendar months and want automatic resets. The two combine freely.
+- **Stamp your own id and retry safely.** Put your customer id in `external_id` on the key and every budget, and send an `Idempotency-Key` on each create. Then a signup that times out halfway can simply be replayed: the calls that already succeeded return their original response instead of minting a second key, and `external_id` lets you find what you created without having stored our ids first. That is what turns provisioning from "store four ids in a transaction and hope" into a retryable job, and it means you can look a tenant up with `?external_id=acme-tenant-4171` instead of keeping a mapping table in sync. See [retrying a create safely](/ai-gateway/api/management#retrying-a-create-safely).
+- **`manual` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use calendar windows (`month`, aligned UTC) instead if you bill on calendar months and want automatic resets, or set `cycle_anchor_at` to the moment the customer signed up so their period rolls on their own anniversary rather than the 1st. The three combine freely.
 - **The hard and soft caps are two budgets**, not one field: `block` at the real ceiling, `warn` below it. Crossing 80 percent of either emits `gateway.budget.threshold_crossed`; hitting a limit emits `gateway.budget.breached`. See [Budgets](/ai-gateway/budgets).
 - **The attributed-user template** is one rule, "each distinct end user on this key: $25 per month". Buckets appear lazily on first spend; there is nothing to create or delete per user. Non-uniform caps are additional templates on other anchors.
 

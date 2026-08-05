@@ -29,6 +29,7 @@ class PostApiSuitesByIdDuplicateResponse201:
         labels (list[str]):
         created_at (str):
         updated_at (str):
+        platform_url (str):
     """
 
     id: str
@@ -41,6 +42,7 @@ class PostApiSuitesByIdDuplicateResponse201:
     labels: list[str]
     created_at: str
     updated_at: str
+    platform_url: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -68,6 +70,8 @@ class PostApiSuitesByIdDuplicateResponse201:
 
         updated_at = self.updated_at
 
+        platform_url = self.platform_url
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -82,6 +86,7 @@ class PostApiSuitesByIdDuplicateResponse201:
                 "labels": labels,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
+                "platformUrl": platform_url,
             }
         )
 
@@ -124,6 +129,8 @@ class PostApiSuitesByIdDuplicateResponse201:
 
         updated_at = d.pop("updatedAt")
 
+        platform_url = d.pop("platformUrl")
+
         post_api_suites_by_id_duplicate_response_201 = cls(
             id=id,
             name=name,
@@ -135,6 +142,7 @@ class PostApiSuitesByIdDuplicateResponse201:
             labels=labels,
             created_at=created_at,
             updated_at=updated_at,
+            platform_url=platform_url,
         )
 
         post_api_suites_by_id_duplicate_response_201.additional_properties = d

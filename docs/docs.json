@@ -889,9 +889,9 @@
             "pages": [
               "api-reference/traces/overview",
               "api-reference/traces/search",
-              "api-reference/traces/projection-dsl",
               "api-reference/traces/get-trace",
-              "api-reference/traces/update-metadata",
+              "api-reference/traces/get-transcript",
+              "api-reference/traces/update-trace-metadata",
               "api-reference/traces/create-public-trace-path",
               "api-reference/traces/delete-public-trace-path"
             ]
@@ -902,16 +902,21 @@
               "api-reference/datasets/overview",
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
+              "api-reference/datasets/create-direct-upload",
               "api-reference/datasets/create-upload",
               "api-reference/datasets/get-dataset",
               "api-reference/datasets/get-records",
               "api-reference/datasets/update-dataset",
               "api-reference/datasets/update-records",
+              "api-reference/datasets/update-staging",
               "api-reference/datasets/post-dataset-entries",
               "api-reference/datasets/action-records",
               "api-reference/datasets/action-upload",
+              "api-reference/datasets/action-finalize",
+              "api-reference/datasets/action-retry",
               "api-reference/datasets/delete-dataset",
-              "api-reference/datasets/delete-records"
+              "api-reference/datasets/delete-records",
+              "api-reference/datasets/delete-direct-upload"
             ]
           },
           {
@@ -996,14 +1001,6 @@
             ]
           },
           {
-            "group": "Evaluations v3",
-            "pages": [
-              "api-reference/evaluations/overview",
-              "api-reference/evaluations/get-runs",
-              "api-reference/evaluations/action-run"
-            ]
-          },
-          {
             "group": "Monitors",
             "pages": [
               "api-reference/monitors/overview",
@@ -1062,6 +1059,7 @@
             "pages": [
               "api-reference/scenario-events/overview",
               "api-reference/scenario-events/create-scenario-events",
+              "api-reference/scenario-events/create-browser-tab",
               "api-reference/scenario-events/delete-scenario-events"
             ]
           },
@@ -1116,6 +1114,7 @@
               "api-reference/workflows/list-workflows",
               "api-reference/workflows/get-workflows",
               "api-reference/workflows/update-workflows",
+              "api-reference/workflows/action-evaluate",
               "api-reference/workflows/delete-workflows"
             ]
           },
@@ -1176,9 +1175,7 @@
               "api-reference/projects/create-project",
               "api-reference/projects/get-project",
               "api-reference/projects/update-project",
-              "api-reference/projects/archive-project",
-              "api-reference/projects/get-api-key",
-              "api-reference/projects/regenerate-api-key"
+              "api-reference/projects/archive-project"
             ]
           },
           {
@@ -1188,12 +1185,12 @@
               "api-reference/teams/list-teams",
               "api-reference/teams/create-team",
               "api-reference/teams/get-team",
-              "api-reference/teams/update-team",
-              "api-reference/teams/archive-team",
               "api-reference/teams/list-members",
+              "api-reference/teams/list-projects",
+              "api-reference/teams/update-team",
               "api-reference/teams/add-member",
-              "api-reference/teams/remove-member",
-              "api-reference/teams/list-projects"
+              "api-reference/teams/archive-team",
+              "api-reference/teams/remove-member"
             ]
           },
           {
@@ -1203,14 +1200,14 @@
               "api-reference/groups/list-groups",
               "api-reference/groups/create-group",
               "api-reference/groups/get-group",
-              "api-reference/groups/rename-group",
-              "api-reference/groups/delete-group",
-              "api-reference/groups/list-members",
-              "api-reference/groups/add-member",
-              "api-reference/groups/remove-member",
               "api-reference/groups/list-bindings",
+              "api-reference/groups/list-members",
+              "api-reference/groups/rename-group",
               "api-reference/groups/add-binding",
-              "api-reference/groups/remove-binding"
+              "api-reference/groups/add-member",
+              "api-reference/groups/delete-group",
+              "api-reference/groups/remove-binding",
+              "api-reference/groups/remove-member"
             ]
           },
           {
@@ -1229,19 +1226,12 @@
               "api-reference/gateway-virtual-keys/list-virtual-keys",
               "api-reference/gateway-virtual-keys/create-virtual-key",
               "api-reference/gateway-virtual-keys/get-virtual-key",
+              "api-reference/gateway-virtual-keys/read-a-virtual-key-s-spend",
               "api-reference/gateway-virtual-keys/update-virtual-key",
+              "api-reference/gateway-virtual-keys/disable-virtual-key",
+              "api-reference/gateway-virtual-keys/enable-virtual-key",
               "api-reference/gateway-virtual-keys/revoke-virtual-key",
               "api-reference/gateway-virtual-keys/rotate-virtual-key-secret"
-            ]
-          },
-          {
-            "group": "Gateway: Provider Bindings",
-            "pages": [
-              "api-reference/gateway-providers/overview",
-              "api-reference/gateway-providers/list-provider-bindings",
-              "api-reference/gateway-providers/bind-a-model-provider-to-the-gateway",
-              "api-reference/gateway-providers/update-provider-binding",
-              "api-reference/gateway-providers/disable-provider-binding"
             ]
           },
           {
@@ -1250,7 +1240,9 @@
               "api-reference/gateway-budgets/overview",
               "api-reference/gateway-budgets/list-budgets-applicable-to-the-project",
               "api-reference/gateway-budgets/create-budget",
+              "api-reference/gateway-budgets/get-budget",
               "api-reference/gateway-budgets/update-budget",
+              "api-reference/gateway-budgets/reset-budget-period",
               "api-reference/gateway-budgets/archive-budget"
             ]
           },
@@ -1263,6 +1255,34 @@
               "api-reference/gateway-cache-rules/get-a-cache-rule",
               "api-reference/gateway-cache-rules/update-a-cache-rule",
               "api-reference/gateway-cache-rules/archive-a-cache-rule"
+            ]
+          },
+          {
+            "group": "Gateway: Spend",
+            "pages": [
+              "api-reference/gateway-spend/overview",
+              "api-reference/gateway-spend/list-spend-events",
+              "api-reference/gateway-spend/list-spend-summaries",
+              "api-reference/gateway-spend/replay-spend-events-to-an-endpoint",
+              "api-reference/gateway-spend/read-one-end-user-s-spend"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "api-reference/webhooks/overview",
+              "api-reference/webhooks/list-webhook-endpoints",
+              "api-reference/webhooks/list-subscribable-event-types",
+              "api-reference/webhooks/list-emitted-events",
+              "api-reference/webhooks/create-a-webhook-endpoint",
+              "api-reference/webhooks/get-a-webhook-endpoint",
+              "api-reference/webhooks/list-an-endpoint-s-delivery-attempts",
+              "api-reference/webhooks/read-an-endpoint-s-delivery-health",
+              "api-reference/webhooks/get-one-emitted-event",
+              "api-reference/webhooks/update-a-webhook-endpoint",
+              "api-reference/webhooks/roll-an-endpoint-s-signing-secret",
+              "api-reference/webhooks/send-a-test-event-to-an-endpoint",
+              "api-reference/webhooks/archive-a-webhook-endpoint"
             ]
           }
         ]
