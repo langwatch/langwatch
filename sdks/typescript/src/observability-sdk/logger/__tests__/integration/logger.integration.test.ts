@@ -44,7 +44,7 @@ const TEST_GEN_AI_ATTRIBUTES = {
 
 type SetupObservabilityOptions = NonNullable<Parameters<typeof setupObservability>[0]>;
 
-describe("Logger Integration Tests", () => {
+describe("given logger observability wired to a real OpenTelemetry SDK", () => {
   let logRecordExporter: InMemoryLogRecordExporter;
   let logRecordProcessor: SimpleLogRecordProcessor;
   let observabilityHandle: ReturnType<typeof setupObservability>;
@@ -88,7 +88,11 @@ describe("Logger Integration Tests", () => {
   }
 
   beforeEach(() => {
-    // Reset OpenTelemetry global state
+    // Clears Vitest's module registry and nulls this SDK's cached config. It
+    // does NOT reset OpenTelemetry's globalThis state: a provider registered
+    // globally by an earlier test stays registered, and static imports are not
+    // reevaluated. That is precisely why each start below owns its exporter and
+    // processor rather than sharing module-level ones.
     vi.resetModules();
     resetObservabilitySdkConfig();
 
