@@ -2,42 +2,55 @@
  * Builds and attaches a "comparison" evaluator target to an experiments-v3
  * workbench state from a CLI/API-key-authenticated request.
  *
- * A comparison is not a distinct target type — it is an `evaluator` target
+ * A comparison is not a distinct target type: it is an `evaluator` target
  * whose `targetEvaluatorId` points at a `langevals/select_best_compare` row
  * and whose `comparison` config lists the other targets ("variants") it
- * judges between. Until now the only place that shape was assembled was
- * inline JSX/handler code in EvaluationsV3Table.tsx, reachable only via a
- * session-authenticated browser flow.
+ * judges between. The Workbench assembles the same shape from its own handler
+ * code in EvaluationsV3Table.tsx; this module is the API-key path to it.
  *
  * Must work correctly against an experiment that already has targets, not
  * just a fresh one: referencing a prompt/agent that's already a target in
  * this experiment reuses that target rather than creating a duplicate column.
  */
-import { nanoid } from "nanoid";
+
 import type { PrismaClient } from "@prisma/client";
+import { nanoid } from "nanoid";
 import { z } from "zod";
-import type { Field } from "~/optimization_studio/types/dsl";
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import {
   COMPARISON_EVALUATOR_TYPE,
-  isComparisonEvaluator,
-  isGoldenFieldSatisfied,
   type ComparisonEvaluatorConfig,
   type DatasetReference,
+  isComparisonEvaluator,
+  isGoldenFieldSatisfied,
   type TargetConfig,
 } from "~/experiments-v3/types";
+import {
+  buildHttpAgentTarget,
+  convertHttpComponentConfig,
+} from "~/experiments-v3/utils/httpAgentUtils";
 import {
   deriveComparisonTargetMappings,
   inferAllTargetMappings,
 } from "~/experiments-v3/utils/mappingInference";
 import { getTargetMissingMappings } from "~/experiments-v3/utils/mappingValidation";
-import {
-  buildHttpAgentTarget,
-  convertHttpComponentConfig,
-} from "~/experiments-v3/utils/httpAgentUtils";
+import type {
+  Field,
+  HttpComponentConfig,
+} from "~/optimization_studio/types/dsl";
 import { AgentService } from "~/server/agents/agent.service";
 import { AgentNotFoundError } from "~/server/agents/errors";
 import { EvaluatorService } from "~/server/evaluators/evaluator.service";
+import { ExperimentDatasetMissingError } from "~/server/experiments/errors";
+import {
+  ComparisonFieldNotInDatasetError,
+  ComparisonGoldenFieldRequiredError,
+  ComparisonVariantAgentNotFoundError,
+  ComparisonVariantIsComparisonError,
+  ComparisonVariantsNotDistinctError,
+  ComparisonVariantTargetNotFoundError,
+  ComparisonVariantUnmappableError,
+} from "~/server/experiments-v3/errors";
+import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors/not-found-error";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 
 export const variantSpecSchema = z.discriminatedUnion("kind", [
@@ -52,13 +65,7 @@ export const variantSpecSchema = z.discriminatedUnion("kind", [
 export type VariantSpec = z.infer<typeof variantSpecSchema>;
 
 export const attachComparisonBodySchema = z.object({
-  // Deliberately no .min(2) here: a zod schema failure returns Hono's raw
-  // { success: false, error: ZodError } envelope, a different shape from
-  // every other error this route returns ({ error: string }). The <2 check
-  // (covering both "too few given" and "resolved to fewer than 2 distinct
-  // targets") happens in attachComparison() instead, so callers only ever
-  // see one error shape.
-  variants: z.array(variantSpecSchema),
+  variants: z.array(variantSpecSchema).min(2),
   goldenField: z.string().optional(),
   hasGoldenAnswer: z.boolean().optional(),
   inputField: z.string().optional(),
@@ -66,15 +73,6 @@ export const attachComparisonBodySchema = z.object({
   randomizeOrder: z.boolean().optional(),
 });
 export type AttachComparisonBody = z.infer<typeof attachComparisonBodySchema>;
-
-export class ComparisonTargetError extends Error {
-  readonly status: 400 | 404;
-  constructor(message: string, status: 400 | 404 = 400) {
-    super(message);
-    this.name = "ComparisonTargetError";
-    this.status = status;
-  }
-}
 
 export type AttachComparisonResult = {
   targets: TargetConfig[];
@@ -86,68 +84,83 @@ export type AttachComparisonResult = {
 const DEFAULT_INPUT: Field = { identifier: "input", type: "str" };
 const DEFAULT_OUTPUT: Field = { identifier: "output", type: "str" };
 
-const describeTargets = (targets: TargetConfig[]): string =>
-  targets.length > 0
-    ? targets.map((t) => `${t.id} (${t.type})`).join(", ")
-    : "none";
-
 /**
- * Resolve one variant spec against the experiment's current targets,
- * creating a new target only when no matching one already exists. Mutates
- * `allTargets`/`createdTargetIds`/`reusedTargetIds` in place — kept private
- * to attachComparison, which owns those accumulators.
+ * The accumulators `attachComparison` owns and every resolver appends to: the
+ * running target list plus the two id lists the response reports back, so a
+ * caller can see what was built for it and what was already there.
  */
-const resolveVariant = async ({
-  spec,
-  projectId,
-  allTargets,
-  datasets,
-  promptService,
-  agentService,
-  createdTargetIds,
-  reusedTargetIds,
-}: {
-  spec: VariantSpec;
-  projectId: string;
+type VariantResolution = {
   allTargets: TargetConfig[];
   datasets: DatasetReference[];
-  promptService: PromptLookup;
-  agentService: AgentLookup;
   createdTargetIds: string[];
   reusedTargetIds: string[];
+};
+
+/** Records a freshly built target against the experiment and the response. */
+const adoptNewTarget = (
+  target: TargetConfig,
+  resolution: VariantResolution,
+  spec: Extract<VariantSpec, { kind: "prompt" | "agent" }>,
+): TargetConfig => {
+  finishNewTarget(target, resolution.datasets, spec);
+  resolution.allTargets.push(target);
+  resolution.createdTargetIds.push(target.id);
+  return target;
+};
+
+/** A `target:<id>` variant: already in the experiment, or not a variant at all. */
+const resolveExistingTargetVariant = (
+  spec: Extract<VariantSpec, { kind: "existingTarget" }>,
+  { allTargets }: VariantResolution,
+): TargetConfig => {
+  const found = allTargets.find((t) => t.id === spec.targetId);
+  if (!found) {
+    throw new ComparisonVariantTargetNotFoundError({
+      targetId: spec.targetId,
+      availableTargets: allTargets.map((t) => ({ id: t.id, type: t.type })),
+    });
+  }
+  return found;
+};
+
+/**
+ * A `prompt:<handle>[@version]` variant. An experiment that already runs this
+ * prompt keeps its target rather than gaining a second column for the same
+ * thing; a pinned version only matches a target on that same version.
+ */
+const resolvePromptVariant = async ({
+  spec,
+  projectId,
+  promptService,
+  resolution,
+}: {
+  spec: Extract<VariantSpec, { kind: "prompt" }>;
+  projectId: string;
+  promptService: PromptLookup;
+  resolution: VariantResolution;
 }): Promise<TargetConfig> => {
-  if (spec.kind === "existingTarget") {
-    const found = allTargets.find((t) => t.id === spec.targetId);
-    if (!found) {
-      throw new ComparisonTargetError(
-        `Target "${spec.targetId}" not found in this experiment. Current targets: ${describeTargets(allTargets)}`,
-      );
-    }
-    return found;
+  const prompt = await promptService.getPromptByIdOrHandle({
+    idOrHandle: spec.handle,
+    projectId,
+    version: spec.version,
+  });
+  if (!prompt) {
+    throw new PromptNotFoundError(`Prompt "${spec.handle}" not found`);
   }
 
-  if (spec.kind === "prompt") {
-    const prompt = await promptService.getPromptByIdOrHandle({
-      idOrHandle: spec.handle,
-      projectId,
-      version: spec.version,
-    });
-    if (!prompt) {
-      throw new ComparisonTargetError(`Prompt "${spec.handle}" not found`, 404);
-    }
+  const existing = resolution.allTargets.find(
+    (t) =>
+      t.type === "prompt" &&
+      t.promptId === prompt.id &&
+      (spec.version === undefined || t.promptVersionNumber === prompt.version),
+  );
+  if (existing) {
+    resolution.reusedTargetIds.push(existing.id);
+    return existing;
+  }
 
-    const existing = allTargets.find(
-      (t) =>
-        t.type === "prompt" &&
-        t.promptId === prompt.id &&
-        (spec.version === undefined || t.promptVersionNumber === prompt.version),
-    );
-    if (existing) {
-      reusedTargetIds.push(existing.id);
-      return existing;
-    }
-
-    const newTarget: TargetConfig = {
+  return adoptNewTarget(
+    {
       id: `target_${nanoid()}`,
       type: "prompt",
       promptId: prompt.id,
@@ -160,29 +173,57 @@ const resolveVariant = async ({
         ? (prompt.outputs as Field[])
         : [DEFAULT_OUTPUT],
       mappings: {},
-    };
-    finishNewTarget(newTarget, datasets, spec);
-    allTargets.push(newTarget);
-    createdTargetIds.push(newTarget.id);
-    return newTarget;
-  }
+    },
+    resolution,
+    spec,
+  );
+};
 
-  // spec.kind === "agent"
-  let agent: Awaited<ReturnType<AgentLookup["getByIdOrThrow"]>>;
+/** The agent row behind an `agent:<id>` variant, or a handled not-found. */
+const loadVariantAgent = async ({
+  spec,
+  projectId,
+  agentService,
+}: {
+  spec: Extract<VariantSpec, { kind: "agent" }>;
+  projectId: string;
+  agentService: AgentLookup;
+}): Promise<Awaited<ReturnType<AgentLookup["getByIdOrThrow"]>>> => {
   try {
-    agent = await agentService.getByIdOrThrow({ id: spec.agentId, projectId });
+    return await agentService.getByIdOrThrow({ id: spec.agentId, projectId });
   } catch (error) {
     if (error instanceof AgentNotFoundError) {
-      throw new ComparisonTargetError(`Agent "${spec.agentId}" not found`, 404);
+      throw new ComparisonVariantAgentNotFoundError(spec.agentId, {
+        reasons: [error],
+      });
     }
     throw error;
   }
+};
 
-  const existing = allTargets.find(
+/**
+ * An `agent:<id>` variant. HTTP agents carry a request config the workbench
+ * builds a target from; every other kind maps its declared inputs and outputs
+ * straight across.
+ */
+const resolveAgentVariant = async ({
+  spec,
+  projectId,
+  agentService,
+  resolution,
+}: {
+  spec: Extract<VariantSpec, { kind: "agent" }>;
+  projectId: string;
+  agentService: AgentLookup;
+  resolution: VariantResolution;
+}): Promise<TargetConfig> => {
+  const agent = await loadVariantAgent({ spec, projectId, agentService });
+
+  const existing = resolution.allTargets.find(
     (t) => t.type === "agent" && t.dbAgentId === agent.id,
   );
   if (existing) {
-    reusedTargetIds.push(existing.id);
+    resolution.reusedTargetIds.push(existing.id);
     return existing;
   }
 
@@ -191,7 +232,7 @@ const resolveVariant = async ({
     outputs?: Field[];
   } & Partial<HttpComponentConfig>;
 
-  const newTarget: TargetConfig =
+  return adoptNewTarget(
     agent.type === "http"
       ? buildHttpAgentTarget({
           id: `target_${nanoid()}`,
@@ -206,11 +247,43 @@ const resolveVariant = async ({
           inputs: config.inputs?.length ? config.inputs : [DEFAULT_INPUT],
           outputs: config.outputs?.length ? config.outputs : [DEFAULT_OUTPUT],
           mappings: {},
-        };
-  finishNewTarget(newTarget, datasets, spec);
-  allTargets.push(newTarget);
-  createdTargetIds.push(newTarget.id);
-  return newTarget;
+        },
+    resolution,
+    spec,
+  );
+};
+
+/**
+ * Resolve one variant spec against the experiment's current targets, creating
+ * a new target only when no matching one already exists. Appends to the
+ * accumulators in `resolution`, which `attachComparison` owns.
+ */
+const resolveVariant = async ({
+  spec,
+  projectId,
+  promptService,
+  agentService,
+  resolution,
+}: {
+  spec: VariantSpec;
+  projectId: string;
+  promptService: PromptLookup;
+  agentService: AgentLookup;
+  resolution: VariantResolution;
+}): Promise<TargetConfig> => {
+  switch (spec.kind) {
+    case "existingTarget":
+      return resolveExistingTargetVariant(spec, resolution);
+    case "prompt":
+      return resolvePromptVariant({
+        spec,
+        projectId,
+        promptService,
+        resolution,
+      });
+    case "agent":
+      return resolveAgentVariant({ spec, projectId, agentService, resolution });
+  }
 };
 
 /**
@@ -232,12 +305,14 @@ const finishNewTarget = (
       (m) => m.isRequired,
     );
     if (missingRequired.length > 0) {
-      const fields = missingRequired.map((m) => m.fieldName).join(", ");
-      const describedSpec =
-        spec.kind === "prompt" ? `prompt:${spec.handle}` : `agent:${spec.agentId}`;
-      throw new ComparisonTargetError(
-        `Cannot map required input(s) [${fields}] for the new target built from ${describedSpec} to any dataset column. Add a matching column to the dataset, or reference an existing target instead.`,
-      );
+      throw new ComparisonVariantUnmappableError({
+        variant:
+          spec.kind === "prompt"
+            ? `prompt:${spec.handle}`
+            : `agent:${spec.agentId}`,
+        fields: missingRequired.map((m) => m.fieldName),
+        datasetId: dataset.id,
+      });
     }
   }
 };
@@ -248,6 +323,157 @@ type EvaluatorLookup = Pick<
   EvaluatorService,
   "getAllWithFields" | "createWithDefaults" | "enrichWithFields"
 >;
+
+/**
+ * Resolves every variant spec against the experiment's targets, creating the
+ * ones that are missing, and returns the distinct target ids the comparison
+ * will judge between.
+ *
+ * Two specs can land on the same underlying target (an explicit duplicate, or
+ * a `prompt:`/`agent:` spec naming a target already referenced via `target:`),
+ * so the ids are deduped and then required to still number at least two: a
+ * comparison of a target against itself has no verdict to give.
+ */
+const resolveVariantTargets = async ({
+  specs,
+  projectId,
+  promptService,
+  agentService,
+  resolution,
+}: {
+  specs: readonly VariantSpec[];
+  projectId: string;
+  promptService: PromptLookup;
+  agentService: AgentLookup;
+  resolution: VariantResolution;
+}): Promise<string[]> => {
+  const variantTargetIds: string[] = [];
+
+  for (const spec of specs) {
+    const resolved = await resolveVariant({
+      spec,
+      projectId,
+      promptService,
+      agentService,
+      resolution,
+    });
+
+    if (isComparisonEvaluator(resolved)) {
+      throw new ComparisonVariantIsComparisonError(resolved.id);
+    }
+
+    variantTargetIds.push(resolved.id);
+  }
+
+  const uniqueVariantIds = [...new Set(variantTargetIds)];
+  if (uniqueVariantIds.length < 2) {
+    throw new ComparisonVariantsNotDistinctError(uniqueVariantIds);
+  }
+  return uniqueVariantIds;
+};
+
+/**
+ * Builds the comparison's judging config and refuses one that cannot be run:
+ * `goldenField`/`inputField` are free text on the wire, unlike the workbench's
+ * dropdown, so a typo would otherwise persist and only surface as a missing
+ * value once the experiment runs.
+ */
+const buildComparisonConfig = ({
+  body,
+  variantTargetIds,
+  activeDataset,
+}: {
+  body: AttachComparisonBody;
+  variantTargetIds: string[];
+  activeDataset: DatasetReference;
+}): ComparisonEvaluatorConfig => {
+  for (const [field, value] of [
+    ["goldenField", body.goldenField],
+    ["inputField", body.inputField],
+  ] as const) {
+    if (value && !activeDataset.columns.some((c) => c.name === value)) {
+      throw new ComparisonFieldNotInDatasetError({
+        field,
+        value,
+        datasetId: activeDataset.id,
+        availableColumns: activeDataset.columns.map((c) => c.name),
+      });
+    }
+  }
+
+  const config: ComparisonEvaluatorConfig = {
+    variants: variantTargetIds,
+    hasGoldenAnswer: body.hasGoldenAnswer ?? !!body.goldenField,
+    goldenField: body.goldenField,
+    inputField: body.inputField,
+    includeMetrics: [...new Set(body.includeMetrics ?? [])],
+    randomizeOrder: body.randomizeOrder ?? true,
+  };
+
+  if (!isGoldenFieldSatisfied(config)) {
+    throw new ComparisonGoldenFieldRequiredError();
+  }
+  return config;
+};
+
+/**
+ * The project's comparison evaluator row, created on first use. One row serves
+ * every comparison in the project: the per-comparison detail lives on the
+ * target's `comparison` config, not on the evaluator.
+ */
+const resolveComparisonEvaluator = async ({
+  evaluatorService,
+  projectId,
+}: {
+  evaluatorService: EvaluatorLookup;
+  projectId: string;
+}) => {
+  const existingEvaluators = await evaluatorService.getAllWithFields({
+    projectId,
+  });
+  const existing = existingEvaluators.find((e) => {
+    const config = e.config as { evaluatorType?: string } | null;
+    return config?.evaluatorType === COMPARISON_EVALUATOR_TYPE;
+  });
+  if (existing) return existing;
+
+  const created = await evaluatorService.createWithDefaults({
+    id: `evaluator_${nanoid()}`,
+    projectId,
+    name: "Comparison",
+    type: "evaluator",
+    config: { evaluatorType: COMPARISON_EVALUATOR_TYPE },
+  });
+  return evaluatorService.enrichWithFields(created);
+};
+
+/** The evaluator target that carries the comparison, mapped to the dataset. */
+const buildComparisonTarget = ({
+  evaluator,
+  config,
+  activeDataset,
+}: {
+  evaluator: Awaited<ReturnType<typeof resolveComparisonEvaluator>>;
+  config: ComparisonEvaluatorConfig;
+  activeDataset: DatasetReference;
+}): TargetConfig => ({
+  id: `target_${nanoid()}`,
+  type: "evaluator",
+  targetEvaluatorId: evaluator.id,
+  inputs: evaluator.fields.map((f) => ({
+    identifier: f.identifier,
+    type: f.type as Field["type"],
+    ...(f.optional && { optional: true }),
+  })),
+  outputs: evaluator.outputFields.map((f) => ({
+    identifier: f.identifier,
+    type: f.type as Field["type"],
+  })),
+  mappings: {
+    [activeDataset.id]: deriveComparisonTargetMappings(config, activeDataset),
+  },
+  comparison: config,
+});
 
 /**
  * Attaches a comparison target to an experiment's targets, resolving each
@@ -279,137 +505,53 @@ export const attachComparison = async ({
     evaluatorService?: EvaluatorLookup;
   };
 }): Promise<AttachComparisonResult> => {
-  if (datasets.length === 0) {
-    throw new ComparisonTargetError("No dataset configured");
-  }
-  if (body.variants.length < 2) {
-    throw new ComparisonTargetError(
-      "At least two variants are required to build a comparison",
-    );
-  }
-
-  const activeDataset =
-    datasets.find((d) => d.id === activeDatasetId) ?? datasets[0];
-
-  const allTargets = [...targets];
-  const createdTargetIds: string[] = [];
-  const reusedTargetIds: string[] = [];
-  const variantTargetIds: string[] = [];
-
-  const promptService = services?.promptService ?? new PromptService(prisma);
-  const agentService = services?.agentService ?? AgentService.create(prisma);
-
-  for (const spec of body.variants) {
-    const resolved = await resolveVariant({
-      spec,
-      projectId,
-      allTargets,
-      datasets,
-      promptService,
-      agentService,
-      createdTargetIds,
-      reusedTargetIds,
-    });
-
-    if (isComparisonEvaluator(resolved)) {
-      throw new ComparisonTargetError(
-        `Target "${resolved.id}" is itself a comparison and cannot be used as a variant of another comparison`,
-      );
-    }
-
-    variantTargetIds.push(resolved.id);
+  // The comparison's mappings are derived against one dataset, so which one it
+  // is has to be a fact rather than a guess: the experiment's own
+  // `activeDatasetId`, resolved against its own list. An experiment carrying no
+  // datasets, or an `activeDatasetId` naming one it no longer has, cannot host
+  // a comparison at all.
+  const activeDataset = datasets.find((d) => d.id === activeDatasetId);
+  if (!activeDataset) {
+    throw new ExperimentDatasetMissingError({ activeDatasetId });
   }
 
-  // Two --variant specs can resolve to the same underlying target (e.g. an
-  // explicit duplicate, or a `prompt:`/`agent:` spec that reuses a target
-  // already referenced via `target:`). Dedupe rather than silently building
-  // a "compare X against itself" comparison, then require at least two
-  // distinct candidates remain — a comparison needs real variety.
-  const uniqueVariantIds = [...new Set(variantTargetIds)];
-  if (uniqueVariantIds.length < 2) {
-    throw new ComparisonTargetError(
-      "At least two distinct variants are required to build a comparison — the given variants resolved to the same target.",
-    );
-  }
-
-  // goldenField/inputField are free-text in the request (unlike the UI's
-  // dropdown, which can only ever offer real columns). A typo here would
-  // otherwise persist silently and only surface as a missing value at run
-  // time, well after the caller has moved on.
-  for (const [label, field] of [
-    ["goldenField", body.goldenField],
-    ["inputField", body.inputField],
-  ] as const) {
-    if (field && !activeDataset!.columns.some((c) => c.name === field)) {
-      throw new ComparisonTargetError(
-        `${label} "${field}" is not a column on dataset "${activeDataset!.id}". Available columns: ${activeDataset!.columns.map((c) => c.name).join(", ") || "none"}`,
-      );
-    }
-  }
-
-  const hasGoldenAnswer = body.hasGoldenAnswer ?? !!body.goldenField;
-  const comparisonConfig: ComparisonEvaluatorConfig = {
-    variants: uniqueVariantIds,
-    hasGoldenAnswer,
-    goldenField: body.goldenField,
-    inputField: body.inputField,
-    includeMetrics: [...new Set(body.includeMetrics ?? [])],
-    randomizeOrder: body.randomizeOrder ?? true,
+  const resolution: VariantResolution = {
+    allTargets: [...targets],
+    datasets,
+    createdTargetIds: [],
+    reusedTargetIds: [],
   };
 
-  if (!isGoldenFieldSatisfied(comparisonConfig)) {
-    throw new ComparisonTargetError(
-      "hasGoldenAnswer is true but no golden field was provided",
-    );
-  }
-
-  const evaluatorService =
-    services?.evaluatorService ?? EvaluatorService.create(prisma);
-  const existingEvaluators = await evaluatorService.getAllWithFields({
+  const variantTargetIds = await resolveVariantTargets({
+    specs: body.variants,
     projectId,
-  });
-  let comparisonEvaluator = existingEvaluators.find((e) => {
-    const config = e.config as { evaluatorType?: string } | null;
-    return config?.evaluatorType === COMPARISON_EVALUATOR_TYPE;
+    promptService: services?.promptService ?? new PromptService(prisma),
+    agentService: services?.agentService ?? AgentService.create(prisma),
+    resolution,
   });
 
-  if (!comparisonEvaluator) {
-    const created = await evaluatorService.createWithDefaults({
-      id: `evaluator_${nanoid()}`,
+  const comparisonConfig = buildComparisonConfig({
+    body,
+    variantTargetIds,
+    activeDataset,
+  });
+
+  const comparisonTarget = buildComparisonTarget({
+    evaluator: await resolveComparisonEvaluator({
+      evaluatorService:
+        services?.evaluatorService ?? EvaluatorService.create(prisma),
       projectId,
-      name: "Comparison",
-      type: "evaluator",
-      config: { evaluatorType: COMPARISON_EVALUATOR_TYPE },
-    });
-    comparisonEvaluator = await evaluatorService.enrichWithFields(created);
-  }
+    }),
+    config: comparisonConfig,
+    activeDataset,
+  });
 
-  const comparisonTargetId = `target_${nanoid()}`;
-  const comparisonTarget: TargetConfig = {
-    id: comparisonTargetId,
-    type: "evaluator",
-    targetEvaluatorId: comparisonEvaluator.id,
-    inputs: comparisonEvaluator.fields.map((f) => ({
-      identifier: f.identifier,
-      type: f.type as Field["type"],
-      ...(f.optional && { optional: true }),
-    })),
-    outputs: comparisonEvaluator.outputFields.map((f) => ({
-      identifier: f.identifier,
-      type: f.type as Field["type"],
-    })),
-    mappings: activeDataset
-      ? { [activeDataset.id]: deriveComparisonTargetMappings(comparisonConfig, activeDataset) }
-      : {},
-    comparison: comparisonConfig,
-  };
-
-  allTargets.push(comparisonTarget);
+  resolution.allTargets.push(comparisonTarget);
 
   return {
-    targets: allTargets,
-    comparisonTargetId,
-    createdTargetIds,
-    reusedTargetIds,
+    targets: resolution.allTargets,
+    comparisonTargetId: comparisonTarget.id,
+    createdTargetIds: resolution.createdTargetIds,
+    reusedTargetIds: resolution.reusedTargetIds,
   };
 };

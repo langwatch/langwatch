@@ -1,11 +1,25 @@
+import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import type { DatasetReference, TargetConfig } from "~/experiments-v3/types";
 import { AgentNotFoundError } from "~/server/agents/errors";
-import {
-  attachComparison,
-  ComparisonTargetError,
-} from "../comparisonTargetService";
+import { attachComparison } from "../comparisonTargetService";
+
+/**
+ * The handled error `work` rejected with, for a test to assert on. Tests assert
+ * the `code` rather than the sentence: the code is the contract every caller
+ * branches on, the sentence is copy.
+ */
+const rejectionOf = async (work: Promise<unknown>): Promise<HandledError> => {
+  const error: unknown = await work.then(
+    () => undefined,
+    (thrown: unknown) => thrown,
+  );
+  if (!HandledError.isHandled(error)) {
+    throw new Error(`expected a handled error, got: ${String(error)}`);
+  }
+  return error;
+};
 
 const dataset = (): DatasetReference => ({
   id: "dataset-1",
@@ -38,11 +52,7 @@ const promptTarget = (id: string): TargetConfig => ({
 const fakePromptService = (
   prompts: Record<string, { id: string; version: number; versionId: string }>,
 ) => ({
-  getPromptByIdOrHandle: async ({
-    idOrHandle,
-  }: {
-    idOrHandle: string;
-  }) => {
+  getPromptByIdOrHandle: async ({ idOrHandle }: { idOrHandle: string }) => {
     const found = prompts[idOrHandle];
     if (!found) return null;
     return {
@@ -80,11 +90,12 @@ const fakeEvaluatorService = () => {
       created = { id: input.id, config: input.config };
       return created as never;
     },
-    enrichWithFields: async (evaluator: { id: string; config: unknown }) => ({
-      ...evaluator,
-      fields: [{ identifier: "candidates", type: "str" }],
-      outputFields: [{ identifier: "label", type: "str" }],
-    }) as never,
+    enrichWithFields: async (evaluator: { id: string; config: unknown }) =>
+      ({
+        ...evaluator,
+        fields: [{ identifier: "candidates", type: "str" }],
+        outputFields: [{ identifier: "label", type: "str" }],
+      }) as never,
   };
 };
 
@@ -92,6 +103,7 @@ describe("attachComparison()", () => {
   const basePrisma = {} as PrismaClient;
 
   describe("when both variants already exist as targets", () => {
+    /** @scenario "Attach a comparison to two targets that already exist" */
     it("adds one comparison target referencing both, creating nothing new", async () => {
       const targets = [promptTarget("target-a"), promptTarget("target-b")];
 
@@ -126,6 +138,7 @@ describe("attachComparison()", () => {
   });
 
   describe("when a prompt variant is already a target in the experiment", () => {
+    /** @scenario "A prompt variant reuses its existing target instead of duplicating it" */
     it("reuses the existing target instead of creating a duplicate", async () => {
       const existing = promptTarget("target-a");
       existing.promptId = "prompt-draft-v1";
@@ -161,6 +174,7 @@ describe("attachComparison()", () => {
   });
 
   describe("when a variant references a prompt and an agent that don't exist yet as targets", () => {
+    /** @scenario "Attach a comparison creating missing variant targets inline" */
     it("creates both targets inline and compares them", async () => {
       const result = await attachComparison({
         prisma: basePrisma,
@@ -202,6 +216,7 @@ describe("attachComparison()", () => {
   });
 
   describe("when fewer than two variants resolve", () => {
+    /** @scenario "Rejects a variant that is itself a comparison" */
     it("rejects a variant that is itself a comparison", async () => {
       const comparisonTarget: TargetConfig = {
         ...promptTarget("verdict"),
@@ -215,7 +230,7 @@ describe("attachComparison()", () => {
         },
       };
 
-      await expect(
+      const error = await rejectionOf(
         attachComparison({
           prisma: basePrisma,
           projectId: "project-1",
@@ -230,13 +245,15 @@ describe("attachComparison()", () => {
           },
           services: { evaluatorService: fakeEvaluatorService() },
         }),
-      ).rejects.toThrow(/cannot be used as a variant/i);
+      );
+      expect(error.code).toBe("comparison_variant_is_comparison");
     });
   });
 
   describe("when an existingTarget reference does not exist", () => {
+    /** @scenario "Unknown existing-target reference lists the current targets" */
     it("lists the current targets in the error", async () => {
-      await expect(
+      const error = await rejectionOf(
         attachComparison({
           prisma: basePrisma,
           projectId: "project-1",
@@ -251,13 +268,20 @@ describe("attachComparison()", () => {
           },
           services: { evaluatorService: fakeEvaluatorService() },
         }),
-      ).rejects.toThrow(/target-a.*target-b|target-b.*target-a/is);
+      );
+      expect(error.code).toBe("comparison_variant_target_not_found");
+
+      expect(error.meta.availableTargets).toEqual([
+        { id: "target-a", type: "prompt" },
+        { id: "target-b", type: "prompt" },
+      ]);
     });
   });
 
   describe("when a created agent target's required input has no matching dataset column", () => {
+    /** @scenario "Rejects a variant whose input cannot be mapped to the dataset" */
     it("fails fast instead of persisting an unrunnable target", async () => {
-      await expect(
+      const error = await rejectionOf(
         attachComparison({
           prisma: basePrisma,
           projectId: "project-1",
@@ -284,13 +308,16 @@ describe("attachComparison()", () => {
             evaluatorService: fakeEvaluatorService(),
           },
         }),
-      ).rejects.toThrow(ComparisonTargetError);
+      );
+      expect(error.code).toBe("comparison_variant_unmappable");
+
+      expect(error.meta.fields).toEqual(["thread_history"]);
     });
   });
 
   describe("when hasGoldenAnswer is true but no golden field is given", () => {
     it("rejects with a clear error", async () => {
-      await expect(
+      const error = await rejectionOf(
         attachComparison({
           prisma: basePrisma,
           projectId: "project-1",
@@ -306,13 +333,14 @@ describe("attachComparison()", () => {
           },
           services: { evaluatorService: fakeEvaluatorService() },
         }),
-      ).rejects.toThrow(/golden field/i);
+      );
+      expect(error.code).toBe("comparison_golden_field_required");
     });
   });
 
   describe("when goldenField does not match a real dataset column", () => {
     it("rejects rather than persisting a mapping to nothing", async () => {
-      await expect(
+      const error = await rejectionOf(
         attachComparison({
           prisma: basePrisma,
           projectId: "project-1",
@@ -328,13 +356,14 @@ describe("attachComparison()", () => {
           },
           services: { evaluatorService: fakeEvaluatorService() },
         }),
-      ).rejects.toThrow(/not a column on dataset/i);
+      );
+      expect(error.code).toBe("comparison_field_not_in_dataset");
     });
   });
 
   describe("when inputField does not match a real dataset column", () => {
     it("rejects rather than persisting a mapping to nothing", async () => {
-      await expect(
+      const error = await rejectionOf(
         attachComparison({
           prisma: basePrisma,
           projectId: "project-1",
@@ -350,7 +379,8 @@ describe("attachComparison()", () => {
           },
           services: { evaluatorService: fakeEvaluatorService() },
         }),
-      ).rejects.toThrow(/not a column on dataset/i);
+      );
+      expect(error.code).toBe("comparison_field_not_in_dataset");
     });
   });
 
@@ -384,33 +414,36 @@ describe("attachComparison()", () => {
 
   describe("when an agent variant references an agent that doesn't exist", () => {
     it("rejects with a clean 404-style error, not a generic failure", async () => {
-      const error = await attachComparison({
-        prisma: basePrisma,
-        projectId: "project-1",
-        targets: [promptTarget("target-a")],
-        datasets: [dataset()],
-        activeDatasetId: "dataset-1",
-        body: {
-          variants: [
-            { kind: "existingTarget", targetId: "target-a" },
-            { kind: "agent", agentId: "does-not-exist" },
-          ],
-        },
-        services: {
-          agentService: fakeAgentService({}),
-          evaluatorService: fakeEvaluatorService(),
-        },
-      }).catch((e: unknown) => e);
+      const error = await rejectionOf(
+        attachComparison({
+          prisma: basePrisma,
+          projectId: "project-1",
+          targets: [promptTarget("target-a")],
+          datasets: [dataset()],
+          activeDatasetId: "dataset-1",
+          body: {
+            variants: [
+              { kind: "existingTarget", targetId: "target-a" },
+              { kind: "agent", agentId: "does-not-exist" },
+            ],
+          },
+          services: {
+            agentService: fakeAgentService({}),
+            evaluatorService: fakeEvaluatorService(),
+          },
+        }),
+      );
+      expect(error.code).toBe("comparison_variant_agent_not_found");
 
-      expect(error).toBeInstanceOf(ComparisonTargetError);
-      expect((error as ComparisonTargetError).status).toBe(404);
-      expect((error as Error).message).toMatch(/does-not-exist.*not found/i);
+      expect(error.httpStatus).toBe(404);
+      expect(error.meta.agentId).toBe("does-not-exist");
     });
   });
 
   describe("when the experiment has no dataset configured", () => {
+    /** @scenario "Rejects an experiment with no dataset to compare against" */
     it("rejects rather than building an unrunnable comparison", async () => {
-      await expect(
+      const error = await rejectionOf(
         attachComparison({
           prisma: basePrisma,
           projectId: "project-1",
@@ -425,13 +458,14 @@ describe("attachComparison()", () => {
           },
           services: { evaluatorService: fakeEvaluatorService() },
         }),
-      ).rejects.toThrow(/no dataset/i);
+      );
+      expect(error.code).toBe("experiment_dataset_missing");
     });
   });
 
   describe("when two --variant specs resolve to the same underlying target", () => {
     it("rejects an explicit duplicate existingTarget reference", async () => {
-      await expect(
+      const error = await rejectionOf(
         attachComparison({
           prisma: basePrisma,
           projectId: "project-1",
@@ -446,14 +480,15 @@ describe("attachComparison()", () => {
           },
           services: { evaluatorService: fakeEvaluatorService() },
         }),
-      ).rejects.toThrow(/at least two distinct variants/i);
+      );
+      expect(error.code).toBe("comparison_variants_not_distinct");
     });
 
     it("rejects when a prompt: spec resolves to the same target as an existingTarget: spec", async () => {
       const existing = promptTarget("target-a");
       existing.promptId = "prompt-draft-v1";
 
-      await expect(
+      const error = await rejectionOf(
         attachComparison({
           prisma: basePrisma,
           projectId: "project-1",
@@ -468,12 +503,17 @@ describe("attachComparison()", () => {
           },
           services: {
             promptService: fakePromptService({
-              "draft-v1": { id: "prompt-draft-v1", version: 1, versionId: "v1" },
+              "draft-v1": {
+                id: "prompt-draft-v1",
+                version: 1,
+                versionId: "v1",
+              },
             }),
             evaluatorService: fakeEvaluatorService(),
           },
         }),
-      ).rejects.toThrow(/at least two distinct variants/i);
+      );
+      expect(error.code).toBe("comparison_variants_not_distinct");
     });
   });
 

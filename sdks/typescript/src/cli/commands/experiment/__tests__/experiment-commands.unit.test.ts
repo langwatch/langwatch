@@ -195,6 +195,19 @@ describe("parseVariantSpec()", () => {
     });
   });
 
+  describe("when the version suffix is not a whole number", () => {
+    /** @scenario "Rejects a version suffix that is not a whole number" */
+    it.each([
+      ["prompt:draft-v1@", "an empty suffix"],
+      ["prompt:draft-v1@latest", "a word"],
+      ["prompt:draft-v1@1.5", "a decimal"],
+      ["prompt:draft-v1@-2", "a negative number"],
+      ["prompt:draft-v1@ 3", "a padded number"],
+    ])("rejects %s (%s) rather than resolving a version nobody asked for", (spec) => {
+      expect(() => parseVariantSpec(spec)).toThrow(/whole number/i);
+    });
+  });
+
   it("parses agent:<id>", () => {
     expect(parseVariantSpec("agent:agent_123")).toEqual({
       kind: "agent",
@@ -228,6 +241,7 @@ describe("addComparisonCommand()", () => {
   });
 
   describe("when fewer than two --variant flags are given", () => {
+    /** @scenario "Rejects fewer than two variants" */
     it("exits with code 1 without calling the API", async () => {
       await expect(
         addComparisonCommand("quality-check", { variant: ["prompt:draft-v1"] }),
@@ -292,22 +306,23 @@ describe("addComparisonCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
-      const result = {
+  describe("when the caller asked for machine output", () => {
+    it("returns the document for the output port rather than printing it", async () => {
+      const attached = {
         comparisonTargetId: "target_new",
         createdTargetIds: ["target_new_variant"],
         reusedTargetIds: [],
         targets: [],
       };
-      mockAttachComparison.mockResolvedValue(result);
+      mockAttachComparison.mockResolvedValue(attached);
 
-      await addComparisonCommand("quality-check", {
+      const result = await addComparisonCommand("quality-check", {
         variant: ["prompt:draft-v1", "prompt:draft-v2"],
         format: "json",
       });
 
-      expect(console.log).toHaveBeenCalledWith(JSON.stringify(result, null, 2));
+      expect(result?.data).toEqual(attached);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 

@@ -5,6 +5,7 @@
  * - POST /api/experiments/execute (SSE streaming experiment execution)
  * - POST /api/experiments/abort (abort a running experiment)
  * - POST /api/experiments/:slug/run (CI/CD execution by slug)
+ * - POST /api/experiments/:slug/comparison (attach a comparison judge by slug)
  * - GET  /api/experiments/runs (list runs for an experiment slug)
  * - GET  /api/experiments/runs/:runId (poll run status)
  * - GET  /api/experiments/runs/:runId/results (per-row results)
@@ -21,7 +22,10 @@ import {
   type EvaluationsV3State,
   type TargetConfig,
 } from "~/experiments-v3/types";
-import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
+import {
+  type PersistedEvaluationsV3State,
+  persistedEvaluationsV3StateSchema,
+} from "~/experiments-v3/types/persistence";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { Permission } from "~/server/api/rbac";
 import { hasProjectPermission } from "~/server/api/rbac";
@@ -41,6 +45,10 @@ import {
   RunNotFoundError,
 } from "~/server/experiments/errors";
 import { ExperimentService } from "~/server/experiments/experiment.service";
+import {
+  attachComparison,
+  attachComparisonBodySchema,
+} from "~/server/experiments-v3/comparisonTargetService";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
@@ -56,11 +64,6 @@ import {
   runInputsBodySchema,
 } from "~/server/experiments-v3/execution/types";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
-import {
-  attachComparison,
-  attachComparisonBodySchema,
-  ComparisonTargetError,
-} from "~/server/experiments-v3/comparisonTargetService";
 import { trackServerEvent } from "~/server/posthog";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -74,9 +77,10 @@ const sessionAuth = handlerManagedAuth({
   permissions: ["evaluations:manage"],
   credential: "session",
 });
-// The read endpoints (runs list / status / results) and the run endpoint gate
-// on different grains, so they declare separately: a single shared policy
-// would report the coarser of the two for routes that only read.
+// The read endpoints (runs list / status / results), the run endpoint and the
+// configuration endpoints gate on different grains, so they declare
+// separately: a single shared policy would report the coarsest of the three
+// for routes that only read.
 const apiKeyAuthRead = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
@@ -87,6 +91,17 @@ const apiKeyAuthRun = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
   permissions: ["evaluations:create"],
+  credential: "apiKey",
+});
+// Attaching a comparison edits the experiment's saved configuration: it adds
+// targets and rewrites the workbench state that every later run reads. That
+// outlives any one run, so it asks for `:manage` rather than the `:create`
+// that starting a run needs. A key scoped to run experiments in CI can keep
+// running them without gaining the ability to reshape what they measure.
+const apiKeyAuthManage = handlerManagedAuth({
+  reason:
+    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["evaluations:manage"],
   credential: "apiKey",
 });
 
@@ -575,7 +590,7 @@ secured.access(apiKeyAuthRun).post("/:slug/run", async (c) => {
 // ── POST /:slug/comparison (attach a comparison target via API key) ─
 
 secured
-  .access(apiKeyAuth)
+  .access(apiKeyAuthManage)
   .post(
     "/:slug/comparison",
     zValidator("json", attachComparisonBodySchema),
@@ -584,23 +599,21 @@ secured
 
       const authResult = await authenticateRequest(c, "evaluations:manage");
       if ("error" in authResult) {
-        return c.json(
-          { error: authResult.error },
-          { status: authResult.status },
-        );
+        return c.json(authResult.body ?? { error: authResult.error }, {
+          status: authResult.status,
+        });
       }
       const { project, markUsed } = authResult;
 
-      const experiment = await ExperimentService.create(
-        prisma,
-      ).findBySlugAndType({
+      const experimentService = ExperimentService.create(prisma);
+      const experiment = await experimentService.findBySlugAndType({
         projectId: project.id,
         slug,
         type: ExperimentType.EVALUATIONS_V3,
       });
 
       if (!experiment) {
-        return c.json({ error: "Experiment not found" }, { status: 404 });
+        throw new ExperimentNotFoundError(slug);
       }
 
       const parseResult = persistedEvaluationsV3StateSchema.safeParse(
@@ -611,31 +624,42 @@ secured
           { slug, errors: parseResult.error.errors },
           "Invalid workbenchState",
         );
-        return c.json(
-          { error: "Invalid experiment configuration" },
-          { status: 400 },
-        );
+        throw new InvalidExperimentConfigurationError(slug);
       }
       const workbenchState = parseResult.data;
 
       const body = c.req.valid("json");
 
       try {
-        const { targets, comparisonTargetId, createdTargetIds, reusedTargetIds } =
-          await attachComparison({
-            prisma,
-            projectId: project.id,
-            targets: workbenchState.targets as TargetConfig[],
-            datasets: workbenchState.datasets as DatasetReference[],
-            activeDatasetId:
-              workbenchState.datasets[0]?.id ?? "dataset-1",
-            body,
-          });
+        const {
+          targets,
+          comparisonTargetId,
+          createdTargetIds,
+          reusedTargetIds,
+        } = await attachComparison({
+          prisma,
+          projectId: project.id,
+          targets: workbenchState.targets as TargetConfig[],
+          datasets: workbenchState.datasets as DatasetReference[],
+          activeDatasetId: workbenchState.activeDatasetId,
+          body,
+        });
 
-        await ExperimentService.create(prisma).updateWorkbenchState({
+        // `updatedAt` was read with the state above, so a Workbench autosave
+        // landing in between refuses this write instead of being overwritten
+        // by it.
+        await experimentService.updateWorkbenchState({
           projectId: project.id,
           id: experiment.id,
-          workbenchState: { ...workbenchState, targets },
+          workbenchState: {
+            ...workbenchState,
+            // The DSL's `TargetConfig` and the persisted schema's inferred
+            // target differ only in how loosely each types free-form JSON
+            // (`json_schema`). The service re-parses the whole state before
+            // writing, so the schema stays the authority on what lands.
+            targets: targets as PersistedEvaluationsV3State["targets"],
+          },
+          expectedUpdatedAt: experiment.updatedAt,
         });
 
         logger.info(
@@ -644,10 +668,17 @@ secured
         );
         markUsed();
 
-        return c.json({ comparisonTargetId, createdTargetIds, reusedTargetIds, targets });
+        return c.json({
+          comparisonTargetId,
+          createdTargetIds,
+          reusedTargetIds,
+          targets,
+        });
       } catch (error) {
-        if (error instanceof ComparisonTargetError) {
-          return c.json({ error: error.message }, { status: error.status });
+        // Handled errors already name their cause and carry the status the
+        // boundary serialises; only the rest are ours to report.
+        if (HandledError.isHandled(error)) {
+          throw error;
         }
         logger.error(
           { error, projectId: project.id, slug },
@@ -656,10 +687,7 @@ secured
         captureException(toError(error), {
           extra: { projectId: project.id, slug },
         });
-        return c.json(
-          { error: "Failed to attach comparison target" },
-          { status: 400 },
-        );
+        throw error;
       }
     },
   );
