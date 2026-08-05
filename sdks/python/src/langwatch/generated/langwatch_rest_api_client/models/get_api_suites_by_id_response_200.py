@@ -27,6 +27,7 @@ class GetApiSuitesByIdResponse200:
         labels (list[str]):
         created_at (str):
         updated_at (str):
+        platform_url (str):
     """
 
     id: str
@@ -39,6 +40,7 @@ class GetApiSuitesByIdResponse200:
     labels: list[str]
     created_at: str
     updated_at: str
+    platform_url: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -66,6 +68,8 @@ class GetApiSuitesByIdResponse200:
 
         updated_at = self.updated_at
 
+        platform_url = self.platform_url
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -80,6 +84,7 @@ class GetApiSuitesByIdResponse200:
                 "labels": labels,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
+                "platformUrl": platform_url,
             }
         )
 
@@ -120,6 +125,8 @@ class GetApiSuitesByIdResponse200:
 
         updated_at = d.pop("updatedAt")
 
+        platform_url = d.pop("platformUrl")
+
         get_api_suites_by_id_response_200 = cls(
             id=id,
             name=name,
@@ -131,6 +138,7 @@ class GetApiSuitesByIdResponse200:
             labels=labels,
             created_at=created_at,
             updated_at=updated_at,
+            platform_url=platform_url,
         )
 
         get_api_suites_by_id_response_200.additional_properties = d

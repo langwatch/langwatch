@@ -234,6 +234,36 @@ const parentEntryScoped = (): ScopedModelConfig => ({
 const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   AiToolEntryTeam: parentEntryScoped(),
   AiToolEntryDepartment: parentEntryScoped(),
+  // Idempotency receipts carry their tenancy on `scopeId` alone: the project
+  // on the gateway platform's creates, the organization on the webhook
+  // platform's. Every query names either the row id just claimed or the
+  // (scopeId, key) pair being looked up, so the stricter check is what stops a
+  // bare findMany from walking every tenant's keys.
+  IdempotencyReceipt: {
+    validateWhere: (where) => {
+      const reason = "requires a row id or scopeId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.scopeId === "string" ||
+          // The compound unique, as `findUnique` spells it.
+          typeof c.scopeId_key?.scopeId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.scopeId !== "string") {
+          return "create requires a scopeId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
   ModelProvider: {
     validateWhere: (where) => {
       if (!where) {
@@ -574,10 +604,14 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // One table, two channels, two tenancy anchors: a platform row belongs to an
+  // organization and an endpoint, an automations row to a project and a
+  // trigger. A query is scoped if it names either pair's anchor; a create must
+  // carry one complete pair, so a row can never land without a tenant.
   WebhookEndpointDelivery: {
     validateWhere: (where) => {
       const reason =
-        "requires a row id, organizationId, or endpointId in the where clause";
+        "requires a row id, organizationId, endpointId, or projectId in the where clause";
       if (!where) return reason;
       const ok = validateRecursive(
         where,
@@ -585,7 +619,9 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           hasIdOrInPredicate(c) ||
           typeof c.organizationId === "string" ||
           (c.organizationId && Array.isArray(c.organizationId.in)) ||
-          typeof c.endpointId === "string",
+          typeof c.endpointId === "string" ||
+          typeof c.projectId === "string" ||
+          (c.projectId && Array.isArray(c.projectId.in)),
       );
       return ok ? null : reason;
     },
@@ -593,11 +629,13 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       const records = Array.isArray(data) ? data : [data];
       for (const d of records) {
         if (!d) return "create requires a data payload";
-        if (
-          typeof d.organizationId !== "string" ||
-          typeof d.endpointId !== "string"
-        ) {
-          return "create requires organizationId and endpointId in the data payload";
+        const platformScoped =
+          typeof d.organizationId === "string" &&
+          typeof d.endpointId === "string";
+        const automationsScoped =
+          typeof d.projectId === "string" && typeof d.triggerId === "string";
+        if (!platformScoped && !automationsScoped) {
+          return "create requires organizationId and endpointId, or projectId and triggerId, in the data payload";
         }
       }
       return null;

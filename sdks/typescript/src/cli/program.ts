@@ -1757,7 +1757,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     virtualKeysCmd
       .command("rotate <id>")
-      .description("Rotate a virtual key's secret (old secret stops working immediately)")
+      .description("Rotate a virtual key's secret (the old one keeps working for 24 hours)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string) => {
       const { rotateVirtualKeyCommand: impl } = await import("./commands/virtual-keys/rotate.js");
@@ -1829,11 +1829,12 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--virtual-key <id>", "Virtual key id (for scope=virtual-key)")
       .option("--principal <id>", "Principal user id (for scope=principal)")
       .option("--group <id>", "Group id (for scope=group; --limit becomes the PER-MEMBER allowance)")
-      .requiredOption("--window <w>", "Budget window: minute|hour|day|week|month|total")
+      .requiredOption("--window <w>", "Budget window: minute|hour|day|week|month|total|manual")
       .requiredOption("--limit <usd>", "Hard cap in USD (e.g. 100 or 49.99). Per member for scope=group")
       .option("--on-breach <action>", "block (default) or warn", "block")
-      .option("--timezone <tz>", "IANA timezone for window boundaries (e.g. Europe/Amsterdam)")
+      .option("--timezone <tz>", "IANA timezone recorded on the budget for your own reporting. Window boundaries are UTC (e.g. Europe/Amsterdam)")
       .option("--provider-key <id>", "Pin the budget to one ModelProvider id (default: counts every provider)")
+      .option("--cycle-anchor-at <rfc3339>", "Start the budget's cycle at this instant instead of the calendar (e.g. 2026-01-17T09:00:00Z). Not valid on total or manual windows")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       name: string;
@@ -1850,6 +1851,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       onBreach?: "block" | "warn";
       timezone?: string;
       providerKey?: string;
+      cycleAnchorAt?: string;
     }) => {
       const { createGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/create.js");
       return impl(options);
@@ -1878,7 +1880,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--clear-description", "Clear the description")
       .option("--limit <usd>", "New hard-cap in USD")
       .option("--on-breach <action>", "block or warn")
-      .option("--timezone <tz>", "New IANA timezone")
+      .option("--timezone <tz>", "New IANA timezone. Recorded on the budget; window boundaries stay UTC")
       .option("--clear-timezone", "Clear the timezone override")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string, options: {
@@ -1995,11 +1997,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     webhooksCmd
-      .command("delete <id>")
-      .description("Archive an endpoint")
+      .command("archive <id>")
+      .description("Archive an endpoint (deliveries stop; history stays readable)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string) => {
-      const { deleteWebhookCommand: impl } = await import("./commands/webhooks/delete.js");
+      const { archiveWebhookCommand: impl } = await import("./commands/webhooks/archive.js");
       return impl(id);
     },
   );
@@ -2030,9 +2032,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     webhooksCmd
       .command("deliveries <id>")
       .description("The endpoint's delivery log with receiver status codes")
-      .option("--limit <n>", "Max attempts to return (default 50)")
+      .option("--cursor <cursor>", "Page cursor from the previous call")
+      .option("--limit <n>", "Attempts per page (default 50)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { limit?: string }) => {
+    async (id: string, options: { cursor?: string; limit?: string }) => {
       const { webhookDeliveriesCommand: impl } = await import("./commands/webhooks/deliveries.js");
       return impl(id, options);
     },
