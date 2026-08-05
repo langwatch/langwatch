@@ -175,15 +175,34 @@ admin:
 
 # Budget enforcement. VK-level rate limits (rpm/rpd) and the budget
 # precheck are both enforced locally against the cached bundle snapshot;
-# there is no control-plane call on the hot path. The gateway does not
-# send debits: cost rides the OTel span and the control plane's
-# trace-fold reactor writes the ClickHouse ledger, which flows back into
-# the snapshot on the next /changes refresh. Watch
-# `gateway_budget_blocks_total{scope}` to confirm a hard cap is firing.
+# there is no control-plane call on the hot path. Debits come from the
+# spend records below: the control plane folds them into the ClickHouse
+# ledger, and the new totals reach this pod on the next /changes refresh.
+# Watch `gateway_budget_blocks_total{scope}` to confirm a hard cap is
+# firing.
 budget:
   # Fraction of the hard limit at which a `warn`-mode scope starts
   # reporting a warn verdict.
   warnThresholdPct: "0.9"  # 90%
+
+# Spend emission. Every request writes a spend record to a bounded on-disk
+# spool that a background drainer ships to the control plane, which is where
+# every gateway budget debit comes from. On by default: a gateway with this
+# off serves traffic that costs money and debits nothing, so its budgets go
+# stale at zero and stop enforcing.
+#
+# The spool lives under /tmp, on the writable emptyDir this chart already
+# mounts (see scratchSizeLimit), and bounds itself at 64 MiB. Deliberately
+# not a PersistentVolume: a pod deleted with records still unshipped loses
+# roughly a second of drain lag, and a volume per pod would trade that
+# second for a stateful gateway. Watch `gateway_spend_spool_dropped_total`,
+# where every drop is spend nobody bills.
+#
+# Turn it off only while the control plane is older than the gateway and has
+# no spend-command ingest route yet. Even then, leaving it on is degraded but
+# safe: the drainer retries on backoff and the spool is bounded.
+spend:
+  enabled: true
 
 guardrails:
   preTimeout: 800ms
@@ -191,6 +210,9 @@ guardrails:
   streamChunkWindow: 50ms
 
 # Pod-level security.
+## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
+scratchSizeLimit: 1Gi
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 65532
@@ -200,6 +222,9 @@ podSecurityContext:
     type: RuntimeDefault
 
 containerSecurityContext:
+  # runAsNonRoot is also set on the pod above; some Gatekeeper constraints
+  # inspect the container-level field directly, so set it here too.
+  runAsNonRoot: true
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:

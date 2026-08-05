@@ -38,7 +38,7 @@ jobs:
               - 'cmd/**'
               - 'go.mod'
               - 'go.sum'
-              - 'Dockerfile.go_service'
+              - 'infra/docker/Dockerfile.go_service'
               - '.github/workflows/go-services.yaml'
             chart:
               - 'charts/gateway/**'
@@ -46,30 +46,30 @@ jobs:
             langyagent:
               # The langyagent image bakes in the langwatch CLI, and that CLI is
               # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
-              # typescript-sdk/ + skills/ + feature-map.json + a handful of
-              # langwatch/langevals source files (typescript-sdk/copy-types.sh +
+              # sdks/typescript/ + skills/ + feature-map.json + a handful of
+              # platform/app + services/langevals source files (sdks/typescript/copy-types.sh +
               # generate-skills-bundle.mjs). A change to any of those can break
-              # `docker build -f Dockerfile.langyagent` with no Go source
+              # `docker build -f infra/docker/Dockerfile.langyagent` with no Go source
               # touched — exactly the gap that shipped a broken build once
               # (a new copy-types.sh input was never COPYed into the image).
               # Validate the image build whenever any build input moves.
               - 'services/langyagent/**'
               - 'pkg/**'
               - 'cmd/**'
-              - 'sdk-go/**'
+              - 'sdks/go/**'
               - 'go.mod'
               - 'go.sum'
-              - 'Dockerfile.langyagent'
-              - 'typescript-sdk/**'
+              - 'infra/docker/Dockerfile.langyagent'
+              - 'sdks/typescript/**'
               - 'packages/langy/**'
               - 'skills/**'
               - 'feature-map.json'
-              - 'langwatch/src/server/tracer/types.ts'
-              - 'langwatch/src/server/filters/types.ts'
-              - 'langwatch/src/server/evaluations/types.ts'
-              - 'langwatch/src/server/modelProviders/llmModels.json'
-              - 'langwatch/src/app/api/openapiLangWatch.json'
-              - 'langevals/ts-integration/evaluators.generated.ts'
+              - 'platform/app/src/server/tracer/types.ts'
+              - 'platform/app/src/server/filters/types.ts'
+              - 'platform/app/src/server/evaluations/types.ts'
+              - 'platform/app/src/server/modelProviders/llmModels.json'
+              - 'platform/app/src/app/api/openapiLangWatch.json'
+              - 'services/langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 
   docker:
@@ -109,7 +109,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v6
         with:
           context: .
-          file: Dockerfile.go_service
+          file: infra/docker/Dockerfile.go_service
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           platforms: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           build-args: |
@@ -145,7 +145,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v6
         with:
           context: .
-          file: Dockerfile.langyagent
+          file: infra/docker/Dockerfile.langyagent
           push: false
           platforms: linux/amd64
           build-args: |

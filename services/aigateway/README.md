@@ -118,12 +118,12 @@ make service svc=aigateway       # run once
 make service-watch svc=aigateway # live reload via air
 ```
 
-This sources `langwatch/.env` in full — Go and the TS control-plane
+This sources `platform/app/.env` in full — Go and the TS control-plane
 share the same file, so secrets like `LW_GATEWAY_INTERNAL_SECRET` live in
 exactly one place. Vars the Go service doesn't need are ignored by
 `config.Hydrate`. Required: `LW_GATEWAY_INTERNAL_SECRET`,
 `LW_GATEWAY_JWT_SECRET`, `LW_GATEWAY_BASE_URL` (see
-`langwatch/.env.example`).
+`platform/app/.env.example`).
 
 Logs emit as pretty-printed JSON locally (`LOG_FORMAT=pretty` is set by the
 Makefile target).

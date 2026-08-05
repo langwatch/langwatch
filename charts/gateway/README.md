@@ -76,6 +76,18 @@ self-hosting. The values you most often override:
 | `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                              |
 | `resources`                   | Pod CPU/memory requests + limits                                     |
 | `otel.endpoint`               | Optional OTLP HTTP exporter URL (gateway emits its own spans)        |
+| `spend.enabled`               | Kill switch for spend emission (default `true`). Off means no budget debits are ever written |
+
+The pod ships hardened (`podSecurityContext` / `containerSecurityContext` in
+`values.yaml`): non-root at both pod and container level, read-only root,
+dropped capabilities, `RuntimeDefault` seccomp, and resource requests+limits.
+It clears Pod Security Admission `restricted` and Gatekeeper / Kyverno
+policies as-is.
+
+The ServiceAccount token is never mounted. That is hardcoded in the pod spec
+rather than exposed as a value: the gateway makes no Kubernetes API calls, and
+it is a public-facing, tenant-controlled egress workload, so there is no
+configuration under which projecting a cluster credential into it is correct.
 
 Many `values.yaml` knobs are exposed as forward-compat for v1.1 and
 have no effect in v1 (e.g. `cache.lruSize`, `redis.url`,

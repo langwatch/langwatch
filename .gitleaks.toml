@@ -24,4 +24,40 @@ useDefault = true
 [[allowlists]]
 description = "Stripe catalog lookupKeys are public price handles, not credentials"
 targetRules = ["generic-api-key"]
-paths = ['''langwatch/ee/billing/stripe/stripeCatalog\.json''']
+paths = ['''platform/app/ee/billing/stripe/stripeCatalog\.json''']
+
+# Gateway test fixtures that pattern-match `generic-api-key` but are provably
+# not credentials: a sequential-hex HMAC fixture (`0123456789abcdef...`) signing
+# the vk-lifecycle and spend-ingest route tests, and the literal process key
+# `"conversation-1"` in the process-store suite.
+# Scoped to those test files and the generic rule only, so a real token
+# landing in either is still caught by every provider-specific rule.
+[[allowlists]]
+description = "Sequential-hex HMAC fixture in the signed-route tests, not a credential"
+targetRules = ["generic-api-key"]
+paths = [
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-lifecycle\.integration\.test\.ts''',
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.spend-ingest\.integration\.test\.ts''',
+]
+
+[[allowlists]]
+description = "Literal fixture ids (conversation-1) in the process-store suite, not credentials"
+targetRules = ["generic-api-key"]
+paths = ['''platform/app/src/server/event-sourcing/process-manager/stores/__tests__/prismaProcessStore\.integration\.test\.ts''']
+
+# The self-hosted license fixtures are base64 payloads signed with the TEST
+# keypair that sits beside them in `fixtures/testKeys.ts`, checked in on
+# purpose: license validation is signature verification, so a test that does not
+# carry a real signature verifies nothing. The keypair signs nothing outside
+# this suite, and the production verifier reads its key from
+# `LANGWATCH_LICENSE_PUBLIC_KEY`, so a fixture key is refused by every real
+# deployment.
+#
+# Scoped to `generic-api-key` only, so a real credential pasted into this file
+# is still caught by every provider-specific rule. Scoped by path rather than by
+# value so a new fixture does not need a config change; the first line of the
+# file already carries the same claim for readers.
+[[allowlists]]
+description = "Signed license test fixtures, verifiable only against the checked-in test keypair"
+targetRules = ["generic-api-key"]
+paths = ['''platform/app/ee/licensing/__tests__/fixtures/testLicenses\.ts''']

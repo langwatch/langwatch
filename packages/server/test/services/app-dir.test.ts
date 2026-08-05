@@ -15,18 +15,18 @@ describe("shell script bits after relocation", () => {
 	async function makeTree(): Promise<string> {
 		const root = await mkdtemp(join(tmpdir(), "langwatch-appdir-"));
 		roots.push(root);
-		mkdirSync(join(root, "langwatch", "scripts"), { recursive: true });
+		mkdirSync(join(root, "platform", "app", "scripts"), { recursive: true });
 		mkdirSync(join(root, "node_modules", "dep"), { recursive: true });
 		// pnpm pack normalizes modes: scripts arrive 0644.
 		writeFileSync(
-			join(root, "langwatch", "scripts", "build-mcp-server.sh"),
+			join(root, "platform", "app", "scripts", "build-mcp-server.sh"),
 			"#!/bin/sh\n",
 			{
 				mode: 0o644,
 			},
 		);
 		writeFileSync(
-			join(root, "langwatch", "scripts", "helper.ts"),
+			join(root, "platform", "app", "scripts", "helper.ts"),
 			"export {};\n",
 			{
 				mode: 0o644,
@@ -46,7 +46,7 @@ describe("shell script bits after relocation", () => {
 			const restored = restoreShellScriptBits(root);
 			expect(restored).toBe(1);
 			const mode = statSync(
-				join(root, "langwatch", "scripts", "build-mcp-server.sh"),
+				join(root, "platform", "app", "scripts", "build-mcp-server.sh"),
 			).mode;
 			expect(mode & 0o111).not.toBe(0);
 		});
@@ -55,7 +55,8 @@ describe("shell script bits after relocation", () => {
 			const root = await makeTree();
 			restoreShellScriptBits(root);
 			expect(
-				statSync(join(root, "langwatch", "scripts", "helper.ts")).mode & 0o111,
+				statSync(join(root, "platform", "app", "scripts", "helper.ts")).mode &
+					0o111,
 			).toBe(0);
 			expect(
 				statSync(join(root, "node_modules", "dep", "hook.sh")).mode & 0o111,

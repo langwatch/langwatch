@@ -54,6 +54,8 @@ const (
 	ChangeKindVirtualKeyConfigUpdate = "VK_CONFIG_UPDATED"
 	ChangeKindVirtualKeyRotated      = "VK_ROTATED"
 	ChangeKindVirtualKeyRevoked      = "VK_REVOKED"
+	ChangeKindVirtualKeyDisabled     = "VK_DISABLED"
+	ChangeKindVirtualKeyEnabled      = "VK_ENABLED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
@@ -680,7 +682,8 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
 		}, "budget_updated", organizationID)
-	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked:
+	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked,
+		ChangeKindVirtualKeyDisabled, ChangeKindVirtualKeyEnabled:
 		if ch.VirtualKeyID == "" {
 			return
 		}

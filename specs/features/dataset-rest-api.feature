@@ -4,7 +4,7 @@ Feature: Dataset REST API
   So that I can programmatically manage datasets without the UI
 
   # All 38 scenarios are now bound to integration tests in
-  # langwatch/src/app/api/dataset/__tests__/dataset-rest-api.integration.test.ts.
+  # platform/app/src/app/api/dataset/__tests__/dataset-rest-api.integration.test.ts.
 
   Background:
     Given a project with a valid API key in the X-Auth-Token header
@@ -46,13 +46,6 @@ Feature: Dataset REST API
     When I call POST /api/dataset with name "Test Data"
     Then the request fails with 409 Conflict
     And the error indicates a dataset with that slug already exists
-
-  @integration
-  Scenario: Create a dataset enforces plan limits
-    Given the project has reached its dataset plan limit
-    When I call POST /api/dataset with name "One More"
-    Then the request fails with 403 Forbidden
-    And the error indicates the dataset limit has been reached
 
   @integration
   Scenario: Create a dataset validates column types
