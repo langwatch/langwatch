@@ -11,7 +11,7 @@ vi.mock("~/server/db", () => ({
 }));
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  defaultClickHouseClientResolver: vi.fn(),
 }));
 
 vi.mock("~/env.mjs", () => ({
@@ -55,7 +55,7 @@ vi.mock("~/server/langevals/stagedFetch", () => ({
   }),
 }));
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { defaultClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { stagedLangevalsFetch } from "../../../langevals/stagedFetch";
 import {
@@ -84,7 +84,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -114,7 +114,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -150,7 +150,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -179,12 +179,14 @@ describe("clusterTopicsForProject", () => {
     });
   });
 
-  describe("when getClickHouseClientForProject returns null", () => {
+  describe("when the ClickHouse resolver is unavailable for the project", () => {
     it("throws because ClickHouse is required", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue(null);
+      vi.mocked(defaultClickHouseClientResolver).mockRejectedValue(
+        new Error("ClickHouse not available for tenant proj-1"),
+      );
 
       await expect(clusterTopicsForProject("proj-1")).rejects.toThrow(
         "ClickHouse client not available for project proj-1",
@@ -208,7 +210,7 @@ describe("clusterTopicsForProject", () => {
         makeProject() as any,
       );
       vi.mocked(prisma.topic.findMany).mockResolvedValue(freshTopics as any);
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -229,7 +231,7 @@ describe("clusterTopicsForProject", () => {
         makeProject() as any,
       );
       vi.mocked(prisma.topic.findMany).mockResolvedValue(freshTopics as any);
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -257,7 +259,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -292,7 +294,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 

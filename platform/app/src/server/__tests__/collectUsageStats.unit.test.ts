@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { InstanceUsageStatsClickHouseRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import { collectUsageStats } from "../collectUsageStats";
 
 const mockClickHouseQuery = vi.fn();
@@ -20,14 +21,16 @@ vi.mock("~/server/db", () => ({
   },
 }));
 
-const mockGetClickHouseClientForOrganization = vi.fn();
-
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForOrganization: (...args: unknown[]) =>
-    mockGetClickHouseClientForOrganization(...args),
-}));
-
 import { prisma } from "~/server/db";
+
+/** The service under test, reading through a real repository over a fake
+ *  resolveClient — mirrors how the org's ClickHouse client is resolved in
+ *  production without touching the real ClickHouse module. */
+const resolveClient = vi.fn();
+function repositoryOver(client: unknown) {
+  resolveClient.mockResolvedValue(client);
+  return new InstanceUsageStatsClickHouseRepository(resolveClient);
+}
 
 describe("collectUsageStats", () => {
   beforeEach(() => {
@@ -36,18 +39,20 @@ describe("collectUsageStats", () => {
 
   describe("when instanceId is invalid", () => {
     it("throws an error", async () => {
-      await expect(collectUsageStats("bad")).rejects.toThrow(
-        "Invalid instance ID",
-      );
+      await expect(
+        collectUsageStats("bad", repositoryOver(null)),
+      ).rejects.toThrow("Invalid instance ID");
     });
   });
 
   describe("when organization has zero projects", () => {
     it("returns zero for traces and scenarios", async () => {
       vi.mocked(prisma.project.findMany).mockResolvedValue([]);
-      mockGetClickHouseClientForOrganization.mockResolvedValue(null);
 
-      const result = await collectUsageStats("inst__org-1");
+      const result = await collectUsageStats(
+        "inst__org-1",
+        repositoryOver(null),
+      );
 
       expect(result.totalTraces).toBe(0);
       expect(result.totalScenarioEvents).toBe(0);
@@ -59,9 +64,6 @@ describe("collectUsageStats", () => {
       vi.mocked(prisma.project.findMany).mockResolvedValue([
         { id: "proj-1" },
       ] as any);
-      mockGetClickHouseClientForOrganization.mockResolvedValue({
-        query: mockClickHouseQuery,
-      } as any);
 
       mockClickHouseQuery
         .mockResolvedValueOnce({
@@ -71,7 +73,10 @@ describe("collectUsageStats", () => {
           json: () => Promise.resolve([{ Total: "75" }]),
         });
 
-      const result = await collectUsageStats("inst__org-1");
+      const result = await collectUsageStats(
+        "inst__org-1",
+        repositoryOver({ query: mockClickHouseQuery }),
+      );
 
       expect(result.totalTraces).toBe(200);
       expect(result.totalScenarioEvents).toBe(75);
@@ -84,9 +89,11 @@ describe("collectUsageStats", () => {
       vi.mocked(prisma.project.findMany).mockResolvedValue([
         { id: "proj-1" },
       ] as any);
-      mockGetClickHouseClientForOrganization.mockResolvedValue(null);
 
-      const result = await collectUsageStats("inst__org-1");
+      const result = await collectUsageStats(
+        "inst__org-1",
+        repositoryOver(null),
+      );
 
       expect(result.totalTraces).toBe(0);
       expect(result.totalScenarioEvents).toBe(0);

@@ -20,6 +20,8 @@ export class App {
     AppCommands["evaluations"];
   readonly experimentRuns: AppCommands["experimentRuns"];
   readonly dspySteps: AppDependencies["dspySteps"];
+  /** Agent 4 batch: the ADR-034 analytics read API. */
+  readonly analytics: AppDependencies["analytics"];
   readonly simulations: AppDependencies["simulations"] &
     AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
@@ -89,6 +91,7 @@ export class App {
     this.evaluations = { ...deps.evaluations, ...deps.commands.evaluations };
     this.experimentRuns = deps.commands.experimentRuns;
     this.dspySteps = deps.dspySteps;
+    this.analytics = deps.analytics;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
     this.topicClustering = {

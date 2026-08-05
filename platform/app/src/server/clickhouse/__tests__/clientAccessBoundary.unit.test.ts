@@ -40,9 +40,17 @@ const ROOTS = ["src", "ee"];
 const CONSTRUCTS_CLIENT = /\bcreateClient\s*\(/;
 const DRIVER_MODULE = /from\s+["']@clickhouse\/client["']/;
 
-/** The functions that hand out a live client. */
+/**
+ * The functions that hand out a live client.
+ *
+ * `defaultClickHouseClientResolver` is one of them. It is a shared
+ * throws-if-unavailable wrapper around `getClickHouseClientForProject`, which
+ * makes it a genuine improvement over the four hand-copied closures it
+ * replaced - and still a way to hold a client. Naming it here is what keeps
+ * "we deduplicated the resolver" from quietly becoming "we exempted it".
+ */
 const RESOLVES_CLIENT =
-  /\b(getClickHouseClientForProject|getClickHouseClientForOrganization|getSharedClickHouseClient|getAllClickHouseInstances)\b/;
+  /\b(getClickHouseClientForProject|getClickHouseClientForOrganization|getSharedClickHouseClient|getAllClickHouseInstances|defaultClickHouseClientResolver)\b/;
 
 /**
  * `getApp().clickhouse.resolveClient` is the same escape hatch wearing the
@@ -121,21 +129,16 @@ const RESOLVES_DIRECTLY_BACKLOG = new Set([
   "ee/governance/services/spendSpikeAnomalyEvaluator.service.ts",
   "src/app/api/gateway-spend/[[...route]]/app.ts",
   "src/app/api/webhooks/[[...route]]/app.ts",
-  "src/server/analytics/clickhouse/clickhouse-analytics.service.ts",
   "src/server/api/routers/gatewaySpendEvents.ts",
   "src/server/api/routers/user.ts",
-  "src/server/app-layer/analytics/analytics.service.ts",
   "src/server/app-layer/automations/graph-trigger-heartbeat.ts",
   "src/server/app-layer/topic-clustering/clustering.ts",
-  "src/server/collectUsageStats.ts",
-  "src/server/evaluations/evaluation.service.ts",
   "src/server/experiments-v3/services/experiment-run.service.ts",
   "src/server/routes/gateway-internal.ts",
   "src/server/routes/ingest/ingestionRoutes.ts",
   "src/server/routes/ops.ts",
   "src/server/stored-objects/stored-objects-cross-tenant-lookup.ts",
   "src/server/traces/clickhouse-trace.service.ts",
-  "src/server/workers/startWorkers.ts",
 ]);
 
 const SKIPPED_DIRECTORIES = new Set([

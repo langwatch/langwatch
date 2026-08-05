@@ -39,7 +39,7 @@ vi.mock("~/server/db", () => ({
 }));
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  defaultClickHouseClientResolver: vi.fn(),
 }));
 
 // The deployment shape that triggers the bug: no clustering endpoint at all.
@@ -82,7 +82,7 @@ vi.mock("../../../langevals/stagedFetch", () => ({
   stagedLangevalsFetch: stagedLangevalsFetchMock,
 }));
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { defaultClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { clusterTopicsForProject, storeResults } from "../clustering";
 
@@ -115,7 +115,7 @@ describe("clusterTopicsForProject", () => {
     vi.mocked(prisma.project.findUnique).mockResolvedValue(
       makeProject() as any,
     );
-    vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+    vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
       query: mockClickHouseQuery,
     } as any);
   });

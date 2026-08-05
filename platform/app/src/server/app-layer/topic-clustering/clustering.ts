@@ -9,7 +9,7 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
-import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
+import { defaultClickHouseClientResolver } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { getProjectEmbeddingsModel } from "../../embeddings";
 import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
@@ -114,9 +114,10 @@ export const clusterTopicsForProject = async (
     throw new Error("Project not found");
   }
 
-  const clickhouse = await getClickHouseClientForProject(projectId);
-
-  if (!clickhouse) {
+  let clickhouse: ClickHouseClient;
+  try {
+    clickhouse = await defaultClickHouseClientResolver(projectId);
+  } catch {
     throw new Error(`ClickHouse client not available for project ${projectId}`);
   }
 

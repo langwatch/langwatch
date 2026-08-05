@@ -5,6 +5,7 @@ import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/service
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
+import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
@@ -111,7 +112,8 @@ import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
 import { TraceUsageService } from "../traces/trace-usage.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
-import { getAnalyticsService } from "./analytics";
+import { createAnalyticsService } from "./analytics";
+import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
@@ -485,6 +487,18 @@ export function initializeDefaultApp(options?: {
         : new NullDspyStepRepository(),
     ),
     "DspyStepService",
+  );
+  // Agent 4 batch: the ADR-034 analytics read API, built once here (same
+  // shape `createAnalyticsService` always used — unconditional on
+  // `clickhouseEnabled`, since the resolver itself already throws at query
+  // time when ClickHouse isn't configured) and handed out as
+  // `getApp().analytics.service` instead of each of its ~6 callers
+  // constructing — and each resolving a ClickHouse client — its own.
+  const analyticsService = createAnalyticsService(
+    resolveClickHouseClient,
+    new ClickHouseAnalyticsService(
+      new LegacyAnalyticsBackendClickHouseRepository(resolveClickHouseClient),
+    ),
   );
   const simulationReads = SimulationRunService.create(
     clickhouseEnabled ? resolveClickHouseClient : null,
@@ -954,7 +968,7 @@ export function initializeDefaultApp(options?: {
                       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
                     }),
                   getTimeseries: (input) =>
-                    getAnalyticsService().getTimeseries(input),
+                    analyticsService.getTimeseries(input),
                 },
                 source,
                 projectId,
@@ -1323,6 +1337,7 @@ export function initializeDefaultApp(options?: {
     triggerTemplates,
     emailSuppressions,
     dspySteps: { steps: dspySteps },
+    analytics: { service: analyticsService },
     simulations: { runs: simulationReads, export: scenarioRunExport },
     suiteRuns: { runs: suiteRunService },
     topicClustering: {
@@ -1534,6 +1549,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
+    analytics: {
+      service: createAnalyticsService(async () => {
+        throw new Error("ClickHouse not available in test app");
+      }, new ClickHouseAnalyticsService(null)),
+    },
     experiments: ExperimentService.create(testPrisma),
     triggers: new TriggerService(new NullTriggerRepository()),
     emailSuppressions: new EmailSuppressionService(
