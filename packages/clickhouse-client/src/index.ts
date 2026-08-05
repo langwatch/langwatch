@@ -60,8 +60,13 @@ export {
   TRANSIENT_HTTP_STATUSES,
   TRANSIENT_NETWORK_CODES,
 } from "./resilience";
-export type { RetryNotice, RetryOptions } from "./retry";
-export { retry } from "./retry";
+export type {
+  RetryAttemptNotice,
+  RetryNotice,
+  RetryOptions,
+  RunWithRetryOptions,
+} from "./retry";
+export { retry, runWithRetry } from "./retry";
 export type {
   RoutingTable,
   TenantDirectory,

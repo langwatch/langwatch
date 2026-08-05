@@ -57,54 +57,96 @@ const realSleep = (ms: number): Promise<void> =>
     ).setTimeout(resolve, ms);
   });
 
-export function retry({
-  maxAttempts = DEFAULT_MAX_ATTEMPTS,
-  baseDelayMs = DEFAULT_BASE_DELAY_MS,
-  maxDelayMs = DEFAULT_MAX_DELAY_MS,
-  transientMessageFragments,
-  sleep = realSleep,
-  random,
-  onRetry,
-}: RetryOptions = {}): QueryMiddleware {
-  return (next) =>
-    async <Row>(request: QueryRequest) => {
-      let lastError: unknown;
+/** What {@link runWithRetry} reports on each retry. No request: it is generic. */
+export interface RetryAttemptNotice {
+  /** Zero-based. */
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  error: unknown;
+  /** `warn` for the first attempt, `debug` after: one failure, one warning. */
+  level: "warn" | "debug";
+}
 
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        try {
-          return await next<Row>(request);
-        } catch (error) {
-          lastError = error;
+export interface RunWithRetryOptions
+  extends Omit<RetryOptions, "onRetry" | "transientMessageFragments"> {
+  transientMessageFragments?: readonly string[] | undefined;
+  onRetry?: ((notice: RetryAttemptNotice) => void) | undefined;
+  /** Stop retrying once this reports true. Nobody is waiting any more. */
+  isAborted?: (() => boolean) | undefined;
+}
 
-          const isLastAttempt = attempt === maxAttempts - 1;
-          const transient = isTransientClickHouseError({
-            error,
-            transientMessageFragments,
-          });
-          // An aborted caller is not waiting for the answer any more, so
-          // spending the rest of the budget only adds load.
-          if (!transient || isLastAttempt || request.signal?.aborted === true) {
-            throw error;
-          }
+/**
+ * Retry any operation under this package's policy.
+ *
+ * The loop lives here rather than in the middleware so a caller that is not
+ * yet on the pipeline - the app's `ResilientClickHouseClient`, which wraps the
+ * vendor client's own `query`/`insert` - can share one implementation instead
+ * of keeping a second copy that drifts.
+ */
+export async function runWithRetry<T>(
+  fn: () => Promise<T>,
+  {
+    maxAttempts = DEFAULT_MAX_ATTEMPTS,
+    baseDelayMs = DEFAULT_BASE_DELAY_MS,
+    maxDelayMs = DEFAULT_MAX_DELAY_MS,
+    transientMessageFragments,
+    sleep = realSleep,
+    random,
+    onRetry,
+    isAborted,
+  }: RunWithRetryOptions = {},
+): Promise<T> {
+  let lastError: unknown;
 
-          const delayMs = jitteredBackoffMs({
-            attempt,
-            baseDelayMs,
-            maxDelayMs,
-            ...(random === undefined ? {} : { random }),
-          });
-          onRetry?.({
-            request,
-            attempt,
-            maxAttempts,
-            delayMs,
-            error,
-            level: retryNoticeLevel(attempt),
-          });
-          await sleep(delayMs);
-        }
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      const isLastAttempt = attempt === maxAttempts - 1;
+      const transient = isTransientClickHouseError({
+        error,
+        transientMessageFragments,
+      });
+      // An aborted caller is not waiting for the answer any more, so spending
+      // the rest of the budget only adds load.
+      if (!transient || isLastAttempt || isAborted?.() === true) {
+        throw error;
       }
 
-      throw lastError;
-    };
+      const delayMs = jitteredBackoffMs({
+        attempt,
+        baseDelayMs,
+        maxDelayMs,
+        ...(random === undefined ? {} : { random }),
+      });
+      onRetry?.({
+        attempt,
+        maxAttempts,
+        delayMs,
+        error,
+        level: retryNoticeLevel(attempt),
+      });
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
+
+export function retry({
+  onRetry,
+  ...options
+}: RetryOptions = {}): QueryMiddleware {
+  return (next) =>
+    <Row>(request: QueryRequest) =>
+      runWithRetry(() => next<Row>(request), {
+        ...options,
+        isAborted: () => request.signal?.aborted === true,
+        ...(onRetry === undefined
+          ? {}
+          : { onRetry: (notice) => onRetry({ ...notice, request }) }),
+      });
 }

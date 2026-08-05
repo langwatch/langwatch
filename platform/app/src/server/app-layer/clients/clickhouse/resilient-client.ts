@@ -1,8 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  RETRY_CAUSE_FIELD,
-  retryNoticeLevel,
-} from "@langwatch/clickhouse-client";
+import { RETRY_CAUSE_FIELD, runWithRetry } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import {
   incrementClickHouseQueryCount,
@@ -10,10 +7,7 @@ import {
 } from "~/server/clickhouse/metrics";
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 import { detectColdScan } from "./cold-scan-detector";
-import {
-  TRANSIENT_NETWORK_CODES,
-  translateClickHouseQueryError,
-} from "./translate-query-error";
+import { translateClickHouseQueryError } from "./translate-query-error";
 import { queryWindowed } from "./windowed-read";
 
 /**
@@ -30,55 +24,14 @@ const logger = createLogger("langwatch:clickhouse:resilient");
 const queryLogger = createLogger("langwatch:clickhouse:query");
 
 /**
- * Reuses the canonical transient-message list from
- * event-sourcing/services/errorHandling.ts so the inline insert retry
- * loop catches the exact same set of cluster-recovery cases (ZK
- * reconnect, replica shutdown, KILL during graceful shutdown, overload)
- * as the outer group-queue retry classifier. Importing instead of
- * duplicating keeps the two layers in lock-step forever.
- */
-function isTransientError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-
-  const message = error.message;
-  if (/timeout/i.test(message)) return true;
-  for (const fragment of CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS) {
-    if (message.includes(fragment)) return true;
-  }
-
-  const code = (error as NodeJS.ErrnoException).code;
-  if (code && TRANSIENT_NETWORK_CODES.has(code)) return true;
-
-  const status =
-    (error as { statusCode?: number }).statusCode ??
-    (error as { status?: number }).status;
-  if (status === 429 || status === 502 || status === 503) return true;
-
-  return false;
-}
-
-function jitteredBackoff({
-  attempt,
-  baseDelayMs,
-  maxDelayMs,
-}: {
-  attempt: number;
-  baseDelayMs: number;
-  maxDelayMs: number;
-}): number {
-  const exponential = baseDelayMs * 2 ** attempt;
-  const jitter = Math.random() * baseDelayMs;
-  return Math.min(exponential + jitter, maxDelayMs);
-}
-
-/**
- * Runs an operation against ClickHouse, retrying transient failures with
- * jittered backoff. Both reads and writes use this: a read rejected with
- * "Too many simultaneous queries" (or any other transient overload /
- * cluster-recovery condition) frees up within moments, and reads are
- * idempotent, so retrying rides through the spike instead of surfacing a
- * 500 to the user. Non-transient errors (e.g. a query syntax error) fail
- * fast on the first attempt.
+ * The whole retry policy - classification, backoff, how loudly to report an
+ * attempt - lives in @langwatch/clickhouse-client, so every ClickHouse caller
+ * in the repo answers to one implementation rather than a copy per layer.
+ *
+ * The transient-message list is still passed in from
+ * event-sourcing/services/errorHandling.ts rather than owned by the package,
+ * which keeps this layer and the outer group-queue classifier reading the same
+ * list forever.
  */
 async function withTransientRetry<T>(
   fn: () => Promise<T>,
@@ -94,32 +47,21 @@ async function withTransientRetry<T>(
     maxDelayMs: number;
   },
 ): Promise<T> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
-
-      if (!isTransientError(error) || attempt === maxRetries) {
-        throw error;
-      }
-
-      const delay = jitteredBackoff({ attempt, baseDelayMs, maxDelayMs });
-
+  return runWithRetry(fn, {
+    // maxRetries counts retries after the first try; runWithRetry counts tries.
+    maxAttempts: maxRetries + 1,
+    baseDelayMs,
+    maxDelayMs,
+    transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+    onRetry: ({ attempt, maxAttempts, delayMs, error, level }) => {
       try {
-        // Only the first attempt warns, and the cause never rides under
-        // `error`. Both rules live in @langwatch/clickhouse-client: a 25-attempt
-        // budget otherwise turned one failure into 25 records, each of which
-        // Loki promoted to error because of the field name.
-        logger[retryNoticeLevel(attempt)](
+        logger[level](
           {
             source: "clickhouse",
             operation,
             attempt: attempt + 1,
-            maxRetries,
-            delayMs: Math.round(delay),
+            maxRetries: maxAttempts - 1,
+            delayMs: Math.round(delayMs),
             [RETRY_CAUSE_FIELD]: error,
           },
           `Transient ClickHouse ${operation} error, retrying`,
@@ -130,12 +72,8 @@ async function withTransientRetry<T>(
           `Failed to log transient ${operation} retry`,
         );
       }
-
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-
-  throw lastError;
+    },
+  });
 }
 
 function safeQueryMeta(params: unknown): {
