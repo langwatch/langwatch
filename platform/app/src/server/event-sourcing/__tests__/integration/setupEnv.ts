@@ -14,6 +14,14 @@
  */
 
 import { TEST_PUBLIC_KEY } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
+import { assertSerialWorkerSlot } from "../../../../test-utils/integrationFileConcurrency";
+
+// This module runs once per worker, which is where a second worker becomes
+// observable at all. Files sharing a ClickHouse schema and a Redis instance
+// only hold together while they run one at a time, so a worker slot that
+// should not exist fails here rather than surfacing as a suite reading another
+// suite's half-applied migration.
+assertSerialWorkerSlot(process.env);
 
 // Set TEST_PUBLIC_KEY for license verification in integration tests.
 // This allows test licenses (signed with TEST_PRIVATE_KEY) to validate correctly.
@@ -65,12 +73,11 @@ if (process.env.CI && process.env.CI_CLICKHOUSE_URL) {
 
 // Give each worker its own Redis logical database.
 //
-// The integration suite ran one file at a time for years because concurrent
-// files fight over Redis: BullMQ derives its keys from the queue name alone,
-// so two workers building the same pipeline share a queue and consume each
-// other's jobs. That is a Redis problem specifically -- the ClickHouse and
-// Postgres fixtures were already written against per-suite tenant ids, so
-// they do not collide.
+// The integration suite runs one file at a time, and Redis is one of the
+// reasons: BullMQ derives its keys from the queue name alone, so two workers
+// building the same pipeline share a queue and consume each other's jobs. The
+// ClickHouse fixtures carry per-suite tenant ids, which keeps their rows
+// apart, though not the schema they share.
 //
 // Redis ships 16 logical databases and `select` isolates them completely, so
 // pointing worker N at database N removes the contention without a second

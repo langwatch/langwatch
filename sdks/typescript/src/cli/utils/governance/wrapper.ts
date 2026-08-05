@@ -15,6 +15,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import { lwTag } from "./brand";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 import { getCliBootstrap } from "./cli-api";
@@ -151,7 +152,7 @@ export async function preflightWrapper(
 	tool: string,
 	opts: PreflightOptions = {},
 ): Promise<PreflightResult> {
-	const cp = cfg.control_plane_url.replace(/\/+$/, "");
+	const cp = normalizeEndpoint(cfg.control_plane_url);
 	const bootstrap = await (opts.bootstrapImpl ?? getCliBootstrap)(cfg).catch(
 		() => null,
 	);
@@ -171,7 +172,7 @@ export async function preflightWrapper(
 		};
 	}
 
-	const gw = cfg.gateway_url.replace(/\/+$/, "");
+	const gw = normalizeEndpoint(cfg.gateway_url);
 	const f = opts.fetchImpl ?? fetch;
 	const timeoutMs = opts.timeoutMs ?? 3000;
 	try {
@@ -619,7 +620,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		modeResult.ingestionToken
 			? createCodexIOStreamer({
 					sinceMs: sessionStartMs,
-					endpoint: `${modeResult.endpoint.replace(/\/+$/, "")}/v1/traces`,
+					endpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/traces`,
 					token: modeResult.ingestionToken,
 				})
 			: null;

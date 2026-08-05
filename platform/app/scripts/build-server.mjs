@@ -158,6 +158,8 @@ const undeclared = new Map();
 const scannedSources = new Set();
 /** @type {Map<string, Set<string>>} specifier -> source files that bare-import it */
 const unlistedSideEffectImports = new Map();
+/** @type {Map<string, Set<string>>} specifier -> files importing JSON with no attribute */
+const jsonImportsWithoutAttribute = new Map();
 
 for (const { name, entry } of ENTRIES) {
   const result = await build({
@@ -228,6 +230,36 @@ for (const { name, entry } of ENTRIES) {
       }
       files.add(input);
     }
+    // Dynamic imports of JSON from an external package. These survive into the
+    // bundle verbatim, so Node resolves them through the ESM loader, which
+    // rejects JSON without an import attribute (ERR_IMPORT_ATTRIBUTE_MISSING).
+    // tsx absorbs the missing attribute, so this only ever breaks in
+    // production, and it breaks quietly wherever the caller catches and
+    // degrades — the tokenizer skipped tokenization entirely for exactly this
+    // reason.
+    for (const m of source.matchAll(
+      /import\s*\(\s*(["'])([^"'\n]+\.json)\1\s*([,)])/g,
+    )) {
+      const spec = m[2] ?? "";
+      // Relative JSON is bundled in, so the loader never sees it.
+      if (/^(\.|\/|~\/|@app\/|@ee\/)/.test(spec)) continue;
+      // Only a literal `with: { type: "json" }` second argument satisfies the
+      // loader. Anything else still throws at runtime: `{}`, an options
+      // variable the scan can't see into, or `assert` (removed in Node 22).
+      if (
+        m[3] === "," &&
+        /^\s*\{\s*with\s*:\s*\{\s*type\s*:\s*(["'])json\1/.test(
+          source.slice((m.index ?? 0) + m[0].length),
+        )
+      )
+        continue;
+      let files = jsonImportsWithoutAttribute.get(spec);
+      if (!files) {
+        files = new Set();
+        jsonImportsWithoutAttribute.set(spec, files);
+      }
+      files.add(input);
+    }
   }
   if (emitMeta) {
     writeFileSync(
@@ -253,7 +285,16 @@ if (undeclared.size > 0) {
     "  The bundles resolve external requires from node_modules at runtime; a --prod install only ships `dependencies`. Declare the packages above in platform/app/package.json dependencies.",
   );
 }
-if (undeclared.size > 0 || unlistedSideEffectImports.size > 0) {
+for (const [spec, files] of jsonImportsWithoutAttribute) {
+  console.error(
+    `  error: dynamic import of "${spec}" in ${[...files].join(", ")} lacks a literal \`with: { type: "json" }\` import attribute — Node's ESM loader rejects JSON without it (ERR_IMPORT_ATTRIBUTE_MISSING). Write: import("${spec}", { with: { type: "json" } })`,
+  );
+}
+if (
+  undeclared.size > 0 ||
+  unlistedSideEffectImports.size > 0 ||
+  jsonImportsWithoutAttribute.size > 0
+) {
   process.exit(1);
 }
 

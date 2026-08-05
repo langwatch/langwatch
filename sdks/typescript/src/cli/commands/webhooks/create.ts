@@ -15,7 +15,7 @@ export const createWebhookCommand = async (options: {
   try {
     const endpoint = await service.create({
       url: options.url,
-      enabledEvents: options.events.split(",").map((e) => e.trim()).filter(Boolean),
+      enabled_events: options.events.split(",").map((e) => e.trim()).filter(Boolean),
     });
     spinner.succeed(`Created endpoint ${endpoint.id}`);
     return {
