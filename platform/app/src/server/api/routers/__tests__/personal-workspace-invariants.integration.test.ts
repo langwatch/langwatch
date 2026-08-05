@@ -866,11 +866,27 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
     });
   });
 
+  // Put the seat user back the way `beforeAll` left them, by writing the rows
+  // rather than replaying the router: teardown that depends on the app a test
+  // wired up restores nothing once the app is reset, and swallowing that is how
+  // it goes unnoticed. The shared-team binding goes back to ADMIN too, or the
+  // next test's assertion that the cascade corrected it to VIEWER would hold
+  // whether or not the cascade ran.
   afterEach(async () => {
     await resetApp();
-    await setSeatUserOrganizationRole(OrganizationUserRole.MEMBER).catch(
-      () => {},
-    );
+    await prisma.organizationUser.update({
+      where: { userId_organizationId: { userId: seatUserId, organizationId } },
+      data: { role: OrganizationUserRole.MEMBER },
+    });
+    await prisma.roleBinding.updateMany({
+      where: {
+        organizationId,
+        userId: seatUserId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: sharedTeamId,
+      },
+      data: { role: TeamUserRole.ADMIN },
+    });
   });
 
   /** @scenario Moving a member who has a personal workspace to Lite Member succeeds */

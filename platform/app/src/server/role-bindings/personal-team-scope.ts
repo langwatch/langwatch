@@ -46,10 +46,13 @@ export async function findSharedTeamIds({
  * project reaches the same private space as one on the personal team, so naming
  * the project rather than the team cannot be the way around the refusal.
  */
-export async function findPersonalTeamInScopes(
-  client: Client,
-  scopes: RoleBindingScope[],
-): Promise<{ name: string } | null> {
+export async function findPersonalTeamInScopes({
+  client,
+  scopes,
+}: {
+  client: Client;
+  scopes: RoleBindingScope[];
+}): Promise<{ name: string } | null> {
   const idsOfType = (scopeType: RoleBindingScopeType) => [
     ...new Set(
       scopes
@@ -85,11 +88,14 @@ export async function findPersonalTeamInScopes(
   return null;
 }
 
-export async function scopesTouchPersonalTeam(
-  client: Client,
-  scopes: RoleBindingScope[],
-): Promise<boolean> {
-  return (await findPersonalTeamInScopes(client, scopes)) !== null;
+export async function scopesTouchPersonalTeam({
+  client,
+  scopes,
+}: {
+  client: Client;
+  scopes: RoleBindingScope[];
+}): Promise<boolean> {
+  return (await findPersonalTeamInScopes({ client, scopes })) !== null;
 }
 
 /**
@@ -122,11 +128,14 @@ export async function scopesTouchPersonalTeam(
  * workspace is never in the set, and this stays what it was built to be: the
  * line an attempt to *share* a personal workspace runs into.
  */
-export async function assertNoPersonalTeamScope(
-  client: Client,
-  scopes: RoleBindingScope[],
-): Promise<void> {
-  const personalTeam = await findPersonalTeamInScopes(client, scopes);
+export async function assertNoPersonalTeamScope({
+  client,
+  scopes,
+}: {
+  client: Client;
+  scopes: RoleBindingScope[];
+}): Promise<void> {
+  const personalTeam = await findPersonalTeamInScopes({ client, scopes });
   if (personalTeam) {
     throw new PersonalWorkspaceNotManagedHereError(personalTeam.name);
   }

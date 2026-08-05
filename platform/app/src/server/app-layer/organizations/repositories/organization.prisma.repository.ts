@@ -537,8 +537,18 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       if (personalTeams.length === 0) return;
 
       const personalTeamIds = personalTeams.map((team) => team.id);
+      // `isPersonal` on the same terms the reactivation reads it, so the two
+      // sides move the same rows. A personal team holds nothing else today
+      // (creating a project in one, or moving one into it, is refused), and the
+      // flag mirrors the team's, so this narrows nothing away; it keeps the pair
+      // symmetric if that ever slips, since archiving what the revival would
+      // not return is the failure with no way back.
       await tx.project.updateMany({
-        where: { teamId: { in: personalTeamIds }, archivedAt: null },
+        where: {
+          teamId: { in: personalTeamIds },
+          isPersonal: true,
+          archivedAt: null,
+        },
         data: { archivedAt },
       });
       await tx.team.updateMany({

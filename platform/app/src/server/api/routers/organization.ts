@@ -1327,9 +1327,12 @@ export const organizationRouter = createTRPCRouter({
     .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
-      await assertNoPersonalTeamScope(prisma, [
-        { scopeType: RoleBindingScopeType.TEAM, scopeId: input.teamId },
-      ]);
+      await assertNoPersonalTeamScope({
+        client: prisma,
+        scopes: [
+          { scopeType: RoleBindingScopeType.TEAM, scopeId: input.teamId },
+        ],
+      });
       const inputIsCustomRole = isCustomRole(input.role);
 
       if (inputIsCustomRole && input.customRoleId) {
@@ -1489,13 +1492,13 @@ export const organizationRouter = createTRPCRouter({
       // this the shared-teams-only set below would answer "that team is not in
       // the organization", which is both wrong and no help. No UI sends these
       // updates today; the procedure accepts them, so it has to answer them.
-      await assertNoPersonalTeamScope(
-        prisma,
-        (input.teamRoleUpdates ?? []).map((update) => ({
+      await assertNoPersonalTeamScope({
+        client: prisma,
+        scopes: (input.teamRoleUpdates ?? []).map((update) => ({
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: update.teamId,
         })),
-      );
+      });
 
       // Only the teams the organization shares. A seat decision is about the
       // person, so it applies to the teams they work in with other people and

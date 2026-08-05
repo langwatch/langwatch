@@ -187,6 +187,7 @@ function MembersList({
                 },
               });
             });
+          void queryClient.limits.getUsage.invalidate();
           void queryClient.licenseEnforcement.checkLimit.invalidate();
         },
         onError: () => {
@@ -214,6 +215,7 @@ function MembersList({
             tags: { organizationId: organization.id },
           });
         });
+      void queryClient.limits.getUsage.invalidate();
       void queryClient.licenseEnforcement.checkLimit.invalidate();
     },
   });

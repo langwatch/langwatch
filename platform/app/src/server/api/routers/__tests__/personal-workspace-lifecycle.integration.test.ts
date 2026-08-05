@@ -194,7 +194,7 @@ describe("given a member with a personal workspace in an organization", () => {
       ).resolves.toBeNull();
     });
 
-    describe("and that member joins the organization again", () => {
+    describe("when that member joins the organization again", () => {
       beforeAll(async () => {
         await prisma.organizationUser.create({
           data: {
