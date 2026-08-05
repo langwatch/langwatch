@@ -54,7 +54,11 @@ vi.mock("~/server/posthog", () => ({ trackServerEvent: vi.fn() }));
 // cannot stand in for it. Unmocked it opens a real Postgres connection, which
 // passes on a machine that happens to run one locally and fails in CI, where
 // nothing is listening. A unit test should not depend on either.
-vi.mock("../../../../auditLog", () => ({ auditLog: vi.fn() }));
+//
+// The specifier has to be the one `trpc.ts` imports: a path that resolves to
+// no module mocks nothing, silently, and the test then passes or fails on
+// whether a database happens to be listening.
+vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: vi.fn() }));
 
 function caller() {
   const ctx = createInnerTRPCContext({
