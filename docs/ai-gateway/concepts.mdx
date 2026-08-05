@@ -46,7 +46,7 @@ Windows: `minute`, `hour`, `day`, `week`, `month`, `total`.
 
 Hierarchical: a single request is checked against every budget that applies. **Any** hard-block breach blocks; warnings compose.
 
-Spend is debited after the response completes, using the token counts the provider reported, via the trace-fold reactor, replays of the same `gateway_request_id` collapse so gateway retries never double-bill.
+Spend is debited after the response completes, using the token counts the provider reported, from the spend commands the gateway emits for every request. Redeliveries of the same `gateway_request_id` collapse, so a retry never double-bills.
 
 See [Budgets](/ai-gateway/budgets).
 

@@ -88,12 +88,19 @@ type Worker interface {
 	// Release returns the worker to idle and records the turn as recently-handled.
 	// Always paired with a granted ClaimTurn.
 	Release()
+	// HasServedTurn reports whether this worker has completed at least one turn —
+	// the honest cold/warm signal behind the pre-first-frame status copy.
+	HasServedTurn() bool
 	// Touch resets the idle timer.
 	Touch()
-	// PostMessage queues the turn on the worker's opencode session. resumeToken
+	// PostMessage queues the turn on the worker's opencode session. historySeed
+	// is the control plane's conversation-so-far block: folded in ahead of the
+	// prompt on the FIRST message this worker's session receives, ignored once a
+	// prompt has been delivered (the session's own transcript carries it from
+	// then on, and re-sending it would bloat every later message). resumeToken
 	// (ADR-048) carries an opaque prior-turn checkpoint to resume from; empty on
 	// a cold start.
-	PostMessage(ctx context.Context, system, prompt, resumeToken string) error
+	PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string) error
 	// StreamEvents forwards this session's opencode events into sink until a
 	// terminal event or ctx cancellation.
 	StreamEvents(ctx context.Context, sink ChatSink) error
@@ -102,6 +109,14 @@ type Worker interface {
 	// under it, and its mediated LLM calls carry it as traceparent. Called at
 	// each turn start; implementations without a telemetry relay no-op.
 	SetTurnTraceContext(sc trace.SpanContext)
+	// ForwardTurnSpan emits the turn's customer-facing root span — the real
+	// parent for everything the worker and gateway put in the customer's
+	// trace this turn. Called once at turn end with the turn's span context
+	// and wall-clock bounds; failure is non-nil when the turn ended in a
+	// terminal error, so the customer span carries the error status and
+	// message instead of reading as a silent success. Implementations
+	// without a telemetry relay no-op.
+	ForwardTurnSpan(sc trace.SpanContext, start, end time.Time, failure *domain.TurnFailure)
 	// LastLLMError is the typed gateway herr the worker's most recent mediated
 	// LLM call failed with this turn, if any — the real cause behind an
 	// agent-reported turn error. Implementations without mediation return
@@ -145,7 +160,7 @@ type TurnFinalizer interface {
 }
 
 // ChatSink is the typed frame sink the app streams a turn's output frames into.
-// In self-drive (LANGY_WORKER_REDESIGN §0/§0b) the app no longer holds an
+// In self-drive (see app.go and adapters/controlplane) the app no longer holds an
 // http.ResponseWriter open: the coding agent's output is mapped to typed
 // internal/frames values, and the sink SIGNS each and pushes it to the
 // control-plane relay (adapters/controlplane.RelayStream) — while the app also

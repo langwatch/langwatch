@@ -1,0 +1,42 @@
+---
+title: Langy Token Usage and Cost
+description: Langy's model calls bill to your own accounts through the LangWatch AI Gateway, per token for API keys or against your subscription for Codex, and every turn is a traced, costed run in your own LangWatch project.
+sidebarTitle: Token usage and cost
+keywords: langy token cost, ai agent cost tracking, llm spend
+---
+
+Whichever provider you configured, or your Codex subscription if you connected one, is what actually gets charged. LangWatch never touches your bill, and the charge shows up alongside everything else in your project, broken out by turn, not as a separate invoice to track down.
+
+## Who pays for tokens
+
+Langy has no model account of its own. It runs on:
+
+- **Your provider API keys**, for any provider you configure with a key. See [Models and bring your own key](/langy/models).
+- **Your Codex subscription**, if you sign in with your OpenAI account. See [Run Langy on your own OpenAI plan](/langy/codex).
+
+Every Langy LLM call routes through the LangWatch AI Gateway on a per-project virtual key. Your gateway budgets and rate limits apply to Langy the same way they apply to the rest of your traffic, so Langy's spend is capped and enforced by the limits you already set.
+
+## How you see the spend
+
+Every Langy turn is traced into your own LangWatch project, with tokens and cost, like any other agent run. A turn produces:
+
+- A `langy.turn` root span for the turn itself.
+- The model calls under it, with full token counts and cost from the gateway.
+
+Because each session is a run in your project, you can open it in the same trace views you use for your own agents and read exactly what a session spent. Langy is observed with the same tools you use to observe everything else.
+
+{/* TODO screenshot: a Langy turn shown as a traced, costed run in Trace Explorer. Not yet staged in docs/images/langy/. */}
+
+<Note>
+Langy excludes its own turns from your production-traffic views by default. Its traces carry the `langy` origin, so they do not mix into samples of your application traffic unless you ask for them.
+</Note>
+
+<Info>
+**Also check:** [Models and bring your own key](/langy/models), [Run Langy on your own OpenAI plan](/langy/codex).
+</Info>
+
+## Reference
+
+- [Models and bring your own key](/langy/models)
+- [Run Langy on your own OpenAI plan (Codex)](/langy/codex)
+- [Data flow and privacy](/langy/security/data-flow-and-privacy)

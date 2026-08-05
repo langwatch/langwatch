@@ -4,7 +4,7 @@ Feature: Integration tests against native local services
   So that I can run integration tests without Docker Desktop eating my machine
 
   # Activated by LANGWATCH_TEST_CLICKHOUSE_URL + LANGWATCH_TEST_REDIS_URL
-  # (optionally LANGWATCH_TEST_DATABASE_URL for Postgres) in langwatch/.env.
+  # (optionally LANGWATCH_TEST_DATABASE_URL for Postgres) in platform/app/.env.
   # The mode is never active in CI, and testcontainers remains the default
   # when the variables are absent. These scenarios exercise the test harness
   # itself, so they are validated by running the suite, not by bound tests.
@@ -34,3 +34,28 @@ Feature: Integration tests against native local services
   Scenario: CI is unaffected
     Given the suite runs in CI
     Then CI service containers are used regardless of LANGWATCH_TEST_* variables
+
+  # Suites that assert per-organization ClickHouse routing need two or more
+  # endpoints that cannot see each other's rows. They ask for those endpoints
+  # instead of starting their own containers, so the native mode covers them too.
+
+  @unimplemented
+  Scenario: Routing suites get isolated endpoints without docker
+    Given a suite needs two mutually isolated ClickHouse endpoints
+    And the native local services are configured
+    When the suite runs
+    Then a row written through one endpoint is invisible to the other
+    And no docker container is started
+
+  @unimplemented
+  Scenario: A suite never touches the developer's own data
+    Given the native server also holds the developer's dev ClickHouse data
+    When a suite runs against its own endpoints
+    Then the dev data is neither read nor written
+
+  @unimplemented
+  Scenario: The same suites still run in CI
+    Given the suite runs in CI
+    When the suite asks for isolated endpoints
+    Then the endpoints stay isolated from one another
+    And the suite passes with no native service configured

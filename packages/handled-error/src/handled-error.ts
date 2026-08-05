@@ -78,7 +78,14 @@ export interface SerializedHandledError {
  * pre-collapsed to type "unknown".
  */
 export interface HerrEnvelope {
+  /**
+   * The discriminant, OpenAI-compatible name. Go emits this and `code` with
+   * the same value; `type` stays required here so an envelope from a writer
+   * that only sets it still parses.
+   */
   type: string;
+  /** Always equal to `type` when Go wrote the envelope. Preferred when present. */
+  code?: string;
   message: string;
   meta?: Record<string, unknown>;
   trace_id?: string;
@@ -226,7 +233,9 @@ export abstract class HandledError extends Error {
    * handled at all?"), or compare `err.code` to pick out one subclass.
    */
   static is<T extends HandledError>(
-    this: abstract new (...args: never) => T,
+    this: abstract new (
+      ...args: never
+    ) => T,
     error: unknown,
   ): error is T {
     return error instanceof this;
@@ -260,10 +269,7 @@ export abstract class HandledError extends Error {
    * }
    * ```
    */
-  static toUserMessage(
-    error: unknown,
-    log?: (error: unknown) => void,
-  ): string {
+  static toUserMessage(error: unknown, log?: (error: unknown) => void): string {
     if (HandledError.isHandled(error)) return error.message;
     log?.(error);
     return "An unknown error occurred";
@@ -308,9 +314,12 @@ export function handledErrorFromHerr(
   body: HerrEnvelope,
   options: { httpStatus?: number } = {},
 ): HandledError {
+  // Go emits `code` and `type` with the same value; prefer `code` and fall back
+  // to `type` so an envelope from an older writer resolves identically.
+  const code = body.code ?? body.type;
   return new (class extends HandledError {
     constructor() {
-      super(body.type, body.message, {
+      super(code, body.message, {
         meta: body.meta,
         httpStatus: options.httpStatus,
         fault: body.fault,
@@ -320,13 +329,24 @@ export function handledErrorFromHerr(
         spanId: body.span_id,
         reasons: (body.reasons ?? []).map((r) => handledErrorFromHerr(r)),
       });
-      this.name = body.type;
+      this.name = code;
     }
   })();
 }
 
 function serializeReason(error: Error): SerializedReason {
   if (HandledError.isHandled(error)) {
+    // A HandledError's message is safe to show by the class contract, and for
+    // a reason it is often the only prose there is (a herr-deserialized cause
+    // carries its message on `.message`, not in meta — FromBody/toErrorBody
+    // promote between the two on the Go side). Fold it into `meta.message` —
+    // the ADR-045 prose channel consumers already read — so the reason chain
+    // keeps naming the real failure across this serialization too. An explicit
+    // meta.message wins; a message that merely repeats the code adds nothing.
+    const meta =
+      error.message && error.message !== error.code && !error.meta.message
+        ? { ...error.meta, message: error.message }
+        : error.meta;
     return {
       code: error.code,
       // Deprecated back-compat alias — see SerializedReason.kind.
@@ -334,7 +354,7 @@ function serializeReason(error: Error): SerializedReason {
       fault: error.fault,
       ...(error.traceId ? { traceId: error.traceId } : {}),
       ...(error.spanId ? { spanId: error.spanId } : {}),
-      ...(Object.keys(error.meta).length > 0 && { meta: error.meta }),
+      ...(Object.keys(meta).length > 0 && { meta }),
       ...(error.tips.length > 0 && { tips: error.tips }),
       ...(error.docsUrl ? { docsUrl: error.docsUrl } : {}),
       ...(error.reasons.length > 0 && {
@@ -361,6 +381,25 @@ export interface HandledErrorOptions {
  * with identifying fields (e.g. `{ spanId }`).
  */
 export class NotFoundError extends HandledError {
+  /**
+   * `code` is a bare `string` on purpose, and that is NOT the same as saying
+   * any string is acceptable.
+   *
+   * This package sits UPSTREAM of every tree that enumerates codes: the app
+   * (`platform/app/src/features/errors/logic/codes.ts`), the MCP server and
+   * `packages/api` all depend on it, and none of them can be
+   * depended on from here without inverting that edge into a cycle. There is
+   * also no single union to narrow to — each consumer owns its own code list,
+   * and a union of one of them would reject the others' perfectly valid codes.
+   *
+   * So the enumeration is enforced downstream instead, where the codes live:
+   * `platform/app/src/features/errors/logic/__tests__/codes.unit.test.ts` scans
+   * the app's trees for every code a handled error declares — including the
+   * `new NotFoundError("…", …)` shape specifically — and fails when a raised
+   * code is missing from `APP_ERROR_CODES`, which is the key set the client
+   * presentation registry must satisfy exhaustively. A code passed here
+   * without copy fails that guard, not the type checker.
+   */
   constructor(
     code: string,
     resource: string,

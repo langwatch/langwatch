@@ -38,12 +38,12 @@ func TestWarm_ValidReturns204(t *testing.T) {
 
 // A path-escaping conversationId is rejected before any spawn, as the field-typed
 // herr envelope.
-func TestWarm_InvalidConversationIDReturns400(t *testing.T) {
+func TestWarm_InvalidConversationIDReturns422(t *testing.T) {
 	router := newTestRouter(&stubPool{})
 	body := `{"conversationId":"../etc","projectId":"project-1","actorUserId":"user-a","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`
 	rec := post(t, router, "/warm", body)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", rec.Code)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422", rec.Code)
 	}
 	if got := errorType(t, rec.Body.String()); got != string(domain.ErrInvalidConversationID) {
 		t.Errorf("error type = %q, want %q", got, domain.ErrInvalidConversationID)
@@ -82,11 +82,11 @@ func TestProbe_BindsSignatureToPrincipal(t *testing.T) {
 	}
 }
 
-func TestProbe_InvalidConversationIDReturns400(t *testing.T) {
+func TestProbe_InvalidConversationIDReturns422(t *testing.T) {
 	router := newTestRouter(&stubPool{})
 	rec := post(t, router, "/worker/probe", `{"conversationId":"../etc","projectId":"project-1","actorUserId":"user-a"}`)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", rec.Code)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422", rec.Code)
 	}
 	if got := errorType(t, rec.Body.String()); got != string(domain.ErrInvalidConversationID) {
 		t.Errorf("error type = %q, want %q", got, domain.ErrInvalidConversationID)

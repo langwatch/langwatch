@@ -14,7 +14,7 @@
 // turn that carries none, trips the gate; the gate cancels the stream and
 // driveTurn emits the vetted error frame. The command grammar mirrors the TS
 // recogniser in
-// langwatch/src/server/app-layer/langy/execution/githubCommand.ts — keep the
+// platform/app/src/server/app-layer/langy/execution/githubCommand.ts — keep the
 // two in sync.
 package app
 
@@ -65,9 +65,9 @@ func newGithubGate(hasCredential bool, cancel func()) *githubGate {
 // The end frame is self-describing (input rides it too), so the settle event
 // alone answers "what ran, and how did it end?".
 type gateToolFrame struct {
-	Type    string `json:"type"`
-	Phase   string `json:"phase"`
-	Input   struct {
+	Type  string `json:"type"`
+	Phase string `json:"phase"`
+	Input struct {
 		Command string `json:"command"`
 	} `json:"input"`
 	Output  string `json:"output"`

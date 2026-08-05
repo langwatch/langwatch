@@ -5,7 +5,7 @@ Feature: Recent Items Backend
   So that I can quickly jump back to what I was working on
 
   # Most scenarios bound via existing
-  # `langwatch/src/server/home/__tests__/recent-items.integration.test.ts`.
+  # `platform/app/src/server/home/__tests__/recent-items.integration.test.ts`.
   # The remaining @unimplemented scenarios (monitor/annotation extraction,
   # ordering, dedup, deep-link URLs) need additional cases in that same
   # file — the audit-log → entity-resolver pipeline is fully functional
@@ -206,7 +206,7 @@ Feature: Recent Items Backend
       | checkId | monitor-123 |
     And a monitor exists with id "monitor-123" and name "My Evaluation" and slug "my-evaluation"
     When I request recent items with limit 12
-    Then the item should have href "/project-456/evaluations"
+    Then the item should have href "/project-456/online-evaluations"
 
   @unimplemented
   Scenario: Returns correct deep link URL for annotation queues

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -12,20 +13,27 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/langwatch/langwatch/pkg/breaker"
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/jwtverify"
+
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/authresolver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/budget"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/cacherules"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/controlplane"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/customertracebridge"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/modelresolver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/policy"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ratelimit"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/spendemitter"
 )
 
 // Deps holds validated infrastructure adapters needed by the gateway.
@@ -44,6 +52,12 @@ type Deps struct {
 	Cache         *cacherules.Evaluator
 	Models        *modelresolver.Resolver
 	Health        *health.Registry
+	Metrics       *gatewaymetrics.Recorder
+	Breaker       *breaker.Registry
+	// Spend emission (nil when LW_GATEWAY_SPEND_ENABLED is off).
+	SpendEmitter *spendemitter.Emitter
+	SpendSpool   *spendemitter.Spool
+	SpendDrainer *spendemitter.Drainer
 }
 
 // NewDeps builds all infrastructure adapters from the given config.
@@ -55,6 +69,10 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	logger := clog.New(ctx, cfg.Log)
 	ctx = clog.Set(ctx, logger)
 	nodeID := resolveNodeID(ctx)
+
+	// Built first so every adapter below can be handed the recorder it
+	// reports into. Holds no resources and starts no goroutines.
+	metrics := gatewaymetrics.New()
 
 	otelProvider, err := cfg.OTel.Configure(ctx, nodeID)
 	if err != nil {
@@ -70,6 +88,22 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	projectRegistry := customertracebridge.NewRegistry()
 	bridge, err := customertracebridge.NewEmitter(ctx, customertracebridge.EmitterOptions{
 		Registry: projectRegistry,
+		// This service's customer-trace policy: no resource attribute passes
+		// through (the pod environment is platform detail), and every retold
+		// span carries this service's origin identity.
+		Policy: customertracebridge.Policy{
+			Stamp: []attribute.KeyValue{
+				attribute.String(otelsetup.AttrLangWatchOrigin, gatewaytracer.OriginGateway),
+			},
+		},
+		// ADR-061 mirror leg: when configured, a Langy VK's gen_ai span is
+		// duplicated into the mirror project at the bundle's tier. Unset leaves
+		// the leg dormant.
+		Mirror: customertracebridge.MirrorConfig{
+			Endpoint:  cfg.LangyMirror.TraceEndpoint,
+			Key:       cfg.LangyMirror.TraceKey,
+			ProjectID: cfg.LangyMirror.ProjectID,
+		},
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("customer trace bridge init: %w", err)
@@ -94,18 +128,20 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Verifier:  verifier,
 		UserAgent: userAgent,
 		// Custom transport: OTel instrumentation wraps the pooled inner
-		// transport so every control-plane RPC gets a span automatically.
-		// The inner transport keeps connections warm to avoid TCP/TLS
+		// transport so every control-plane RPC gets a span automatically,
+		// and the metrics round-tripper wraps that so every RPC is also
+		// timed and counted for operators without a trace backend. The
+		// inner transport keeps connections warm to avoid TCP/TLS
 		// handshake cost on auth-miss bursts.
 		HTTPClient: &http.Client{
 			Timeout: 10 * time.Second,
-			Transport: otelhttp.NewTransport(&http.Transport{
+			Transport: gatewaymetrics.WrapTransport(otelhttp.NewTransport(&http.Transport{
 				MaxIdleConnsPerHost: 100,
 				IdleConnTimeout:     90 * time.Second,
 				ForceAttemptHTTP2:   true,
 			}, otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
 				return "controlplane " + r.Method + " " + r.URL.Path
-			})),
+			})), metrics),
 		},
 		Logger: logger,
 	})
@@ -115,6 +151,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		ConfigFetcher: cpClient,
 		ChangePoller:  changePollerAdapter{client: cpClient},
 		Logger:        logger,
+		Metrics:       metrics,
 		SoftBump:      cfg.AuthCache.SoftBump,
 		HardGrace:     cfg.AuthCache.HardGrace,
 		ConfigTTL:     cfg.AuthCache.ConfigTTL,
@@ -128,18 +165,35 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		BlockLocalHTTPCalls:           cfg.BlockLocalHTTPCalls,
 		RequireHTTPSCustomerEndpoints: cfg.RequireHTTPSCustomerEndpoints,
 		AllowedEndpointHosts:          splitAllowedHosts(cfg.AllowedProxyHosts),
+		// The control plane owns codex OAuth sessions; the router calls back
+		// through it to refresh a 401'd access token once.
+		CodexRefresher: cpClient,
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("bifrost init: %w", err)
 	}
 
-	limiter, err := ratelimit.New(ratelimit.Options{})
+	limiter, err := ratelimit.New(ratelimit.Options{Metrics: metrics})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("ratelimit init: %w", err)
 	}
 
 	budgetChecker := budget.NewChecker(budget.CheckerOptions{
-		Logger: logger,
+		Logger:  logger,
+		Metrics: metrics,
+		// Attributed-user templates enforce per end user through a cached
+		// control-plane bucket read; everything else stays bundle-local.
+		Buckets: budget.NewCachedBucketSpend(cpClient),
+	})
+
+	// Per-credential circuit breaker. A provider that keeps failing is
+	// skipped outright rather than costing every request another dead
+	// round-trip, and its state is published so operators can see which
+	// credential is cut off.
+	circuits := breaker.NewRegistry(breaker.Options{
+		Window:       time.Duration(cfg.Circuit.WindowS) * time.Second,
+		Threshold:    cfg.Circuit.Threshold,
+		OpenDuration: time.Duration(cfg.Circuit.CooldownS) * time.Second,
 	})
 
 	probes := health.New(contexts.MustGetServiceInfo(ctx).Environment)
@@ -159,6 +213,64 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	// state, not on observed traffic.
 	probes.MarkStarted()
 
+	// Gauges that read their value at scrape time, wired once their
+	// source exists.
+	metrics.TrackDraining(probes.Draining)
+	metrics.TrackAuthCacheSize(authSvc.CacheLen)
+
+	var spendSpool *spendemitter.Spool
+	var spendEmitterAdapter *spendemitter.Emitter
+	var spendDrainer *spendemitter.Drainer
+	if cfg.SpendEmitter.Enabled {
+		spoolDir := cfg.SpendEmitter.SpoolDir
+		if spoolDir == "" {
+			spoolDir = filepath.Join(os.TempDir(), "langwatch-gateway-spend-spool")
+		}
+		flushEvery := time.Duration(cfg.SpendEmitter.FlushIntervalSeconds) * time.Second
+		spendSpool, err = spendemitter.Open(spendemitter.SpoolOptions{
+			Dir:           spoolDir,
+			MaxTotalBytes: cfg.SpendEmitter.SpoolMaxBytes,
+			FlushEvery:    flushEvery,
+			PodID:         nodeID,
+			Logf:          func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
+		})
+		if err != nil {
+			// Spend emission is best-effort billing telemetry: a bad spool
+			// directory must not take the LLM proxy down with it. Serve
+			// without emission and scream; settlement reconciliation surfaces
+			// the gap.
+			logger.Sugar().Errorf("spend spool unavailable, serving WITHOUT spend emission: %v", err)
+		} else {
+			ingestBase := cfg.SpendEmitter.IngestBaseURL
+			if ingestBase == "" {
+				ingestBase = cfg.ControlPlane.BaseURL
+			}
+			ingestClient, err := spendemitter.NewIngestClient(ingestBase, signer)
+			if err != nil {
+				logger.Sugar().Errorf("spend ingest client unavailable, serving WITHOUT spend emission: %v", err)
+				_ = spendSpool.Close()
+				spendSpool = nil
+			} else {
+				spendEmitterAdapter = spendemitter.NewEmitter(spendSpool)
+				spendDrainer = spendemitter.NewDrainer(spendemitter.DrainerOptions{
+					Spool:   spendSpool,
+					Shipper: ingestClient,
+					Logf:    func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
+				})
+			}
+		}
+	}
+	if spendSpool != nil {
+		metrics.TrackSpendSpool(func() gatewaymetrics.SpoolStats {
+			stats := spendSpool.Stats()
+			return gatewaymetrics.SpoolStats{
+				Appended:        stats.Appended,
+				DroppedIntake:   stats.DroppedIntake,
+				DroppedOverflow: stats.DroppedOverflow,
+			}
+		})
+	}
+
 	return ctx, &Deps{
 		Logger:        logger,
 		NodeID:        nodeID,
@@ -174,6 +286,11 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Cache:         cacherules.NewEvaluator(),
 		Models:        modelresolver.New(),
 		Health:        probes,
+		Metrics:       metrics,
+		Breaker:       circuits,
+		SpendEmitter:  spendEmitterAdapter,
+		SpendSpool:    spendSpool,
+		SpendDrainer:  spendDrainer,
 	}, nil
 }
 

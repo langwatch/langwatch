@@ -10,6 +10,16 @@
 {{- $env := "production" -}}
 {{- with .Values.global }}{{- with .env }}{{- $env = . }}{{- end }}{{- end }}
 {{- with .Values.environment }}{{- $env = . }}{{- end }}
+{{- /* The mirror lane needs both halves or neither: the manager refuses to boot
+       with one set (services/langyagent/config.go). An endpoint with no key is
+       the half we cannot fill in for the operator — only they can say which
+       project to mirror into — so refuse at render time rather than shipping a
+       pod that crashloops on its own config. The opposite pairing needs no
+       guard: a key with no endpoint resolves to this install's control plane
+       below. */ -}}
+{{- if and .Values.chartManaged .Values.mirror.traceEndpoint (not .Values.mirror.existingSecretName) }}
+{{- fail "langyagent.mirror.traceEndpoint is set but langyagent.mirror.existingSecretName is empty — the agent refuses to start with only half the mirror configured. Create a Secret holding the mirror project's API key and name it in langyagent.mirror.existingSecretName, or clear traceEndpoint to leave the mirror off." }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -24,7 +34,7 @@ data:
   LANGY_MAX_WORKERS: {{ .Values.manager.maxWorkers | quote }}
   LANGY_WORKER_IDLE_MS: {{ .Values.manager.workerIdleMs | quote }}
   LANGY_READINESS_TIMEOUT_MS: {{ .Values.manager.readinessTimeoutMs | quote }}
-  # Egress enforcement (ADR-043). The FQDN floor is the operator-owned
+  # Egress enforcement (ADR-076). The FQDN floor is the operator-owned
   # always-allowed set; the toggles gate the enforcement rungs. Per-project
   # customer allow-lists do NOT live here — they ride the per-request
   # credentials envelope (Project.langyEgressAllowlist).
@@ -32,3 +42,22 @@ data:
   LANGY_EGRESS_REQUIRE_TLS: {{ .Values.egress.requireTls | quote }}
   LANGY_EGRESS_ENFORCE_FLOOR: {{ .Values.egress.enforceFloor | quote }}
   LANGY_EGRESS_SNI_CROSSCHECK: {{ .Values.egress.sniCrossCheck | quote }}
+  {{- /* Mirror lane (ADR-061): the secondary exporter for the turn's gen_ai
+         trace data into the operator-designated mirror project. The key is NOT
+         here — it is a project API key, injected from the mirror Secret in the
+         Deployment env.
+
+         The endpoint is derivable: the only thing an operator can tell us that
+         we cannot work out ourselves is which project to mirror into, which is
+         what the key says. So when they supply the key and leave the endpoint
+         empty, point at this install's own control plane over cluster DNS.
+         Only when the key is present — the manager refuses to boot if one half
+         of the pair is set without the other, so deriving an endpoint for an
+         install with no mirror key would turn a dormant lane into a crashloop. */}}
+  {{- $mirrorEndpoint := .Values.mirror.traceEndpoint }}
+  {{- if and (not $mirrorEndpoint) .Values.mirror.existingSecretName }}
+  {{- $mirrorEndpoint = printf "http://%s-app:5560" .Release.Name }}
+  {{- end }}
+  {{- with $mirrorEndpoint }}
+  LANGY_MIRROR_TRACE_ENDPOINT: {{ . | quote }}
+  {{- end }}

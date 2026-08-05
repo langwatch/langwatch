@@ -1,4 +1,4 @@
-//go:build live_openai || live_anthropic || live_gemini || live_bedrock || live_azure || live_vertex || live_embeddings
+//go:build live_openai || live_anthropic || live_gemini || live_bedrock || live_azure || live_vertex || live_embeddings || live_audio
 
 // Package matrix runs the provider × scenario coverage matrix against a live
 // gateway + control plane + real provider credentials. Build-tagged per
@@ -296,6 +296,129 @@ func mustJSON(v any) []byte {
 		panic(err) // test-time panic is acceptable — input is constant
 	}
 	return b
+}
+
+// capBody builds a request that would run long without a cap, with the
+// output cap sent under an explicit field name (max_tokens or
+// max_completion_tokens) rather than the per-model maxTokensKey pick, so
+// each cell can prove one specific alias is honored on one specific lane.
+func capBody(model, capField string, limit int, stream bool) []byte {
+	body := map[string]any{
+		"model": model,
+		"messages": []map[string]any{
+			{"role": "user", "content": "Count from 1 to 200, one number per line."},
+		},
+		capField: limit,
+	}
+	if stream {
+		body["stream"] = true
+		body["stream_options"] = map[string]any{"include_usage": true}
+	}
+	return mustJSON(body)
+}
+
+// capOutcome is what a cap-fidelity cell extracts from a response,
+// regardless of sync or streaming shape.
+type capOutcome struct {
+	completionTokens int
+	finishReason     string
+}
+
+// parseCapOutcomeSync reads usage + finish_reason from a non-streaming
+// chat-completions envelope.
+func parseCapOutcomeSync(t *testing.T, raw []byte) capOutcome {
+	t.Helper()
+	var parsed struct {
+		Choices []struct {
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+		Usage struct {
+			CompletionTokens int `json:"completion_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		t.Fatalf("decode completion body: %v\nbody: %s", err, raw)
+	}
+	out := capOutcome{completionTokens: parsed.Usage.CompletionTokens}
+	if len(parsed.Choices) > 0 {
+		out.finishReason = parsed.Choices[0].FinishReason
+	}
+	return out
+}
+
+// parseCapOutcomeStream walks the SSE frames of a streamed completion,
+// keeping the last non-empty finish_reason and the final usage chunk
+// (stream_options.include_usage puts usage on a trailing frame).
+func parseCapOutcomeStream(t *testing.T, raw []byte) capOutcome {
+	t.Helper()
+	var out capOutcome
+	sawFrame := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if payload == "" || payload == "[DONE]" {
+			continue
+		}
+		var frame struct {
+			Choices []struct {
+				FinishReason *string `json:"finish_reason"`
+			} `json:"choices"`
+			Usage *struct {
+				CompletionTokens int `json:"completion_tokens"`
+			} `json:"usage"`
+		}
+		if err := json.Unmarshal([]byte(payload), &frame); err != nil {
+			t.Fatalf("decode SSE frame: %v\nframe: %s", err, payload)
+		}
+		sawFrame = true
+		if len(frame.Choices) > 0 && frame.Choices[0].FinishReason != nil && *frame.Choices[0].FinishReason != "" {
+			out.finishReason = *frame.Choices[0].FinishReason
+		}
+		if frame.Usage != nil && frame.Usage.CompletionTokens > 0 {
+			out.completionTokens = frame.Usage.CompletionTokens
+		}
+	}
+	if !sawFrame {
+		t.Fatalf("no SSE data frames in streamed response:\n%s", raw)
+	}
+	return out
+}
+
+// runCapCell fires one cap-fidelity cell and asserts the provider
+// verifiably stopped at the client's cap: completion_tokens within the
+// cap, finish reason "length". A cap that comes back exceeded is the
+// unenforced-guarantee bug this cell exists to catch (the gateway's
+// translated lanes used to drop max_tokens on the floor and dispatch
+// uncapped).
+func runCapCell(t *testing.T, rc resolvedCell, capField string, limit int) {
+	t.Helper()
+	body := capBody(rc.model, capField, limit, rc.streaming)
+	status, raw, _ := fireForBody(t, rc, body)
+	if status != 200 {
+		t.Fatalf("want 200, got %d\nbody: %s", status, raw)
+	}
+	var out capOutcome
+	if rc.streaming {
+		out = parseCapOutcomeStream(t, raw)
+	} else {
+		out = parseCapOutcomeSync(t, raw)
+	}
+	if out.completionTokens == 0 {
+		t.Fatalf("%s/%s: no completion token usage reported; cannot verify the cap\nbody: %s", rc.provider, rc.scenario, raw)
+	}
+	if out.completionTokens > limit {
+		t.Errorf("%s/%s: completion_tokens=%d exceeds the client's %s=%d; the cap was not forwarded to the provider",
+			rc.provider, rc.scenario, out.completionTokens, capField, limit)
+	}
+	if out.finishReason != "length" {
+		t.Errorf("%s/%s: finish_reason=%q, want \"length\" when generation stops at the cap",
+			rc.provider, rc.scenario, out.finishReason)
+	}
+	t.Logf("cell %s/%s: %s=%d completion_tokens=%d finish_reason=%s",
+		rc.provider, rc.scenario, capField, limit, out.completionTokens, out.finishReason)
 }
 
 // fireAndAssert runs one resolved cell against the live gateway and asserts

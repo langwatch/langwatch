@@ -6,17 +6,17 @@ Feature: Prompt spans on the playground — trace→playground resume parity wit
     and I can click "Open in Prompts" to resume the conversation byte-equivalent to where I left it
 
   # Wire-format reference (locked, do not drift):
-  #   python-sdk/src/langwatch/prompts/decorators/prompt_service_tracing.py
-  #   python-sdk/src/langwatch/prompts/decorators/prompt_tracing.py
-  #   python-sdk/src/langwatch/attributes.py (LangWatchPrompt* keys)
+  #   sdks/python/src/langwatch/prompts/decorators/prompt_service_tracing.py
+  #   sdks/python/src/langwatch/prompts/decorators/prompt_tracing.py
+  #   sdks/python/src/langwatch/attributes.py (LangWatchPrompt* keys)
   # Trace-UI consumers that depend on this shape:
-  #   langwatch/src/features/traces-v2/utils/promptAttributes.ts
-  #   langwatch/src/features/traces-v2/components/TraceDrawer/PromptAccordion.tsx
-  #   langwatch/src/features/traces-v2/utils/findPromptReferenceInAncestors.ts
+  #   platform/app/src/features/traces-v2/utils/promptAttributes.ts
+  #   platform/app/src/features/traces-v2/components/TraceDrawer/PromptAccordion.tsx
+  #   platform/app/src/features/traces-v2/utils/findPromptReferenceInAncestors.ts
   #
   # Bindings:
   #   - Emission scenarios (1, 3, 4, 5, 6): services/nlpgo/tests/integration/prompt_spans_playground_test.go
-  #   - Drawer / Open-in-Prompts scenario (2): langwatch/src/features/traces-v2/.../PromptAccordion.integration.test.ts
+  #   - Drawer / Open-in-Prompts scenario (2): platform/app/src/features/traces-v2/.../PromptAccordion.integration.test.ts
 
   Background:
     Given the nlpgo service is running and the project is on the Go-NLP execution path
@@ -61,7 +61,10 @@ Feature: Prompt spans on the playground — trace→playground resume parity wit
     # Live chat content goes to the LLM-span messages, not to compile vars; see scenario 4 for declared-variable fidelity.
     And "PromptApiService.get", "Prompt.compile", and the LLM span are three siblings under the same parent (the per-event-type root span for playground)
 
-  @integration @v1
+    # @unimplemented: the integration test that bound this was skipped from the
+    # day it landed and was removed with the other 22 permanently-skipped suites.
+    # Marked honestly rather than left bound to a test that never ran.
+  @integration @v1 @unimplemented
   Scenario: trace drawer surfaces "Open in Prompts" with the exact handle and version
     Given I have sent a chat message that produced the saved-version span pair
     When I open the trace details drawer for the resulting LLM span

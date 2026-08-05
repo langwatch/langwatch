@@ -12,7 +12,7 @@ Feature: The haven hub — one place to see and act on every stack
   # enter/g opens git, d+confirm downs, x+type-the-name destroys) and
   # `app/hub_test.go` (TestDownStack, TestDestroyWorktree with the
   # primary-checkout and running-from refusals). The parity checker
-  # (`langwatch/scripts/check-feature-parity.ts`) scans tools/thuishaven's
+  # (`platform/app/scripts/check-feature-parity.ts`) scans tools/thuishaven's
   # Go tests: @unit scenarios are bound by `// @scenario` annotations above
   # those test funcs; the live-terminal flows remain `@unimplemented`.
 
@@ -21,13 +21,13 @@ Feature: The haven hub — one place to see and act on every stack
 
   @integration @unimplemented
   Scenario: Opening the hub
-    When I run "haven hub" (or bare "haven") in a terminal
+    When I run bare "haven" in a terminal
     Then I see every registered stack with its liveness, branch, and services
     And the view refreshes itself while it is open
 
   @integration @unimplemented
   Scenario: Agents get the plain list instead of a TUI
-    When an agent runs "haven hub"
+    When an agent runs bare "haven"
     Then the plain stack list is printed
     And no interactive UI is started
 
@@ -42,12 +42,12 @@ Feature: The haven hub — one place to see and act on every stack
   Scenario: Shutting a stack down from the hub
     Given a running stack is selected in the hub
     When I press "d" and confirm
-    Then the stack stops and disappears from the hub and "haven list"
+    Then the stack stops and disappears from the hub and "haven status"
     And its hostnames stop serving it
     And its databases are kept for the next start
 
   # Boundary with the never-delete-uncommitted-work guardrail: automated
-  # cleanup (`haven prune`) never touches a dirty worktree. Destroying one
+  # cleanup (`haven clean`) never touches a dirty worktree. Destroying one
   # is only possible here, where a person deliberately types the stack's
   # exact name to confirm — that explicit confirmation is the sanctioned
   # exception, not a loophole in the guardrail.

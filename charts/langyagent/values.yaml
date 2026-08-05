@@ -55,14 +55,42 @@ service:
   port: 80
   targetPort: 8080
 
-# Auth secret shared with the control plane. Helm never materialises it —
-# the operator creates it out-of-band (terraform / external-secrets), and
-# the SAME value must be set as LANGY_INTERNAL_SECRET on langwatch-app.
+# Auth secret shared with the control plane: the app sends it as a Bearer
+# token, the agent verifies it, so BOTH pods must read the same value.
+#
+# Under the umbrella chart this defaults to the app's own Secret, which the
+# umbrella materialises (generated when autogen is on, supplied by the
+# operator otherwise) — nothing to create by hand. This standalone default
+# only applies when the subchart is installed on its own, in which case the
+# operator creates it and sets the same value as LANGY_INTERNAL_SECRET on
+# langwatch-app:
 #   kubectl create secret generic langwatch-langyagent-auth \
 #     --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32)
 secrets:
   existingSecretName: langwatch-langyagent-auth
   internalSecretKey: LANGY_INTERNAL_SECRET
+
+# Mirror lane (ADR-061) — a secondary exporter for the turn's gen_ai trace
+# data: the manager ALSO posts a copy of each Langy turn's traces into a
+# LangWatch project the OPERATOR designates (an internal ops project), so
+# whoever runs this install can watch Langy work with LangWatch's own trace
+# tools. Optional: leave the block empty (the default) and the lane stays
+# dormant. The key is an ordinary project API key for the designated mirror
+# project; rotate it like any project key.
+#   read -rsp "Mirror project API key: " KEY
+#   kubectl create secret generic langwatch-langyagent-mirror \
+#     --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"; unset KEY
+mirror:
+  # Base URL of the LangWatch deployment holding the mirror project —
+  # /api/otel/v1/traces is appended by the manager. Leave empty and set
+  # existingSecretName below to mirror into THIS install: the endpoint then
+  # resolves to the release's own app Service over cluster DNS. Set it
+  # explicitly to mirror into a different LangWatch deployment.
+  traceEndpoint: ""
+  # Secret holding the mirror project's API key. Helm never materialises it;
+  # the operator creates it out-of-band, like the auth secret above.
+  existingSecretName: ""
+  traceKeyKey: LANGY_MIRROR_TRACE_KEY
 
 # /health (manager HTTP) backs both probes.
 probes:
@@ -85,7 +113,15 @@ terminationGracePeriodSeconds: 30
 
 # emptyDir for /workspace. Bump sizeLimit if many concurrent sessions write
 # large per-worker homes; leave {} for the cluster default.
-workspaceVolume: {}
+workspaceVolume:
+  # Bounded by default: the workspace is node ephemeral storage, and a
+  # runaway session filling it evicts every pod on the node, not just this
+  # one. Override with a larger cap, or replace wholesale with another
+  # emptyDir spec (e.g. medium: Memory).
+  sizeLimit: 2Gi
+
+## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir required under readOnlyRootFilesystem.
+scratchSizeLimit: 1Gi
 
 ## SecurityContext.
 ##
@@ -111,8 +147,8 @@ workspaceVolume: {}
 ##     `/etc` or `/usr`.
 ##   - fsGroup intentionally OMITTED — setting it would group-share every
 ##     worker's files and re-open the cross-worker boundary.
-##   - runtimeClassName: gvisor (operator-set) hardens the pod->node escape
-##     surface, complementary to the in-pod per-UID isolation.
+##   - runtimeClassName (operator-set, see the hardening guide) closes the
+##     pod->node escape surface, complementary to the in-pod per-UID isolation.
 podSecurityContext:
   runAsNonRoot: false
   runAsUser: 0
@@ -149,28 +185,43 @@ containerSecurityContext:
     add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID"]
 
 # Sandboxed container runtime for this pod. The agent runs LLM-driven
-# arbitrary code (opencode workers shell out to git/npm/gh), so the headline
-# risk is a worker breaking OUT of the container to the node. The default
-# `gvisor` (runsc) inserts a user-space kernel between the worker and the
-# host kernel and shrinks that node-escape surface — required posture for
-# this workload.
+# arbitrary code (opencode workers shell out to git/npm/gh), so a worker
+# breaking OUT of the container to the node is a real risk, and a sandboxed
+# runtime (gvisor/runsc, or Kata) is what closes it.
 #
-# OPERATOR REQUIREMENT — the cluster MUST define a `gvisor` RuntimeClass
-# before the langyagent chart is enabled (`langyagent.chartManaged: true`).
-# Without it, pods will fail to schedule with
-#   FailedCreatePodSandBox: ... runtimeclasses.node.k8s.io "gvisor" not found
-# Install via the gVisor operator or by applying the RuntimeClass manifest
-# from https://gvisor.dev/docs/user_guide/install/. The langyagent chart
-# refuses to deploy with chartManaged=true and an unset/empty runtimeClass
-# would be a security regression, so the default is opinionated.
+# It is NOT the default, and the reasoning is worth keeping: it is the one
+# control in this chart whose behaviour depends on the operator's node image,
+# container runtime version and sandbox build, none of which we can test. A
+# default that misbehaves on their nodes reads as "Langy is broken", and when
+# the RuntimeClass is simply absent the pod is rejected at admission, so it
+# never appears at all. The controls that bound the attack that actually
+# happens (per-worker UID isolation, the per-worker opencode password, and a
+# NetworkPolicy with egress off) are on by default and work everywhere.
 #
-# To opt OUT (NOT recommended; documented for completeness): set
-#   runtimeClassName: ""
-# which omits the field from the pod spec → kubelet uses the node default
-# runtime (runc/containerd, no sandbox). Worker→worker isolation inside the
-# pod is still enforced by the per-UID + bearer-token authproxy work, but
-# pod→host isolation reverts to standard cgroups + namespaces only.
-runtimeClassName: "gvisor"
+# HARDENING, once, on purpose:
+#   runtimeClassName: "gvisor"          # or your Kata class on AKS
+#   acceptUnsandboxedRuntime: false
+# The full recipe, including the installer DaemonSet for EKS:
+#   https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
+#
+# Blanking the class while acceptUnsandboxedRuntime is false is refused at
+# render time (see deployment.yaml), so a cluster that HAS hardened cannot
+# silently lose its sandbox.
+runtimeClassName: ""
+
+# Accept running the agent WITHOUT a sandboxed runtime. Only meaningful when
+# runtimeClassName is blank; the render fails otherwise (see deployment.yaml).
+#
+# What you give up: the pod->host escape surface reverts to standard cgroups +
+# namespaces, so a worker that breaks out of the container faces only the node
+# kernel. What you keep: per-worker UID isolation and the per-worker opencode
+# password still separate one conversation's credentials from another's inside
+# the pod, and the NetworkPolicy still bounds where workers can reach.
+#
+# The judgement call this leaves the operator: a single-tenant install whose
+# users are all colleagues carries a much smaller worker-versus-worker risk
+# than a multi-tenant one. Read it that way, not as a formality.
+acceptUnsandboxedRuntime: true
 
 networkPolicy:
   enabled: true
@@ -192,6 +243,26 @@ networkPolicy:
   egressToControlPlane: []
   gatewayPort: 5563
   egressToGateway: []
+  # Manager OTLP telemetry egress (OTEL_OTLP_ENDPOINT). Empty by default: no
+  # rule is rendered, and a manager pointed at an in-cluster collector is
+  # silently blackholed by the default-deny; OTel exporters fail quietly by
+  # design, so set this whenever telemetry targets a cluster-internal
+  # collector. On the AWS EKS eBPF dataplane the podSelector here must match
+  # the collector SERVICE's spec.selector labels, not merely the pods' — see
+  # the rule comment in networkpolicy.yaml (pre-DNAT ClusterIP enforcement).
+  #
+  # Example:
+  #   egressToOtelCollector:
+  #     - namespaceSelector:
+  #         matchLabels:
+  #           kubernetes.io/metadata.name: observability
+  #       podSelector:
+  #         matchLabels:
+  #           app.kubernetes.io/name: otel-collector
+  egressToOtelCollector: []
+  # The collector's POD port for the rule above (NetworkPolicy egress ports
+  # match the destination pod port). 4318 is OTLP/HTTP's default.
+  otelCollectorPort: 4318
   # External HTTPS egress for OpenCode workers — needed for `git clone`,
   # `gh` API calls, npm/pip installs the LLM-driven tools shell out to, and
   # opencode's own update/telemetry. Default false: this pod runs LLM-
@@ -202,7 +273,7 @@ networkPolicy:
   # operators who actually need PR-opening / git-clone must opt in
   # explicitly here. Sergio's 2026-06-30 review round 3.
   #
-  # ADR-043 rung 4: this `0.0.0.0/0:443` rule is the L3/L4 backstop. FQDN
+  # ADR-076 rung 4: this `0.0.0.0/0:443` rule is the L3/L4 backstop. FQDN
   # bounding ("only github/npm/…") is NOT expressible at L3/L4 and is instead
   # enforced at L7 by the per-worker egress adapter (see `egress` below), which
   # is now the SOLE egress path for workers (their tools egress via HTTPS_PROXY).
@@ -239,11 +310,22 @@ networkPolicy:
                           # CIDR places PODS (and sometimes NODES + the apiserver
                           # ENI) here; NOT covered by RFC1918, so it MUST be
                           # excluded or a worker reaches neighbours on :443.
+  # IPv6 side of the external-HTTPS rule (`::/0` with the excepts below):
+  # OPT-IN, and only for genuinely dual-stack clusters. On an IPv4-only EKS
+  # cluster the v6 block is not just dead weight, it BREAKS enforcement: the
+  # aws-network-policy-agent's per-pod allow-list is an IPv4 LPM trie, a v6
+  # `except` key fails the eBPF map write with EINVAL, and the agent aborts
+  # the ENTIRE egress refresh on that first bad key, so the policy silently
+  # freezes at its pod-birth snapshot and every later endpoint change (a
+  # control-plane or gateway deploy, a collector move) leaves the pod pointed
+  # at stale IPs. IPv4-only pods cannot emit IPv6 anyway; omitting the rule
+  # DENIES v6 (fail closed), it does not allow it.
+  allowExternalHttpsIpv6: false
   privateExceptV6:
     - fd00::/8            # unique-local (incl. IPv6 metadata fd00:ec2::254)
     - fe80::/10           # link-local
 
-# Egress enforcement (ADR-043) — the per-worker L7 egress adapter. Monitor
+# Egress enforcement (ADR-076) — the per-worker L7 egress adapter. Monitor
 # first, enforce last: the default posture is monitor-only. These map to the
 # manager's LANGY_EGRESS_* env via the ConfigMap.
 egress:
@@ -272,7 +354,7 @@ egress:
   # Optional bypass-proof upgrade: a Cilium CiliumNetworkPolicy with `toFQDNs`
   # enforces the SAME floor at the datapath, which a worker cannot bypass by
   # ignoring HTTPS_PROXY. Requires the Cilium CNI. The stock default is the
-  # cooperative adapter + monitored bypass (ADR-043 "honest limit"); this is the
+  # cooperative adapter + monitored bypass (ADR-076 "honest limit"); this is the
   # opt-in mandatory-enforcement path. The non-Cilium equivalent is the ADR-033
   # Fix B per-worker netns.
   cilium:

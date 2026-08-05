@@ -13,9 +13,10 @@
 #     LangWatch API at LANGWATCH_ENDPOINT.
 #   - AI gateway (langwatch-gateway) — OpenCode's LLM traffic goes out via
 #     OPENAI_BASE_URL pointed at the gateway, not direct to providers.
-#   - 443 to anywhere (optional, default on) — OpenCode may reach external
-#     hosts (e.g. its own update/telemetry). Tighten by setting
-#     networkPolicy.allowExternalHttps=false once egress needs are pinned.
+#   - 443 to anywhere (optional, default OFF) — the tools OpenCode shells out
+#     to (git, gh, npm) need it, and so does opencode's own update/telemetry.
+#     Turn it on with networkPolicy.allowExternalHttps=true; private ranges and
+#     the cloud metadata service stay carved out either way.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -35,6 +36,17 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: {{ .Release.Name }}-app
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- /* The workers pod, not the app pod, is what actually POSTs a turn
+               to the manager: Langy turns are driven by the process outbox in
+               the event-sourcing runtime, which runs in the worker stack (see
+               startWorkers.ts). Admitting only the app pod let every turn die
+               in a dropped packet with both pods healthy — the failure looks
+               like the agent ignoring the request, because from the agent's
+               side nothing ever arrived. */}}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Release.Name }}-workers
               app.kubernetes.io/instance: {{ .Release.Name }}
         {{- end }}
       ports:
@@ -77,12 +89,32 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.networkPolicy.gatewayPort }}
+    {{- with .Values.networkPolicy.egressToOtelCollector }}
+    # Manager OTLP export (OTEL_OTLP_ENDPOINT). Without this rule a manager
+    # pointed at an in-cluster collector is silently blackholed by the
+    # default-deny; OTel exporters fail quietly by design, so the only symptom
+    # is telemetry that never arrives.
+    #
+    # AWS EKS eBPF dataplane gotcha, learned in production: egress to a
+    # ClusterIP Service is enforced PRE-DNAT against the Service's ClusterIP,
+    # and the network-policy controller only resolves that ClusterIP into the
+    # allow-list when this rule's podSelector matches the SERVICE's
+    # spec.selector labels (the selector map matched as a label set): matching
+    # only the POD labels resolves the pod IPs but not the ClusterIP, so the
+    # service-DNS path times out while direct pod-IP connects work. Select on
+    # the labels the collector's Service selects on.
+    - to:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ $.Values.networkPolicy.otelCollectorPort }}
+    {{- end }}
     {{- if .Values.networkPolicy.allowExternalHttps }}
     # External HTTPS (OpenCode update/telemetry, git/gh/npm over :443). This is
     # the pod's ONLY route to the public internet, and the most dangerous rule
     # in the policy — it is off by default (allowExternalHttps=false).
     #
-    # ADR-043: FQDN bounding ("only github/npm/…") is enforced at L7 by the
+    # ADR-076: FQDN bounding ("only github/npm/…") is enforced at L7 by the
     # per-worker egress adapter (worker tools egress via HTTPS_PROXY), NOT here —
     # L3/L4 policy cannot express FQDN egress. This rule stays the coarse
     # backstop; for bypass-proof datapath FQDN egress enable
@@ -108,12 +140,24 @@ spec:
               {{- range .Values.networkPolicy.privateExcept }}
               - {{ . }}
               {{- end }}
+        {{- if .Values.networkPolicy.allowExternalHttpsIpv6 }}
+        # OPT-IN, and only for genuinely dual-stack clusters. On an IPv4-only
+        # cluster this block is dead weight that BREAKS the AWS EKS eBPF
+        # dataplane: the aws-network-policy-agent's per-pod allow-list is an
+        # IPv4 LPM trie, a v6 `except` key (prefix length > 32) fails the map
+        # write with EINVAL, and the agent aborts the ENTIRE egress refresh on
+        # that first bad key. The policy then silently freezes at its pod-birth
+        # snapshot: every later endpoint change (a control-plane or gateway
+        # deploy, a collector move) leaves the pod pointed at stale IPs.
+        # IPv4-only pods cannot emit IPv6 anyway; omitting the rule DENIES v6
+        # (fail closed), it does not allow it.
         - ipBlock:
             cidr: ::/0
             except:
               {{- range .Values.networkPolicy.privateExceptV6 }}
               - {{ . }}
               {{- end }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: 443

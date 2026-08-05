@@ -63,7 +63,7 @@ Feature: Platform MCP tools for evaluators and model providers
 
   @unit @unimplemented
   Scenario: Discover specific evaluator type details
-    When I call discover_schema with category "evaluators" and evaluatorType "langevals/llm_judge"
+    When I call discover_schema with category "evaluators" and evaluatorType "langevals/llm_boolean"
     Then I receive the full schema for that evaluator type
     And it includes settings with descriptions and defaults
     And it includes required/optional fields and env vars
