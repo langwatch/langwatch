@@ -16,6 +16,7 @@ import {
 } from "../../../src/server/data-retention/retentionPolicy.schema";
 import { SubscriptionRecordNotFoundError } from "../errors";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
+import { applyAnnualEventsBillingThreshold } from "../stripe/annualEventsBillingThreshold";
 import { SubscriptionStatus } from "../planTypes";
 import {
   isGrowthEventsPrice,
@@ -531,6 +532,28 @@ export class EEWebhookService implements WebhookService {
     if (subscriptionRecord) {
       await this.subscriptionRepository.cancelTrialSubscriptions(
         subscriptionRecord.organizationId,
+      );
+    }
+
+    // Annual subscriptions accrue metered events for a full year; the
+    // billing threshold makes Stripe collect that overage in slices as it
+    // accrues instead of one oversized renewal invoice. Checkout cannot set
+    // the field, so it is applied here, right after the subscription exists.
+    // Best-effort: a failure leaves the subscription behaving as before
+    // (single renewal invoice) and must never fail checkout completion.
+    try {
+      const thresholdResult = await applyAnnualEventsBillingThreshold({
+        stripe: this.stripe,
+        stripeSubscriptionId: subscriptionId,
+      });
+      logger.info(
+        { subscriptionId, thresholdResult },
+        "[stripeWebhook] Annual events billing threshold evaluated",
+      );
+    } catch (err) {
+      logger.error(
+        { subscriptionId, err },
+        "[stripeWebhook] Failed to set annual events billing threshold — re-run the backfill script or apply manually",
       );
     }
 

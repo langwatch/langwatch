@@ -1,0 +1,55 @@
+Feature: Annual subscriptions collect event overage during the year
+
+  A customer on an annual plan accrues metered event usage for twelve months
+  and, without intervention, pays for all of it in a single renewal invoice.
+  For a high-volume customer that renewal can be thousands of dollars in one
+  charge — a payment profile far more likely to be declined than the same
+  amount collected in slices as it accrues.
+
+  # Stripe billing thresholds solve this without touching the plan: once a
+  # threshold amount is set on the subscription, Stripe invoices and charges
+  # the accrued metered amount automatically every time it crosses the line.
+  # The annual included-events quota keeps its cumulative semantics across
+  # threshold invoices, and the billing anniversary never moves.
+  #
+  # Stripe Checkout cannot set this field at subscription creation (the
+  # parameter is rejected), so the platform applies it right after checkout
+  # completes, from the webhook that already links the new subscription.
+  # Existing annual subscriptions get the same treatment from a one-time
+  # backfill script.
+
+  Background:
+    Given the platform bills Growth plans as a seat item plus a metered events item
+
+  @unit
+  Scenario: An annual subscription gets a billing threshold after checkout completes
+    Given a customer completes checkout for an annual Growth plan
+    When the checkout completion webhook is processed
+    Then the Stripe subscription is updated with a billing threshold of 750 in the subscription currency
+    And the billing cycle anchor is not reset by threshold invoices
+
+  @unit
+  Scenario: A monthly subscription is left without a billing threshold
+    Given a customer completes checkout for a monthly Growth plan
+    When the checkout completion webhook is processed
+    Then no billing threshold is set on the Stripe subscription
+
+  @unit
+  Scenario: A failure setting the threshold never fails the checkout
+    Given a customer completes checkout for an annual Growth plan
+    And the Stripe threshold update fails
+    When the checkout completion webhook is processed
+    Then the subscription is still linked and activated
+    And the failure is logged for manual follow-up
+
+  @unit
+  Scenario: Applying the threshold twice is a no-op
+    Given an annual subscription that already carries the billing threshold
+    When the threshold is applied again
+    Then no Stripe update call is made
+
+  @unit
+  Scenario: The backfill applies the threshold only to annual event subscriptions
+    Given a mix of annual, monthly, and legacy subscriptions in Stripe
+    When the threshold is applied to each subscription
+    Then only subscriptions carrying an annual events price are updated

@@ -33,6 +33,19 @@ export const isGrowthSeatPrice = (priceId: string): boolean =>
 export const isGrowthEventsPrice = (priceId: string): boolean =>
   GROWTH_EVENTS_PRICE_IDS.has(priceId);
 
+/** Growth events prices with an annual interval — the ones whose accrued
+ * usage would otherwise only be collected at renewal. */
+const ANNUAL_GROWTH_EVENTS_PRICE_IDS = new Set([
+  prices.GROWTH_EVENTS_EUR_ANNUAL,
+  prices.GROWTH_EVENTS_USD_ANNUAL,
+  prices.GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026,
+  prices.GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026,
+]);
+
+/** Checks whether a given price ID is an annually-billed Growth events price. */
+export const isAnnualGrowthEventsPrice = (priceId: string): boolean =>
+  ANNUAL_GROWTH_EVENTS_PRICE_IDS.has(priceId);
+
 export type BillingInterval = "monthly" | "annual";
 
 /** All GROWTH_SEAT plan type strings. */
