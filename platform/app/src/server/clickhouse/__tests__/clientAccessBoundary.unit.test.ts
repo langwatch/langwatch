@@ -189,6 +189,7 @@ describe("the ClickHouse client access boundary", () => {
   });
 
   describe("when a file builds a ClickHouse client", () => {
+    /** @scenario a new bypass cannot be introduced unnoticed */
     it("is one of the named construction sites", () => {
       const offenders = scanned
         .filter((file) => file.constructs && !MAY_CONSTRUCT.has(file.path))
@@ -217,6 +218,7 @@ describe("the ClickHouse client access boundary", () => {
   });
 
   describe("when a file resolves a ClickHouse client", () => {
+    /** @scenario ClickHouse is reached through a repository, from the application object */
     it("is a repository, the app-layer wiring, or a known backlog entry", () => {
       const offenders = scanned
         .filter(

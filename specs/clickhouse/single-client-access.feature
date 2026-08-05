@@ -19,41 +19,48 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
   Background:
     Given the platform is configured with a ClickHouse instance
 
+  @unit
   Scenario: every client is built the same way
     Given the shared instance and a customer's own instance are both configured
     When the platform builds a client for each
     Then both carry the same concurrency bound, retry policy, logging and metrics
     And neither was assembled by hand at its call site
 
+  @unit
   Scenario: statements are bounded, and the bound is the one that binds
     Given more statements are issued at once than the bound allows
     When the surplus statements are issued
     Then the statements beyond the bound wait for a slot rather than reaching the server
     And the number waiting and the number in flight are both reported
 
+  @unit
   Scenario: a slot is held across retries, not taken per attempt
     Given a statement that fails transiently and is retried
     When the retry runs
     Then it keeps the slot it already holds
     And it does not rejoin the queue behind statements that arrived later
 
+  @unit
   Scenario: an overloaded process refuses rather than queueing without limit
     Given the wait queue is already full
     When another statement is issued
     Then it is refused immediately with an error that names overload as the cause
     And the refusal is counted so the operator can see the platform shedding
 
+  @unit
   Scenario: a caller that gives up stops waiting
     Given a statement is waiting for a slot
     When the caller abandons the request
     Then the statement leaves the queue instead of occupying it until a slot frees
 
+  @unit
   Scenario: ClickHouse is reached through a repository, from the application object
     Given a service needs data that lives in ClickHouse
     When it asks for that data
     Then it asks a repository it obtained from the application object
     And it never holds a ClickHouse client of its own
 
+  @unit
   Scenario: a new bypass cannot be introduced unnoticed
     Given a change adds a direct ClickHouse client to a service, route or worker
     When the test suite runs
