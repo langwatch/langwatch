@@ -7,6 +7,7 @@ import {
   gqBlockedGroups,
   gqFastqActive,
   gqFastqPending,
+  gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
   gqParkedGroups,
   gqPendingGroups,
@@ -20,6 +21,18 @@ import type { DispatchResult, GroupStagingScripts } from "./scripts";
  * oldest-pending-age gauge excludes it — see the computation in collect().
  */
 const READY_UNBLOCK_SENTINEL_SCORE = 1;
+
+/**
+ * How many of the soonest-future-scored ("nearest deferred") ready groups the
+ * backlog-age gauge samples per collect. Retry-pinned groups' scores sit
+ * within maxBackoffMs (600s) of now, so an ascending scan from just-past-now
+ * finds them first; long-delayed groups (monitor timers, hours out) rank far
+ * later in that same scan and can no longer displace them, unlike a sample
+ * taken from the opposite (largest-score) end. In-flight groups sampled
+ * alongside contribute nothing because their head job is not due. Bounded so
+ * a collect cycle stays O(sample) pipeline commands whatever the backlog size.
+ */
+const OLDEST_BACKLOG_SAMPLE_GROUPS = 50;
 
 /**
  * Periodically collects metrics from the group queue processing and staging layers.
@@ -103,55 +116,7 @@ export class GroupQueueMetricsCollector {
         this.params.activeJobCountFn(),
       );
 
-      // Oldest eligible-waiting age. A group's readyKey score is its
-      // dispatch-eligibility time, and every not-yet-dispatchable state is
-      // future-scored:
-      //   - genuinely eligible & waiting     → score <= now   (counted)
-      //   - in-flight (re-scored to activeUntil), backoff-pending retry,
-      //     and not-yet-due delayed stage    → score > now    (excluded)
-      // So the oldest eligible-waiting group is simply the smallest score in
-      // (sentinel, now]. STAGE writes the score with ZADD LT (keep-if-smaller)
-      // and COMPLETE rewrites it to the next remaining job, so the readyKey
-      // score already tracks the group's oldest still-pending job.
-      //
-      // This replaces the previous "min dispatchAfterMs over the first 10 ready
-      // groups" scan, which had two independent defects:
-      //   1. Sampling bias — zrange(readyKey, 0, 9) returns the 10 MOST
-      //      dispatch-eligible groups, not the oldest, so a real backlog sitting
-      //      past index 10 was never inspected and the gauge under-reported.
-      //   2. Wrong clock origin — it read the per-group jobs zset, whose scores
-      //      are PRESERVED across a block/park, so a just-unblocked group
-      //      reported its entire blocked duration as backlog age (0 -> hours in
-      //      one tick).
-      //
-      // Exclude the unblock sentinel: UNBLOCK_LUA (app-layer/ops/repositories/
-      // queue.redis.repository.ts) re-adds a group to ready with the constant
-      // score 1 (epoch 1ms) to force prompt dispatch — not a real eligibility
-      // time, so a just-unblocked group must not read as ~56 years. The
-      // exclusive `(1` lower bound drops it; any real timestamp is far larger.
-      //
-      // Known residual: unpark restores a group's preserved (pre-park) ready
-      // score, so a long-parked group briefly over-reports on unpark until it is
-      // dispatched (one scan cycle). Closing that needs an unpark re-score
-      // decision (queue-fairness change), tracked separately.
-      const nowMs = Date.now();
-      const oldestEligible = await this.params.redisConnection.zrangebyscore(
-        readyKey,
-        `(${READY_UNBLOCK_SENTINEL_SCORE}`,
-        nowMs,
-        "WITHSCORES",
-        "LIMIT",
-        0,
-        1,
-      );
-      const age =
-        oldestEligible.length >= 2
-          ? Math.max(0, nowMs - Number(oldestEligible[1]))
-          : 0;
-      gqOldestPendingAgeMilliseconds.set(
-        { queue_name: this.params.queueName },
-        age,
-      );
+      await this.collectOldestAges({ readyKey, keyPrefix });
     } catch (error) {
       this.params.logger.debug(
         {
@@ -162,4 +127,124 @@ export class GroupQueueMetricsCollector {
       );
     }
   }
+
+  /**
+   * The two age gauges, from opposite clock origins.
+   *
+   * Oldest eligible-waiting age. A group's readyKey score is its
+   * dispatch-eligibility time, and every not-yet-dispatchable state is
+   * future-scored:
+   *   - genuinely eligible & waiting     → score <= now   (counted)
+   *   - in-flight (re-scored to activeUntil), backoff-pending retry,
+   *     and not-yet-due delayed stage    → score > now    (excluded)
+   * So the oldest eligible-waiting group is simply the smallest score in
+   * (sentinel, now]. STAGE writes the score with ZADD LT (keep-if-smaller)
+   * and COMPLETE rewrites it to the next remaining job, so the readyKey
+   * score already tracks the group's oldest still-pending job.
+   *
+   * This replaces the previous "min dispatchAfterMs over the first 10 ready
+   * groups" scan, which had two independent defects:
+   *   1. Sampling bias — zrange(readyKey, 0, 9) returns the 10 MOST
+   *      dispatch-eligible groups, not the oldest, so a real backlog sitting
+   *      past index 10 was never inspected and the gauge under-reported.
+   *   2. Wrong clock origin — it read the per-group jobs zset, whose scores
+   *      are PRESERVED across a block/park, so a just-unblocked group
+   *      reported its entire blocked duration as backlog age (0 -> hours in
+   *      one tick).
+   *
+   * Exclude the unblock sentinel: UNBLOCK_LUA (app-layer/ops/repositories/
+   * queue.redis.repository.ts) re-adds a group to ready with the constant
+   * score 1 (epoch 1ms) to force prompt dispatch — not a real eligibility
+   * time, so a just-unblocked group must not read as ~56 years. The
+   * exclusive `(1` lower bound drops it; any real timestamp is far larger.
+   *
+   * Known residual: unpark restores a group's preserved (pre-park) ready
+   * score, so a long-parked group briefly over-reports on unpark until it is
+   * dispatched (one scan cycle). Closing that needs an unpark re-score
+   * decision (queue-fairness change), tracked separately.
+   *
+   * Backlog age regardless of eligibility. The eligible gauge is structurally
+   * blind to a group pinned in retry backoff: every failed attempt rewrites
+   * the group's ready score to now+backoff, so it is either future-scored
+   * (excluded) or freshly re-scored (reads as seconds old) — a head job due
+   * for a day never surfaces (2026-08-05 incident: day-old
+   * codingAgentSpanFactsDispatch backlogs under a ~2.5s gauge). The
+   * per-group jobs zset keeps the job's ORIGINAL due time across retries, so
+   * clock off that instead, sampling the soonest-future-scored ("nearest
+   * deferred") groups of ready — where retry-pinned groups live, their scores
+   * within maxBackoffMs of now — while long-delayed groups (hours out) rank
+   * far later and can no longer displace them, and folding in the eligible
+   * head so an old eligible group past the sample bound still registers.
+   */
+  private async collectOldestAges({
+    readyKey,
+    keyPrefix,
+  }: {
+    readyKey: string;
+    keyPrefix: string;
+  }): Promise<void> {
+    const nowMs = Date.now();
+    const oldestEligible = await this.params.redisConnection.zrangebyscore(
+      readyKey,
+      `(${READY_UNBLOCK_SENTINEL_SCORE}`,
+      nowMs,
+      "WITHSCORES",
+      "LIMIT",
+      0,
+      1,
+    );
+    const eligibleDueMs =
+      oldestEligible.length >= 2 ? Number(oldestEligible[1]) : null;
+    gqOldestPendingAgeMilliseconds.set(
+      { queue_name: this.params.queueName },
+      eligibleDueMs === null ? 0 : Math.max(0, nowMs - eligibleDueMs),
+    );
+
+    let oldestDueMs = eligibleDueMs;
+    const deferredGroups = await this.params.redisConnection.zrangebyscore(
+      readyKey,
+      `(${nowMs}`,
+      "+inf",
+      "LIMIT",
+      0,
+      OLDEST_BACKLOG_SAMPLE_GROUPS,
+    );
+    if (deferredGroups.length > 0) {
+      const headPipeline = this.params.redisConnection.pipeline();
+      for (const groupId of deferredGroups) {
+        headPipeline.zrange(
+          `${keyPrefix}group:${groupId}:jobs`,
+          0,
+          0,
+          "WITHSCORES",
+        );
+      }
+      const headResults = (await headPipeline.exec()) ?? [];
+      oldestDueMs = minDueMs(oldestDueMs, headResults, nowMs);
+    }
+    gqOldestBacklogAgeMilliseconds.set(
+      { queue_name: this.params.queueName },
+      oldestDueMs === null ? 0 : Math.max(0, nowMs - oldestDueMs),
+    );
+  }
+}
+
+/**
+ * Folds the sampled head-job [member, score] replies into the running oldest
+ * due time. Only DUE jobs are backlog: a head legitimately scheduled in the
+ * future (delayed stage, monitor timers hours out) is not late work.
+ */
+function minDueMs(
+  seed: number | null,
+  headResults: Array<[unknown, unknown]>,
+  nowMs: number,
+): number | null {
+  let oldest = seed;
+  for (const [err, value] of headResults) {
+    const arr = err ? [] : (value as string[]);
+    const dueMs = arr.length >= 2 ? Number(arr[1]) : Number.NaN;
+    const isDue = Number.isFinite(dueMs) && dueMs <= nowMs;
+    if (isDue && (oldest === null || dueMs < oldest)) oldest = dueMs;
+  }
+  return oldest;
 }
