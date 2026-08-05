@@ -1,7 +1,7 @@
 /**
  * The exact live failure this pins: an agent ran
- * `langwatch evaluator create "quick-relevancy" --type "ragas/answer_relevancy"`
- * — a stale slug (the catalog has `ragas/response_relevancy`) — and got a 422
+ * `langwatch evaluator create "quick-relevancy" --type "ragas/answer_relevancy"`,
+ * a stale slug (the catalog has `ragas/response_relevancy`), and got a 422
  * whose reasons named the field but not what it would have accepted, so the
  * error's own "fix the fields and retry" advice was impossible to follow.
  *

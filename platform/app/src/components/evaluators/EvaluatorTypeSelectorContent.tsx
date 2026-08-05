@@ -60,7 +60,7 @@ const evaluatorCategoryMap: Record<
   "langevals/competitor_llm_function_call": "safety",
   "langevals/off_topic": "safety",
 
-  // Ignored — custom templates or internal
+  // Ignored: custom templates or internal
   "langevals/basic": "ignored",
   "langevals/similarity": "ignored",
   // Superseded by select_best_compare ("Comparison"), which handles two
