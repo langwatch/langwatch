@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -83,9 +84,14 @@ export class FilterService {
             "Failed to fetch filter options from ClickHouse",
           );
           span.setAttribute("clickhouse.error", true);
-          // Do not rethrow the raw ClickHouse error — its message embeds the
-          // failing SQL (table/column layout), which tRPC would forward to the
-          // browser. Details stay in the server log and span above.
+          // A handled error is already safe to surface and already carries the
+          // code the client renders guidance from - overload in particular,
+          // which is a retry-in-a-moment, not a broken filter. Flattening it
+          // here would throw away the very thing the typed error exists for.
+          if (error instanceof HandledError) throw error;
+          // Everything else is not rethrown: a raw ClickHouse message embeds
+          // the failing SQL (table and column layout), which tRPC would
+          // forward to the browser. Details stay in the server log and span.
           throw new Error("Failed to fetch filter options");
         }
       },

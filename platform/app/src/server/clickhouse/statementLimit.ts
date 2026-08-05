@@ -113,6 +113,19 @@ export function withStatementLimit<T extends ClickHouseClient>({
       });
   }
 
+  // `close` and `ping` are not statements, so they are not limited - but they
+  // must still run against the real client. The facade is an Object.create
+  // over it and the default-settings proxy forwards with `receiver`, so
+  // without this they would execute with `this` bound to the facade, and a
+  // driver that uses `this` for teardown would break on the cleanup path.
+  for (const passthrough of ["close", "ping"] as const) {
+    const inner = client[passthrough];
+    if (typeof inner !== "function") continue;
+    (limited as Record<string, unknown>)[passthrough] = (
+      ...args: unknown[]
+    ): unknown => (inner as (...a: unknown[]) => unknown).apply(client, args);
+  }
+
   return limited;
 }
 

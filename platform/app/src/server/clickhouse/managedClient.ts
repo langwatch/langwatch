@@ -12,6 +12,13 @@ import { withStatementLimit } from "./statementLimit";
 const logger = createLogger("langwatch:clickhouse:managed-client");
 
 /**
+ * The metrics label for the shared instance. A constant because it is written
+ * when the client is built and read when it is closed, and the two must agree
+ * or the limiter's probe outlives it.
+ */
+export const SHARED_INSTANCE = "shared";
+
+/**
  * The only place in the platform that builds a ClickHouse client.
  *
  * Every policy the platform applies to a statement is assembled here, in one

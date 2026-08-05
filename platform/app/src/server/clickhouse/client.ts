@@ -1,5 +1,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createManagedClickHouseClient } from "./managedClient";
+import {
+  createManagedClickHouseClient,
+  SHARED_INSTANCE,
+} from "./managedClient";
+import { unregisterClickHouseLimiter } from "./metrics";
 
 let clickHouseClient: ClickHouseClient | null = null;
 
@@ -44,7 +48,7 @@ function getClickHouseClient(): ClickHouseClient | null {
 
     clickHouseClient = createManagedClickHouseClient({
       url: clickHouseUrl,
-      instance: "shared",
+      instance: SHARED_INSTANCE,
     });
   }
 
@@ -55,6 +59,9 @@ export async function closeClickHouseClient(): Promise<void> {
   if (clickHouseClient) {
     await clickHouseClient.close();
     clickHouseClient = null;
+    // The limiter goes with the client it bounded. Left registered, its gauges
+    // would keep reporting a bound that no longer fronts anything.
+    unregisterClickHouseLimiter(SHARED_INSTANCE);
   }
 }
 
