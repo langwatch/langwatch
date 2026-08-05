@@ -503,7 +503,16 @@ export class AiToolEntryService {
       // First (lowest-order) tile per slug wins.
       if (overrides[slug]) continue;
 
-      const allowVk = config.allowVk === undefined ? true : !!config.allowVk;
+      // Structural forces, immune to tile config: cursor has no terminal
+      // env path (no direct OTLP), and `code` (VS Code Copilot Chat) has no
+      // BYOK gateway env (no VK path) — a tile default of `true` would
+      // enable a path that cannot exist. ADR-039 §Extension #2.
+      const allowVk =
+        slug === "code"
+          ? false
+          : config.allowVk === undefined
+            ? true
+            : !!config.allowVk;
       const allowOtelDirect =
         slug === "cursor"
           ? false

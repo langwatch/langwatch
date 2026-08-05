@@ -62,6 +62,13 @@ import {
 	otelWiringLooksLangwatchAuthored,
 	removeClaudeProjectTelemetryPin,
 } from "./telemetry-refresh";
+import {
+	removeVscodeTerminalOtelEnv,
+	VSCODE_TELEMETRY_ENV_KEYS,
+	type VscodePlatform,
+	vscodeTerminalEnvHasAnyClear,
+	vscodeUserSettingsPath,
+} from "./vscode-settings";
 
 export interface TelemetryTarget {
 	/** Human label for the confirm list + removal summary. */
@@ -178,6 +185,32 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 				remove: () => removeBlockFromRc(shell, markers),
 			});
 		}
+	}
+
+	// VS Code integrated-terminal telemetry clear (the `code` hardening).
+	const vscodePlatform = process.platform;
+	if (
+		vscodePlatform === "darwin" ||
+		vscodePlatform === "linux" ||
+		vscodePlatform === "win32"
+	) {
+		const home = os.homedir();
+		const vscodeArgs = {
+			platform: vscodePlatform as VscodePlatform,
+			home,
+			keys: [...VSCODE_TELEMETRY_ENV_KEYS],
+		};
+		const settingsPath = vscodeUserSettingsPath(
+			vscodePlatform as VscodePlatform,
+			home,
+		);
+		targets.push({
+			label: `VS Code terminal telemetry clear (${tildify(
+				settingsPath ?? "settings.json",
+			)})`,
+			present: vscodeTerminalEnvHasAnyClear(vscodeArgs),
+			remove: () => removeVscodeTerminalOtelEnv(vscodeArgs),
+		});
 	}
 
 	return targets;

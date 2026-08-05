@@ -313,6 +313,23 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
+  program
+    .command("code", { hidden: true })
+    .description("Run `code` (VS Code) with LangWatch telemetry for GitHub Copilot Chat (direct OTLP).")
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { wrapCode } = await import("./commands/wrap.js");
+        await wrapCode(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
   const copilotAppCmd = program
     .command("copilot-app")
     .description(
@@ -397,6 +414,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "  claude          Run `claude` (Claude Code) routed through the gateway",
       "  codex           Run `codex` (OpenAI Codex CLI) routed through the gateway",
       "  copilot         Run `copilot` (GitHub Copilot CLI) with LangWatch telemetry",
+      "  code            Run `code` (VS Code) with LangWatch telemetry for GitHub Copilot Chat",
       "  cursor          Run `cursor` routed through the gateway",
       "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",

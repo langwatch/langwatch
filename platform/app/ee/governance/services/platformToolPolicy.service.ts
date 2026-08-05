@@ -31,6 +31,7 @@ export const PLATFORM_TOOL_SLUGS = [
   "opencode",
   "cursor",
   "copilot",
+  "code",
 ] as const;
 
 export type PlatformToolSlug = (typeof PLATFORM_TOOL_SLUGS)[number];
@@ -62,6 +63,11 @@ export const PLATFORM_TOOL_POLICY_DEFAULTS: Record<
   // GitHub Copilot CLI (>= 1.0.41): native OTel export + BYOK gateway
   // env vars, so both paths are real. ADR-039.
   copilot: { allowVk: true, allowOtelDirect: true },
+  // `code` (VS Code Copilot Chat) is ingestion-only: the chat extension has
+  // native OTel export but no BYOK gateway env, so Path A is structurally
+  // impossible. Inverse of cursor. ADR-039 §Extension #2. allowVk stays
+  // false regardless of tile config (forced, like cursor's allowOtelDirect).
+  code: { allowVk: false, allowOtelDirect: true },
 };
 
 export function isPlatformToolSlug(slug: string): slug is PlatformToolSlug {

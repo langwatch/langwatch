@@ -116,7 +116,7 @@ describe("the real command tree", () => {
 
       // Launchers and passthroughs: they exec another tool and own its stdio.
       ...(
-        ["claude", "codex", "cursor", "gemini", "opencode", "copilot", "open"] as const
+        ["claude", "codex", "cursor", "gemini", "opencode", "copilot", "code", "open"] as const
       ).map((n) => [n, "launches another tool and owns its stdio"] as const),
       // Local machine setup: mints a key and installs an OS login agent;
       // progress prose, no structured result document.
