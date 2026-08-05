@@ -82,7 +82,7 @@ const missingModelDescriptions = {
   transcription:
     'Add a "model" field to the multipart form for POST /v1/audio/transcriptions, then try again.',
   passthrough: "Put the model in the Gemini request URL, then try again.",
-} satisfies Record<MissingModelRequestType, string>;
+} as const satisfies Record<MissingModelRequestType, string>;
 
 const describeMissingModel = (error: HandledErrorShape): string => {
   const requestType = error.meta.request_type;
