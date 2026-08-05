@@ -75,9 +75,13 @@ secured
         );
       }
 
+      // warn, not error: a malformed body is the caller's mistake and we answer
+      // it with a 400. These three sites return rather than throw, so they never
+      // reach the boundary that would classify them as customer fault, and at
+      // error level they were about a fifth of this service's error stream.
       const contentType = c.req.header("content-type");
       if (!contentType?.includes("application/json")) {
-        logger.error("collector request body is not json");
+        logger.warn("collector request body is not json");
 
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
@@ -86,12 +90,12 @@ secured
       try {
         body = await c.req.json();
       } catch {
-        logger.error("collector request body is not valid json");
+        logger.warn("collector request body is not valid json");
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
       if (typeof body !== "object") {
-        logger.error("collector request body is not json");
+        logger.warn("collector request body is not json");
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
