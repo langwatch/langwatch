@@ -200,7 +200,8 @@ export class FanOutRepository {
     projectId: string;
     status: FanOutBatchStatus;
     batchRunId?: string;
-    seedScenarioRunId?: string;
+    /** `null` clears the column; omit it to leave the column untouched. */
+    seedScenarioRunId?: string | null;
   }): Promise<FanOutBatch> {
     return tracer.withActiveSpan(
       "FanOutRepository.updateBatchStatus",
@@ -220,7 +221,7 @@ export class FanOutRepository {
           data: {
             status: input.status,
             ...(input.batchRunId ? { batchRunId: input.batchRunId } : {}),
-            ...(input.seedScenarioRunId
+            ...(input.seedScenarioRunId !== undefined
               ? { seedScenarioRunId: input.seedScenarioRunId }
               : {}),
           },

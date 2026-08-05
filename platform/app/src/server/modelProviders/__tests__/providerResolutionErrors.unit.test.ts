@@ -19,7 +19,7 @@ describe("provider resolution errors", () => {
   describe("given the resolved model names a provider the project never set up", () => {
     const error = new ModelProviderNotConfiguredError("azure");
 
-    it("is a handled error, so the boundary keeps its code instead of degrading to unknown", () => {
+    it("reads as handled, so the boundary keeps its code instead of degrading to unknown", () => {
       expect(HandledError.isHandled(error)).toBe(true);
     });
 
@@ -45,7 +45,7 @@ describe("provider resolution errors", () => {
   describe("given the provider exists but is switched off", () => {
     const error = new ModelProviderNotEnabledError("openai_codex");
 
-    it("is a handled error", () => {
+    it("reads as handled at the boundary", () => {
       expect(HandledError.isHandled(error)).toBe(true);
     });
 

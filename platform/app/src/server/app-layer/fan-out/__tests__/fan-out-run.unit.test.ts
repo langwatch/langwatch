@@ -401,6 +401,60 @@ describe("FanOutRunService", () => {
     });
 
     /** @scenario "Running a batch with nothing approved is refused" */
+    it("clears the batch's seed run id when the baseline fails to queue", async () => {
+      const { fanOutRepository, scenarioRepository } = fakeRepositories();
+      fanOutRepository.findBatchById.mockResolvedValue({
+        id: "batch_1",
+        scenarioSetId: "__internal__batch_1__fanout",
+        seedScenarioId: "scenario_seed",
+        // The original failure. It belongs to a different run, so it must not
+        // survive as this batch run's baseline.
+        seedScenarioRunId: "scenariorun_original_failure",
+        seedTarget: target,
+        variants: [variant({ id: "v1", scenarioId: "s1", status: "APPROVED" })],
+      });
+      // The seed is queued first, so rejecting the first call rejects the seed.
+      const queueSimulationRun = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("queue unavailable"))
+        .mockResolvedValueOnce(undefined);
+      const service = FanOutRunService.create({
+        queueSimulationRun: queueSimulationRun as never,
+        fanOutRepository: fanOutRepository as unknown as FanOutRepository,
+        scenarioRepository: scenarioRepository as unknown as ScenarioRepository,
+      });
+
+      await service.dispatchBatch({
+        projectId: "project_1",
+        batchId: "batch_1",
+      });
+
+      expect(fanOutRepository.updateBatchStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ seedScenarioRunId: null }),
+      );
+    });
+
+    it("leaves the seed run id alone for a batch that has no seed scenario", async () => {
+      const { service, fanOutRepository } = serviceWithBatch({
+        id: "batch_1",
+        scenarioSetId: "__internal__batch_1__fanout",
+        seedScenarioId: null,
+        seedScenarioRunId: null,
+        seedTarget: target,
+        variants: [variant({ id: "v1", scenarioId: "s1", status: "APPROVED" })],
+      });
+
+      await service.dispatchBatch({
+        projectId: "project_1",
+        batchId: "batch_1",
+      });
+
+      // Distinct from the null case: nothing to say, so the column is not
+      // written at all.
+      const written = fanOutRepository.updateBatchStatus.mock.calls[0]![0];
+      expect("seedScenarioRunId" in written).toBe(false);
+    });
+
     it("refuses a batch with nothing approved", async () => {
       const { service, queueSimulationRun } = serviceWithBatch({
         id: "batch_1",

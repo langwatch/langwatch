@@ -28,8 +28,16 @@ export type FanOutRunResult = {
   batchRunId: string;
   scenarioSetId: string;
   itemCount: number;
-  /** The run id the seed baseline was dispatched under, when there is a seed. */
-  seedScenarioRunId?: string;
+  /**
+   * The run id the seed baseline was dispatched under.
+   *
+   * Three states, because "no seed" and "the seed never queued" call for
+   * different writes: `undefined` when the batch has no seed scenario at all
+   * (leave the column alone), `null` when a seed existed but its queue call
+   * was rejected (clear the column, or the report would present the original
+   * failure as this run's baseline), and a string when it queued.
+   */
+  seedScenarioRunId?: string | null;
 };
 
 const TARGET_TYPES = ["prompt", "http", "code", "workflow"] as const;
@@ -129,8 +137,10 @@ export class FanOutRunService {
       // The baseline gets a fresh run id inside this batch run. Leaving the
       // column pointing at the original failure would make the report look up
       // a run id that is not part of this batch, so the seed comparison the
-      // report exists to show would silently never appear.
-      ...(result.seedScenarioRunId
+      // report exists to show would silently never appear. A seed that failed
+      // to queue arrives as null and clears the column for the same reason:
+      // the old id belongs to a different run.
+      ...(result.seedScenarioRunId !== undefined
         ? { seedScenarioRunId: result.seedScenarioRunId }
         : {}),
     });
@@ -202,24 +212,12 @@ export class FanOutRunService {
       occurredAt: now,
     });
 
-    // A run id written for an item that never made it onto the queue is worse
-    // than no id at all: the report would look for a run that will never
-    // exist, so the variant sits in totalVariants and never reaches
-    // finishedVariants, and the blast radius keeps a denominator it can never
-    // meet. Take those ids back.
-    const seedOffset = seedItem ? 1 : 0;
-    const abandoned = variantItems.filter(
-      (_, index) => settled[index + seedOffset]?.status === "rejected",
-    );
-    await Promise.all(
-      abandoned.map((item) =>
-        this.fanOutRepository.setVariantScenarioRunId({
-          id: item.variantId,
-          projectId: params.projectId,
-          scenarioRunId: null,
-        }),
-      ),
-    );
+    await this.takeBackAbandonedRunIds({
+      variantItems,
+      settled,
+      seedOffset: seedItem ? 1 : 0,
+      projectId: params.projectId,
+    });
 
     const queuedCount = settled.filter(
       (outcome) => outcome.status === "fulfilled",
@@ -229,10 +227,45 @@ export class FanOutRunService {
       batchRunId,
       scenarioSetId: params.scenarioSetId,
       itemCount: queuedCount,
-      ...(seedItem && settled[0]?.status === "fulfilled"
-        ? { seedScenarioRunId: seedItem.scenarioRunId }
+      ...(seedItem
+        ? {
+            seedScenarioRunId:
+              settled[0]?.status === "fulfilled"
+                ? seedItem.scenarioRunId
+                : null,
+          }
         : {}),
     };
+  }
+
+  /**
+   * Releases the run ids reserved for items that never reached the queue.
+   *
+   * A run id written for an item that was never queued is worse than no id at
+   * all: the report would look for a run that will never exist, so the variant
+   * sits in totalVariants and never reaches finishedVariants, and the blast
+   * radius keeps a denominator it can never meet.
+   */
+  private async takeBackAbandonedRunIds(params: {
+    variantItems: Array<{ variantId: string }>;
+    settled: PromiseSettledResult<void>[];
+    seedOffset: number;
+    projectId: string;
+  }): Promise<void> {
+    const abandoned = params.variantItems.filter(
+      (_, index) =>
+        params.settled[index + params.seedOffset]?.status === "rejected",
+    );
+
+    await Promise.all(
+      abandoned.map((item) =>
+        this.fanOutRepository.setVariantScenarioRunId({
+          id: item.variantId,
+          projectId: params.projectId,
+          scenarioRunId: null,
+        }),
+      ),
+    );
   }
 
   /**
