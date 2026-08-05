@@ -158,7 +158,11 @@ func TestRecorder_ClientRejects(t *testing.T) {
 		{"a key looping on a malformed body", "bad_request", "vk_flooder", 3, 3},
 		{"the same key failing a different way", "model_not_allowed", "vk_flooder", 1, 1},
 		{"another key entirely", "bad_request", "vk_quiet", 1, 1},
-		{"a rejection with no key resolved", "invalid_api_key", "", 1, 1},
+		// Belt and braces only: the gateway rejects an unauthenticated
+		// request before the choke point that records this counter, so a
+		// recorded reject always has a key. The placeholder is what keeps
+		// that guarantee cheap if a future caller records without one.
+		{"a reject recorded without a key", "bad_request", "", 1, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -171,9 +175,9 @@ func TestRecorder_ClientRejects(t *testing.T) {
 	assert.Equal(t, 3.0, testutil.ToFloat64(r.clientRejects.WithLabelValues("bad_request", "vk_flooder")))
 	assert.Equal(t, 1.0, testutil.ToFloat64(r.clientRejects.WithLabelValues("model_not_allowed", "vk_flooder")))
 	assert.Equal(t, 1.0, testutil.ToFloat64(r.clientRejects.WithLabelValues("bad_request", "vk_quiet")))
-	// An unauthenticated rejection has no key; folding it onto the
-	// placeholder keeps it countable instead of scattering empty labels.
-	assert.Equal(t, 1.0, testutil.ToFloat64(r.clientRejects.WithLabelValues("invalid_api_key", unknownLabel)))
+	// The placeholder is a fixed constant, never the caller's input, so even
+	// a keyless reject folds onto one series rather than minting one.
+	assert.Equal(t, 1.0, testutil.ToFloat64(r.clientRejects.WithLabelValues("bad_request", unknownLabel)))
 	assert.Equal(t, 4, testutil.CollectAndCount(r.clientRejects))
 }
 
