@@ -48,7 +48,7 @@ describe("scenario model factory", () => {
 
   async function callWithJudgeTool(
     model: ReturnType<typeof createModelFromParams>,
-    providerOptions?: Record<string, Record<string, unknown>>,
+    providerOptions?: Parameters<typeof generateText>[0]["providerOptions"],
   ) {
     await generateText({
       model,
@@ -87,6 +87,7 @@ describe("scenario model factory", () => {
     );
   });
 
+  /** @scenario "The same model outside the judge is untouched" */
   it("does not change the simulator or target model using the same model id", async () => {
     const body = await callWithJudgeTool(
       createModelFromParams({
@@ -101,6 +102,7 @@ describe("scenario model factory", () => {
     expect(body).not.toHaveProperty("reasoning_effort");
   });
 
+  /** @scenario "Unverified models are not silently changed" */
   it.each([
     "openai/gpt-5.6-sol-pro",
     "azure/gpt-5.6-sol",
@@ -116,6 +118,7 @@ describe("scenario model factory", () => {
     expect(body).not.toHaveProperty("reasoning_effort");
   });
 
+  /** @scenario "The compatibility value is a default, not an override" */
   it("uses none only as a default, preserving explicit call intent", async () => {
     const body = await callWithJudgeTool(
       createJudgeModelFromParams({

@@ -76,7 +76,7 @@ describe("classifyScenarioInfraError", () => {
   });
 
   describe("when the judge model rejects reasoning with function tools", () => {
-    /** @scenario "A remaining judge reasoning conflict becomes a handled scenario error" */
+    /** @scenario "A remaining conflict is surfaced as a handled scenario error" */
     it("classifies the observed OpenAI JSON envelope without exposing provider prose", () => {
       const raw = JSON.stringify({
         error: {
