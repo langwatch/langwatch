@@ -258,9 +258,8 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
        * This read declares its window authoritative, so a miss never widens and
        * has no widen outcome to appear as. It gets counted as a miss instead of
        * folded into `hit`.
-       *
-       * @scenario a bounded miss is recorded as a miss, not as an answer
        */
+      /** @scenario a bounded miss is recorded as a miss, not as an answer */
       it("counts an empty window as a miss, not as a hit", async () => {
         const beforeEmpty = await windowedReadCount({
           table: TABLE,

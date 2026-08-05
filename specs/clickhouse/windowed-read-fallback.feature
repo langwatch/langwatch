@@ -41,6 +41,7 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
     Then the failure is surfaced to the caller
     And the failure is recorded as its own outcome, so failed reads are never invisible
 
+  @unit
   Scenario: a caller that forbids widening stays bounded on a miss
     Given the caller declares the scoped window authoritative
     And the answer lies outside the scoped window
@@ -54,6 +55,7 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
   # from a healthy one. Callers that resolve queued work this way retry on the
   # empty result, so the miss rate is the signal that says whether the work is
   # draining or stuck.
+  @unit
   Scenario: a bounded miss is recorded as a miss, not as an answer
     Given the caller declares the scoped window authoritative
     And there is no answer inside the scoped window

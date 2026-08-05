@@ -343,7 +343,6 @@ const LEGACY_INERT: string[] = [
   "specs/ci/pr-impact-map.feature",
   "specs/claude/drive-pr.feature",
   "specs/claude/telemetry-turn-bounding.feature",
-  "specs/clickhouse/windowed-read-fallback.feature",
   "specs/coding-agent/personal-usage.feature",
   "specs/components/code-block-editor.feature",
   "specs/data-retention/data-size-metering.feature",

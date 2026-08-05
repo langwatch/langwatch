@@ -691,9 +691,8 @@ describe("codingAgentSpanFactsDispatch", () => {
        * describe what the queue does rather than what we wish it did. The old
        * wording promised retries "until the span store write lands", which read
        * as still-working while 22 groups sat parked and stopped.
-       *
-       * @scenario work whose payload is not readable yet retries, never drops
        */
+      /** @scenario work whose payload is not readable yet retries, never drops */
       it("does not promise a retry budget the queue will not spend", async () => {
         const event = rawSpanEvent({
           name: "claude_code.tool",
@@ -795,9 +794,8 @@ describe("codingAgentSpanFactsDispatch", () => {
        * The whole point of the shape: the sibling spanStorage write is the
        * dependency that parked 22 groups, so a lifted job must succeed with the
        * store entirely absent, not merely usually.
-       *
-       * @scenario work whose result is a bounded derivation carries it instead of a pointer
        */
+      /** @scenario work whose result is a bounded derivation carries it instead of a pointer */
       it("succeeds even when the span never lands in the store", async () => {
         const { subscriber, dispatched } = makeSubscriber(async () => null);
 
@@ -857,9 +855,8 @@ describe("codingAgentSpanFactsDispatch", () => {
       /**
        * The reference upgrade kept the key stable; this one must too, or a
        * rollout that mixes shapes double-counts the same span's facts.
-       *
-       * @scenario a redelivered event resolves to the unit of work already queued
        */
+      /** @scenario a redelivered event resolves to the unit of work already queued */
       it("matches the key the full event and the claim-check produce", async () => {
         const event = rawSpanEvent({
           name: "claude_code.tool",
@@ -893,9 +890,8 @@ describe("codingAgentSpanFactsDispatch", () => {
        * bounded by that list rather than by the span. If an unlisted key could
        * ride along, "carry the derivation" would quietly become "queue the
        * payload", which is the cost ADR-069 exists to prevent.
-       *
-       * @scenario a carried derivation never carries content
        */
+      /** @scenario a carried derivation never carries content */
       it("carries the listed facts and none of the content", async () => {
         const { subscriber, dispatched } = makeSubscriber();
         const bulk = "x".repeat(50_000);
@@ -953,9 +949,8 @@ describe("codingAgentSpanFactsDispatch", () => {
        * The counterweight to the scenario above: refusing unknown shapes must
        * not turn "not a coding-agent span" into a retry loop, or every ordinary
        * span in the project becomes a poison job during a filterless drain.
-       *
-       * @scenario an event the subscriber declines is still completed quietly
        */
+      /** @scenario an event the subscriber declines is still completed quietly */
       it("completes quietly without contributing or throwing", async () => {
         const { subscriber, dispatched } = makeSubscriber();
 
