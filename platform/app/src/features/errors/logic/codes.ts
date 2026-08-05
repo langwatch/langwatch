@@ -45,6 +45,7 @@ export const APP_ERROR_CODES = [
   "cache_rule_not_found",
   "cannot_impersonate_admin",
   "cannot_impersonate_deactivated_user",
+  "clickhouse_overloaded",
   "clickhouse_unavailable",
   "codex_auth_failed",
   "custom_role_not_found",

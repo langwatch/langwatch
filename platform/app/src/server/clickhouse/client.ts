@@ -1,11 +1,5 @@
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { createLogger } from "@langwatch/observability";
-import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
-import { ClickHouseLogger } from "./clickhouseLogger";
-import { getClickHouseMaxOpenConnections } from "./connectionPool";
-import { wrapWithDefaultSettings } from "./safeClickhouseClient";
-
-const logger = createLogger("langwatch:clickhouse:client");
+import type { ClickHouseClient } from "@clickhouse/client";
+import { createManagedClickHouseClient } from "./managedClient";
 
 let clickHouseClient: ClickHouseClient | null = null;
 
@@ -48,32 +42,10 @@ function getClickHouseClient(): ClickHouseClient | null {
       throw new Error("CLICKHOUSE_URL environment variable is required.");
     }
 
-    let url: URL | string = clickHouseUrl;
-    try {
-      url = new URL(clickHouseUrl);
-    } catch (error) {
-      logger.warn(
-        { error },
-        "ClickHouse URL was not a valid URL, it will still be set, but may not work as expected.",
-      );
-    }
-
-    const raw = createClient({
-      url,
-      clickhouse_settings: {
-        date_time_input_format: "best_effort",
-      },
-      max_open_connections: getClickHouseMaxOpenConnections(),
-      keep_alive: {
-        enabled: true,
-        idle_socket_ttl: 1500,
-      },
-      log: { LoggerClass: ClickHouseLogger },
+    clickHouseClient = createManagedClickHouseClient({
+      url: clickHouseUrl,
+      instance: "shared",
     });
-
-    clickHouseClient = wrapWithDefaultSettings(
-      createResilientClickHouseClient({ client: raw }),
-    );
   }
 
   return clickHouseClient;

@@ -1,9 +1,8 @@
 /**
  * Connection-pool sizing.
  *
- * A pool is per client INSTANCE, and a process that constructs two clients
- * opens two pools. The server's budget has to cover every pool on every pod, so
- * the only safe way to pick a size is from the server's own
+ * A pool is per client INSTANCE, so the server's budget has to cover every pool
+ * on every pod, and the only safe way to pick a size is from the server's own
  * `max_concurrent_queries` divided by the fleet - never a fixed number chosen
  * against an assumed replica count.
  *
@@ -11,6 +10,16 @@
  * met a fleet of 10 worker pods and 3 app pods each holding 2 clients. The
  * server rejected ~37k queries with TOO_MANY_SIMULTANEOUS_QUERIES, and the
  * retry path drove every rejection straight back into the same wall.
+ *
+ * Read the sizing here for what it is: a ceiling on sockets, and a backstop
+ * rather than the working limit. Production says so plainly - ClickHouse holds
+ * one connection per statement actually in flight and closes idle ones within
+ * `idle_socket_ttl`, so its connection count tracks its query count 1:1 and
+ * never approaches the pool cap. What a process needs bounded is the number of
+ * statements it will TRY to run, which is set by whatever queue feeds it, not
+ * by this number. That bound lives in `./rateLimit`, and it is the one that
+ * should bind first; this only stops a runaway from opening sockets without
+ * limit.
  *
  * Nothing here reads `process.env`: the caller passes the numbers in, so the
  * rules are the same in every process and testable without mocking the
@@ -26,8 +35,17 @@ export const DEFAULT_SERVER_MAX_CONCURRENT_QUERIES = 300;
  */
 export const FLEET_SAFETY_FACTOR = 0.7;
 
-/** Both the raw client and the app-layer factory build one, each with a pool. */
-export const DEFAULT_CLIENTS_PER_PROCESS = 2;
+/**
+ * One, because a process now has exactly one construction site for a client
+ * against a given server (`~/server/clickhouse/managedClient.ts`).
+ *
+ * It was 2 while the app-layer factory existed alongside the raw client. That
+ * factory turned out to have no callers at all, so the 2 was halving every
+ * derived ceiling to pay for a pool nobody opened. Both are gone; a per-tenant
+ * private instance still gets its own client, but that is a different server
+ * with its own budget, not a second pool against this one.
+ */
+export const DEFAULT_CLIENTS_PER_PROCESS = 1;
 
 /**
  * Used only when the fleet size is unknown, which is the case for any process
