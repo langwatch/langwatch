@@ -53297,11 +53297,11 @@ When using the Helm chart, you rarely need to set environment variables directly
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |, |
-| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes |, |
-| `REDIS_URL` | Redis connection string | Yes |, |
+| `DATABASE_URL` | PostgreSQL connection string | Yes | - |
+| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes | - |
+| `REDIS_URL` | Redis connection string | Yes | - |
 | `NODE_ENV` | Environment (`production`, `development`) | No | `production` |
-| `BASE_HOST` | Internal base URL for the application | Yes |, |
+| `BASE_HOST` | Internal base URL for the application | Yes | - |
 | `NEXTAUTH_URL` | Public URL for authentication callbacks | Yes | Same as `BASE_HOST` |
 | `START_WORKERS` | Run workers in-process (`true`/`false`) | No | `false` |
 
@@ -53426,22 +53426,71 @@ When `STORED_OBJECTS_BACKEND=azure` is set, all three of `AZURE_BLOB_ACCOUNT_NAM
 
 ## Email
 
+Notification emails (alerts, invites, scheduled reports, password resets) are sent through one gateway, selected with `EMAIL_PROVIDER`.
+
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `EMAIL_ENABLED` | Enable email notifications | `false` |
-| `EMAIL_PROVIDER` | Email provider (`sendgrid`) | `sendgrid` |
-| `SENDGRID_API_KEY` | SendGrid API key |, |
-| `EMAIL_DEFAULT_FROM` | Default "from" address |, |
+| `EMAIL_PROVIDER` | Gateway to send through: `sendgrid`, `ses`, `smtp` or `resend` | inferred |
+| `EMAIL_DEFAULT_FROM` | Default "from" address | - |
+
+When `EMAIL_PROVIDER` is not set, the gateway is inferred from whichever credentials are present (`USE_AWS_SES` first, then `SENDGRID_API_KEY`), so existing installs keep working untouched. `smtp` and `resend` must always be named explicitly.
+
+### SendGrid
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SENDGRID_API_KEY` | SendGrid API key | - |
+
+### AWS SES
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `USE_AWS_SES` | Set to `true` to send through SES | `false` |
+| `AWS_REGION` | AWS region for SES | - |
+| `AWS_SES_ENDPOINT` | Override the SES endpoint, for a VPC endpoint or an internal relay | public regional endpoint |
+
+Credentials come from the standard AWS chain (instance role, IRSA, or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`).
+
+### SMTP
+
+Use this for an internal relay, Azure Communication Services, Office 365, Google Workspace, Postmark, Mailgun, Brevo, or any other gateway that speaks SMTP.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SMTP_URL` | Full connection URL, e.g. `smtps://user:pass@relay.internal:465`. Takes precedence over the settings below | - |
+| `SMTP_HOST` | Relay hostname | - |
+| `SMTP_PORT` | Relay port | `587` |
+| `SMTP_SECURE` | `true` for implicit TLS, `false` for STARTTLS | `true` on port 465, otherwise `false` |
+| `SMTP_USER` | Username. Omit entirely for an unauthenticated internal relay | - |
+| `SMTP_PASSWORD` | Password | - |
+
+### Resend
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RESEND_API_KEY` | Resend API key | - |
+
+### Sending through an outbound proxy
+
+Deployments whose only egress is a corporate HTTP proxy can set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses`, `resend` and `sendgrid` gateways all route their API calls through it; `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
+
+The `smtp` gateway ignores these variables on purpose, because an SMTP relay is normally an internal host that must be reached directly. Point it at your relay's real address, or use a vendor's SMTP endpoint if that is what the proxy allows out.
+
+<Note>
+Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so LangWatch attaches the proxy to the SES and Resend clients itself. SendGrid's client is axios-based and reads the variables directly. Without this wiring, a proxied deployment fails with a `read ETIMEDOUT` reaching the provider.
+</Note>
+
 
 ## Evaluator Providers
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `AZURE_OPENAI_EVALUATOR_ENABLED` | Enable Azure OpenAI for evaluations | `false` |
-| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |, |
-| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |, |
+| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL | - |
+| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key | - |
 | `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
-| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON |, |
+| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | - |
 
 ## Feature Flags
 
@@ -53455,8 +53504,7 @@ When `STORED_OBJECTS_BACKEND=azure` is set, all three of `AZURE_BLOB_ACCOUNT_NAM
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
-| `SENTRY_DSN` | Sentry DSN for error tracking |, |
-| `METRICS_API_KEY` | API key for metrics collection |, |
+| `METRICS_API_KEY` | API key for metrics collection | - |
 
 ## Langy (optional)
 
@@ -53482,6 +53530,15 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.email.enabled` | `EMAIL_ENABLED` |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
+| `app.email.providers.ses.region` | `AWS_REGION` (with `USE_AWS_SES=true`) |
+| `app.email.providers.ses.endpoint` | `AWS_SES_ENDPOINT` |
+| `app.email.providers.smtp.url.value` | `SMTP_URL` |
+| `app.email.providers.smtp.host` | `SMTP_HOST` |
+| `app.email.providers.smtp.port` | `SMTP_PORT` |
+| `app.email.providers.smtp.secure` | `SMTP_SECURE` |
+| `app.email.providers.smtp.user` | `SMTP_USER` |
+| `app.email.providers.smtp.password.value` | `SMTP_PASSWORD` |
+| `app.email.providers.resend.apiKey.value` | `RESEND_API_KEY` |
 | `app.evaluators.azureOpenAI.enabled` | `AZURE_OPENAI_EVALUATOR_ENABLED` |
 | `app.evaluators.azureOpenAI.endpoint.value` | `AZURE_OPENAI_EVALUATOR_ENDPOINT` |
 | `app.evaluators.azureOpenAI.apiKey.value` | `AZURE_OPENAI_EVALUATOR_API_KEY` |
