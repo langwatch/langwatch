@@ -9,6 +9,7 @@ import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import { app as eventsApp } from "../app/api/events/[[...route]]/app";
+import { app as experimentsApp } from "../app/api/experiments/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
@@ -19,6 +20,13 @@ import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import rawCurrentSpec from "../app/api/openapiLangWatch.json";
+// The two legacy route files below are wired in for the routes they describe
+// and nothing else: `generateSpecs` skips any handler without `describeRoute`,
+// so the unannotated siblings sharing these files (the stripe webhook, the demo
+// bot, the MCP authorize step) cannot reach a public document merely by living
+// next to something that is published.
+import { app as experimentsV3App } from "../server/routes/experiments-v3";
+import { app as miscApp } from "../server/routes/misc";
 
 // Surfaces whose routes come straight from their Hono apps. Their paths
 // REPLACE on merge, and any path the apps no longer serve is pruned from
@@ -30,6 +38,10 @@ const APP_DERIVED_PREFIXES = [
   "/api/dashboards",
   "/api/evaluators",
   "/api/events",
+  // Covers `/api/experiment/init` and every `/api/experiments/...` route in
+  // one prefix. Both used to be hand-maintained entries in the JSON; they are
+  // generated now, so the hand-written copies are pruned here.
+  "/api/experiment",
   "/api/webhooks",
   "/api/gateway/v1",
   "/api/governance",
@@ -105,6 +117,12 @@ export default async function execute() {
   const evaluatorsSpec = await generateSpecs(evaluatorsApp);
   console.log("Building events spec...");
   const eventsSpec = await generateSpecs(eventsApp);
+  console.log("Building experiments spec...");
+  const experimentsSpec = await generateSpecs(experimentsApp);
+  console.log("Building experiment runs spec...");
+  const experimentsV3Spec = await generateSpecs(experimentsV3App);
+  console.log("Building experiment init spec...");
+  const miscSpec = await generateSpecs(miscApp);
   console.log("Building gateway-platform spec...");
   const gatewayPlatformSpec = await generateSpecs(gatewayPlatformApp);
   console.log("Building governance spec...");
@@ -154,6 +172,9 @@ export default async function execute() {
       datasetSpec,
       evaluatorsSpec,
       eventsSpec,
+      experimentsSpec,
+      experimentsV3Spec,
+      miscSpec,
       gatewayPlatformSpec,
       governanceSpec,
       graphsSpec,
@@ -193,6 +214,43 @@ export default async function execute() {
 
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),
-    JSON.stringify(mergedSpec, null, 2),
+    JSON.stringify(withoutEmptyPaths(mergedSpec), null, 2),
   );
+}
+
+const OPENAPI_METHODS = [
+  "get",
+  "post",
+  "put",
+  "patch",
+  "delete",
+  "head",
+  "options",
+  "trace",
+];
+
+/**
+ * Drops path entries left holding no operation.
+ *
+ * `describeRoute({ hide: true })` removes the operation but keeps its path key,
+ * so a hidden route leaves `"/api/experiments/execute": {}` behind — an entry
+ * that documents nothing and reads, to anything scanning the document, as a
+ * path we publish.
+ */
+function withoutEmptyPaths<T extends { paths?: Record<string, unknown> }>(
+  spec: T,
+): T {
+  const paths = spec.paths;
+  if (!paths) return spec;
+
+  return {
+    ...spec,
+    paths: Object.fromEntries(
+      Object.entries(paths).filter(([, item]) =>
+        OPENAPI_METHODS.some(
+          (method) => (item as Record<string, unknown>)?.[method] !== undefined,
+        ),
+      ),
+    ),
+  };
 }

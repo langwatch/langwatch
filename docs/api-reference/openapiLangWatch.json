@@ -1025,241 +1025,6 @@
         }
       }
     },
-    "/api/experiments/runs/{runId}": {
-      "get": {
-        "description": "Get the current status of an evaluation run for polling. Returns progress while running, and summary when completed.",
-        "operationId": "getEvaluationsV3RunStatus",
-        "tags": [
-          "Evaluations V3"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "runId",
-            "required": true,
-            "description": "The run ID returned from POST /api/experiments/{slug}/run"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Run status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "runId": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "pending",
-                        "running",
-                        "completed",
-                        "failed",
-                        "stopped"
-                      ]
-                    },
-                    "progress": {
-                      "type": "integer",
-                      "description": "Number of cells completed"
-                    },
-                    "total": {
-                      "type": "integer",
-                      "description": "Total number of cells"
-                    },
-                    "startedAt": {
-                      "type": "integer",
-                      "description": "Unix timestamp when run started"
-                    },
-                    "finishedAt": {
-                      "type": "integer",
-                      "description": "Unix timestamp when run finished (only present when completed/failed/stopped)"
-                    },
-                    "summary": {
-                      "type": "object",
-                      "description": "Execution summary (only present when completed)",
-                      "properties": {
-                        "runId": {
-                          "type": "string"
-                        },
-                        "totalCells": {
-                          "type": "integer"
-                        },
-                        "completedCells": {
-                          "type": "integer"
-                        },
-                        "failedCells": {
-                          "type": "integer"
-                        },
-                        "duration": {
-                          "type": "integer",
-                          "description": "Total execution time in milliseconds"
-                        },
-                        "runUrl": {
-                          "type": "string",
-                          "description": "URL to view the run in LangWatch"
-                        }
-                      }
-                    },
-                    "error": {
-                      "type": "string",
-                      "description": "Error message (only present when failed)"
-                    }
-                  },
-                  "required": [
-                    "runId",
-                    "status",
-                    "progress",
-                    "total"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized - Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Run not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/experiments/{slug}/run": {
-      "post": {
-        "description": "Start execution of a saved Evaluations V3 experiment by slug. Returns immediately with a runId for polling, or streams SSE events if Accept: text/event-stream header is provided.",
-        "operationId": "postEvaluationsV3Run",
-        "tags": [
-          "Evaluations V3"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "slug",
-            "required": true,
-            "description": "The slug of the evaluation to run"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Run started successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "runId": {
-                      "type": "string",
-                      "description": "Unique identifier for this run"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "running"
-                      ],
-                      "description": "Initial status of the run"
-                    },
-                    "total": {
-                      "type": "integer",
-                      "description": "Total number of cells to execute"
-                    },
-                    "runUrl": {
-                      "type": "string",
-                      "description": "URL to view the run in LangWatch"
-                    }
-                  },
-                  "required": [
-                    "runId",
-                    "status",
-                    "total"
-                  ]
-                }
-              },
-              "text/event-stream": {
-                "schema": {
-                  "type": "string",
-                  "description": "Server-sent events stream with execution progress"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized - Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Evaluation not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/projects": {
       "get": {
         "operationId": "listProjects",
@@ -7570,6 +7335,1193 @@
         "operationId": "postApiEventsTrack",
         "parameters": [],
         "description": "Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types validate against their schemas; custom event types pass through `trackEventRESTParamsValidatorSchema`."
+      }
+    },
+    "/api/experiments": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "experiments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "workflowId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          },
+                          "runsCount": {
+                            "type": "number"
+                          },
+                          "lastRunAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "name",
+                          "type",
+                          "workflowId",
+                          "createdAt",
+                          "updatedAt",
+                          "runsCount",
+                          "lastRunAt"
+                        ]
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "number"
+                        },
+                        "pageSize": {
+                          "type": "number"
+                        },
+                        "totalHits": {
+                          "type": "number"
+                        },
+                        "hasMore": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "page",
+                        "pageSize",
+                        "totalHits",
+                        "hasMore"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "experiments",
+                    "pagination"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiExperiments",
+        "parameters": [],
+        "description": "List experiments for the project. Includes a runs count and last-run timestamp per experiment."
+      }
+    },
+    "/api/experiments/{slug}/run": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Run started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runId": {
+                      "type": "string",
+                      "description": "Identifier to poll this run with"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "running"
+                    },
+                    "total": {
+                      "type": "number",
+                      "description": "Number of cells this run will execute"
+                    },
+                    "runUrl": {
+                      "type": "string",
+                      "description": "Link to the run in the LangWatch app"
+                    }
+                  },
+                  "required": [
+                    "runId",
+                    "status",
+                    "total"
+                  ]
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "Progress events, ending with a done event carrying the summary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such experiment or run in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiExperimentsBySlugRun",
+        "tags": [
+          "Experiments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
+        "summary": "Run an experiment",
+        "description": "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes."
+      }
+    },
+    "/api/experiments/runs": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Runs for the experiment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "experimentId": {
+                      "type": "string"
+                    },
+                    "experimentSlug": {
+                      "type": "string"
+                    },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "experimentId": {
+                            "type": "string"
+                          },
+                          "runId": {
+                            "type": "string"
+                          },
+                          "workflowVersion": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "commitMessage": {
+                                "type": "string"
+                              },
+                              "author": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "image": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "image"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "version",
+                              "commitMessage",
+                              "author"
+                            ]
+                          },
+                          "timestamps": {
+                            "type": "object",
+                            "properties": {
+                              "createdAt": {
+                                "type": "number"
+                              },
+                              "updatedAt": {
+                                "type": "number"
+                              },
+                              "finishedAt": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "stoppedAt": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "createdAt",
+                              "updatedAt"
+                            ]
+                          },
+                          "progress": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "total": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "summary": {
+                            "type": "object",
+                            "properties": {
+                              "datasetCost": {
+                                "type": "number"
+                              },
+                              "evaluationsCost": {
+                                "type": "number"
+                              },
+                              "datasetAverageCost": {
+                                "type": "number"
+                              },
+                              "datasetAverageDuration": {
+                                "type": "number"
+                              },
+                              "evaluationsAverageCost": {
+                                "type": "number"
+                              },
+                              "evaluationsAverageDuration": {
+                                "type": "number"
+                              },
+                              "evaluations": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "averageScore": {
+                                      "type": [
+                                        "number",
+                                        "null"
+                                      ]
+                                    },
+                                    "averagePassed": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "averageScore"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "evaluations"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "experimentId",
+                          "runId",
+                          "workflowVersion",
+                          "timestamps",
+                          "summary"
+                        ]
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "number"
+                        },
+                        "pageSize": {
+                          "type": "number"
+                        },
+                        "totalHits": {
+                          "type": "number"
+                        },
+                        "hasMore": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "page",
+                        "pageSize",
+                        "totalHits",
+                        "hasMore"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "experimentId",
+                    "experimentSlug",
+                    "runs",
+                    "pagination"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "experimentSlug was not supplied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such experiment or run in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiExperimentsRuns",
+        "tags": [
+          "Experiments"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "experimentSlug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Slug of the experiment whose runs you want"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "1-based page number"
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 200
+            },
+            "description": "Runs per page, capped at 200"
+          }
+        ],
+        "summary": "List runs of an experiment",
+        "description": "Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`."
+      }
+    },
+    "/api/experiments/runs/{runId}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Run state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "running",
+                        "completed",
+                        "failed",
+                        "stopped"
+                      ]
+                    },
+                    "progress": {
+                      "type": "number",
+                      "description": "Cells finished so far"
+                    },
+                    "total": {
+                      "type": "number",
+                      "description": "Cells in the run"
+                    },
+                    "startedAt": {
+                      "type": "number",
+                      "description": "Unix milliseconds"
+                    },
+                    "finishedAt": {
+                      "type": "number",
+                      "description": "Unix milliseconds; set once the run is no longer running"
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "datasetCost": {
+                          "type": "number"
+                        },
+                        "evaluationsCost": {
+                          "type": "number"
+                        },
+                        "datasetAverageCost": {
+                          "type": "number"
+                        },
+                        "datasetAverageDuration": {
+                          "type": "number"
+                        },
+                        "evaluationsAverageCost": {
+                          "type": "number"
+                        },
+                        "evaluationsAverageDuration": {
+                          "type": "number"
+                        },
+                        "evaluations": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "averageScore": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "averagePassed": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "averageScore"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "evaluations"
+                      ],
+                      "description": "Present when completed"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code, present when failed. Not display copy: render your own wording keyed on it."
+                    },
+                    "traceId": {
+                      "type": "string",
+                      "description": "Trace id for failures that carry no code, to quote in support"
+                    }
+                  },
+                  "required": [
+                    "runId",
+                    "status",
+                    "progress",
+                    "total"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such experiment or run in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiExperimentsRunsByRunId",
+        "tags": [
+          "Experiments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "runId",
+            "required": true
+          }
+        ],
+        "summary": "Poll a run",
+        "description": "Current state of one run. Returns progress while it is going and a summary once it finishes, so a CI job can poll this until `status` leaves `running`."
+      }
+    },
+    "/api/experiments/runs/{runId}/results": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Rows and evaluations for the run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "experimentId": {
+                      "type": "string"
+                    },
+                    "runId": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "workflowVersionId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "progress": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "total": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "dataset": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "index": {
+                            "type": "number"
+                          },
+                          "targetId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "entry": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "predicted": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "cost": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "duration": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "traceId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "index",
+                          "entry"
+                        ]
+                      },
+                      "description": "One row per dataset entry, with what the target predicted"
+                    },
+                    "evaluations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "evaluator": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "targetId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "processed",
+                              "skipped",
+                              "error"
+                            ]
+                          },
+                          "index": {
+                            "type": "number"
+                          },
+                          "score": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "passed": {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ]
+                          },
+                          "details": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "cost": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "duration": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "inputs": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "evaluator",
+                          "status",
+                          "index"
+                        ]
+                      },
+                      "description": "One row per evaluator per dataset entry"
+                    },
+                    "timestamps": {
+                      "type": "object",
+                      "properties": {
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        },
+                        "finishedAt": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "stoppedAt": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "createdAt",
+                        "updatedAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "experimentId",
+                    "runId",
+                    "projectId",
+                    "dataset",
+                    "evaluations",
+                    "timestamps"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such experiment or run in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiExperimentsRunsByRunIdResults",
+        "tags": [
+          "Experiments"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "experimentSlug",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Owning experiment. Required once the run has aged out of the status cache."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "runId",
+            "required": true
+          }
+        ],
+        "summary": "Read run results",
+        "description": "Every dataset row of a run with what the target predicted, plus one entry per evaluator per row. Runs older than the status cache need `experimentSlug` as well, since a run id is only unique within its experiment."
+      }
+    },
+    "/api/experiment/init": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "The experiment, created or already existing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slug": {
+                      "type": "string",
+                      "description": "Slug of the experiment, created or existing"
+                    },
+                    "path": {
+                      "type": "string",
+                      "description": "Path to the experiment in the LangWatch app"
+                    }
+                  },
+                  "required": [
+                    "slug",
+                    "path"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neither experiment_slug nor experiment_id was supplied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The plan's experiment limit is already reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "limitType": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": "number"
+                    },
+                    "max": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message",
+                    "limitType",
+                    "current",
+                    "max"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiExperimentInit",
+        "tags": [
+          "Experiments"
+        ],
+        "parameters": [],
+        "summary": "Create an experiment",
+        "description": "Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "experiment_slug": {
+                    "type": "string",
+                    "description": "Stable slug you choose. Reusing it returns the same experiment instead of creating another, which is what makes repeated runs land together."
+                  },
+                  "experiment_id": {
+                    "type": "string",
+                    "description": "Existing experiment id, as an alternative to the slug"
+                  },
+                  "experiment_type": {
+                    "type": "string",
+                    "enum": [
+                      "DSPY",
+                      "BATCH_EVALUATION",
+                      "BATCH_EVALUATION_V2"
+                    ],
+                    "description": "BATCH_EVALUATION_V2 for SDK batch evaluations, DSPY for optimizer runs"
+                  },
+                  "experiment_name": {
+                    "type": "string",
+                    "description": "Display name, used only when the experiment is created"
+                  },
+                  "workflowId": {
+                    "type": "string",
+                    "description": "Optimization Studio workflow this experiment belongs to"
+                  }
+                },
+                "required": [
+                  "experiment_type"
+                ],
+                "oneOf": [
+                  {
+                    "required": [
+                      "experiment_slug"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "experiment_id"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "/api/gateway/v1/virtual-keys": {

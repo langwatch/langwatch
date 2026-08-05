@@ -781,6 +781,13 @@ jobs:
         working-directory: platform/app
         run: pnpm check:openapi-completeness
 
+      # The completeness check only inspects operations already in the
+      # document. This one catches the route that never got there: a handler
+      # with no describeRoute, or one whose app the generator never imports.
+      - name: Check OpenAPI route coverage
+        working-directory: platform/app
+        run: pnpm check:openapi-route-coverage
+
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:

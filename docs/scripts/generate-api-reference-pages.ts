@@ -39,9 +39,6 @@ const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
 const RETIRED_GATEWAY_PROVIDER_BINDINGS =
   "Retired surface, intentionally undocumented: the gateway provider binding routes answer 410 Gone, and the credentials they wrapped are managed under /api/model-providers.";
 
-const UNDOCUMENTED_EXPERIMENT_RUNS =
-  "Not yet documented in the API reference: the Evaluations v3 experiment run routes have no reference pages yet.";
-
 const UNDOCUMENTED_INGESTION_TEMPLATES =
   "Not yet documented in the API reference: the governance ingestion template routes have no reference pages yet.";
 
@@ -66,8 +63,6 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/events/track":
     "Not yet documented in the API reference: the trace event tracking route has no reference page yet.",
-  "/api/experiments/runs/{runId}": UNDOCUMENTED_EXPERIMENT_RUNS,
-  "/api/experiments/{slug}/run": UNDOCUMENTED_EXPERIMENT_RUNS,
   "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
@@ -108,6 +103,16 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/evaluations"],
     overviewDescription:
       "Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.",
+  },
+  {
+    name: "Experiments",
+    dirName: "experiments",
+    // Two prefixes, because the create endpoint is singular: `/api/experiments`
+    // does not start with `/api/experiment/`, so one prefix would leave either
+    // the create call or the rest of the family unowned.
+    pathPrefixes: ["/api/experiments", "/api/experiment"],
+    overviewDescription:
+      "Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly.",
   },
   {
     name: "Monitors",

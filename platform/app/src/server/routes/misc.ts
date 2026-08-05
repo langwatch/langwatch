@@ -21,6 +21,8 @@ import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { bodyLimit } from "hono/body-limit";
+import { describeRoute } from "hono-openapi";
+import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
 import type Stripe from "stripe";
@@ -88,6 +90,7 @@ import { encrypt } from "~/utils/encryption";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { experimentInitResponseSchema } from "./experiments-v3.schemas";
 
 const logger = createLogger("langwatch:misc");
 // Shared auth middlewares for every API-key-aware handler in this file.
@@ -437,82 +440,176 @@ const dspyInitParamsSchema = z
     return true;
   });
 
-secured
-  .access(experimentsManageAuth)
-  .post(
-    "/experiment/init",
-    authMiddleware,
-    requireExperimentsManage,
-    async (c) => {
-      const project = c.get("project");
-
-      let body: Record<string, any>;
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ message: "Bad request" }, 400);
-      }
-
-      let params: z.infer<typeof dspyInitParamsSchema>;
-      try {
-        params = dspyInitParamsSchema.parse(body);
-      } catch (error) {
-        logger.error(
-          { error, body, projectId: project.id },
-          "invalid init data received",
-        );
-        captureException(toError(error), { extra: { projectId: project.id } });
-        const validationError = fromZodError(error as ZodError);
-        return c.json({ error: validationError.message }, 400);
-      }
-
-      let experiment;
-      try {
-        experiment = await findOrCreateExperiment({
-          project,
-          experiment_slug: params.experiment_slug,
-          experiment_type: params.experiment_type as ExperimentType,
-          experiment_name: params.experiment_name,
-          workflowId: params.workflowId,
-        });
-      } catch (error) {
-        if (error instanceof LimitExceededError) {
-          let message = error.message;
-          try {
-            const organizationId = await resolveOrganizationId(project.teamId);
-            if (organizationId) {
-              message = await buildResourceLimitMessage({
-                organizationId,
-                limitType: error.limitType,
-                max: error.max,
-              });
-            }
-          } catch {
-            logger.warn(
-              { projectId: project.id },
-              "Failed to build resource limit message",
-            );
-          }
-          return c.json(
-            {
-              error: error.code,
-              message,
-              limitType: error.limitType,
-              current: error.current,
-              max: error.max,
+secured.access(experimentsManageAuth).post(
+  "/experiment/init",
+  describeRoute({
+    summary: "Create an experiment",
+    description:
+      "Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you.",
+    tags: ["Experiments"],
+    // Declared by hand rather than through zValidator: this handler parses and
+    // validates the body itself and answers its own sentence on a bad one, so
+    // there is no validator schema for the generator to read. `experiment_slug`
+    // and `experiment_id` are individually optional and jointly required, which
+    // `oneOf` states and a required-list cannot.
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              experiment_slug: {
+                type: "string",
+                description:
+                  "Stable slug you choose. Reusing it returns the same experiment instead of creating another, which is what makes repeated runs land together.",
+              },
+              experiment_id: {
+                type: "string",
+                description:
+                  "Existing experiment id, as an alternative to the slug",
+              },
+              experiment_type: {
+                type: "string",
+                enum: ["DSPY", "BATCH_EVALUATION", "BATCH_EVALUATION_V2"],
+                description:
+                  "BATCH_EVALUATION_V2 for SDK batch evaluations, DSPY for optimizer runs",
+              },
+              experiment_name: {
+                type: "string",
+                description:
+                  "Display name, used only when the experiment is created",
+              },
+              workflowId: {
+                type: "string",
+                description:
+                  "Optimization Studio workflow this experiment belongs to",
+              },
             },
-            403,
+            required: ["experiment_type"],
+            oneOf: [
+              { required: ["experiment_slug"] },
+              { required: ["experiment_id"] },
+            ],
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "The experiment, created or already existing",
+        content: {
+          "application/json": {
+            schema: resolver(experimentInitResponseSchema),
+          },
+        },
+      },
+      400: {
+        description: "Neither experiment_slug nor experiment_id was supplied",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ error: z.string() })),
+          },
+        },
+      },
+      401: {
+        description: "Missing or invalid API key",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ message: z.string() })),
+          },
+        },
+      },
+      403: {
+        description: "The plan's experiment limit is already reached",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                error: z.string(),
+                message: z.string(),
+                limitType: z.string(),
+                current: z.number(),
+                max: z.number(),
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  authMiddleware,
+  requireExperimentsManage,
+  async (c) => {
+    const project = c.get("project");
+
+    let body: Record<string, any>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
+    }
+
+    let params: z.infer<typeof dspyInitParamsSchema>;
+    try {
+      params = dspyInitParamsSchema.parse(body);
+    } catch (error) {
+      logger.error(
+        { error, body, projectId: project.id },
+        "invalid init data received",
+      );
+      captureException(toError(error), { extra: { projectId: project.id } });
+      const validationError = fromZodError(error as ZodError);
+      return c.json({ error: validationError.message }, 400);
+    }
+
+    let experiment;
+    try {
+      experiment = await findOrCreateExperiment({
+        project,
+        experiment_slug: params.experiment_slug,
+        experiment_type: params.experiment_type as ExperimentType,
+        experiment_name: params.experiment_name,
+        workflowId: params.workflowId,
+      });
+    } catch (error) {
+      if (error instanceof LimitExceededError) {
+        let message = error.message;
+        try {
+          const organizationId = await resolveOrganizationId(project.teamId);
+          if (organizationId) {
+            message = await buildResourceLimitMessage({
+              organizationId,
+              limitType: error.limitType,
+              max: error.max,
+            });
+          }
+        } catch {
+          logger.warn(
+            { projectId: project.id },
+            "Failed to build resource limit message",
           );
         }
-        throw error;
+        return c.json(
+          {
+            error: error.code,
+            message,
+            limitType: error.limitType,
+            current: error.current,
+            max: error.max,
+          },
+          403,
+        );
       }
+      throw error;
+    }
 
-      return c.json({
-        path: `/${project.slug}/experiments/${experiment.slug}`,
-        slug: experiment.slug,
-      });
-    },
-  );
+    return c.json({
+      path: `/${project.slug}/experiments/${experiment.slug}`,
+      slug: experiment.slug,
+    });
+  },
+);
 
 // =============================================
 // POST /api/mcp/authorize

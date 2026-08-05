@@ -24,10 +24,8 @@ import {
   applySuppressions,
   auditSpec,
   collectQueryReadingOperations,
-  collectRouteRegistrations,
   EXEMPTIONS,
   gatedBasePathOf,
-  honoPathToTemplate,
   isEntryModule,
   KNOWN_GAPS,
   type Suppression,
@@ -340,65 +338,6 @@ describe("the shipped suppression lists", () => {
     );
 
     expect(new Set(keys).size).toBe(keys.length);
-  });
-});
-
-describe("honoPathToTemplate", () => {
-  it("rewrites Hono parameters into OpenAPI templates", () => {
-    expect(honoPathToTemplate("/api/gateway/v1/virtual-keys/:id/spend")).toBe(
-      "/api/gateway/v1/virtual-keys/{id}/spend",
-    );
-  });
-});
-
-describe("collectRouteRegistrations", () => {
-  it("finds a registration whose path argument sits on the next line", () => {
-    const registrations = collectRouteRegistrations(
-      [
-        'secured.access(requires("things:view")).get(',
-        '  "/things",',
-        '  zValidator("query", schema),',
-        "  async (c) => c.json({}),",
-        ");",
-      ].join("\n"),
-    );
-
-    expect(registrations).toEqual([
-      { method: "get", path: "/things", readsQuery: true },
-    ]);
-  });
-
-  it("does not mistake a context read for a route", () => {
-    const registrations = collectRouteRegistrations(
-      [
-        'secured.access(publicEndpoint("probe")).get("/health", (c) => {',
-        '  const project = c.get("project");',
-        '  cache.delete("stale");',
-        "  return c.body(null, 204);",
-        "});",
-      ].join("\n"),
-    );
-
-    expect(registrations).toEqual([
-      { method: "get", path: "/health", readsQuery: false },
-    ]);
-  });
-
-  it("attributes a query read to the registration it sits inside", () => {
-    const registrations = collectRouteRegistrations(
-      [
-        'secured.get("/first", async (c) => c.json({}));',
-        'secured.get("/second", async (c) => {',
-        '  const limit = c.req.query("limit");',
-        "  return c.json({ limit });",
-        "});",
-      ].join("\n"),
-    );
-
-    expect(registrations).toEqual([
-      { method: "get", path: "/first", readsQuery: false },
-      { method: "get", path: "/second", readsQuery: true },
-    ]);
   });
 });
 

@@ -38495,6 +38495,12 @@ description: Run experiments programmatically from notebooks or scripts to batch
 LangWatch makes it easy to run experiments from code.
 Just add a few lines to start tracking your experiments.
 
+Not using Python or TypeScript? The SDKs call the same REST endpoints you can call
+yourself: [create an experiment](/api-reference/experiments/create-an-experiment),
+[run it](/api-reference/experiments/run-an-experiment), then
+[poll the run](/api-reference/experiments/poll-a-run) and
+[read its results](/api-reference/experiments/read-run-results).
+
 ## Quickstart
 
 ### 1. Install the SDK
@@ -60184,6 +60190,73 @@ openapi: post /ragas/summarization_score/evaluate
 ---
 openapi: post /langevals/valid_format/evaluate
 ---
+---
+
+# FILE: ./api-reference/experiments/create-an-experiment.mdx
+
+---
+title: "Create an experiment"
+openapi: "POST /api/experiment/init"
+---
+
+---
+
+# FILE: ./api-reference/experiments/list-experiments.mdx
+
+---
+title: "List experiments for the project"
+openapi: "GET /api/experiments"
+---
+
+---
+
+# FILE: ./api-reference/experiments/list-runs-of-an-experiment.mdx
+
+---
+title: "List runs of an experiment"
+openapi: "GET /api/experiments/runs"
+---
+
+---
+
+# FILE: ./api-reference/experiments/overview.mdx
+
+---
+title: "Overview"
+description: "Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly."
+---
+
+## Intro
+
+Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly.
+
+---
+
+# FILE: ./api-reference/experiments/poll-a-run.mdx
+
+---
+title: "Poll a run"
+openapi: "GET /api/experiments/runs/{runId}"
+---
+
+---
+
+# FILE: ./api-reference/experiments/read-run-results.mdx
+
+---
+title: "Read run results"
+openapi: "GET /api/experiments/runs/{runId}/results"
+---
+
+---
+
+# FILE: ./api-reference/experiments/run-an-experiment.mdx
+
+---
+title: "Run an experiment"
+openapi: "POST /api/experiments/{slug}/run"
+---
+
 ---
 
 # FILE: ./api-reference/gateway-budgets/archive-budget.mdx

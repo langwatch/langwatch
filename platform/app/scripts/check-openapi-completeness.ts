@@ -28,14 +28,10 @@
  *     a `basePath` equal to a gated prefix are kept. A kept file may declare
  *     only one such prefix; two would make its route paths ambiguous and the
  *     check fails rather than guessing.
- *   - Inside a kept file, a route registration is a `.get(`/`.post(`/`.put(`/
- *     `.patch(`/`.delete(` call whose first argument is a string literal
- *     starting with `/`. That excludes context and collection reads such as
- *     `c.get("project")` or `cache.delete(key)`.
- *   - A registration owns the source from its own call to the next one. If
- *     that span mentions `validator("query"`, `zValidator("query"`,
- *     `c.req.valid("query")`, or `c.req.query(`, the handler reads the query
- *     string.
+ *   - `./lib/hono-route-table` finds the route registrations in a kept file and
+ *     says which of them read the query string; see that module for what counts
+ *     as either. `check-openapi-route-coverage.ts` reads the same table for a
+ *     different question, which is why the parsing lives there and not here.
  *   - The Hono path is joined to the basePath and `:param` is rewritten to
  *     `{param}` to match the document's path templates.
  *
@@ -53,10 +49,16 @@
  *   pnpm check:openapi-completeness --json    # machine-readable report
  */
 
-import type { Dirent } from "node:fs";
-import { readdirSync, readFileSync, realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  collectRouteRegistrations,
+  discoverTypeScriptFiles,
+  HTTP_METHODS,
+  honoPathToTemplate,
+  joinRoutePath,
+} from "./lib/hono-route-table";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -80,7 +82,6 @@ export const HANDLER_ROOTS = [
 ];
 
 const BODY_ACCEPTING_METHODS = new Set(["post", "patch", "put"]);
-const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
 
 export type Rule = "request-body" | "query-parameters" | "response-schema";
 
@@ -189,16 +190,6 @@ export function isGatedPath(path: string): boolean {
   return GATED_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
-/** `:id` segments become `{id}` so a Hono path can be compared to a template. */
-export function honoPathToTemplate(path: string): string {
-  return path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
-}
-
-function joinRoutePath(basePath: string, routePath: string): string {
-  const joined = `${basePath.replace(/\/$/, "")}/${routePath.replace(/^\//, "")}`;
-  return joined.replace(/\/$/, "") || "/";
-}
-
 /**
  * The operations whose handlers read the query string, as
  * `METHOD /path/{template}` keys. See the rule 2 note in the module docstring
@@ -244,97 +235,6 @@ export function gatedBasePathOf(source: string, file: string): string | null {
     );
   }
   return [...declared][0] ?? null;
-}
-
-/**
- * What a query read looks like in source. The validator pattern is
- * case-insensitive on its first letter because the repo imports Hono's
- * `validator` under the alias `zValidator`, and matching only one spelling
- * would silently narrow the rule to the routes that also happen to call
- * `c.req.valid("query")` in the same span.
- */
-const QUERY_READ_MARKERS = [
-  /[Vv]alidator\(\s*"query"/,
-  /c\.req\.valid\(\s*"query"\s*\)/,
-  /c\.req\.query\(/,
-];
-
-export interface RouteRegistration {
-  method: string;
-  path: string;
-  readsQuery: boolean;
-}
-
-export function collectRouteRegistrations(source: string): RouteRegistration[] {
-  const pattern = new RegExp(
-    `\\.(${HTTP_METHODS.join("|")})\\(\\s*"(/[^"]*)"`,
-    "g",
-  );
-
-  const starts: { method: string; path: string; index: number }[] = [];
-  for (const match of source.matchAll(pattern)) {
-    const [, method, path] = match;
-    if (method === undefined || path === undefined) continue;
-    starts.push({ method, path, index: match.index });
-  }
-
-  return starts.map((start, i) => {
-    const end = starts[i + 1]?.index ?? source.length;
-    const body = source.slice(start.index, end);
-    return {
-      method: start.method,
-      path: start.path,
-      readsQuery: QUERY_READ_MARKERS.some((marker) => marker.test(body)),
-    };
-  });
-}
-
-/** A directory that cannot be read holds no route registrations to find. */
-function readEntries(dir: string): Dirent[] {
-  try {
-    return readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-}
-
-const isSkippedDirectory = (name: string): boolean =>
-  name === "node_modules" || name === "__tests__";
-
-const isSourceFile = (name: string): boolean =>
-  name.endsWith(".ts") && !name.endsWith(".d.ts");
-
-/** One directory's children, split into what to descend into and what to read. */
-function partitionDirectory(dir: string): {
-  directories: string[];
-  files: string[];
-} {
-  const directories: string[] = [];
-  const files: string[] = [];
-
-  for (const entry of readEntries(dir)) {
-    if (isSkippedDirectory(entry.name)) continue;
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) directories.push(full);
-    else if (isSourceFile(entry.name)) files.push(full);
-  }
-
-  return { directories, files };
-}
-
-function discoverTypeScriptFiles(roots: string[]): string[] {
-  const found: string[] = [];
-  const pending = [...roots];
-
-  while (pending.length > 0) {
-    const dir = pending.pop();
-    if (dir === undefined) break;
-    const { directories, files } = partitionDirectory(dir);
-    pending.push(...directories);
-    found.push(...files);
-  }
-
-  return found.sort();
 }
 
 function hasTwoHundredSchema(operation: OpenApiOperation): boolean {
