@@ -9,6 +9,7 @@ import {
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
+import { resolveAppPackageRoot } from "./server/appPackageRoot";
 
 /**
  * Auto-mints a self-signed cert pair for the local dev HTTPS+HTTP/2 server.
@@ -117,7 +118,7 @@ export const metricsMiddleware = promBundle({
   },
 });
 
-export const startApp = async (dir = path.dirname(__dirname)) => {
+export const startApp = async (dir = resolveAppPackageRoot()) => {
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
 
