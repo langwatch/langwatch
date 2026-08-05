@@ -1,6 +1,6 @@
 import type { TraceListItem } from "../../../types/trace";
 
-export type Mode = "thread" | "bubbles" | "markdown" | "annotations";
+export type Mode = "thread" | "bubbles" | "markdown";
 
 /** Chat-turn presentation: ChatGPT-style full-width thread vs side bubbles. */
 export type TurnLayout = "thread" | "bubbles";

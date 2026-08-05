@@ -41,12 +41,15 @@ Feature: Per-turn actions in ConversationView
     And the form is pre-scoped to the second turn's traceId
     And the comment textarea is autofocused
 
-  Scenario: Existing annotations are edited via the badge popover, not the action row
-    Given the second turn's trace already has an annotation
+  Scenario: In bubbles layout, existing annotations are edited via the badge popover
+    Given the conversation is in bubbles layout
+    And the second turn's trace already has an annotation
     When the user clicks the `TurnAnnotationBadges` count chip on the second turn
     Then a popover lists existing annotations
     When the user clicks an annotation row
     Then `AnnotationPopover` reopens in edit mode pre-filled from that annotation
+    # Thread layout edits from the rail instead, in the card's own place.
+    # See specs/traces-v2/annotation-rail.feature.
 
   Scenario: Submitting the annotation closes the popover and refreshes the count
     Given the user has filled in the annotation popover on the second turn
@@ -54,6 +57,17 @@ Feature: Per-turn actions in ConversationView
     Then the popover closes
     And `api.annotation.getByTraceId` is invalidated so the count chip re-renders
     And a success toast "Annotation saved" appears
+
+  # The conversation reads every turn's annotations through one batched feed
+  # rather than a query per turn. That feed is the source for the counts, the
+  # badge lists and the rail, so a write that leaves it cached hides the
+  # reviewer's own annotation from them until the cache expires minutes later.
+  @integration
+  Scenario: Saving, updating, or deleting an annotation refreshes the batched annotation feed
+    Given the conversation reads its turns' annotations through the batched feed
+    When the reviewer saves, updates, or deletes an annotation on a turn
+    Then the batched feed is invalidated alongside the per-trace annotation read
+    And the turn's count and annotation list reflect the write immediately
 
   # ─── Annotation score keys ─────────────────────────────────────────────
 
@@ -110,16 +124,33 @@ Feature: Per-turn actions in ConversationView
   # also stored as the trace's corrected output, so the add-to-dataset read
   # returns the corrected trace. That second write happens inside the two
   # annotation mutations this popover saves through, so every surface that
-  # suggests gets it: the per-turn action row here, the legacy conversation on
-  # the annotation queue, and the saved-suggestion list under a message. The
-  # storage half is specified in specs/traces-v2/trace-edit-overlay.feature.
+  # suggests gets it: the per-turn action row here, the rail composer in thread
+  # layout, the legacy trace details page, and the saved-suggestion list under
+  # a message. The storage half is specified in
+  # specs/traces-v2/trace-edit-overlay.feature.
 
   @integration
   Scenario: The legacy conversation suggests through the same correction popover
-    Given the reviewer is reading a message in the legacy conversation
+    Given the reviewer is reading a message in the legacy conversation on the trace details page
     When the reviewer uses the suggest action on it
     Then the same correction popover opens in suggest mode for that message's trace
     And it is pre-filled with the message's current output, so the reviewer edits in place
+
+  # The saved-suggestion list under a message is the legacy conversation's own
+  # way of reading corrections back. The v2 conversation shows them beside the
+  # turn instead (specs/traces-v2/annotation-rail.feature).
+
+  @integration
+  Scenario: Saved suggestions are listed under the output without an editor
+    Given a message whose trace already carries two suggestions
+    Then both are listed under the output with their author
+    And neither is an editable field sitting in the page
+
+  @integration
+  Scenario: Picking a saved suggestion reopens it in the correction popover
+    Given a message whose trace already carries a suggestion
+    When I pick that suggestion
+    Then the correction popover opens on it for editing
 
   # ─── Add to dataset (turn) ─────────────────────────────────────────────
 
@@ -155,13 +186,17 @@ Feature: Per-turn actions in ConversationView
     When the user saves
     Then exactly 3 records are added to "qa-set"
 
-  # ─── Conversation-level annotations rollup ─────────────────────────────
+  # ─── Conversation-level annotations ────────────────────────────────────
+  #
+  # Annotations read beside the turn they are about, not in a rollup the
+  # reviewer has to leave the conversation to open. The rail is specified in
+  # specs/traces-v2/annotation-rail.feature.
 
-  Scenario: AnnotationsView renders a per-turn rollup of all annotations
-    When the user toggles the conversation's mode segment to "annotations"
-    Then `AnnotationsView` lists each turn that has annotations
-    And each annotation shows the author avatar, name, comment, and createdAt
-    And clicking an entry reopens AnnotationPopover in edit mode (when the user has manage permission)
+  @integration
+  Scenario: The conversation offers no separate annotations mode
+    Given the trace drawer is open on a conversation
+    Then the conversation's mode segment offers thread, bubbles, and markdown only
+    And every turn's annotations are read beside that turn in thread layout
 
   # ─── Legacy parity ─────────────────────────────────────────────────────
 

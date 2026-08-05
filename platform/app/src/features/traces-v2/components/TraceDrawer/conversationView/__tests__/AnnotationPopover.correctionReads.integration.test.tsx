@@ -4,12 +4,22 @@
  * A suggested output is stored as a correction to the trace, so writing one has
  * to make the drawer's copy of that correction stale. Left cached, an edit
  * session started minutes later would build on the old one and undo the
- * suggestion when it saves.
- * See specs/traces-v2/trace-edit-mode.feature.
+ * suggestion when it saves. The same write also has to refresh the batched
+ * annotation feed the conversation counts its turns from.
+ * See specs/traces-v2/trace-edit-mode.feature and
+ * specs/traces-v2/annotations.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 type MutationOptions = { onSuccess?: () => void; onError?: () => void };
@@ -19,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   remove: vi.fn(),
   invalidateAnnotations: vi.fn(),
+  invalidateAnnotationFeed: vi.fn(),
   invalidateOverlay: vi.fn(),
   existingAnnotations: [] as unknown[],
 }));
@@ -32,7 +43,10 @@ vi.mock("~/components/ui/toaster", () => ({ toaster: { create: vi.fn() } }));
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      annotation: { getByTraceId: { invalidate: mocks.invalidateAnnotations } },
+      annotation: {
+        getByTraceId: { invalidate: mocks.invalidateAnnotations },
+        getByTraceIds: { invalidate: mocks.invalidateAnnotationFeed },
+      },
       traceEditOverlay: {
         getByTraceId: { invalidate: mocks.invalidateOverlay },
       },
@@ -80,6 +94,25 @@ function renderSuggest({ annotationId }: { annotationId?: string } = {}) {
 /** The trace's stored correction, as the invalidation would name it. */
 const THIS_TRACES_CORRECTION = { projectId: "project-1", traceId: TRACE };
 
+/**
+ * Run the popover's save path to completion: render, submit, and let the
+ * mutation report success the way the server would.
+ */
+async function submitAndSucceed({
+  buttonName,
+  mutation,
+  annotationId,
+}: {
+  buttonName: string;
+  mutation: Mock;
+  annotationId?: string;
+}) {
+  renderSuggest({ annotationId });
+  fireEvent.click(await screen.findByRole("button", { name: buttonName }));
+  const options = mutation.mock.calls[0]?.[1] as MutationOptions;
+  options.onSuccess?.();
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.existingAnnotations = [];
@@ -91,16 +124,19 @@ describe("given a reviewer suggesting a correction on a trace", () => {
   describe("when the suggestion is saved", () => {
     /** @scenario "Saving builds on the correction as it stands" */
     it("makes the trace's stored correction stale", async () => {
-      renderSuggest();
-
-      fireEvent.click(await screen.findByRole("button", { name: "Save" }));
-      const options = mocks.create.mock.calls[0]?.[1] as MutationOptions;
-      options.onSuccess?.();
+      await submitAndSucceed({ buttonName: "Save", mutation: mocks.create });
 
       expect(mocks.invalidateAnnotations).toHaveBeenCalled();
       expect(mocks.invalidateOverlay).toHaveBeenCalledWith(
         THIS_TRACES_CORRECTION,
       );
+    });
+
+    /** @scenario "Saving, updating, or deleting an annotation refreshes the batched annotation feed" */
+    it("refreshes the batched annotation feed the conversation counts from", async () => {
+      await submitAndSucceed({ buttonName: "Save", mutation: mocks.create });
+
+      expect(mocks.invalidateAnnotationFeed).toHaveBeenCalled();
     });
   });
 });
@@ -120,34 +156,54 @@ describe("given a suggestion the reviewer had already made", () => {
   describe("when it is changed", () => {
     /** @scenario "Saving builds on the correction as it stands" */
     it("makes the trace's stored correction stale", async () => {
-      renderSuggest({ annotationId: "annotation-1" });
-
-      fireEvent.click(await screen.findByRole("button", { name: "Update" }));
-      const options = mocks.update.mock.calls[0]?.[1] as MutationOptions;
-      options.onSuccess?.();
+      await submitAndSucceed({
+        buttonName: "Update",
+        mutation: mocks.update,
+        annotationId: "annotation-1",
+      });
 
       expect(mocks.invalidateAnnotations).toHaveBeenCalled();
       expect(mocks.invalidateOverlay).toHaveBeenCalledWith(
         THIS_TRACES_CORRECTION,
       );
     });
+
+    /** @scenario "Saving, updating, or deleting an annotation refreshes the batched annotation feed" */
+    it("refreshes the batched annotation feed the conversation counts from", async () => {
+      await submitAndSucceed({
+        buttonName: "Update",
+        mutation: mocks.update,
+        annotationId: "annotation-1",
+      });
+
+      expect(mocks.invalidateAnnotationFeed).toHaveBeenCalled();
+    });
   });
 
   describe("when it is deleted", () => {
     /** @scenario "Saving builds on the correction as it stands" */
     it("makes the trace's stored correction stale", async () => {
-      renderSuggest({ annotationId: "annotation-1" });
-
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Delete annotation" }),
-      );
-      const options = mocks.remove.mock.calls[0]?.[1] as MutationOptions;
-      options.onSuccess?.();
+      await submitAndSucceed({
+        buttonName: "Delete annotation",
+        mutation: mocks.remove,
+        annotationId: "annotation-1",
+      });
 
       expect(mocks.invalidateAnnotations).toHaveBeenCalled();
       expect(mocks.invalidateOverlay).toHaveBeenCalledWith(
         THIS_TRACES_CORRECTION,
       );
+    });
+
+    /** @scenario "Saving, updating, or deleting an annotation refreshes the batched annotation feed" */
+    it("refreshes the batched annotation feed the conversation counts from", async () => {
+      await submitAndSucceed({
+        buttonName: "Delete annotation",
+        mutation: mocks.remove,
+        annotationId: "annotation-1",
+      });
+
+      expect(mocks.invalidateAnnotationFeed).toHaveBeenCalled();
     });
   });
 });

@@ -42,8 +42,12 @@ export function useAnnotationsByTraceIds({
 }): UseAnnotationsByTraceIdsResult {
   // Dedupe before chunking: duplicate ids spanning chunks would fetch the
   // same annotations twice and double them in `data` after the flatMap.
+  //
+  // Sort too. The chunk contents are the query key, so two consumers reading
+  // the same traces in different orders would otherwise key differently and
+  // each fetch its own copy of the same annotations.
   const uniqueTraceIds = useMemo(
-    () => Array.from(new Set(traceIds)),
+    () => Array.from(new Set(traceIds)).sort(),
     [traceIds],
   );
 

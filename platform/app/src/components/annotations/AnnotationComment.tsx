@@ -103,6 +103,13 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     }
   }, [getAnnotation.data, action]);
 
+  // The turn badges read one trace at a time; the conversation reads every
+  // turn at once. Both go stale on any write here.
+  const invalidateAnnotationReads = () => {
+    void queryClient.annotation.getByTraceId.invalidate();
+    void queryClient.annotation.getByTraceIds.invalidate();
+  };
+
   const onSubmit = (data: Annotation) => {
     const filteredScoreOptions = Object.fromEntries(
       Object.entries(data.scoreOptions ?? {}).filter(
@@ -126,7 +133,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
         },
         {
           onSuccess: () => {
-            void queryClient.annotation.getByTraceId.invalidate();
+            invalidateAnnotationReads();
             void queryClient.annotation.getAll.invalidate();
 
             toaster.create({
@@ -165,7 +172,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
         },
         {
           onSuccess: () => {
-            void queryClient.annotation.getByTraceId.invalidate();
+            invalidateAnnotationReads();
 
             toaster.create({
               title: "Annotation Created",
@@ -202,7 +209,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
       },
       {
         onSuccess: () => {
-          void queryClient.annotation.getByTraceId.invalidate();
+          invalidateAnnotationReads();
 
           toaster.create({
             title: "Annotation Deleted",

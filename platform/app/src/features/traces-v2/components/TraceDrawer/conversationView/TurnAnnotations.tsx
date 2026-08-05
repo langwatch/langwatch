@@ -15,6 +15,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import { useAnnotationDraftStore } from "../../../stores/annotationDraftStore";
 import { AnnotationPopover } from "./AnnotationPopover";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
@@ -34,6 +35,12 @@ interface TurnAnnotationProps {
     isLoading: boolean;
     onToggle: () => void;
   };
+  /**
+   * Write annotations in the rail beside the turn rather than in a popover
+   * over it. Set by the thread layout, which has a rail; the bubbles layout
+   * has none and keeps its popovers.
+   */
+  preferRailComposer?: boolean;
 }
 
 /**
@@ -45,9 +52,11 @@ export function TurnActionRow({
   traceId,
   output,
   translation,
+  preferRailComposer = false,
 }: TurnAnnotationProps) {
   const { hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const openDraft = useAnnotationDraftStore((s) => s.openDraft);
   const [openPopover, setOpenPopover] = useState<"annotate" | "suggest" | null>(
     null,
   );
@@ -119,36 +128,63 @@ export function TurnActionRow({
       )}
       {canManage && (
         <>
-          <AnnotationPopover
-            traceId={traceId}
-            output={output}
-            mode="annotate"
-            open={openPopover === "annotate"}
-            onOpenChange={async (open) => {
-              if (open) {
-                const allowed = await annotationsGate.requestEnable();
-                if (!allowed) return;
-              }
-              setOpenPopover(open ? "annotate" : null);
-            }}
-            triggerTooltip="Add a note or score"
-            trigger={<ActionButton icon={Edit3} label="Annotate" />}
-          />
-          <AnnotationPopover
-            traceId={traceId}
-            output={output}
-            mode="suggest"
-            open={openPopover === "suggest"}
-            onOpenChange={async (open) => {
-              if (open) {
-                const allowed = await annotationsGate.requestEnable();
-                if (!allowed) return;
-              }
-              setOpenPopover(open ? "suggest" : null);
-            }}
-            triggerTooltip="Suggest a corrected output"
-            trigger={<ActionButton icon={Lightbulb} label="Suggest" />}
-          />
+          {preferRailComposer ? (
+            <>
+              <RailComposerButton
+                icon={Edit3}
+                label="Annotate"
+                tooltip="Add a note or score"
+                onOpen={async () => {
+                  const allowed = await annotationsGate.requestEnable();
+                  if (!allowed) return;
+                  openDraft({ traceId, mode: "annotate", output });
+                }}
+              />
+              <RailComposerButton
+                icon={Lightbulb}
+                label="Suggest"
+                tooltip="Suggest a corrected output"
+                onOpen={async () => {
+                  const allowed = await annotationsGate.requestEnable();
+                  if (!allowed) return;
+                  openDraft({ traceId, mode: "suggest", output });
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <AnnotationPopover
+                traceId={traceId}
+                output={output}
+                mode="annotate"
+                open={openPopover === "annotate"}
+                onOpenChange={async (open) => {
+                  if (open) {
+                    const allowed = await annotationsGate.requestEnable();
+                    if (!allowed) return;
+                  }
+                  setOpenPopover(open ? "annotate" : null);
+                }}
+                triggerTooltip="Add a note or score"
+                trigger={<ActionButton icon={Edit3} label="Annotate" />}
+              />
+              <AnnotationPopover
+                traceId={traceId}
+                output={output}
+                mode="suggest"
+                open={openPopover === "suggest"}
+                onOpenChange={async (open) => {
+                  if (open) {
+                    const allowed = await annotationsGate.requestEnable();
+                    if (!allowed) return;
+                  }
+                  setOpenPopover(open ? "suggest" : null);
+                }}
+                triggerTooltip="Suggest a corrected output"
+                trigger={<ActionButton icon={Lightbulb} label="Suggest" />}
+              />
+            </>
+          )}
           <Tooltip
             content="Add this turn to a dataset"
             positioning={{ placement: "top" }}
@@ -175,6 +211,35 @@ export function TurnActionRow({
       <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
       <PersonalFeatureGateDialog state={datasetsGate.dialogState} />
     </HStack>
+  );
+}
+
+/**
+ * The rail's flavour of an action button: no popover to anchor, it just opens
+ * the composer in the column beside the turn.
+ */
+function RailComposerButton({
+  icon,
+  label,
+  tooltip,
+  onOpen,
+}: {
+  icon: typeof Edit3;
+  label: string;
+  tooltip: string;
+  onOpen: () => void;
+}) {
+  return (
+    <Tooltip content={tooltip} positioning={{ placement: "top" }}>
+      <ActionButton
+        icon={icon}
+        label={label}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen();
+        }}
+      />
+    </Tooltip>
   );
 }
 

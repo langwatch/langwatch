@@ -251,7 +251,11 @@ function TraceSwitchOverlay() {
 /**
  * Conversation-view branch. In-app only — the caller gates it behind
  * `!readOnly` (it fetches session-backed reads); this component owns just its
- * error boundary and scroll viewport.
+ * error boundary and the room the conversation fills.
+ *
+ * The scroll belongs to the turns list inside the conversation, which is also
+ * what the annotation rail measures itself against. A second scroller here
+ * would trap one inside the other and leave that measurement ambiguous.
  */
 function ConversationModePane({
   conversationId,
@@ -265,7 +269,7 @@ function ConversationModePane({
       scope="Couldn't render conversation view"
       resetKeys={[conversationId, traceId]}
     >
-      <Box flex={1} minHeight={0} overflow="auto">
+      <Box flex={1} minHeight={0}>
         <ConversationView
           conversationId={conversationId}
           currentTraceId={traceId}

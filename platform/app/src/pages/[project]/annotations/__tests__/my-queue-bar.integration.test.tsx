@@ -96,9 +96,18 @@ vi.mock("~/components/icons/TasksDone", () => ({
   TasksDone: () => <div data-testid="tasks-done" />,
 }));
 
-vi.mock("~/components/messages/Conversation", () => ({
-  Conversation: () => <div data-testid="conversation" />,
+vi.mock("~/features/traces-v2/components/TraceDrawer/conversationView", () => ({
+  ConversationView: () => <div data-testid="conversation-view" />,
 }));
+
+// The real adapter loads Shiki's grammars and themes; the bar cares about
+// none of it, and the conversation it highlights is mocked away above.
+vi.mock(
+  "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter",
+  () => ({
+    useShikiAdapter: () => ({ getHighlighter: () => () => null }),
+  }),
+);
 
 vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },

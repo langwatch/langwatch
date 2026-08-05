@@ -27,7 +27,12 @@ export function buildConversationMarkdownChunks(
 ): ConversationMarkdownChunk[] {
   const chunks: ConversationMarkdownChunk[] = [];
 
-  const headerLines: string[] = [`# Conversation \`${conversationId}\``, ""];
+  // A threadless trace has no conversation id to name; the heading stands on
+  // its own rather than trailing an empty pair of backticks.
+  const headerLines: string[] = [
+    conversationId ? `# Conversation \`${conversationId}\`` : "# Conversation",
+    "",
+  ];
   headerLines.push(`- **Turns:** ${parsedTurns.length}`);
   if (parsedTurns.length > 0) {
     const first = parsedTurns[0]!.turn;

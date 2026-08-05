@@ -20,12 +20,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { RouterOutputs } from "~/utils/api";
+import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
+import { useConversationAnnotations } from "../../../hooks/useConversationAnnotations";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
 import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
+import { useAnnotationDraftStore } from "../../../stores/annotationDraftStore";
 import type { TraceListItem } from "../../../types/trace";
 import { RenderedMarkdown } from "../markdownView";
 import { SegmentedToggle } from "../SegmentedToggle";
@@ -34,8 +34,7 @@ import {
   extractReasoningText,
   extractSystemText,
 } from "../transcript";
-import { AnnotationsView } from "./AnnotationsView";
-import { ChatTurnRow } from "./ChatTurnRow";
+import { AnnotatedTurnRow } from "./AnnotatedTurnRow";
 import { ConversationExpandContext } from "./expandContext";
 import { SystemPromptBanner } from "./SystemPromptBanner";
 import {
@@ -45,14 +44,19 @@ import {
   type TurnLayout,
 } from "./types";
 import {
+  type RailLayout,
+  isRailActive as resolveIsRailActive,
+  threadColumnMaxWidth,
+  useRailLayout,
+} from "./useRailLayout";
+import {
   buildConversationMarkdownChunks,
   type ConversationMarkdownChunk,
   joinConversationMarkdown,
 } from "./utils";
 
-type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
-export type AnnotationsByTrace = Map<string, AnnotationItem[]>;
-const EMPTY_ANNOTATION_ITEMS: AnnotationItem[] = [];
+type AnnotationsByTrace = Map<string, AnnotationByTrace[]>;
+const EMPTY_ANNOTATION_ITEMS: AnnotationByTrace[] = [];
 
 /**
  * Below this turn count it's cheaper to render every row inline than to
@@ -73,41 +77,54 @@ const MARKDOWN_CHUNK_ESTIMATE_PX = 360;
 const EMPTY_CHUNKS: ConversationMarkdownChunk[] = [];
 
 interface ConversationViewProps {
-  conversationId: string;
+  /** The thread to render. Null renders `fallbackTurns` instead. */
+  conversationId: string | null;
   currentTraceId: string;
+  /**
+   * Where picking a turn takes the reader. Defaults to opening that turn in
+   * the trace drawer.
+   */
+  onSelectTurn?: (turn: { traceId: string; timestamp: number }) => void;
+  /** The turns to render when there is no thread to query. */
+  fallbackTurns?: TraceListItem[];
+  /** Seeds "Expand all"; the reader can still toggle it. */
+  defaultExpandAll?: boolean;
 }
 
 export const ConversationView = memo(function ConversationView({
   conversationId,
   currentTraceId,
+  onSelectTurn,
+  fallbackTurns,
+  defaultExpandAll = false,
 }: ConversationViewProps) {
-  const { navigateToTrace } = useTraceDrawerNavigation();
   const [mode, setMode] = useState<Mode>("thread");
   // "Expand all" seeds every message's local expand state; individual
   // Show more / Show less toggles override until the next expand-all flip.
-  const [isExpandAllEnabled, setIsExpandAllEnabled] = useState(false);
+  const [isExpandAllEnabled, setIsExpandAllEnabled] =
+    useState(defaultExpandAll);
   const query = useConversationTurns(conversationId);
 
-  const turns =
-    (query.data?.items as TraceListItem[] | undefined) ?? EMPTY_TURNS;
+  const turns = resolveTurns({
+    conversationId,
+    queriedTurns: query.data?.items as TraceListItem[] | undefined,
+    fallbackTurns,
+  });
 
   const traceIds = useMemo(() => turns.map((t) => t.traceId), [turns]);
-  const { project, hasPermission } = useOrganizationTeamProject();
-  const annotationsQuery = useAnnotationsByTraceIds({
-    projectId: project?.id ?? "",
-    traceIds,
-    enabled: !!project?.id && hasPermission("annotations:view"),
-    keepPreviousData: true,
+  const annotations = useConversationAnnotations(traceIds);
+
+  // The rail belongs to this conversation only when the composer that opened
+  // it did: the queue page and the trace drawer can each be showing one at the
+  // same time, and only the annotated one should change shape.
+  const draftTraceId = useAnnotationDraftStore((s) => s.draft?.traceId ?? null);
+  const turnTraceIds = useMemo(() => new Set(traceIds), [traceIds]);
+  const isRailActive = resolveIsRailActive({
+    layout: mode,
+    hasAnnotations: annotations.hasAny,
+    draftTraceId,
+    turnTraceIds,
   });
-  const annotationsByTrace = useMemo<AnnotationsByTrace>(() => {
-    const map: AnnotationsByTrace = new Map();
-    for (const a of annotationsQuery.data ?? []) {
-      const list = map.get(a.traceId);
-      if (list) list.push(a);
-      else map.set(a.traceId, [a]);
-    }
-    return map;
-  }, [annotationsQuery.data]);
 
   // Single pass over `turns`: pre-parse the latest user message and the
   // wall-clock gap to the previous turn. Without this, every ChatTurnRow
@@ -135,28 +152,11 @@ export const ConversationView = memo(function ConversationView({
     return out;
   }, [turns]);
 
-  // Stable select callback. Closes over a ref instead of `currentTraceId` so
-  // its identity doesn't change every time the user navigates to a different
-  // turn — otherwise every row's memo would bail on each navigation even
-  // though only the previously- and newly-selected rows actually change.
-  const currentTraceIdRef = useRef(currentTraceId);
-  useEffect(() => {
-    currentTraceIdRef.current = currentTraceId;
-  }, [currentTraceId]);
-  const handleSelectTurn = useCallback(
-    (traceId: string) => {
-      navigateToTrace({
-        fromTraceId: currentTraceIdRef.current,
-        fromViewMode: "conversation",
-        toTraceId: traceId,
-        // Open the turn's Summary, not the raw Trace tab — and transiently, so
-        // peeking at a turn doesn't repoint the user's remembered tab.
-        toViewMode: "summary",
-        persistViewMode: false,
-      });
-    },
-    [navigateToTrace],
-  );
+  const handleSelectTurn = useTurnSelection({
+    currentTraceId,
+    turns,
+    onSelectTurn,
+  });
 
   // Build markdown at the parent so the result survives mode toggles. Stay
   // lazy: skip the build until the user has actually viewed markdown at least
@@ -169,14 +169,15 @@ export const ConversationView = memo(function ConversationView({
   }, [mode]);
   const markdownChunks = useMemo<ConversationMarkdownChunk[]>(() => {
     if (!hasViewedMarkdown) return EMPTY_CHUNKS;
-    return buildConversationMarkdownChunks(conversationId, parsedTurns);
+    return buildConversationMarkdownChunks(conversationId ?? "", parsedTurns);
   }, [hasViewedMarkdown, conversationId, parsedTurns]);
 
   // Only show the skeleton on the very first load. With keepPreviousData
   // the previous conversation's turns stay rendered while the new query
   // fetches in the background, so re-clicking a cached conversation no
-  // longer flashes the skeleton.
-  if (query.isLoading && !query.data) {
+  // longer flashes the skeleton. Without a conversation there is no query to
+  // wait on: react-query reports a disabled query as loading forever.
+  if (conversationId && query.isLoading && !query.data) {
     return <ConversationSkeleton conversationId={conversationId} />;
   }
 
@@ -194,6 +195,7 @@ export const ConversationView = memo(function ConversationView({
     <VStack align="stretch" gap={0} height="full">
       <ConversationHeader
         conversationId={conversationId}
+        currentTraceId={currentTraceId}
         turnCount={turns.length}
         mode={mode}
         onModeChange={setMode}
@@ -210,20 +212,85 @@ export const ConversationView = memo(function ConversationView({
             systemPromptInput={turns[0]?.input}
             currentTraceId={currentTraceId}
             onSelectTurn={handleSelectTurn}
-            annotationsByTrace={annotationsByTrace}
+            annotationsByTrace={annotations.byTrace}
+            isRailActive={isRailActive}
           />
         </ConversationExpandContext.Provider>
-      ) : mode === "annotations" ? (
-        <AnnotationsView
-          parsedTurns={parsedTurns}
-          currentTraceId={currentTraceId}
-        />
       ) : (
         <MarkdownConversationView chunks={markdownChunks} />
       )}
     </VStack>
   );
 });
+
+/**
+ * The turns to render: the queried thread when there is one, otherwise the
+ * turns the host supplied. A trace with no thread still reads as a
+ * conversation, it just gets its turns handed to it.
+ */
+function resolveTurns({
+  conversationId,
+  queriedTurns,
+  fallbackTurns,
+}: {
+  conversationId: string | null;
+  queriedTurns: TraceListItem[] | undefined;
+  fallbackTurns: TraceListItem[] | undefined;
+}): TraceListItem[] {
+  if (!conversationId) return fallbackTurns ?? EMPTY_TURNS;
+  return queriedTurns ?? EMPTY_TURNS;
+}
+
+/**
+ * What clicking a turn does. Opens that turn in the trace drawer unless the
+ * host asked for something else.
+ *
+ * The callback closes over refs rather than values so its identity survives
+ * navigation. Otherwise every row's memo would bail each time the reader moves
+ * to another turn, even though only two rows actually changed.
+ */
+function useTurnSelection({
+  currentTraceId,
+  turns,
+  onSelectTurn,
+}: {
+  currentTraceId: string;
+  turns: TraceListItem[];
+  onSelectTurn?: (turn: { traceId: string; timestamp: number }) => void;
+}): (traceId: string) => void {
+  const { navigateToTrace } = useTraceDrawerNavigation();
+
+  const currentTraceIdRef = useRef(currentTraceId);
+  useEffect(() => {
+    currentTraceIdRef.current = currentTraceId;
+  }, [currentTraceId]);
+  const turnsRef = useRef(turns);
+  useEffect(() => {
+    turnsRef.current = turns;
+  }, [turns]);
+
+  return useCallback(
+    (traceId: string) => {
+      if (onSelectTurn) {
+        // A row only knows its trace; the host's contract is the turn, so read
+        // the timestamp back off the turn the row was rendered from.
+        const turn = turnsRef.current.find((t) => t.traceId === traceId);
+        if (turn) onSelectTurn({ traceId, timestamp: turn.timestamp });
+        return;
+      }
+      navigateToTrace({
+        fromTraceId: currentTraceIdRef.current,
+        fromViewMode: "conversation",
+        toTraceId: traceId,
+        // Open the turn's Summary, not the raw Trace tab — and transiently, so
+        // peeking at a turn doesn't repoint the user's remembered tab.
+        toViewMode: "summary",
+        persistViewMode: false,
+      });
+    },
+    [navigateToTrace, onSelectTurn],
+  );
+}
 
 const SKELETON_TURNS: { user: string; assistant: [string, string?] }[] = [
   { user: "62%", assistant: ["88%", "54%"] },
@@ -340,15 +407,11 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({
   );
 };
 
-const CONVERSATION_MODES: Mode[] = [
-  "thread",
-  "bubbles",
-  "markdown",
-  "annotations",
-];
+const CONVERSATION_MODES: Mode[] = ["thread", "bubbles", "markdown"];
 
 const ConversationHeader: React.FC<{
-  conversationId: string;
+  conversationId: string | null;
+  currentTraceId: string;
   turnCount: number;
   mode: Mode;
   onModeChange: (m: Mode) => void;
@@ -356,6 +419,7 @@ const ConversationHeader: React.FC<{
   onToggleExpandAll: () => void;
 }> = ({
   conversationId,
+  currentTraceId,
   turnCount,
   mode,
   onModeChange,
@@ -384,7 +448,9 @@ const ConversationHeader: React.FC<{
         Conversation
       </Text>
       <Text textStyle="xs" color="fg.subtle" truncate>
-        {conversationId}
+        {/* A threadless trace reads as a one-turn conversation; name it by
+            the trace so the header is never blank. */}
+        {conversationId ?? currentTraceId}
       </Text>
       <Box flex={1} />
       {isExpandAllVisible && (
@@ -412,13 +478,6 @@ const ConversationHeader: React.FC<{
   );
 };
 
-/**
- * ChatGPT-style thread layout constrains the column to a comfortable reading
- * width and centers it; bubbles span the pane so the left/right sides have
- * room to breathe.
- */
-const THREAD_MAX_WIDTH = "800px";
-
 const TurnsView: React.FC<{
   layout: TurnLayout;
   parsedTurns: ParsedTurn[];
@@ -426,6 +485,7 @@ const TurnsView: React.FC<{
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
   annotationsByTrace: AnnotationsByTrace;
+  isRailActive: boolean;
 }> = ({
   layout,
   parsedTurns,
@@ -433,11 +493,21 @@ const TurnsView: React.FC<{
   currentTraceId,
   onSelectTurn,
   annotationsByTrace,
+  isRailActive,
 }) => {
   const systemPrompt = useMemo(
     () => extractSystemText(systemPromptInput),
     [systemPromptInput],
   );
+
+  // On open, drop the reader at the turn whose trace the drawer is showing
+  // rather than at the top — a long thread otherwise opens scrolled away
+  // from the turn the operator clicked in from. Centers once per mount; we
+  // don't re-scroll on later navigation so we never fight the user.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<HTMLDivElement>(null);
+  useCenterActiveTurnOnce({ scrollRef, activeRef });
+  const railLayout = useRailLayout(scrollRef);
 
   if (parsedTurns.length >= VIRTUALIZE_AT) {
     return (
@@ -448,19 +518,10 @@ const TurnsView: React.FC<{
         currentTraceId={currentTraceId}
         onSelectTurn={onSelectTurn}
         annotationsByTrace={annotationsByTrace}
+        isRailActive={isRailActive}
       />
     );
   }
-
-  const maxWidth = layout === "thread" ? THREAD_MAX_WIDTH : undefined;
-
-  // On open, drop the reader at the turn whose trace the drawer is showing
-  // rather than at the top — a long thread otherwise opens scrolled away
-  // from the turn the operator clicked in from. Centers once per mount; we
-  // don't re-scroll on later navigation so we never fight the user.
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const activeRef = useRef<HTMLDivElement>(null);
-  useCenterActiveTurnOnce({ scrollRef, activeRef });
 
   return (
     <Box
@@ -475,7 +536,7 @@ const TurnsView: React.FC<{
         align="stretch"
         gap={layout === "thread" ? 2 : 5}
         width="full"
-        maxWidth={maxWidth}
+        maxWidth={columnMaxWidth({ layout, isRailActive, railLayout })}
         marginX="auto"
       >
         {systemPrompt && <SystemPromptBanner text={systemPrompt} />}
@@ -487,21 +548,18 @@ const TurnsView: React.FC<{
               ref={isCurrent ? activeRef : undefined}
               width="full"
             >
-              <ChatTurnRow
+              <AnnotatedTurnRow
                 layout={layout}
-                turn={p.turn}
-                userText={p.userText}
-                assistantText={p.assistantText}
-                assistantReasoning={p.assistantReasoning}
-                gapSecs={p.gapSecs}
-                showGap={p.showGap}
+                parsed={p}
                 index={i + 1}
                 isCurrent={isCurrent}
-                onSelect={onSelectTurn}
-                annotationItems={
+                onSelectTurn={onSelectTurn}
+                annotations={
                   annotationsByTrace.get(p.turn.traceId) ??
                   EMPTY_ANNOTATION_ITEMS
                 }
+                isRailActive={isRailActive}
+                railLayout={railLayout}
               />
             </Box>
           );
@@ -510,6 +568,23 @@ const TurnsView: React.FC<{
     </Box>
   );
 };
+
+/**
+ * How wide the centered column may grow. Bubbles span the pane; thread caps
+ * itself at a comfortable reading width, plus the rail when one is open.
+ */
+function columnMaxWidth({
+  layout,
+  isRailActive,
+  railLayout,
+}: {
+  layout: TurnLayout;
+  isRailActive: boolean;
+  railLayout: RailLayout;
+}): string | undefined {
+  if (layout !== "thread") return undefined;
+  return threadColumnMaxWidth({ isActive: isRailActive, layout: railLayout });
+}
 
 /**
  * Scroll the active turn to the vertical center of its scroll container,
@@ -549,6 +624,7 @@ const VirtualizedTurnsView: React.FC<{
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
   annotationsByTrace: AnnotationsByTrace;
+  isRailActive: boolean;
 }> = ({
   layout,
   parsedTurns,
@@ -556,8 +632,10 @@ const VirtualizedTurnsView: React.FC<{
   currentTraceId,
   onSelectTurn,
   annotationsByTrace,
+  isRailActive,
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
+  const railLayout = useRailLayout(parentRef);
   const virtualizer = useVirtualizer({
     count: parsedTurns.length,
     getScrollElement: () => parentRef.current,
@@ -581,11 +659,13 @@ const VirtualizedTurnsView: React.FC<{
     virtualizer.scrollToIndex(activeIndex, { align: "center" });
   }, [parsedTurns, currentTraceId, virtualizer]);
 
-  const maxWidth = layout === "thread" ? THREAD_MAX_WIDTH : undefined;
-
   return (
     <Box ref={parentRef} flex={1} overflow="auto" paddingX={5} paddingY={4}>
-      <Box width="full" maxWidth={maxWidth} marginX="auto">
+      <Box
+        width="full"
+        maxWidth={columnMaxWidth({ layout, isRailActive, railLayout })}
+        marginX="auto"
+      >
         {systemPrompt && (
           <Box marginBottom={5}>
             <SystemPromptBanner text={systemPrompt} />
@@ -610,21 +690,18 @@ const VirtualizedTurnsView: React.FC<{
                 transform={`translateY(${row.start}px)`}
                 paddingBottom={layout === "thread" ? 2 : 5}
               >
-                <ChatTurnRow
+                <AnnotatedTurnRow
                   layout={layout}
-                  turn={p.turn}
-                  userText={p.userText}
-                  assistantText={p.assistantText}
-                  assistantReasoning={p.assistantReasoning}
-                  gapSecs={p.gapSecs}
-                  showGap={p.showGap}
+                  parsed={p}
                   index={row.index + 1}
                   isCurrent={p.turn.traceId === currentTraceId}
-                  onSelect={onSelectTurn}
-                  annotationItems={
+                  onSelectTurn={onSelectTurn}
+                  annotations={
                     annotationsByTrace.get(p.turn.traceId) ??
                     EMPTY_ANNOTATION_ITEMS
                   }
+                  isRailActive={isRailActive}
+                  railLayout={railLayout}
                 />
               </Box>
             );

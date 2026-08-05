@@ -1,6 +1,8 @@
 # Implementation:
 #   platform/app/src/pages/[project]/annotations/my-queue.tsx     (queue walk, bottom bar, end-of-queue hand-off)
-#   platform/app/src/components/messages/MessageHoverActions.tsx  (suggest a correction from the conversation)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/ConversationView.tsx
+#                                                                 (the conversation the reviewer reads and corrects)
+#   platform/app/src/features/traces-v2/utils/legacyTraceToTurn.ts (a threadless trace read as a single-turn conversation)
 #   platform/app/src/components/AnnotationExpectedOutputs.tsx     (saved suggestions under the output)
 #   platform/app/src/components/AddDatasetRecordDrawer.tsx        (the drawer the hand-off opens)
 #   platform/app/src/server/api/routers/annotation.ts             (queue marks, mark clearing)
@@ -20,9 +22,15 @@
 #   - Correcting a trace happens in the trace drawer opened straight into edit
 #     mode, not in a second editor bolted onto the queue page. The dataset reads
 #     the correction, so what the reviewer fixed is what the dataset gets.
-#   - Suggesting a better output is a correction too, so it opens the same
-#     correction popover the trace drawer uses instead of a separate inline
-#     textarea whose only save button lived in another column.
+#   - The queue reads the thread through the same conversation view the trace
+#     drawer uses, so annotating, suggesting, translating and expanding a
+#     message work the same way wherever the reviewer meets the conversation.
+#     The conversation owns the scroll; the page around it does not, so the
+#     bar stays put and the turns scroll under it.
+#   - Suggesting a better output is a correction too, so it is offered on the
+#     turn being read and opens the conversation's own correction editor,
+#     instead of a separate inline textarea whose only save button lived in
+#     another column.
 
 Feature: Walking an annotation queue into a dataset
   As a reviewer working through my annotation queue
@@ -142,22 +150,43 @@ Feature: Walking an annotation queue into a dataset
       When the marked items are read
       Then that item is not among them
 
-  Rule: A better output is suggested through the correction popover
+  Rule: The queue reads its trace as a conversation
 
     @integration
-    Scenario: The suggest action on a queued message opens the correction popover
-      When I use the suggest action on a message
-      Then the correction popover opens for that message's trace
-      And no correction draft is seeded into the comment sidebar
+    Scenario: A queued trace is read as the whole thread it belongs to
+      Given the trace behind the open queue item belongs to a thread
+      When I open that queue item
+      Then that thread's turns are rendered as a conversation
+      And the turn under review is the one marked as current
 
     @integration
-    Scenario: Saved suggestions are listed under the output without an editor
-      Given a message whose trace already carries two suggestions
-      Then both are listed under the output with their author
-      And neither is an editable field sitting in the page
+    Scenario: Messages arrive expanded so the whole output can be read
+      When I open a queue item
+      Then the conversation's messages are already expanded
+      And nothing is cut off mid-answer for the reviewer to unfold by hand
 
     @integration
-    Scenario: Picking a saved suggestion reopens it in the correction popover
-      Given a message whose trace already carries a suggestion
-      When I pick that suggestion
-      Then the correction popover opens on it for editing
+    Scenario: A trace with no thread is still read as a conversation
+      Given the trace behind the open queue item carries no thread id
+      When I open that queue item
+      Then that trace alone is rendered as a single-turn conversation
+      And I am told to pass the thread_id to capture the whole conversation
+
+    @integration
+    Scenario: Picking another turn opens that turn's trace in the drawer
+      Given the open queue item's thread has more than one turn
+      When I pick one of the other turns
+      Then that turn's trace opens in the trace drawer over the queue
+
+  Rule: A better output is suggested through the conversation's correction editor
+
+    @integration
+    Scenario: Suggesting is offered on the turn being read
+      When I open a queue item
+      Then suggesting a better output is offered by the conversation on each turn
+      And the page holds no editor of its own for me to hunt for
+
+      # A turn that already carries a suggestion is marked as corrected in the
+      # conversation itself. The saved-suggestion list under a message belongs
+      # to the legacy conversation on the trace details Thread tab, and is
+      # specified in specs/traces-v2/annotations.feature.

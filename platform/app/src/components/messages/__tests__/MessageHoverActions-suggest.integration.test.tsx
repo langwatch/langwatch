@@ -118,7 +118,7 @@ afterEach(() => {
 
 describe("given a reviewer reading a message in the legacy conversation", () => {
   describe("when the reviewer uses the suggest action", () => {
-    /** @scenario "The suggest action on a queued message opens the correction popover" */
+    /** @scenario "The legacy conversation suggests through the same correction popover" */
     it("opens the correction popover for that message's trace", async () => {
       const user = userEvent.setup();
       render(<Harness />);
@@ -144,7 +144,7 @@ describe("given a reviewer reading a message in the legacy conversation", () => 
   });
 
   describe("when the reviewer reaches the suggest action from the keyboard", () => {
-    /** @scenario "The suggest action on a queued message opens the correction popover" */
+    /** @scenario "The legacy conversation suggests through the same correction popover" */
     it("opens the correction popover the same way a click does", async () => {
       const user = userEvent.setup();
       render(<Harness />);
