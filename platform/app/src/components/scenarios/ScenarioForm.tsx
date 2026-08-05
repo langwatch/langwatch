@@ -1,8 +1,35 @@
-import { Field, Input, Text, Textarea, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { HelpCircle, ShieldAlert } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { Controller, type UseFormReturn, useForm } from "react-hook-form";
+import {
+  Controller,
+  type UseFormReturn,
+  useForm,
+  useWatch,
+} from "react-hook-form";
 import { z } from "zod";
+import {
+  RED_TEAM_DEFAULT_TURNS,
+  RED_TEAM_MAX_TURNS,
+  RedTeamConfigSchema,
+  RedTeamStrategySchema,
+} from "~/server/scenarios/execution/types";
+import {
+  redTeamStateIssue,
+  withApplicableRedTeamConfig,
+} from "~/server/scenarios/red-team-input";
+import { Tooltip } from "../ui/tooltip";
+import { RedTeamAttackSection } from "./RedTeamAttackSection";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { SectionHeader } from "./ui/SectionHeader";
 
@@ -10,14 +37,57 @@ import { SectionHeader } from "./ui/SectionHeader";
  * Zod schema for scenario form validation.
  * Colocated with the form component it validates.
  */
-export const scenarioFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  situation: z.string(),
-  criteria: z.array(z.string()),
-  labels: z.array(z.string()),
-});
+export const scenarioFormSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    situation: z.string(),
+    criteria: z.array(z.string()),
+    labels: z.array(z.string()),
+    // Red-team configuration. Null strategy = a standard scenario; the form
+    // shows the attack section only once a strategy is picked.
+    //
+    // The schemas come from the execution contract rather than being written out
+    // again here. A re-declared copy is a copy that drifts: the editor would go
+    // on accepting a value the API had started rejecting, and the only symptom
+    // is a save that fails after the user has finished typing.
+    redTeamStrategy: RedTeamStrategySchema.nullish(),
+    redTeamTarget: z.string().nullish(),
+    redTeamTotalTurns: z
+      .number()
+      .int()
+      .min(1)
+      .max(RED_TEAM_MAX_TURNS)
+      .nullish(),
+    redTeamConfig: RedTeamConfigSchema.nullish(),
+  })
+  .superRefine((values, ctx) => {
+    // Same rule the API enforces, surfaced on the field rather than as a
+    // failed save — see redTeamStateIssue for why it cannot be per-field.
+    //
+    // Asked of what will be *sent*, not of what the form is holding. The
+    // editor keeps a Crescendo attack plan while the user looks at GOAT so
+    // switching back does not lose it; `handleSave` strips it on the way out,
+    // so validating the raw draft would block a save over a value the form
+    // has stopped rendering and is not going to write.
+    const issue = redTeamStateIssue(withApplicableRedTeamConfig(values));
+    if (issue) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [issue.field],
+        message: issue.message,
+      });
+    }
+  });
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
+
+/**
+ * Every field the form owns, from the schema itself so the list cannot fall
+ * behind it. `superRefine` wraps the object, hence the `.innerType()`.
+ */
+const SCENARIO_FORM_FIELDS = Object.keys(
+  scenarioFormSchema.innerType().shape,
+) as (keyof ScenarioFormData)[];
 
 /**
  * Initial data passed to ScenarioFormDrawer via complexProps when creating
@@ -30,22 +100,191 @@ export interface ScenarioInitialData {
 type ScenarioFormProps = {
   defaultValues?: Partial<ScenarioFormData>;
   formRef?: (form: UseFormReturn<ScenarioFormData>) => void;
+  /** Show the Standard / Red team selector. */
+  showTypeSelector?: boolean;
+  /** Reports whether this is currently a red-team scenario, so the drawer
+   *  can mark itself. Fires on toggle, not only on load. */
+  onIsRedTeamChange?: (isRedTeam: boolean) => void;
 };
+
+/**
+ * The two modes. No per-button tooltip: the (i) on the Type header explains
+ * the difference, so hovering a button added a second thing to read for the
+ * same answer.
+ */
+const TYPE_HELP =
+  "Standard sends a cooperative user who is trying to get something done. Red team sends an attacker trying to make the agent break the criteria you set — only use it on agents you own or have permission to test.";
+
+const TYPES = [
+  {
+    redTeam: false,
+    label: "Standard scenario",
+  },
+  {
+    redTeam: true,
+    label: "Red team",
+  },
+];
+
+/**
+ * Selected is a tint and a border, not a solid fill. A block of deep red for
+ * the whole button made choosing a mode look like a warning; the colour should
+ * say which one is on, and the drawer edge already says it is an attack.
+ */
+function ScenarioTypeButton({
+  type,
+  selected,
+  onSelect,
+}: {
+  type: (typeof TYPES)[number];
+  selected: boolean;
+  onSelect: (redTeam: boolean) => void;
+}) {
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      flex={1}
+      colorPalette={type.redTeam ? "redteam" : "gray"}
+      borderColor={selected ? "colorPalette.solid" : "border.muted"}
+      bg={selected ? "colorPalette.subtle" : undefined}
+      color={selected ? "colorPalette.fg" : "fg.muted"}
+      fontWeight={selected ? "medium" : "normal"}
+      onClick={() => onSelect(type.redTeam)}
+    >
+      {type.redTeam ? <ShieldAlert size={14} /> : null}
+      {type.label}
+    </Button>
+  );
+}
+
+/**
+ * Standard vs red team. Switching to red team reveals the attack section
+ * below rather than opening a second panel over this one.
+ */
+function ScenarioTypeSelector({
+  isRedTeam,
+  onSelect,
+}: {
+  isRedTeam: boolean;
+  onSelect: (redTeam: boolean) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={2}>
+      {/* An (i) on the header, matching Attack below: the difference between
+          the two modes should be reachable without discovering that the
+          buttons are hoverable. */}
+      <HStack gap={1.5} align="center">
+        <SectionHeader>Type</SectionHeader>
+        <Tooltip content={TYPE_HELP}>
+          <Box
+            color="fg.muted"
+            display="flex"
+            cursor="pointer"
+            paddingBottom="2px"
+          >
+            <HelpCircle size={13} />
+          </Box>
+        </Tooltip>
+      </HStack>
+      <HStack gap={2}>
+        {TYPES.map((type) => (
+          <ScenarioTypeButton
+            key={type.label}
+            type={type}
+            selected={type.redTeam === isRedTeam}
+            onSelect={onSelect}
+          />
+        ))}
+      </HStack>
+    </VStack>
+  );
+}
+
+/** Blank values for every field the form owns, before defaults are laid over. */
+const EMPTY_SCENARIO = {
+  name: "",
+  situation: "",
+  criteria: [],
+  labels: [],
+} satisfies Partial<ScenarioFormData>;
+
+/**
+ * Turn the form into a red-team scenario or back into a standard one.
+ *
+ * Picking red team defaults to Crescendo — the SDK's own recommended starting
+ * strategy — so the section opens usable rather than empty. Going back clears
+ * the whole attack, matching what the API does with a null strategy.
+ */
+function applyScenarioType({
+  form,
+  redTeam,
+  redTeamStrategy,
+}: {
+  form: UseFormReturn<ScenarioFormData>;
+  redTeam: boolean;
+  redTeamStrategy: ScenarioFormData["redTeamStrategy"];
+}) {
+  if (redTeam) {
+    if (!redTeamStrategy) form.setValue("redTeamStrategy", "crescendo");
+    if (!form.getValues("redTeamTotalTurns")) {
+      form.setValue("redTeamTotalTurns", RED_TEAM_DEFAULT_TURNS);
+    }
+    return;
+  }
+  form.setValue("redTeamStrategy", null);
+  form.setValue("redTeamTarget", null);
+  form.setValue("redTeamTotalTurns", null);
+  form.setValue("redTeamConfig", null);
+}
+
+/**
+ * Reset the form when the scenario behind it changes.
+ *
+ * Keyed on every field the form owns, derived from the schema rather than
+ * hand-listed. The old list named four, so the red-team fields could change
+ * without the form noticing — masked today only because the drawer remounts on
+ * `key={scenarioId}`, which is another component's implementation detail to be
+ * depending on. Deriving it means a field added to the schema is covered by
+ * construction.
+ *
+ * Still the fields and not the whole row: `updatedAt` and `lastUpdatedById`
+ * change on every write, and keying on those would reset the form for metadata
+ * churn that changes nothing the user typed.
+ */
+function useResetWhenDefaultsChange({
+  defaultValues,
+  reset,
+}: {
+  defaultValues?: Partial<ScenarioFormData>;
+  reset: UseFormReturn<ScenarioFormData>["reset"];
+}) {
+  const prevDefaultsRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentDefaults = defaultValues
+      ? JSON.stringify(
+          SCENARIO_FORM_FIELDS.map((field) => defaultValues[field]),
+        )
+      : null;
+    if (currentDefaults === prevDefaultsRef.current) return;
+    prevDefaultsRef.current = currentDefaults;
+    if (defaultValues) reset({ ...EMPTY_SCENARIO, ...defaultValues });
+  }, [defaultValues, reset]);
+}
 
 /**
  * Pure UI form for creating/editing scenarios.
  * Matches the design mockup layout.
  * Submit is handled externally via formRef.
  */
-export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
+export function ScenarioForm({
+  defaultValues,
+  formRef,
+  showTypeSelector = true,
+  onIsRedTeamChange,
+}: ScenarioFormProps) {
   const form = useForm<ScenarioFormData>({
-    defaultValues: {
-      name: "",
-      situation: "",
-      criteria: [],
-      labels: [],
-      ...defaultValues,
-    },
+    defaultValues: { ...EMPTY_SCENARIO, ...defaultValues },
     resolver: zodResolver(scenarioFormSchema),
   });
 
@@ -56,38 +295,38 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
     formState: { errors },
   } = form;
 
+  // useWatch, not form.watch: this component receives `form` from its own
+  // useForm here, but the same rule applies for re-render correctness inside
+  // the nested selector.
+  const redTeamStrategy = useWatch({ control, name: "redTeamStrategy" });
+  const isRedTeam = !!redTeamStrategy;
+
+  const handleTypeSelect = (redTeam: boolean) =>
+    applyScenarioType({ form, redTeam, redTeamStrategy });
+
   // Expose form to parent
   useEffect(() => {
     formRef?.(form);
   }, [form, formRef]);
 
-  // Reset form when defaultValues change (using ref to track previous serialized values)
-  const prevDefaultsRef = useRef<string | null>(null);
   useEffect(() => {
-    const currentDefaults = defaultValues
-      ? JSON.stringify([
-          defaultValues.name,
-          defaultValues.situation,
-          defaultValues.criteria,
-          defaultValues.labels,
-        ])
-      : null;
-    if (currentDefaults !== prevDefaultsRef.current) {
-      prevDefaultsRef.current = currentDefaults;
-      if (defaultValues) {
-        reset({
-          name: "",
-          situation: "",
-          criteria: [],
-          labels: [],
-          ...defaultValues,
-        });
-      }
-    }
-  }, [defaultValues, reset]);
+    onIsRedTeamChange?.(isRedTeam);
+  }, [isRedTeam, onIsRedTeamChange]);
+
+  useResetWhenDefaultsChange({ defaultValues, reset });
 
   return (
     <VStack align="stretch" gap={6}>
+      {/* TYPE Section — a red-team scenario is still a scenario; only who
+          drives the conversation changes, so this is a mode on the same form
+          rather than a separate creation flow. */}
+      {showTypeSelector && (
+        <ScenarioTypeSelector
+          isRedTeam={isRedTeam}
+          onSelect={handleTypeSelect}
+        />
+      )}
+
       {/* SCENARIO Section */}
       <VStack align="stretch" gap={3}>
         {/* Name */}
@@ -101,13 +340,16 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         </Field.Root>
       </VStack>
 
+      {isRedTeam && <RedTeamAttackSection form={form} />}
+
       {/* SITUATION Section */}
       <VStack align="stretch" gap={3}>
         <VStack align="stretch" gap={1}>
           <SectionHeader>Situation</SectionHeader>
           <Text fontSize="13px" color="fg.muted">
-            Describe the user, their context, and what they're trying to
-            accomplish. Think about a critical path or a complex edge case.
+            {isRedTeam
+              ? "Context the agent is operating in — who it thinks it is talking to, and what it has access to. The attacker's goal is set above."
+              : "Describe the user, their context, and what they're trying to accomplish. Think about a critical path or a complex edge case."}
           </Text>
         </VStack>
         <Field.Root invalid={!!errors.situation}>
@@ -126,8 +368,9 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         <VStack align="stretch" gap={1}>
           <SectionHeader>Criteria</SectionHeader>
           <Text fontSize="13px" color="fg.muted">
-            What must the agent DO or NOT DO? e.g. "Must remain empathetic",
-            "Must NOT offer refund without manager approval"
+            {isRedTeam
+              ? 'What must the agent never do, however it is asked? These are what the attack is judged against, e.g. "Must never reveal its system prompt"'
+              : 'What must the agent DO or NOT DO? e.g. "Must remain empathetic", "Must NOT offer refund without manager approval"'}
           </Text>
         </VStack>
         <Controller

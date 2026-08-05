@@ -4,7 +4,19 @@ import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { trackServerEvent } from "~/server/posthog";
-import { ScenarioNotFoundError } from "~/server/scenarios/errors";
+import {
+  RedTeamConfigurationError,
+  ScenarioNotFoundError,
+} from "~/server/scenarios/errors";
+import type { RedTeamConfig } from "~/server/scenarios/execution/types";
+import {
+  mergeRedTeamState,
+  normalizeRedTeamWrite,
+  redTeamFields,
+  redTeamStateIssue,
+  touchesRedTeam,
+} from "~/server/scenarios/red-team-input";
+import { toPrismaRedTeamConfig } from "~/server/scenarios/red-team-prisma";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { checkProjectPermission } from "../../rbac";
@@ -12,6 +24,11 @@ import { projectSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:scenarios:crud");
 
+/**
+ * Optional adversarial configuration. A red-team scenario needs both a
+ * strategy and an objective; the objective is what the attacker is trying to
+ * make the agent do, so a strategy without one has nothing to pursue.
+ */
 const createScenarioSchema = projectSchema.extend({
   name: z.string().min(1),
   situation: z.string(),
@@ -21,6 +38,7 @@ const createScenarioSchema = projectSchema.extend({
   // default (scenarios.user_simulator / scenarios.judge).
   simulatorModel: z.string().nullish(),
   judgeModel: z.string().nullish(),
+  ...redTeamFields,
 });
 
 const updateScenarioSchema = projectSchema.extend({
@@ -31,6 +49,7 @@ const updateScenarioSchema = projectSchema.extend({
   labels: z.array(z.string()).optional(),
   simulatorModel: z.string().nullish(),
   judgeModel: z.string().nullish(),
+  ...redTeamFields,
 });
 
 /**
@@ -40,12 +59,21 @@ export const scenarioCrudRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ ctx, input }) => {
-      logger.info({ projectId: input.projectId }, "Creating scenario");
+    .mutation(async ({ ctx, input: rawInput }) => {
+      logger.info({ projectId: rawInput.projectId }, "Creating scenario");
+
+      const input = normalizeRedTeamWrite(rawInput);
+      const createIssue = redTeamStateIssue(input);
+      if (createIssue) {
+        throw new RedTeamConfigurationError(createIssue);
+      }
+
+      const { redTeamConfig, ...rest } = input;
 
       const service = ScenarioService.create(ctx.prisma);
       const result = await service.create({
-        ...input,
+        ...rest,
+        ...toPrismaRedTeamConfig(redTeamConfig),
         lastUpdatedById: ctx.session.user.id,
       });
 
@@ -119,16 +147,47 @@ export const scenarioCrudRouter = createTRPCRouter({
   update: protectedProcedure
     .input(updateScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input: rawInput }) => {
       logger.info(
-        { projectId: input.projectId, scenarioId: input.id },
+        { projectId: rawInput.projectId, scenarioId: rawInput.id },
         "Updating scenario",
       );
 
-      const { id, projectId, ...data } = input;
+      const input = normalizeRedTeamWrite(rawInput);
+      const { id, projectId, redTeamConfig, ...data } = input;
       const service = ScenarioService.create(ctx.prisma);
+
+      // Only read the stored row when the write actually mentions the attack:
+      // merging is needed so a partial update is not rejected for a field it
+      // never sent, but a rename should not pay for a round trip to find that
+      // out.
+      if (touchesRedTeam(input)) {
+        const existing = await service.getById({ id, projectId });
+        // A missing row is a missing row. Merging against nothing produces an
+        // all-undefined state, and the pairing check would answer for it —
+        // reporting "needs an attack objective" for a scenario that does not
+        // exist, which sends the caller looking for the wrong bug.
+        if (!existing) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Scenario not found",
+          });
+        }
+        const updateIssue = redTeamStateIssue(
+          mergeRedTeamState(input, {
+            redTeamStrategy: existing.redTeamStrategy,
+            redTeamTarget: existing.redTeamTarget,
+            redTeamTotalTurns: existing.redTeamTotalTurns,
+            redTeamConfig: existing.redTeamConfig as RedTeamConfig | null,
+          }),
+        );
+        if (updateIssue) {
+          throw new RedTeamConfigurationError(updateIssue);
+        }
+      }
       const result = await service.update(id, projectId, {
         ...data,
+        ...toPrismaRedTeamConfig(redTeamConfig),
         lastUpdatedById: ctx.session.user.id,
       });
 

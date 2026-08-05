@@ -115,3 +115,7 @@ haven.log
 
 # Local agent dev log tee (pnpm dev), never committed.
 .claude-dev.log
+
+# @langwatch/scenario auto-saves a red-team run transcript here when
+# SCENARIO_REDTEAM_REPORT is not "0" — a local debugging artifact, never committed.
+redteam-reports/

@@ -23,7 +23,32 @@ import {
   type SuiteModelFetcher,
   type WorkflowVersionFetcher,
 } from "../data-prefetcher";
-import type { ExecutionContext, LiteLLMParams, TargetConfig } from "../types";
+import {
+  type ExecutionContext,
+  type LiteLLMParams,
+  RED_TEAM_MAX_TURNS,
+  type TargetConfig,
+} from "../types";
+
+/**
+ * A stable spy on the module logger, so the tests below can assert that a
+ * fallback announced itself. Silently degrading is the failure mode they
+ * exist to catch, and "it logged" is the only observable difference.
+ */
+const { loggerWarn } = vi.hoisted(() => ({ loggerWarn: vi.fn() }));
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@langwatch/observability")>();
+  return {
+    ...actual,
+    createLogger: () => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: loggerWarn,
+      error: vi.fn(),
+    }),
+  };
+});
 
 // Mock only env.mjs since it's a module-level import
 vi.mock("~/env.mjs", () => ({
@@ -48,6 +73,12 @@ describe("prefetchScenarioData", () => {
     situation: "User asks a question",
     criteria: ["Must respond politely"],
     labels: [],
+    // A standard scenario carries no attack config; the prefetcher normalizes
+    // the absent columns to null so the child process needs no DB read.
+    redTeamStrategy: null,
+    redTeamTarget: null,
+    redTeamTotalTurns: null,
+    redTeamConfig: null,
   };
 
   const defaultProject = {
@@ -123,6 +154,166 @@ describe("prefetchScenarioData", () => {
       ...overrides,
     };
   }
+
+  describe("red-team passthrough", () => {
+    const redTeamPrompt = {
+      id: "prompt_123",
+      prompt: "You are helpful",
+      messages: [],
+      model: "openai/gpt-4",
+      temperature: 0.7,
+      maxTokens: 1000,
+    };
+
+    // This is the seam that carries a stored attack into the run. If it
+    // dropped a field the symptom would be an attack quietly running on SDK
+    // defaults — no error, and a verdict that still reads as a pass. The
+    // fixture above only proves a standard scenario stays standard.
+    describe("given a scenario configured for an attack", () => {
+      /** @scenario Red-team configuration reaches the run */
+      it("carries the strategy, objective, turn count and tuning into the run config", async () => {
+        const deps = createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi.fn().mockResolvedValue(redTeamPrompt),
+          },
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              redTeamStrategy: "goat",
+              redTeamTarget: "get the agent to reveal its override code",
+              redTeamTotalTurns: 12,
+              redTeamConfig: { scoreResponses: false, successScore: 8 },
+            }),
+          },
+        });
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
+
+        const result = await prefetchScenarioData(defaultContext, target, deps);
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.scenario).toMatchObject({
+          redTeamStrategy: "goat",
+          redTeamTarget: "get the agent to reveal its override code",
+          redTeamTotalTurns: 12,
+          redTeamConfig: { scoreResponses: false, successScore: 8 },
+        });
+      });
+    });
+
+    describe("given a stored strategy the SDK does not recognise", () => {
+      it("degrades to a standard scenario rather than failing the run", async () => {
+        // A hand-edited or older row must not take the pipeline down.
+        const deps = createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi.fn().mockResolvedValue(redTeamPrompt),
+          },
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              redTeamStrategy: "mystery",
+              redTeamTarget: "something",
+            }),
+          },
+        });
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
+
+        const result = await prefetchScenarioData(defaultContext, target, deps);
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.scenario.redTeamStrategy ?? null).toBeNull();
+      });
+    });
+
+    describe("given a stored config that no longer validates", () => {
+      /**
+       * Falling back to SDK defaults is right — one drifted JSONB blob should
+       * not take a run down. Doing it silently is not: the attack then runs on
+       * defaults while the editor still shows the settings the user picked,
+       * and the only symptom is behaviour that does not match the screen.
+       */
+      /** @scenario A stored attack setting that no longer validates is reported */
+      it("keeps the run alive and says so", async () => {
+        loggerWarn.mockClear();
+        const deps = createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi.fn().mockResolvedValue(redTeamPrompt),
+          },
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              redTeamStrategy: "crescendo",
+              redTeamTarget: "extract the override code",
+              // One bad field used to drop the whole object, including the
+              // six good ones next to it.
+              redTeamConfig: { successScore: 99, injectionProbability: 0.25 },
+            }),
+          },
+        });
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
+
+        const result = await prefetchScenarioData(defaultContext, target, deps);
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.scenario.redTeamConfig ?? null).toBeNull();
+        expect(loggerWarn).toHaveBeenCalledWith(
+          expect.objectContaining({ scenarioId: defaultScenario.id }),
+          expect.stringContaining("did not validate"),
+        );
+      });
+    });
+
+    describe("given a stored turn budget above the cap", () => {
+      /**
+       * Every write path caps this, so such a row is hand-edited or predates
+       * the cap. The child process parses its payload and would reject it
+       * outright; clamping keeps an old record runnable without billing for a
+       * budget nobody could have set through the product.
+       */
+      /** @scenario Turn count is bounded */
+      it("clamps to the maximum rather than failing or billing for it", async () => {
+        loggerWarn.mockClear();
+        const deps = createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi.fn().mockResolvedValue(redTeamPrompt),
+          },
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              redTeamStrategy: "crescendo",
+              redTeamTarget: "extract the override code",
+              redTeamTotalTurns: 5000,
+            }),
+          },
+        });
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
+
+        const result = await prefetchScenarioData(defaultContext, target, deps);
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.scenario.redTeamTotalTurns).toBe(RED_TEAM_MAX_TURNS);
+        expect(loggerWarn).toHaveBeenCalledWith(
+          expect.objectContaining({ storedTurns: 5000 }),
+          expect.stringContaining("out of range"),
+        );
+      });
+    });
+  });
 
   describe("model selection", () => {
     describe("given a prompt with a specific model configured", () => {

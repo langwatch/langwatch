@@ -73,10 +73,15 @@ export function useScenarioGeneration(projectId: string | undefined) {
   const [status, setStatus] = useState<GenerationStatus>("idle");
 
   const generate = useCallback(
-    async (
-      prompt: string,
-      currentScenario: GeneratedScenario | null,
-    ): Promise<GeneratedScenario> => {
+    async ({
+      prompt,
+      currentScenario,
+      redTeam,
+    }: {
+      prompt: string;
+      currentScenario: GeneratedScenario | null;
+      redTeam: boolean;
+    }): Promise<GeneratedScenario> => {
       if (!projectId) {
         throw new Error("Project ID is required");
       }
@@ -84,11 +89,12 @@ export function useScenarioGeneration(projectId: string | undefined) {
       setStatus("generating");
 
       try {
-        const scenario = await generateScenarioWithAI(
+        const scenario = await generateScenarioWithAI({
           prompt,
           projectId,
           currentScenario,
-        );
+          redTeam,
+        });
         setStatus("done");
         return scenario;
       } catch (error) {
@@ -171,20 +177,37 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
     }
 
     try {
+      const redTeam = !!form.getValues("redTeamStrategy");
+
       const currentScenario = hasHistory
         ? {
             name: form.getValues("name"),
             situation: form.getValues("situation"),
             criteria: form.getValues("criteria"),
+            ...(redTeam
+              ? {
+                  // form keeps this nullable; the wire shape does not
+                  redTeamTarget: form.getValues("redTeamTarget") ?? undefined,
+                }
+              : {}),
           }
         : null;
 
-      const scenario = await generate(input, currentScenario);
+      const scenario = await generate({
+        prompt: input,
+        currentScenario,
+        redTeam,
+      });
 
       // Update form with generated data (defensive defaults for unexpected API responses)
       form.setValue("name", scenario.name ?? "");
       form.setValue("situation", scenario.situation ?? "");
       form.setValue("criteria", scenario.criteria ?? []);
+      // Only for a red-team draft, and only when the model actually produced
+      // one — never blank out an objective the person already wrote.
+      if (redTeam && scenario.redTeamTarget) {
+        form.setValue("redTeamTarget", scenario.redTeamTarget);
+      }
 
       addPrompt(input);
       setInput("");

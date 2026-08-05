@@ -9,7 +9,11 @@ import {
 import { generate } from "@langwatch/ksuid";
 import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type UseFormReturn, useWatch } from "react-hook-form";
+import {
+  type FieldErrors,
+  type UseFormReturn,
+  useWatch,
+} from "react-hook-form";
 import {
   applyHandledErrorToForm,
   FormServerError,
@@ -28,6 +32,7 @@ import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import type { TypedAgent } from "../../server/agents/agent.repository";
+import { withApplicableRedTeamConfig } from "../../server/scenarios/red-team-input";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
@@ -82,6 +87,29 @@ export function ScenarioFormDrawerFromUrl(
 }
 
 /**
+ * A stored row as the form's own shape. Prisma types `redTeamConfig` as
+ * JsonValue and `redTeamStrategy` as a plain string, so both are narrowed
+ * here; anything that does not fit reads as "not configured" rather than
+ * putting a value the editor cannot render into the form.
+ */
+function toFormDefaults(scenario: Scenario): Partial<ScenarioFormData> {
+  const { redTeamConfig, redTeamStrategy, ...rest } = scenario;
+  const isKnownStrategy =
+    redTeamStrategy === "goat" || redTeamStrategy === "crescendo";
+  const isConfigObject =
+    !!redTeamConfig &&
+    typeof redTeamConfig === "object" &&
+    !Array.isArray(redTeamConfig);
+  return {
+    ...rest,
+    redTeamStrategy: isKnownStrategy ? redTeamStrategy : null,
+    redTeamConfig: isConfigObject
+      ? (redTeamConfig as ScenarioFormData["redTeamConfig"])
+      : null,
+  };
+}
+
+/**
  * Drawer container for scenario create/edit form.
  * Two-column layout: form on left, help sidebar on right.
  * Bottom bar with Quick Test and Save and Run.
@@ -113,6 +141,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { target: persistedTarget, setTarget: persistTarget } =
     useScenarioTarget(scenarioId);
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
+  const [isRedTeamScenario, setIsRedTeamScenario] = useState(false);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
   const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
 
@@ -302,14 +331,26 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       const projectId = project?.id;
       if (!projectId) return null;
 
+      // The form deliberately keeps a Crescendo attack plan while the user is
+      // looking at GOAT, so switching across and back does not throw the plan
+      // away. This is where that draft becomes a write, so it is where the
+      // settings the chosen strategy ignores come off — a GOAT scenario is
+      // never stored carrying a plan it will not read.
+      const payload = withApplicableRedTeamConfig(data);
+
       return scenario
         ? await updateExisting({
             projectId,
             scenarioId: scenario.id,
-            data,
+            data: payload,
             models,
           })
-        : await createScenario({ projectId, data, skipTransition, models });
+        : await createScenario({
+            projectId,
+            data: payload,
+            skipTransition,
+            models,
+          });
     },
     [project?.id, scenario, updateExisting, createScenario],
   );
@@ -387,6 +428,33 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     [project?.id, project?.slug, formInstance, utils, openDrawer, scenario],
   );
 
+  /**
+   * Say why the save did not happen.
+   *
+   * `handleSubmit` swallows an invalid form: the callback never runs and, with
+   * no second argument, nothing else does either — the button is pressed and
+   * the drawer sits there. Every field renders its own message, but the field
+   * can be scrolled off, or inside the collapsed Advanced section, so the
+   * press needs an answer of its own.
+   */
+  const reportInvalid = useCallback((errors: FieldErrors<ScenarioFormData>) => {
+    // Only the messages this form authored. A server-set field error is put
+    // there by applyHandledErrorToForm, which already renders it at its field,
+    // and its text is copy we did not write — so it never becomes the summary.
+    const fieldMessages = Object.values(errors)
+      .filter(
+        (entry) => (entry as { type?: string } | undefined)?.type !== "server",
+      )
+      .map((entry) => (entry as { message?: string } | undefined)?.message)
+      .filter((text): text is string => !!text);
+    toaster.create({
+      title: "Check the highlighted fields",
+      description: fieldMessages[0] ?? "Some values need fixing before saving.",
+      type: "warning",
+      meta: { closable: true },
+    });
+  }, []);
+
   const confirmRunWithModels = useCallback(async () => {
     const form = formInstance;
     const target = pendingRunTarget;
@@ -428,7 +496,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         void router.push(
           `/${project.slug}/simulations?pendingBatch=${batchRunId}`,
         );
-      })();
+      }, reportInvalid)();
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
     }
@@ -443,6 +511,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     router,
     runSimulatorModel,
     runJudgeModel,
+    reportInvalid,
   ]);
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
@@ -461,8 +530,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       } catch {
         // Error already handled by mutation onError callback
       }
-    })();
-  }, [handleSave, scenario, formInstance, onClose]);
+    }, reportInvalid)();
+  }, [handleSave, scenario, formInstance, onClose, reportInvalid]);
   const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
     setFormInstance(form);
   }, []);
@@ -473,7 +542,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const initialFormData =
     props.initialFormData ?? complexPropsData.initialFormData;
   const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
-    () => scenario ?? initialFormData ?? undefined,
+    () =>
+      scenario ? toFormDefaults(scenario) : (initialFormData ?? undefined),
     [scenario, initialFormData],
   );
 
@@ -483,7 +553,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
     >
-      <Drawer.Content bg="bg">
+      <Drawer.Content
+        bg="bg"
+        // A thin rim so an adversarial scenario is identifiable at a glance
+        // without repainting the whole surface.
+        colorPalette="redteam"
+        borderWidth={isRedTeamScenario ? "1px" : undefined}
+        // emphasized, not solid: the edge should mark the drawer as an attack
+        // without competing with the content inside it.
+        borderColor={isRedTeamScenario ? "colorPalette.emphasized" : undefined}
+      >
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
           <Heading size="md">
@@ -504,6 +583,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 key={scenarioId ?? "new"}
                 defaultValues={defaultValues}
                 formRef={setFormRef}
+                onIsRedTeamChange={setIsRedTeamScenario}
               />
             </GridItem>
             {/* Right: Help Sidebar */}

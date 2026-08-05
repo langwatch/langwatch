@@ -113,7 +113,11 @@ describe("useScenarioGeneration", () => {
     const { result } = renderHook(() => useScenarioGeneration("project-123"));
 
     await act(async () => {
-      await result.current.generate("test prompt", null);
+      await result.current.generate({
+        prompt: "test prompt",
+        currentScenario: null,
+        redTeam: false,
+      });
     });
 
     expect(result.current.status).toBe("done");
@@ -129,7 +133,11 @@ describe("useScenarioGeneration", () => {
 
     let scenario: GeneratedScenario | undefined;
     await act(async () => {
-      scenario = await result.current.generate("test prompt", null);
+      scenario = await result.current.generate({
+        prompt: "test prompt",
+        currentScenario: null,
+        redTeam: false,
+      });
     });
 
     expect(scenario).toEqual(mockScenario);
@@ -145,7 +153,11 @@ describe("useScenarioGeneration", () => {
 
     await act(async () => {
       try {
-        await result.current.generate("test prompt", null);
+        await result.current.generate({
+          prompt: "test prompt",
+          currentScenario: null,
+          redTeam: false,
+        });
       } catch {
         // Expected to throw
       }
@@ -165,7 +177,11 @@ describe("useScenarioGeneration", () => {
     let thrownError: Error | undefined;
     await act(async () => {
       try {
-        await result.current.generate("test prompt", null);
+        await result.current.generate({
+          prompt: "test prompt",
+          currentScenario: null,
+          redTeam: false,
+        });
       } catch (error) {
         thrownError = error as Error;
       }
@@ -185,7 +201,11 @@ describe("useScenarioGeneration", () => {
     let thrownError: Error | undefined;
     await act(async () => {
       try {
-        await result.current.generate("test prompt", null);
+        await result.current.generate({
+          prompt: "test prompt",
+          currentScenario: null,
+          redTeam: false,
+        });
       } catch (error) {
         thrownError = error as Error;
       }
@@ -211,7 +231,11 @@ describe("useScenarioGeneration", () => {
     };
 
     await act(async () => {
-      await result.current.generate("refine this", currentScenario);
+      await result.current.generate({
+        prompt: "refine this",
+        currentScenario,
+        redTeam: false,
+      });
     });
 
     expect(global.fetch).toHaveBeenCalledWith("/api/scenario/generate", {
@@ -221,6 +245,7 @@ describe("useScenarioGeneration", () => {
         prompt: "refine this",
         currentScenario,
         projectId: "project-123",
+        redTeam: false,
       }),
     });
   });

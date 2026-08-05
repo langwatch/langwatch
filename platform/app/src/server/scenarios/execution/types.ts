@@ -209,12 +209,71 @@ export type LiteLLMParams = z.infer<typeof LiteLLMParamsSchema>;
 // ============================================================================
 
 /** Scenario definition - what to test */
+/** Adversarial attack strategies a red-team scenario can run. */
+export const RED_TEAM_STRATEGIES = ["goat", "crescendo"] as const;
+export const RedTeamStrategySchema = z.enum(RED_TEAM_STRATEGIES);
+export type RedTeamStrategyName = z.infer<typeof RedTeamStrategySchema>;
+
+/**
+ * Upper bound on attacker turns. Each turn is a model call on both sides.
+ *
+ * 50 is also the default, on the SDK docs' own recommendation: "agents that
+ * hold at turn 1 often break by turn 20", and the guidance for cheaper runs is
+ * to turn per-turn scoring off rather than cut the budget. The SDK's bare
+ * default is 30; starting there would quietly under-test.
+ */
+export const RED_TEAM_MAX_TURNS = 50;
+export const RED_TEAM_DEFAULT_TURNS = 50;
+
+/**
+ * Upper bounds on the free-text fields, because every one of them is
+ * re-embedded into the attacker's prompt on every turn of every run: an
+ * unbounded objective is a multi-megabyte string paid for fifty times over,
+ * and the row that holds it is written once. The limits are far above any
+ * human-written value — an objective is a sentence, a plan is a few
+ * paragraphs — so they bound abuse without bounding use.
+ */
+export const RED_TEAM_MAX_TARGET_LENGTH = 2_000;
+export const RED_TEAM_MAX_PLAN_LENGTH = 10_000;
+
+/** Optional tuning knobs, all with SDK-supplied defaults. */
+export const RedTeamConfigSchema = z.object({
+  /**
+   * Score each response 0-10 and let the attacker adapt. The documented way to
+   * make a run cheaper is to turn this off and keep the turn budget, rather
+   * than shorten the attack.
+   */
+  scoreResponses: z.boolean().optional(),
+  /** Pattern-match hard refusals to skip the scorer and trigger a backtrack. */
+  detectRefusals: z.boolean().optional(),
+  /**
+   * A ready-made phased plan. Skips the planner model call entirely. Crescendo
+   * only — GOAT never generates a plan, so the SDK ignores this for it.
+   */
+  attackPlan: z.string().max(RED_TEAM_MAX_PLAN_LENGTH).optional(),
+  /**
+   * Overrides the prompt used to WRITE the plan (not the plan itself).
+   * Placeholders: {target}, {description}, {totalTurns}, {phase1End},
+   * {phase2End}, {phase3End}. Crescendo only, same reason as attackPlan.
+   */
+  metapromptTemplate: z.string().max(RED_TEAM_MAX_PLAN_LENGTH).optional(),
+  successScore: z.number().min(0).max(10).optional(),
+  successConfirmTurns: z.number().int().min(1).optional(),
+  injectionProbability: z.number().min(0).max(1).optional(),
+});
+export type RedTeamConfig = z.infer<typeof RedTeamConfigSchema>;
+
 export const ScenarioConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  // Present only for red-team scenarios; null/absent means a standard run.
+  redTeamStrategy: RedTeamStrategySchema.nullish(),
+  redTeamTarget: z.string().max(RED_TEAM_MAX_TARGET_LENGTH).nullish(),
+  redTeamTotalTurns: z.number().int().min(1).max(RED_TEAM_MAX_TURNS).nullish(),
+  redTeamConfig: RedTeamConfigSchema.nullish(),
 });
 export type ScenarioConfig = z.infer<typeof ScenarioConfigSchema>;
 

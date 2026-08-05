@@ -7,7 +7,21 @@ import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
-import { ScenarioNotFoundError } from "~/server/scenarios/errors";
+import {
+  RedTeamConfigurationError,
+  ScenarioNotFoundError,
+} from "~/server/scenarios/errors";
+import {
+  type RedTeamConfig,
+  RedTeamConfigSchema,
+} from "~/server/scenarios/execution/types";
+import {
+  mergeRedTeamState,
+  normalizeRedTeamWrite,
+  redTeamFields,
+  redTeamStateIssue,
+} from "~/server/scenarios/red-team-input";
+import { toPrismaRedTeamWrite } from "~/server/scenarios/red-team-prisma";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
@@ -23,17 +37,33 @@ const scenarioResponseSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  redTeamStrategy: z.string().nullable(),
+  redTeamTarget: z.string().nullable(),
+  redTeamTotalTurns: z.number().nullable(),
+  /**
+   * Read back as well as written. Without it the tuning knobs are write-only
+   * over REST, so a client that set `scoreResponses: false` has no way to see
+   * what else is on the row — and no way to change one knob without guessing
+   * at the rest and overwriting it.
+   */
+  redTeamConfig: RedTeamConfigSchema.nullable(),
 });
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
   platformUrl: z.string().url(),
 });
 
+/**
+ * Optional adversarial configuration, mirroring the tRPC surface so a
+ * red-team scenario can be created over the API and not only in the UI.
+ * A null/absent strategy means a standard scenario.
+ */
 const createScenarioSchema = z.object({
   name: z.string().min(1, "name is required"),
   situation: z.string(),
   criteria: z.array(z.string()).optional().default([]),
   labels: z.array(z.string()).optional().default([]),
+  ...redTeamFields,
 });
 
 const updateScenarioSchema = z.object({
@@ -41,6 +71,7 @@ const updateScenarioSchema = z.object({
   situation: z.string().optional(),
   criteria: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
+  ...redTeamFields,
 });
 
 function toScenarioResponse(scenario: Scenario) {
@@ -50,10 +81,29 @@ function toScenarioResponse(scenario: Scenario) {
     situation: scenario.situation,
     criteria: scenario.criteria,
     labels: scenario.labels,
+    redTeamStrategy: scenario.redTeamStrategy,
+    redTeamTarget: scenario.redTeamTarget,
+    redTeamTotalTurns: scenario.redTeamTotalTurns,
+    // A stored config that no longer parses is reported as absent rather than
+    // failing the read: the row is still a perfectly good scenario, and a
+    // listing should not 500 because one JSONB blob drifted.
+    redTeamConfig:
+      RedTeamConfigSchema.nullish().catch(null).parse(scenario.redTeamConfig) ??
+      null,
   };
 }
 
 export function registerScenarioRoutes(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  registerListRoute(secured);
+  registerGetRoute(secured);
+  registerCreateRoute(secured);
+  registerUpdateRoute(secured);
+  registerArchiveRoute(secured);
+}
+
+function registerListRoute(
   secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
 ): void {
   secured.access(requires("scenarios:view")).get(
@@ -90,7 +140,11 @@ export function registerScenarioRoutes(
       );
     },
   );
+}
 
+function registerGetRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:view")).get(
     "/:id",
     describeRoute({
@@ -137,16 +191,22 @@ export function registerScenarioRoutes(
       });
     },
   );
+}
 
-  // Creating asks for `scenarios:create`, not `scenarios:manage`.
-  //
-  // Nobody loses access: `:manage` implies `:create` through the RBAC
-  // hierarchy, so every role and key that could create a scenario yesterday
-  // still can. What changes is that access granted at the CREATE grain now
-  // works — it used to be a permission the product would issue and then refuse
-  // to honour, which is how an assistant scoped to exactly "read and create"
-  // ended up unable to create anything. A viewer is unaffected: they keep the
-  // read routes and are declined the write, as before.
+/**
+ * Creating asks for `scenarios:create`, not `scenarios:manage`.
+ *
+ * Nobody loses access: `:manage` implies `:create` through the RBAC
+ * hierarchy, so every role and key that could create a scenario yesterday
+ * still can. What changes is that access granted at the CREATE grain now
+ * works — it used to be a permission the product would issue and then refuse
+ * to honour, which is how an assistant scoped to exactly "read and create"
+ * ended up unable to create anything. A viewer is unaffected: they keep the
+ * read routes and are declined the write, as before.
+ */
+function registerCreateRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:create")).post(
     "/",
     describeRoute({
@@ -166,9 +226,14 @@ export function registerScenarioRoutes(
     zValidator("json", createScenarioSchema),
     async (c) => {
       const project = c.get("project");
-      const body = c.req.valid("json");
+      const body = normalizeRedTeamWrite(c.req.valid("json"));
 
       logger.info({ projectId: project.id }, "Creating scenario");
+
+      const issue = redTeamStateIssue(body);
+      if (issue) {
+        throw new RedTeamConfigurationError(issue);
+      }
 
       const service = getService();
       const scenario = await service.create({
@@ -177,6 +242,7 @@ export function registerScenarioRoutes(
         situation: body.situation,
         criteria: body.criteria,
         labels: body.labels,
+        ...toPrismaRedTeamWrite(body),
       });
 
       return c.json(
@@ -191,9 +257,15 @@ export function registerScenarioRoutes(
       );
     },
   );
+}
 
-  // `:update` for the same reason as `:create` above — `:manage` still implies
-  // it, so no existing caller changes.
+/**
+ * `:update` for the same reason as `:create` above. `:manage` still implies
+ * it, so no existing caller changes.
+ */
+function registerUpdateRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:update")).put(
     "/:id",
     describeRoute({
@@ -220,7 +292,7 @@ export function registerScenarioRoutes(
     async (c) => {
       const project = c.get("project");
       const { id } = c.req.param();
-      const body = c.req.valid("json");
+      const body = normalizeRedTeamWrite(c.req.valid("json"));
 
       logger.info(
         { projectId: project.id, scenarioId: id },
@@ -233,11 +305,23 @@ export function registerScenarioRoutes(
         return c.json({ error: "Scenario not found" }, 404);
       }
 
+      const merged = mergeRedTeamState(body, {
+        redTeamStrategy: existing.redTeamStrategy,
+        redTeamTarget: existing.redTeamTarget,
+        redTeamTotalTurns: existing.redTeamTotalTurns,
+        redTeamConfig: existing.redTeamConfig as RedTeamConfig | null,
+      });
+      const updateIssue = redTeamStateIssue(merged);
+      if (updateIssue) {
+        throw new RedTeamConfigurationError(updateIssue);
+      }
+
       const scenario = await service.update(id, project.id, {
         ...(body.name !== undefined && { name: body.name }),
         ...(body.situation !== undefined && { situation: body.situation }),
         ...(body.criteria !== undefined && { criteria: body.criteria }),
         ...(body.labels !== undefined && { labels: body.labels }),
+        ...toPrismaRedTeamWrite(body),
       });
 
       return c.json({
@@ -249,11 +333,17 @@ export function registerScenarioRoutes(
       });
     },
   );
+}
 
-  // Archiving deliberately still asks for `:manage`. Create and update were
-  // refined because access issued at that grain was being refused; nothing is
-  // asking to destroy scenarios at a finer grain, and the destructive verb is
-  // the wrong place to widen who qualifies.
+/**
+ * Archiving deliberately still asks for `:manage`. Create and update were
+ * refined because access issued at that grain was being refused; nothing is
+ * asking to destroy scenarios at a finer grain, and the destructive verb is
+ * the wrong place to widen who qualifies.
+ */
+function registerArchiveRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:manage")).delete(
     "/:id",
     describeRoute({

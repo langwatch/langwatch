@@ -47,6 +47,9 @@ import {
   type HttpAgentData,
   type LiteLLMParams,
   type PromptConfigData,
+  RED_TEAM_MAX_TURNS,
+  RedTeamConfigSchema,
+  RedTeamStrategySchema,
   type ScenarioConfig,
   type TargetAdapterData,
   type TargetConfig,
@@ -69,6 +72,11 @@ export interface ScenarioFetcher {
     simulatorModel?: string | null;
     /** Per-scenario judge model override (null = use default). */
     judgeModel?: string | null;
+    /** Red-team attack config; null strategy = a standard scenario. */
+    redTeamStrategy?: string | null;
+    redTeamTarget?: string | null;
+    redTeamTotalTurns?: number | null;
+    redTeamConfig?: unknown;
   } | null>;
 }
 
@@ -419,10 +427,80 @@ async function fetchScenario(
       situation: scenario.situation,
       criteria: scenario.criteria,
       labels: scenario.labels,
+      // Passthrough so the child process can build the attacker without a
+      // second DB read; absent on a standard scenario.
+      redTeamStrategy: parseRedTeamStrategy(scenario.redTeamStrategy),
+      redTeamTarget: scenario.redTeamTarget ?? null,
+      redTeamTotalTurns: clampRedTeamTurns(scenario),
+      redTeamConfig: parseRedTeamConfig(scenario),
     },
     simulatorModel: scenario.simulatorModel ?? null,
     judgeModel: scenario.judgeModel ?? null,
   };
+}
+
+/**
+ * The stored tuning knobs, or none — but never silently none.
+ *
+ * Falling back to the SDK's defaults keeps a drifted JSONB blob from taking
+ * the run down, which is right. Doing it without a word is not: the attack
+ * then runs on defaults while the editor still shows the settings the user
+ * chose, and the only symptom is a run that behaves unlike its configuration.
+ * That is unfalsifiable from the outside, so it gets logged with the reason.
+ */
+function parseRedTeamConfig(scenario: { id: string; redTeamConfig?: unknown }) {
+  const parsed = RedTeamConfigSchema.nullish().safeParse(
+    scenario.redTeamConfig,
+  );
+  if (parsed.success) return parsed.data;
+
+  logger.warn(
+    {
+      scenarioId: scenario.id,
+      issues: parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        code: issue.code,
+      })),
+    },
+    "stored red-team config did not validate; running on SDK defaults",
+  );
+  return null;
+}
+
+/**
+ * The turn budget, held inside the bound the writers enforce.
+ *
+ * Every write path caps this at RED_TEAM_MAX_TURNS, so a row above it means a
+ * hand-edited or pre-cap record. The child process parses its payload and
+ * would reject such a row outright; clamping here keeps that from turning an
+ * old record into an unrunnable scenario, while still refusing to bill for a
+ * budget nobody could have set through the product.
+ */
+function clampRedTeamTurns(scenario: {
+  id: string;
+  redTeamTotalTurns?: number | null;
+}) {
+  const turns = scenario.redTeamTotalTurns ?? null;
+  if (turns === null || (turns >= 1 && turns <= RED_TEAM_MAX_TURNS)) {
+    return turns;
+  }
+
+  const clamped = Math.min(Math.max(Math.round(turns), 1), RED_TEAM_MAX_TURNS);
+  logger.warn(
+    { scenarioId: scenario.id, storedTurns: turns, turns: clamped },
+    "stored red-team turn budget is out of range; clamping",
+  );
+  return clamped;
+}
+
+/**
+ * A stored strategy that is not one we know about is treated as "no red
+ * team" rather than crashing the run: the column is a plain string, so an
+ * older or hand-edited row must not take the pipeline down.
+ */
+function parseRedTeamStrategy(value: string | null | undefined) {
+  const parsed = RedTeamStrategySchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 type FetchProjectResult =

@@ -30,11 +30,11 @@ describe("generateScenarioWithAI()", () => {
         json: () => Promise.resolve({ scenario: mockScenario }),
       });
 
-      const result = await generateScenarioWithAI(
-        "test prompt",
-        "project-123",
-        null,
-      );
+      const result = await generateScenarioWithAI({
+        prompt: "test prompt",
+        projectId: "project-123",
+        currentScenario: null,
+      });
 
       expect(result).toEqual(mockScenario);
     });
@@ -45,7 +45,11 @@ describe("generateScenarioWithAI()", () => {
         json: () => Promise.resolve({ scenario: mockScenario }),
       });
 
-      await generateScenarioWithAI("test prompt", "project-123", null);
+      await generateScenarioWithAI({
+        prompt: "test prompt",
+        projectId: "project-123",
+        currentScenario: null,
+      });
 
       expect(global.fetch).toHaveBeenCalledWith("/api/scenario/generate", {
         method: "POST",
@@ -54,6 +58,7 @@ describe("generateScenarioWithAI()", () => {
           prompt: "test prompt",
           currentScenario: null,
           projectId: "project-123",
+          redTeam: false,
         }),
       });
     });
@@ -70,11 +75,11 @@ describe("generateScenarioWithAI()", () => {
         criteria: ["existing"],
       };
 
-      await generateScenarioWithAI(
-        "refine this",
-        "project-123",
+      await generateScenarioWithAI({
+        prompt: "refine this",
+        projectId: "project-123",
         currentScenario,
-      );
+      });
 
       expect(global.fetch).toHaveBeenCalledWith("/api/scenario/generate", {
         method: "POST",
@@ -83,6 +88,7 @@ describe("generateScenarioWithAI()", () => {
           prompt: "refine this",
           currentScenario,
           projectId: "project-123",
+          redTeam: false,
         }),
       });
     });
@@ -112,11 +118,11 @@ describe("generateScenarioWithAI()", () => {
     });
 
     it("does not leak a raw JSON.parse error to the caller", async () => {
-      const error = await generateScenarioWithAI(
-        "test prompt",
-        "project-123",
-        null,
-      ).catch((e: unknown) => e);
+      const error = await generateScenarioWithAI({
+        prompt: "test prompt",
+        projectId: "project-123",
+        currentScenario: null,
+      }).catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).not.toMatch(
@@ -125,11 +131,11 @@ describe("generateScenarioWithAI()", () => {
     });
 
     it("surfaces the HTTP status so the failure is actionable", async () => {
-      const error = await generateScenarioWithAI(
-        "test prompt",
-        "project-123",
-        null,
-      ).catch((e: unknown) => e);
+      const error = await generateScenarioWithAI({
+        prompt: "test prompt",
+        projectId: "project-123",
+        currentScenario: null,
+      }).catch((e: unknown) => e);
 
       expect((error as Error).message).toContain("502");
     });
@@ -143,7 +149,11 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null),
+        generateScenarioWithAI({
+          prompt: "test prompt",
+          projectId: "project-123",
+          currentScenario: null,
+        }),
       ).rejects.toThrow("Custom error message");
     });
 
@@ -154,7 +164,11 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null),
+        generateScenarioWithAI({
+          prompt: "test prompt",
+          projectId: "project-123",
+          currentScenario: null,
+        }),
       ).rejects.toThrow("Failed to generate scenario");
     });
   });
@@ -174,11 +188,11 @@ describe("generateScenarioWithAI()", () => {
           }),
       });
 
-      const error = await generateScenarioWithAI(
-        "test prompt",
-        "project-123",
-        null,
-      ).catch((e: unknown) => e);
+      const error = await generateScenarioWithAI({
+        prompt: "test prompt",
+        projectId: "project-123",
+        currentScenario: null,
+      }).catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(ScenarioGenerationError);
       expect((error as ScenarioGenerationError).kind).toBe("missing_provider");
@@ -196,7 +210,11 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null),
+        generateScenarioWithAI({
+          prompt: "test prompt",
+          projectId: "project-123",
+          currentScenario: null,
+        }),
       ).rejects.toThrow("Invalid response: missing scenario data");
     });
 
@@ -216,7 +234,11 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null),
+        generateScenarioWithAI({
+          prompt: "test prompt",
+          projectId: "project-123",
+          currentScenario: null,
+        }),
       ).rejects.toThrow("Invalid scenario data");
     });
 
@@ -232,7 +254,11 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null),
+        generateScenarioWithAI({
+          prompt: "test prompt",
+          projectId: "project-123",
+          currentScenario: null,
+        }),
       ).rejects.toThrow("Invalid scenario data");
     });
   });

@@ -152,3 +152,78 @@ describe("POST /api/scenario/generate — gateway-failure resilience (#5758)", (
     });
   });
 });
+
+/**
+ * A red-team draft is a different piece of writing, not the standard one with
+ * an extra field: the criteria invert into prohibitions, the situation is
+ * written from the defender's side, and there is an attack objective to
+ * invent. These run the real handler and inspect what the model was actually
+ * asked for, so the two prompts cannot quietly converge.
+ */
+describe("POST /api/scenario/generate — red-team drafts", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetServerAuthSession.mockResolvedValue({
+      user: { id: "user_test" },
+      expires: "1",
+    });
+    mockHasProjectPermission.mockResolvedValue(true);
+  });
+
+  /** Runs the route and hands back the system prompt the model received. */
+  const captureSystemPrompt = async (body: unknown) => {
+    let systemPrompt = "";
+    mockGetVercelAIModel.mockResolvedValue(
+      new MockLanguageModelV3({
+        doGenerate: async ({ prompt }) => {
+          systemPrompt = String(
+            prompt.find((m) => m.role === "system")?.content ?? "",
+          );
+          throw retryableGatewayError();
+        },
+      }),
+    );
+    await post(body);
+    return systemPrompt;
+  };
+
+  describe("given the editor is in red-team mode", () => {
+    it("asks for an attack objective", async () => {
+      const systemPrompt = await captureSystemPrompt({
+        ...validBody,
+        redTeam: true,
+      });
+
+      expect(systemPrompt).toContain("redTeamTarget");
+    });
+
+    it("asks for criteria as prohibitions, not cooperative goals", async () => {
+      const systemPrompt = await captureSystemPrompt({
+        ...validBody,
+        redTeam: true,
+      });
+
+      expect(systemPrompt).toContain("must NEVER do");
+      expect(systemPrompt).toContain("ADVERSARIAL RED-TEAM");
+    });
+
+    it("asks for the situation from the defender's side", async () => {
+      const systemPrompt = await captureSystemPrompt({
+        ...validBody,
+        redTeam: true,
+      });
+
+      expect(systemPrompt).toContain("DEFENDER");
+    });
+  });
+
+  describe("given the editor is in standard mode", () => {
+    it("leaves the cooperative-user prompt untouched", async () => {
+      const systemPrompt = await captureSystemPrompt(validBody);
+
+      expect(systemPrompt).not.toContain("ADVERSARIAL RED-TEAM");
+      expect(systemPrompt).not.toContain("redTeamTarget");
+      expect(systemPrompt).toContain("User persona");
+    });
+  });
+});

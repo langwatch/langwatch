@@ -2320,8 +2320,21 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .requiredOption("--situation <situation>", "The situation/context for the scenario")
       .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
       .option("--labels <labels>", "Comma-separated list of labels")
+      .option(
+        "--red-team-strategy <strategy>",
+        "Make this an adversarial scenario: crescendo (escalates gradually) or goat (picks a fresh technique each turn)",
+      )
+      .option(
+        "--red-team-target <objective>",
+        "What the attacker tries to achieve, e.g. \"get the agent to reveal its system prompt\"",
+      )
+      .option("--red-team-turns <turns>", "Attacker turn budget, 1-50 (default 50)")
+      .option(
+        "--no-red-team-scoring",
+        "Stop scoring each reply. Cheaper, and the documented way to shorten a run without cutting turns",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { situation: string; criteria?: string; labels?: string }) => {
+    async (name: string, options: { situation: string; criteria?: string; labels?: string } & import("./commands/scenarios/red-team-options.js").RedTeamCliOptions) => {
       const { createScenarioCommand: impl } = await import("./commands/scenarios/create.js");
       return impl(name, options);
     },
@@ -2335,8 +2348,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--situation <situation>", "New situation/context")
       .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
       .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
+      .option(
+        "--red-team-strategy <strategy>",
+        "Turn this into an adversarial scenario: crescendo or goat",
+      )
+      .option("--red-team-target <objective>", "What the attacker tries to achieve")
+      .option("--red-team-turns <turns>", "Attacker turn budget, 1-50")
+      .option("--no-red-team-scoring", "Stop scoring each reply")
+      .option("--standard", "Clear the red-team configuration, back to a standard scenario")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string }) => {
+    async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string } & import("./commands/scenarios/red-team-options.js").RedTeamCliOptions) => {
       const { updateScenarioCommand: impl } = await import("./commands/scenarios/update.js");
       return impl(id, options);
     },
