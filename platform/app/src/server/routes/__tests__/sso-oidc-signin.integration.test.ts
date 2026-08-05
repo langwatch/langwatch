@@ -227,5 +227,17 @@ describe("given a self-hosted deployment federating to an OIDC identity provider
     it("asks for an authorization code", () => {
       expect(authorizeUrl.searchParams.get("response_type")).toBe("code");
     });
+
+    /**
+     * The config carries `pkce: true`, but only the emitted URL shows whether
+     * that reached the identity provider, and this is the only suite that
+     * looks at the URL.
+     */
+    it("carries a PKCE challenge", () => {
+      expect(authorizeUrl.searchParams.get("code_challenge")).toBeTruthy();
+      expect(authorizeUrl.searchParams.get("code_challenge_method")).toBe(
+        "S256",
+      );
+    });
   });
 });
