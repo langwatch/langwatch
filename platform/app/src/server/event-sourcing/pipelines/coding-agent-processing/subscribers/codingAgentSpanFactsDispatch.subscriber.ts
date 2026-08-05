@@ -7,10 +7,12 @@ import {
   makeSpanReferencedEvent,
   parseSpanReferencedEvent,
   type SpanReceivedEvent,
+  type SpanReferencedEvent,
   type TraceProcessingEvent,
 } from "../../trace-processing/schemas/events";
 import type { NormalizedSpan } from "../../trace-processing/schemas/spans";
 import type { ContributeSpanFactsCommandData } from "../schemas/commands";
+import { parseSpanFactsLiftedEvent } from "../schemas/events";
 import {
   CODING_AGENT_CONTRIBUTION_KEYS,
   detectCodingAgent,
@@ -30,16 +32,27 @@ import { CODING_AGENT_SPAN_NAMES } from "../services/coding-agent-session.deriva
  *     flows past that predicate; one set lookup keeps an ordinary chat trace's
  *     cost at zero. Origin gating is exactly this predicate — no gate reactor
  *     (ADR-056 §3).
- *   - A freshly staged job is a `span_referenced` claim-check: the span's
- *     identity, not its payload. The handler reads the canonical span back
- *     from the span store — where spanStorage already normalized it once —
- *     and lifts the facts from that row. The read races the sibling
- *     spanStorage write, so a miss throws into the queue's backoff and the
- *     `delay` below debounces the common case past the race.
+ *   - A `span_facts_lifted` job carries a bounded derivation: the facts, already
+ *     lifted, on the job itself. The handler contributes them directly. Nothing
+ *     is read back, so nothing races. This is the shape the seam will stage once
+ *     R2 flips the producer (see the handler contract below).
+ *   - A `span_referenced` claim-check carries the span's identity, not its
+ *     payload, and the handler reads the canonical span back from the span
+ *     store. That read races the sibling spanStorage write, which is the
+ *     failure the derivation shape exists to remove: on 2026-08-05 it parked 22
+ *     per-trace groups in `:blocked`. No longer produced; still handled, so
+ *     references already staged in Redis drain.
  *   - A full `span_received` job still processes exactly as before references
  *     existed: jobs staged by a previous release, and matched events the seam
- *     could not reference, carry the whole event, and the handler normalizes
+ *     could not lift, carry the whole event, and the handler normalizes
  *     inline in its own lane.
+ *
+ * **Deploy order (ADR-069).** This build is the CONSUMER half: it reads
+ * `span_facts_lifted` but does not stage it. The producer flip ships a release
+ * later, because a worker that predates the type would otherwise complete such
+ * a job silently. Anything this build cannot read at all now throws instead of
+ * returning, so the next crossing of this boundary fails as a retry rather than
+ * as a silent loss.
  */
 export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
   contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
@@ -87,52 +100,55 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
           // aggregateId is the trace id — span ids are only unique WITHIN a
           // trace, so the key needs both or two traces' spans can collide
           // inside the TTL and silently drop facts. When the span carries a
-          // wire id, both staged shapes expose that same RAW id, so the key is
-          // identical across the reference upgrade; when it carries none, the
-          // key falls back to the event id (see `dedupIdentity`), which both
-          // shapes also share.
+          // wire id, all three staged shapes expose that same RAW id, so the
+          // key is identical across both upgrades; when it carries none, the
+          // key falls back to the event id (see `dedupIdentity`), which every
+          // shape also shares.
           return `coding-agent-span-facts:${tenantId}:${aggregateId}:${spanId}`;
         },
         ttlMs: 60_000,
       },
     },
     handle: async (event) => {
-      // Freshly staged job: a claim-check. Resolve it through the span store.
-      const ref = parseSpanReferencedEvent(event);
-      if (ref) {
-        const span = await deps.getNormalizedSpanById({
-          tenantId: ref.tenantId,
-          traceId: ref.data.traceId,
-          spanId: ref.data.spanId,
-          // Center the store's partition window on the span's OWN start (the
-          // stored row's StartTime is this exact value), not on ingest time:
-          // a span that ran longer than the window and exported on end would
-          // otherwise sit permanently outside an occurredAt-centered read and
-          // exhaust its retries into a blocked group.
-          occurredAtMs: ref.data.startTimeUnixMs ?? ref.occurredAt,
+      // Staged bounded derivation: the facts already rode in on the job, so
+      // there is nothing to read back and nothing to race.
+      const lifted = parseSpanFactsLiftedEvent(event);
+      if (lifted) {
+        await deps.contributeSpanFacts({
+          ...lifted.data,
+          // The envelope's tenant is the one the scheduler grouped and routed
+          // this job by, so it stays authoritative over the staged body. They
+          // are identical by construction; pinning it means a malformed
+          // payload cannot contribute across tenants.
+          tenantId: lifted.tenantId,
         });
-        if (span === null) {
-          // Not readable YET — the reference raced the sibling span write.
-          // Throwing is the contract: the queue retries with backoff, and a
-          // span that never lands surfaces as a loud exhausted job, never a
-          // silent drop.
-          throw new Error(
-            `Referenced span is not readable yet (trace ${ref.data.traceId}, span ${ref.data.spanId}); retrying until the span store write lands`,
-          );
-        }
-        await deps.contributeSpanFacts(
-          liftContribution({
-            span,
-            tenantId: ref.tenantId,
-            occurredAt: ref.occurredAt,
-          }),
-        );
         return;
       }
 
+      // Claim-check staged by an earlier release: resolve through the span
+      // store. No longer produced — kept so references already in Redis drain.
+      const ref = parseSpanReferencedEvent(event);
+      if (ref) {
+        await deps.contributeSpanFacts(await resolveClaimCheck(ref, deps));
+        return;
+      }
+
+      // Neither staged shape. Before treating this as a full event, establish
+      // that it IS one: a payload of some other type is a shape this build
+      // cannot read — almost certainly staged by a newer worker mid-rollout —
+      // and returning here would COMPLETE the job with no throw, no retry and
+      // no counter, silently dropping that span's facts. Refusing it is the
+      // whole reason the deploy-order rule is enforceable (ADR-069).
+      if (!isSpanReceivedEvent(event)) {
+        throw new Error(
+          `codingAgentSpanFactsDispatch cannot read staged payload of type "${String((event as { type?: unknown }).type)}"; refusing it into the queue's retry rather than completing it. A newer build likely staged it — drain with a build that knows the shape.`,
+        );
+      }
+
       // Full-event job: a pre-reference release staged it, or the seam could
-      // not build a reference. Gate, normalize and lift inline — identical to
-      // the pre-reference handler.
+      // not build a derivation. Gate, normalize and lift inline — identical to
+      // the pre-reference handler. A span_received this subscriber declines is
+      // a legitimate quiet completion, not an unreadable shape.
       if (!isCodingAgentSpan(event)) return;
       const span = normalization.normalizeSpanReceived(
         event.tenantId,
@@ -149,6 +165,53 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
       );
     },
   };
+}
+
+/**
+ * Resolves a `span_referenced` claim-check through the span store and lifts its
+ * facts — the legacy path, kept only so references already staged in Redis
+ * drain. Nothing produces new ones.
+ */
+async function resolveClaimCheck(
+  ref: SpanReferencedEvent,
+  deps: {
+    getNormalizedSpanById: (params: {
+      tenantId: string;
+      traceId: string;
+      spanId: string;
+      occurredAtMs: number;
+    }) => Promise<NormalizedSpan | null>;
+  },
+): Promise<ContributeSpanFactsCommandData> {
+  const span = await deps.getNormalizedSpanById({
+    tenantId: ref.tenantId,
+    traceId: ref.data.traceId,
+    spanId: ref.data.spanId,
+    // Center the store's partition window on the span's OWN start (the stored
+    // row's StartTime is this exact value), not on ingest time: a span that ran
+    // longer than the window and exported on end would otherwise sit
+    // permanently outside an occurredAt-centered read and exhaust its retries
+    // into a blocked group.
+    occurredAtMs: ref.data.startTimeUnixMs ?? ref.occurredAt,
+  });
+  if (span === null) {
+    // The reference raced the sibling span write, or that write never landed.
+    // Throwing is the contract: the queue retries with backoff.
+    //
+    // Say what the queue actually does. The retry budget is finite
+    // (JOB_RETRY_CONFIG: 25 attempts, ~2h27m), and on exhaustion the job parks
+    // its per-trace group in `:blocked` and stops. A message promising retries
+    // "until the write lands" read as a system still working on it, while 22
+    // groups sat blocked for hours on 2026-08-05.
+    throw new Error(
+      `Referenced span is not readable in the span store (trace ${ref.data.traceId}, span ${ref.data.spanId}). Retrying on the shared job budget; once that is exhausted this group blocks and stops. A group that blocks here means the span's spanStorage write never landed — investigate that write, not this subscriber.`,
+    );
+  }
+  return liftContribution({
+    span,
+    tenantId: ref.tenantId,
+    occurredAt: ref.occurredAt,
+  });
 }
 
 /**
@@ -241,7 +304,8 @@ function dedupIdentity(payload: TraceProcessingEvent): {
   if (typeof data === "object" && data !== null) {
     const direct = (data as { spanId?: unknown }).spanId;
     if (typeof direct === "string" && direct.length > 0) {
-      // span_referenced: the raw wire span id sits on the reference itself.
+      // span_referenced / span_facts_lifted: the raw wire span id sits on the
+      // staged body itself, at the same path in both.
       return { ...base, spanId: direct };
     }
     const nested = (data as { span?: { spanId?: unknown } }).span?.spanId;

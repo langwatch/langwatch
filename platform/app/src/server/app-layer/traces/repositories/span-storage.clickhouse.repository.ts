@@ -131,6 +131,47 @@ const FULL_SPAN_SELECT = `
 `;
 
 /**
+ * {@link FULL_SPAN_SELECT} minus the `Events.*` / `Links.*` nested columns, for
+ * internal derivation consumers that read scalar span/resource attributes and
+ * never touch a span's events or links.
+ *
+ * Not a micro-optimisation. Those nested columns are what production throws
+ * `Attempt to read after eof (while reading column Links.Attributes)` on — the
+ * failure ran to thousands of lines an hour, and because this read backs a
+ * queue handler, every one of them re-staged the job and re-ran the read on
+ * backoff. Dropping columns the consumer never reads removes the error class
+ * and the retry load it generated in one move.
+ *
+ * {@link mapChRowToNormalized} already tolerates their absence — it defaults
+ * both nested groups to `[]` — so a span mapped from this projection carries
+ * empty `events` and `links`. That is why this select is NOT a drop-in for the
+ * UI read: only use it where empty events/links are correct, never where a
+ * caller renders them.
+ */
+const DERIVATION_SPAN_SELECT = `
+  SpanId,
+  TraceId,
+  TenantId,
+  ParentSpanId,
+  ParentTraceId,
+  ParentIsRemote,
+  Sampled,
+  toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
+  toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
+  DurationMs,
+  SpanName,
+  SpanKind,
+  ResourceAttributes,
+  SpanAttributes,
+  StatusCode,
+  StatusMessage,
+  ScopeName,
+  ScopeVersion,
+  Cost,
+  NonBilledCost
+`;
+
+/**
  * Per-query memory ceiling for the single-trace full-attribute reads below.
  *
  * The heavy column on these reads is the `SpanAttributes` Map: ClickHouse reads
@@ -1071,6 +1112,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * call would fall straight through to the unbounded fragment and scan every
    * partition, cold S3 tier included — precisely what this read promises not
    * to do, and per retry.
+   *
+   * **Returns a span with empty `events` and `links`**: it reads
+   * {@link DERIVATION_SPAN_SELECT}, which omits those nested columns because no
+   * derivation consumer reads them and they are what this read fails on. Do not
+   * reach for this method to render a span — {@link getSpanByIds} is the read
+   * that returns one whole.
    */
   async findNormalizedSpanById({
     tenantId,
@@ -1091,7 +1138,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         fallback: "none",
         isEmpty: (row) => row === null,
         run: (window) =>
-          this.fetchNormalizedSpanRow({ tenantId, traceId, spanId, window }),
+          this.fetchNormalizedSpanRow({
+            tenantId,
+            traceId,
+            spanId,
+            window,
+            // Derivation consumers lift scalar attributes only; the nested
+            // Events/Links columns are both unused here and the source of the
+            // `Attempt to read after eof` failures this read retries on.
+            select: DERIVATION_SPAN_SELECT,
+          }),
       });
     } catch (error) {
       logger.error(
@@ -1119,6 +1175,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
    * rule predates LazilyRead and isn't load-bearing on this shape.
    *
+   * `select` is the caller's projection: the UI read takes the whole span, the
+   * derivation read takes {@link DERIVATION_SPAN_SELECT}. Everything else about
+   * the query — key predicate, dedup form, settings — is identical, which is
+   * why it stays one method rather than two near-copies.
+   *
    * KNOWN MISMATCH, pre-existing: the engine's version column is `StartTime`
    * (`ReplacingMergeTree(StartTime)`), not `UpdatedAt`. So a span re-exported
    * with a CHANGED StartTime answers last-written-wins before a merge and
@@ -1130,17 +1191,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId,
     spanId,
     window,
+    select = FULL_SPAN_SELECT,
   }: {
     tenantId: string;
     traceId: string;
     spanId: string;
     window: WindowFragment | null;
+    select?: string;
   }): Promise<NormalizedSpan | null> {
     const partition = partitionFragment(window);
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `
-        SELECT ${FULL_SPAN_SELECT}
+        SELECT ${select}
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}

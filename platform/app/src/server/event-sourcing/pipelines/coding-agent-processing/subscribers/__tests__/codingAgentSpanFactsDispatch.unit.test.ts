@@ -24,6 +24,11 @@ import {
 } from "../../../trace-processing/schemas/events";
 import type { NormalizedSpan } from "../../../trace-processing/schemas/spans";
 import type { ContributeSpanFactsCommandData } from "../../schemas/commands";
+import {
+  SPAN_FACTS_LIFTED_EVENT_TYPE,
+  SPAN_FACTS_LIFTED_EVENT_VERSION_LATEST,
+} from "../../schemas/constants";
+import type { SpanFactsLiftedEvent } from "../../schemas/events";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "../codingAgentSpanFactsDispatch.subscriber";
 
 const TRACE_ID = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
@@ -154,6 +159,60 @@ function storeReadBackFrom(event: SpanReceivedEvent): NormalizedSpan {
       serializeAttributes(link.attributes),
     ),
   }) as NormalizedSpan;
+}
+
+/**
+ * A `span_facts_lifted` job: the bounded derivation the seam stages once the
+ * producer half ships. Built against the real constant and version so a bump
+ * that forgets this suite fails here rather than in production.
+ */
+function liftedEvent({
+  spanId,
+  traceId = TRACE_ID,
+  startMs = 1_000,
+}: {
+  spanId: string;
+  traceId?: string;
+  startMs?: number;
+}): SpanFactsLiftedEvent {
+  return {
+    id: `evt-${spanId}`,
+    version: SPAN_FACTS_LIFTED_EVENT_VERSION_LATEST,
+    aggregateId: traceId,
+    aggregateType: "trace",
+    tenantId: createTenantId("tenant-1"),
+    createdAt: startMs,
+    occurredAt: startMs,
+    type: SPAN_FACTS_LIFTED_EVENT_TYPE,
+    data: {
+      tenantId: "tenant-1",
+      sessionId: "session-1",
+      sessionKeySource: "provider",
+      agent: "claude_code",
+      occurredAt: startMs,
+      traceId,
+      spanId,
+      name: "claude_code.tool",
+      startTimeUnixMs: startMs,
+      endTimeUnixMs: startMs + 1_000,
+      statusCode: 0,
+      facts: { tool_name: "Bash" },
+      scopeName: "claude_code",
+    },
+  } as unknown as SpanFactsLiftedEvent;
+}
+
+/**
+ * Widens a staged payload to what `handle` accepts.
+ *
+ * `span_facts_lifted` is deliberately NOT a member of `TraceProcessingEvent`:
+ * the seam stages it in a trace event's place, and it never reaches the event
+ * log. So the handler's own parameter type cannot name it, and driving the
+ * handler with one needs this cast. Kept in one named place rather than
+ * scattered inline, so the reason survives.
+ */
+function staged(event: unknown): TraceProcessingEvent {
+  return event as TraceProcessingEvent;
 }
 
 function makeSubscriber(
@@ -623,8 +682,40 @@ describe("codingAgentSpanFactsDispatch", () => {
             makeSpanReferencedEvent(event) as TraceProcessingEvent,
             context,
           ),
-        ).rejects.toThrow(/not readable yet/);
+        ).rejects.toThrow(/not readable in the span store/);
         expect(dispatched).toHaveLength(0);
+      });
+
+      /**
+       * The message is operator-facing under a blocked group, so it has to
+       * describe what the queue does rather than what we wish it did. The old
+       * wording promised retries "until the span store write lands", which read
+       * as still-working while 22 groups sat parked and stopped.
+       *
+       * @scenario work whose payload is not readable yet retries, never drops
+       */
+      it("does not promise a retry budget the queue will not spend", async () => {
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-late-msg",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const { subscriber } = makeSubscriber(async () => null);
+
+        const failure: unknown = await subscriber
+          .handle(
+            makeSpanReferencedEvent(event) as TraceProcessingEvent,
+            context,
+          )
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+
+        const message = (failure as Error).message;
+        expect(message).not.toMatch(/until the span store write lands/);
+        expect(message).toMatch(/blocks/);
+        expect(message).toMatch(/spanStorage/);
       });
     });
 
@@ -648,7 +739,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         // readily as on the version gate. Pin the failure to the gate itself:
         // a schema rejection whose issue is the `version` field.
         const failure: unknown = await subscriber
-          .handle(future as TraceProcessingEvent, context)
+          .handle(staged(future), context)
           .then(
             () => null,
             (error: unknown) => error,
@@ -677,6 +768,207 @@ describe("codingAgentSpanFactsDispatch", () => {
         await subscriber.handle(staged as TraceProcessingEvent, context);
         expect(dispatched).toHaveLength(1);
         expect(reads).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given a lifted-derivation staged job (ADR-069)", () => {
+    describe("when the job carries the facts already lifted", () => {
+      /** @scenario work whose result is a bounded derivation carries it instead of a pointer */
+      it("contributes them without reading the span store at all", async () => {
+        const { subscriber, dispatched, reads } = makeSubscriber(async () => {
+          throw new Error("the store must not be read for a lifted job");
+        });
+
+        await subscriber.handle(
+          staged(liftedEvent({ spanId: "tool-lifted" })),
+          context,
+        );
+
+        expect(reads).toHaveLength(0);
+        expect(dispatched).toHaveLength(1);
+        expect(dispatched[0]!.spanId).toBe("tool-lifted");
+        expect(dispatched[0]!.facts.tool_name).toBe("Bash");
+      });
+
+      /**
+       * The whole point of the shape: the sibling spanStorage write is the
+       * dependency that parked 22 groups, so a lifted job must succeed with the
+       * store entirely absent, not merely usually.
+       *
+       * @scenario work whose result is a bounded derivation carries it instead of a pointer
+       */
+      it("succeeds even when the span never lands in the store", async () => {
+        const { subscriber, dispatched } = makeSubscriber(async () => null);
+
+        await subscriber.handle(
+          staged(liftedEvent({ spanId: "tool-never-stored" })),
+          context,
+        );
+
+        expect(dispatched).toHaveLength(1);
+      });
+    });
+
+    describe("when the staged body names a different tenant than the envelope", () => {
+      /** @scenario work whose result is a bounded derivation carries it instead of a pointer */
+      it("contributes under the envelope's tenant, never the body's", async () => {
+        const { subscriber, dispatched } = makeSubscriber();
+        const lifted = liftedEvent({ spanId: "tool-x-tenant" });
+
+        await subscriber.handle(
+          staged({
+            ...lifted,
+            data: { ...lifted.data, tenantId: "tenant-other" },
+          }),
+          context,
+        );
+
+        expect(dispatched).toHaveLength(1);
+        expect(dispatched[0]!.tenantId).toBe("tenant-1");
+      });
+    });
+
+    describe("when the lifted job carries a version this build does not know", () => {
+      /** @scenario work a build cannot read fails loudly, never half-processed */
+      it("throws into the queue's retry instead of no-opping as another shape", async () => {
+        const { subscriber, dispatched } = makeSubscriber();
+        const future = {
+          ...liftedEvent({ spanId: "tool-vnext-lifted" }),
+          version: "2199-01-01",
+        };
+
+        const failure: unknown = await subscriber
+          .handle(staged(future), context)
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+
+        expect(failure).toBeInstanceOf(ZodError);
+        expect(
+          (failure as ZodError).issues.map((issue) => issue.path.join(".")),
+        ).toContain("version");
+        expect(dispatched).toHaveLength(0);
+      });
+    });
+
+    describe("when the dedup key is built from a lifted job", () => {
+      /**
+       * The reference upgrade kept the key stable; this one must too, or a
+       * rollout that mixes shapes double-counts the same span's facts.
+       *
+       * @scenario a redelivered event resolves to the unit of work already queued
+       */
+      it("matches the key the full event and the claim-check produce", async () => {
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-key",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const makeId = makeSubscriber().subscriber.options?.deduplication;
+        if (typeof makeId !== "object" || makeId === null) {
+          throw new Error("dedup config missing");
+        }
+
+        const fromFull = makeId.makeId(event);
+        const fromReference = makeId.makeId(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+        );
+        const fromLifted = makeId.makeId(
+          staged(liftedEvent({ spanId: "tool-key" })),
+        );
+
+        expect(fromReference).toBe(fromFull);
+        expect(fromLifted).toBe(fromFull);
+      });
+    });
+  });
+
+  describe("given the lift's closed vocabulary", () => {
+    describe("when the span carries large content beside the listed facts", () => {
+      /**
+       * This is the guard that lets a derivation ride on the job at all: the
+       * lift walks a fixed key list and takes scalars, so what it carries is
+       * bounded by that list rather than by the span. If an unlisted key could
+       * ride along, "carry the derivation" would quietly become "queue the
+       * payload", which is the cost ADR-069 exists to prevent.
+       *
+       * @scenario a carried derivation never carries content
+       */
+      it("carries the listed facts and none of the content", async () => {
+        const { subscriber, dispatched } = makeSubscriber();
+        const bulk = "x".repeat(50_000);
+
+        await subscriber.handle(
+          rawSpanEvent({
+            name: "claude_code.tool",
+            spanId: "tool-bulky",
+            attributes: {
+              tool_name: "Bash",
+              prompt_length: 4,
+              // Content, and plausibly-named neighbours of listed keys — none
+              // of them is on the list, so none may be carried.
+              "gen_ai.prompt": bulk,
+              "gen_ai.completion": bulk,
+              tool_result: bulk,
+            },
+          }) as TraceProcessingEvent,
+          context,
+        );
+
+        expect(dispatched).toHaveLength(1);
+        const { facts } = dispatched[0]!;
+        expect(facts.tool_name).toBe("Bash");
+        expect(facts.prompt_length).toBe(4);
+        expect(Object.keys(facts)).not.toContain("gen_ai.prompt");
+        expect(Object.keys(facts)).not.toContain("gen_ai.completion");
+        expect(Object.keys(facts)).not.toContain("tool_result");
+        expect(JSON.stringify(facts)).not.toContain(bulk);
+      });
+    });
+  });
+
+  describe("given a staged payload this build cannot read", () => {
+    describe("when the type belongs to a newer build", () => {
+      /** @scenario a staged shape from a newer build is refused, never quietly completed */
+      it("throws into the queue's retry rather than completing the job", async () => {
+        const { subscriber, dispatched } = makeSubscriber();
+
+        await expect(
+          subscriber.handle(
+            staged({
+              ...liftedEvent({ spanId: "tool-future" }),
+              type: "lw.obs.coding_agent_session.span_facts_from_2099",
+            }),
+            context,
+          ),
+        ).rejects.toThrow(/cannot read staged payload/);
+        expect(dispatched).toHaveLength(0);
+      });
+    });
+
+    describe("when the payload is an event kind this build knows but declines", () => {
+      /**
+       * The counterweight to the scenario above: refusing unknown shapes must
+       * not turn "not a coding-agent span" into a retry loop, or every ordinary
+       * span in the project becomes a poison job during a filterless drain.
+       *
+       * @scenario an event the subscriber declines is still completed quietly
+       */
+      it("completes quietly without contributing or throwing", async () => {
+        const { subscriber, dispatched } = makeSubscriber();
+
+        await expect(
+          subscriber.handle(
+            rawSpanEvent({
+              name: "llm.completion",
+              spanId: "ordinary",
+            }) as TraceProcessingEvent,
+            context,
+          ),
+        ).resolves.toBeUndefined();
+        expect(dispatched).toHaveLength(0);
       });
     });
   });

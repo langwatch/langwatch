@@ -142,6 +142,10 @@ export class SpanStorageService {
    * The partition hint is required rather than optional: the repository read
    * behind this has no unbounded fallback, so a hintless call would widen into
    * a full-table scan instead of staying the cheap point-read it promises.
+   *
+   * Derivation-shaped: the span comes back with empty `events` and `links` —
+   * the read omits those columns because no consumer here reads them and they
+   * are what it fails on. Rendering a span is `getSpanById`'s job, not this.
    */
   async getNormalizedSpanById(
     params: NormalizedSpanByIdParams,

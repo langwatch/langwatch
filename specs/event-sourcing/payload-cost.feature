@@ -139,6 +139,58 @@ Feature: Payload cost governs the scheduling plane
     Then the attempt fails into the queue's retry
     And the work is never mistaken for a shape the build does know
 
+  # The rolling-deploy hazard, stated as behaviour. A newer worker can stage a
+  # shape an older one has never heard of. Treating "I don't know this" as "not
+  # for me" completes the job — no throw, no retry, no counter, no log — and the
+  # contribution is gone. The old worker cannot process the shape, but it can
+  # refuse to swallow it, which is what turns a silent loss into a retry that
+  # the next worker drains.
+  @unit
+  Scenario: a staged shape from a newer build is refused, never quietly completed
+    Given queued work staged in a shape only a newer build produces
+    When a worker that predates that shape processes it
+    Then the attempt fails into the queue's retry
+    And the work is not reported as done
+    And it is never counted as an event this subscriber had no interest in
+
+  # The distinction that keeps the scenario above from swallowing real work:
+  # "a relevant event I decline" and "a shape I cannot read" are different
+  # answers, and only the first is allowed to complete quietly.
+  @unit
+  Scenario: an event the subscriber declines is still completed quietly
+    Given queued work carrying an event of a kind this build does know
+    And the subscriber considers that event not relevant
+    When the subscriber processes it
+    Then the work completes without producing a result
+    And the attempt does not fail into the queue's retry
+
+  # --- A pointer is not the only way to stay cheap ---
+
+  # A pointer keeps the queue cheap but buys a dependency: the payload has to be
+  # readable by the time the work runs, and when it isn't, the work retries
+  # against a store it does not control. Work whose result is a small, bounded
+  # derivation can carry the derivation instead — cheap for the same reason a
+  # pointer is cheap, and with nothing left to race.
+  @unit
+  Scenario: work whose result is a bounded derivation carries it instead of a pointer
+    Given a relevant event whose payload is large
+    And the subscriber's whole result is a derivation drawn from a fixed, closed vocabulary
+    When the event is published
+    Then the queued work carries that derivation
+    And the queued work does not grow with the size of the payload it came from
+    And the subscriber produces its result without reading the payload back
+
+  # The guard that stops this from becoming "queue the payload again": the
+  # vocabulary is closed, so a caller cannot widen it into carrying content by
+  # adding a field that happens to be large.
+  @unit
+  Scenario: a carried derivation never carries content
+    Given an event whose payload contains large content alongside small facts
+    When the work is staged as a carried derivation
+    Then the queued work holds the small facts
+    And the queued work holds none of the content
+    And the content remains readable from the payload's canonical store
+
   @unit
   Scenario: an event whose payload cannot be pointed at is still processed
     Given a relevant event that carries no identity to find its payload by

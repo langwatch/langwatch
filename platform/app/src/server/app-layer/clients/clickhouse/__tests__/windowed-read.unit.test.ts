@@ -131,8 +131,17 @@ describe("queryWindowed", () => {
     });
 
     describe("when the fallback is none", () => {
-      it("does not re-run and records a hit", async () => {
-        const before = await outcomeCount("hit");
+      /**
+       * A non-widening read is the one shape whose miss has nowhere else to
+       * surface: there is no widen outcome to count instead. Recording it as
+       * `hit` is what let a permanently-failing claim-check lookup read as a
+       * healthy one while 22 groups sat blocked.
+       *
+       * @scenario a bounded miss is recorded as a miss, not as an answer
+       */
+      it("does not re-run and records the miss as windowed_empty, not hit", async () => {
+        const beforeEmpty = await outcomeCount("windowed_empty");
+        const beforeHit = await outcomeCount("hit");
         const { run } = fakeRun([[]]);
 
         const result = await queryWindowed({
@@ -145,7 +154,33 @@ describe("queryWindowed", () => {
 
         expect(result).toEqual([]);
         expect(run).toHaveBeenCalledTimes(1);
-        expect(await outcomeCount("hit")).toBe(before + 1);
+        expect(await outcomeCount("windowed_empty")).toBe(beforeEmpty + 1);
+        expect(await outcomeCount("hit")).toBe(beforeHit);
+      });
+
+      /**
+       * The counterweight: splitting the empty case must not reclassify the
+       * answers. A `none` read that finds its row is still a plain hit.
+       *
+       * @scenario a caller that forbids widening stays bounded on a miss
+       */
+      it("still records a hit when the window answers", async () => {
+        const beforeHit = await outcomeCount("hit");
+        const beforeEmpty = await outcomeCount("windowed_empty");
+        const { run } = fakeRun([["row"]]);
+
+        const result = await queryWindowed({
+          table: TABLE,
+          hintMs: 42,
+          fallback: "none",
+          isEmpty: (rows: string[]) => rows.length === 0,
+          run,
+        });
+
+        expect(result).toEqual(["row"]);
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(await outcomeCount("hit")).toBe(beforeHit + 1);
+        expect(await outcomeCount("windowed_empty")).toBe(beforeEmpty);
       });
     });
 

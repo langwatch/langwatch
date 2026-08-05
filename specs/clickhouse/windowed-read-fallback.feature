@@ -48,6 +48,20 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
     Then the read does not widen beyond its window
     And it returns the in-window result without a second, wider scan
 
+  # A read that never widens is the one shape whose miss has nowhere else to
+  # show up: there is no widen to count, so recording it alongside the reads
+  # that found an answer makes a permanently-failing lookup indistinguishable
+  # from a healthy one. Callers that resolve queued work this way retry on the
+  # empty result, so the miss rate is the signal that says whether the work is
+  # draining or stuck.
+  Scenario: a bounded miss is recorded as a miss, not as an answer
+    Given the caller declares the scoped window authoritative
+    And there is no answer inside the scoped window
+    When the read runs
+    Then the read does not widen beyond its window
+    And the empty result is recorded as its own outcome
+    And it is distinguishable from a read that answered from inside the window
+
   Scenario: an unlimited widen is recorded as unlimited, not as a bounded one
     Given the caller allows the read to widen to an unlimited scan
     And the answer lies outside every bounded window
