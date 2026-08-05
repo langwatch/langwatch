@@ -34,6 +34,21 @@ func hydrateStruct(v reflect.Value, t reflect.Type, prefix string) error {
 			envTag = prefix + "_" + envTag
 		}
 
+		// Env-configurable time spans are an int64 count of seconds on a
+		// _SECONDS-suffixed variable across every service that shares this
+		// hydrator. time.Duration is a defined int64 (reflect.Kind() ==
+		// Int64), so a duration field would otherwise slip into the generic
+		// integer branch and accept a raw nanosecond count, giving one
+		// config surface two incompatible notations for the same idea.
+		// Refusing the declaration, rather than only a bad value, means the
+		// mistake surfaces on the first boot of the service that introduced
+		// it instead of on the first deployment that tries to configure it.
+		// Compared by exact type, not Kind, so plain int64 fields are
+		// unaffected.
+		if fieldType.Type == durationType {
+			return fmt.Errorf("config: field %s (env %s) is declared as time.Duration; env-configurable time spans must be an int64 count of seconds on a _SECONDS-suffixed variable", fieldType.Name, envTag)
+		}
+
 		switch field.Kind() {
 		case reflect.Struct:
 			if err := hydrateStruct(field, fieldType.Type, envTag); err != nil {
@@ -55,20 +70,6 @@ func hydrateStruct(v reflect.Value, t reflect.Type, prefix string) error {
 }
 
 func setField(field reflect.Value, tag, value string) error {
-	// time.Duration is a defined int64 (reflect.Kind() == Int64), so without
-	// this check it would silently fall into the generic int branch below
-	// and parse as a raw nanosecond count — meaning a documented value like
-	// "5m" fails to parse, and the only way to actually set the field is an
-	// undocumented, unreadable nanosecond integer. Checked by exact type,
-	// not Kind, so plain int64 fields are unaffected.
-	if field.Type() == durationType {
-		d, err := time.ParseDuration(value)
-		if err != nil {
-			return fmt.Errorf("config: failed to parse %s as duration: %w", tag, err)
-		}
-		field.SetInt(int64(d))
-		return nil
-	}
 	switch field.Kind() {
 	case reflect.String:
 		field.SetString(value)

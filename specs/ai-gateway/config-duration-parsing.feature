@@ -1,48 +1,53 @@
-Feature: Config duration fields parse the format they're documented in
+Feature: Config time spans are seconds, and the hydrator enforces it
 
-  pkg/config.Hydrate routes every env var onto a struct field by
-  reflect.Kind(). time.Duration is a defined int64, so without an explicit
-  check it fell into the generic integer branch and parsed via
-  strconv.ParseInt — meaning a documented value like "5m" failed to parse,
-  and the only value that actually worked was an opaque, undocumented
-  nanosecond count.
+  Every service sharing pkg/config.Hydrate (aigateway, nlpgo, langyagent)
+  expresses an env-configurable time span the same way: an int64 count of
+  seconds, on a variable whose name ends in _SECONDS. Server.GracefulSeconds,
+  Server.DrainDelaySeconds, NonStreamingHeartbeatIntervalSeconds and the
+  auth-cache knobs all follow it.
 
-  AuthCacheConfig.SoftBump/HardGrace/ConfigTTL (services/aigateway/config.go)
-  were the fields this affected in practice, but per reviewer feedback
-  (github.com/langwatch/langwatch/pull/5977#discussion — a defined-int64
-  time.Duration field with string parsing reads as non-standard next to this
-  same PR's plain-int Server.GracefulSeconds/DrainDelaySeconds) they were
-  converted to plain int64 seconds instead of fixed in place — see
-  gateway-service.feature's AuthCache scenario. This Hydrate-level fix
-  remains: it is now preventative for the next time.Duration-tagged field
-  added anywhere pkg/config.Hydrate is used (aigateway, nlpgo, langyagent all
-  share it), demonstrated below with synthetic struct fields rather than a
-  currently-affected real one.
+  A time.Duration field would break that. time.Duration is a defined int64,
+  so Hydrate routes it by reflect.Kind() into the generic integer branch,
+  where the only value that sets it is an opaque raw nanosecond count. One
+  config surface would then carry two incompatible notations for the same
+  idea, and which one applies would depend on a field's Go type rather than
+  on anything an operator can see.
 
-  # Bindings: pkg/config/config_test.go, services/aigateway/config_test.go
+  Hydrate therefore refuses an env-tagged time.Duration field outright,
+  naming the seconds convention in the error. The refusal is on the
+  declaration, not on a bad value, so it fires on the first boot of the
+  service that introduced the field rather than on the first deployment that
+  tries to configure it. The repo has no such field, and this keeps it that
+  way.
+
+  # Bindings: pkg/config/config_test.go
 
   @unit @regression
-  Scenario: a documented duration string like 5m parses correctly
+  Scenario: an env-tagged time.Duration field is refused
     Given a struct field of type time.Duration tagged env:"SOFT_BUMP"
-    When SOFT_BUMP=5m is hydrated onto it
-    Then the field equals 5 minutes
+    And SOFT_BUMP is set to 5m
+    When the struct is hydrated
+    Then Hydrate returns an error naming SOFT_BUMP
+    And the error names time.Duration as the problem
+    And the error points at the _SECONDS convention
 
   @unit @regression
-  Scenario: a negative duration string parses correctly, matching the negative-disables convention
-    Given a struct field of type time.Duration tagged env:"HARD_GRACE"
-    When HARD_GRACE=-1s is hydrated onto it
-    Then the field equals -1 second
+  Scenario: an env-tagged time.Duration field is refused even when its variable is unset
+    Given a struct field of type time.Duration tagged env:"HARD_GRACE_UNSET"
+    And HARD_GRACE_UNSET is not set in the environment
+    When the struct is hydrated
+    Then Hydrate returns an error naming HARD_GRACE_UNSET
+    And the field is left at its zero value
 
   @unit @regression
-  Scenario: a raw nanosecond integer no longer parses as a duration
-    Given a struct field of type time.Duration tagged env:"CONFIG_TTL"
-    When CONFIG_TTL=300000000000 is hydrated onto it
-    Then Hydrate returns an error naming CONFIG_TTL
-    # This is intentionally the value that used to be the only thing that
-    # worked. Asserting it now fails is the regression test for the bug.
+  Scenario: a time.Duration field nested in a sub-struct is refused with its full prefixed name
+    Given a sub-struct tagged env:"LW_GATEWAY_AUTH_CACHE"
+    And that sub-struct holds a time.Duration field tagged env:"CONFIG_TTL"
+    When the outer struct is hydrated
+    Then Hydrate returns an error naming LW_GATEWAY_AUTH_CACHE_CONFIG_TTL
 
   @unit @regression
-  Scenario: a plain int64 field is unaffected by the duration special-case
+  Scenario: a plain int64 field is unaffected by the time.Duration refusal
     Given a struct field of type int64 (not time.Duration) tagged env:"COUNT"
     When COUNT=300000000000 is hydrated onto it
     Then the field equals the integer 300000000000
