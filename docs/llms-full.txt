@@ -53376,7 +53376,7 @@ The chart refuses to render when `app.email.provider` names a gateway nothing co
 
 Settings can instead arrive through `extraEnvs` or `extraEnvFrom`, which the chart cannot see inside and therefore accepts. Supply them to both `app` and `workers`: each Deployment reads only its own extra environment, and both send mail.
 
-A gateway that is named but unusable fails at send time with a message naming the setting to fill in. When a different gateway is fully configured, the message names that one too, which is what an install sees when it names one gateway and supplies another's settings:
+What the chart cannot check fails at the first send instead: a gateway configured through `extraEnvs`, which it is not allowed to look inside, or a referenced Secret that exists but holds an empty value. The message names the setting to fill in, and when a different gateway is fully configured it names that one too, which is what an install sees when it names one gateway and supplies another's settings:
 
 ```
 EMAIL_PROVIDER is "sendgrid" but it is not configured: set SENDGRID_API_KEY. Settings for "ses" are present, did you mean EMAIL_PROVIDER=ses?
