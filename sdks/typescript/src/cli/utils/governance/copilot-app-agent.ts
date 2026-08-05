@@ -31,7 +31,13 @@ export interface AgentIo {
 
 const defaultIo: AgentIo = {
   mkdirp: (dir) => fs.mkdirSync(dir, { recursive: true }),
-  writeFile: (file, content, mode) => fs.writeFileSync(file, content, { mode }),
+  // Remove first: `writeFileSync`'s `mode` applies only on CREATION — a
+  // pre-existing world-readable file at this path would keep its loose
+  // permissions and the descriptor carries a bearer token.
+  writeFile: (file, content, mode) => {
+    fs.rmSync(file, { force: true });
+    fs.writeFileSync(file, content, { mode });
+  },
   removeFile: (file) => {
     try {
       fs.rmSync(file);
@@ -62,13 +68,24 @@ function copilotAppAgentFiles(platform: AppPlatform, home: string): string[] {
   );
 }
 
-/** Whether the agent descriptor is already on disk. */
+/**
+ * Whether ANY agent file is on disk. Deliberately not just the register
+ * descriptor: on win32 the token-bearing `.cmd` wrapper is a separate
+ * file, and a partial removal that lost the XML but kept the wrapper must
+ * still be listed by logout (and its credential deleted) rather than
+ * silently under-reported.
+ */
 export function isCopilotAppAgentInstalled(
   platform: AppPlatform,
   home: string,
   io: Pick<AgentIo, "fileExists"> = defaultIo,
 ): boolean {
-  return io.fileExists(copilotAppAgentPath(platform, home));
+  return copilotAppAgentFiles(platform, home).some((f) => io.fileExists(f));
+}
+
+/** The launchd gui domain target for the current user (darwin only). */
+function launchdGuiDomain(): string {
+  return `gui/${process.getuid?.() ?? 0}`;
 }
 
 interface OsCommand {
@@ -88,26 +105,38 @@ function registerCommands(
   switch (platform) {
     case "darwin":
       return [
-        // unload first so re-connect re-points idempotently; on a first
+        // bootout first so re-connect re-points idempotently; on a first
         // install nothing is loaded yet, so this one failure is expected.
+        // `bootstrap`/`bootout` (not legacy `load`/`unload`): the legacy
+        // verbs print their failure to stderr and EXIT 0, so a rejected
+        // plist would be reported as a successful install with capture
+        // silently off — verified against launchd on macOS 15.
         {
           cmd: "launchctl",
-          args: ["unload", descriptorPath],
+          args: [
+            "bootout",
+            `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`,
+          ],
           tolerateFailure: true,
         },
-        { cmd: "launchctl", args: ["load", descriptorPath] },
+        {
+          cmd: "launchctl",
+          args: ["bootstrap", launchdGuiDomain(), descriptorPath],
+        },
       ];
     case "linux":
       return [
         { cmd: "systemctl", args: ["--user", "daemon-reload"] },
         {
           cmd: "systemctl",
-          args: [
-            "--user",
-            "enable",
-            "--now",
-            `${COPILOT_APP_AGENT_LABEL}.service`,
-          ],
+          args: ["--user", "enable", `${COPILOT_APP_AGENT_LABEL}.service`],
+        },
+        // restart, not `enable --now`: `--now` is a no-op against an
+        // already-active unit, which would leave a running app holding the
+        // just-revoked previous ingest key (minting is hard-cut rotation).
+        {
+          cmd: "systemctl",
+          args: ["--user", "restart", `${COPILOT_APP_AGENT_LABEL}.service`],
         },
       ];
     case "win32":
@@ -116,21 +145,34 @@ function registerCommands(
           cmd: "schtasks",
           args: ["/Create", "/TN", COPILOT_APP_AGENT_LABEL, "/XML", descriptorPath, "/F"],
         },
+        // /Create only registers for the NEXT logon; start the task now so
+        // "connected" is not a promise about a future login.
+        {
+          cmd: "schtasks",
+          args: ["/Run", "/TN", COPILOT_APP_AGENT_LABEL],
+        },
       ];
   }
 }
 
 /** The OS commands that unregister the agent, per platform. Every command
  * must succeed for the agent to be considered stopped. */
-function unregisterCommands(
-  platform: AppPlatform,
-  descriptorPath: string,
-): OsCommand[] {
+function unregisterCommands(platform: AppPlatform): OsCommand[] {
   switch (platform) {
     case "darwin":
-      // Stop + unload the running agent. If this fails the launchd job may
-      // still be alive and exporting, so it is NOT tolerated on removal.
-      return [{ cmd: "launchctl", args: ["unload", descriptorPath] }];
+      // Stop + boot out the running agent. If this fails the launchd job
+      // may still be alive and exporting, so it is NOT tolerated on removal
+      // when the agent is registered. (`bootout` returns real exit codes;
+      // legacy `unload` exits 0 even on failure.)
+      return [
+        {
+          cmd: "launchctl",
+          args: [
+            "bootout",
+            `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`,
+          ],
+        },
+      ];
     case "linux":
       return [
         {
@@ -187,11 +229,17 @@ export function installCopilotAppAgent(
     try {
       io.run(cmd, args);
     } catch (err) {
-      // Only the expected first-install `launchctl unload` is tolerated.
+      // Only the expected first-install darwin bootout is tolerated.
       // Every other service-manager failure means the agent is NOT
-      // registered — surface it so the caller never reports a mint +
-      // "connected" while capture is actually off.
+      // registered — unwind the token-bearing files just written (a
+      // descriptor that failed to register would otherwise sit on disk as
+      // a live credential the OS may still pick up at next login), then
+      // surface it so the caller never reports a mint + "connected" while
+      // capture is actually off.
       if (!tolerateFailure) {
+        for (const file of descriptor.files) {
+          io.removeFile(file.path);
+        }
         throw new CopilotAppAgentError("register", `${cmd} ${args.join(" ")}`, err);
       }
     }
@@ -209,24 +257,37 @@ export function removeCopilotAppAgent(
   home: string,
   io: AgentIo = defaultIo,
 ): boolean {
-  const registerPath = copilotAppAgentPath(platform, home);
-  if (!io.fileExists(registerPath)) return false; // nothing installed
+  const files = copilotAppAgentFiles(platform, home);
+  if (!files.some((f) => io.fileExists(f))) return false; // nothing installed
 
-  // Stop + unregister first. If any command fails, the agent may still be
-  // loaded and exporting content; do NOT delete the descriptor (that would
-  // remove the retry path) and do NOT report success — surface the failure
-  // so `logout` prints it as "couldn't remove" rather than a clean removal.
-  for (const { cmd, args } of unregisterCommands(platform, registerPath)) {
+  // A missing register descriptor means the OS registration is either gone
+  // or unreachable (partial prior removal) — the surviving files are stray
+  // credentials. Still ATTEMPT the unregister (the OS may hold a live
+  // registration pointing at the stray wrapper), but tolerate its failure
+  // so the stray token file is always deleted.
+  const registered = io.fileExists(copilotAppAgentPath(platform, home));
+
+  // Stop + unregister first. While registered, a failure means the agent
+  // may still be loaded and exporting content; do NOT delete the descriptor
+  // (that would remove the retry path) and do NOT report success — surface
+  // the failure so `logout` prints it as "couldn't remove" rather than a
+  // clean removal.
+  for (const { cmd, args } of unregisterCommands(platform)) {
     try {
       io.run(cmd, args);
     } catch (err) {
-      throw new CopilotAppAgentError("unregister", `${cmd} ${args.join(" ")}`, err);
+      if (registered) {
+        throw new CopilotAppAgentError("unregister", `${cmd} ${args.join(" ")}`, err);
+      }
+      // stray-file cleanup: unregister can legitimately fail when the OS
+      // never had (or already lost) the registration — keep going so the
+      // token-bearing files are removed.
     }
   }
 
-  // Unregister succeeded — the agent is stopped, so it is safe to delete
-  // every file it wrote (descriptor + any launch wrapper).
-  for (const file of copilotAppAgentFiles(platform, home)) {
+  // Unregister succeeded (or nothing was registered) — delete every file
+  // the agent wrote (descriptor + any launch wrapper).
+  for (const file of files) {
     io.removeFile(file);
   }
   return true;

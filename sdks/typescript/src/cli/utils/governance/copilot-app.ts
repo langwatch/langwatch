@@ -210,15 +210,26 @@ ${envXml}
       };
     }
     case "linux": {
+      // `%` is a specifier introducer in unit files and must be doubled
+      // (same reason the Windows wrapper doubles it for cmd).
       const envLines = entries
-        .map(([k, v]) => `Environment="${k}=${v.replace(/"/g, '\\"')}"`)
+        .map(
+          ([k, v]) =>
+            `Environment="${k}=${v.replace(/%/g, "%%").replace(/"/g, '\\"')}"`,
+        )
         .join("\n");
       // ExecStart is quoted: the app path may contain spaces (e.g.
       // "/opt/GitHub Copilot/github-copilot"); unquoted, systemd would
       // word-split it into a bogus executable + argument.
+      // graphical-session.target, not default.target: a GUI binary launched
+      // from default.target typically has no DISPLAY/WAYLAND_DISPLAY in the
+      // systemd --user environment and fails to start; tying the unit to the
+      // graphical session starts it when the desktop is actually up and
+      // stops it when the session ends.
       const content = `[Unit]
 Description=LangWatch capture for the GitHub Copilot app
-After=default.target
+After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 Type=simple
@@ -226,7 +237,7 @@ ${envLines}
 ExecStart="${spec.execPath}"
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target
 `;
       const unitPath = path.join(
         spec.home,
@@ -262,6 +273,12 @@ WantedBy=default.target
       <Enabled>true</Enabled>
     </LogonTrigger>
   </Triggers>
+  <Settings>
+    <!-- Task Scheduler's schema DEFAULTS block start-on-battery: a laptop
+         logging in unplugged would silently never start capture. -->
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+  </Settings>
   <Actions>
     <Exec>
       <Command>${xmlEscape(wrapperPath)}</Command>

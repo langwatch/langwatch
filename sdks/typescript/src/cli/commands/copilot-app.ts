@@ -133,12 +133,14 @@ export async function connectCopilotApp(
   }
   const project =
     cfg.organization?.slug ?? cfg.organization?.name ?? "your personal project";
-  // Honest lifecycle: the agent launches Copilot with tracking now and on
-  // each login. A manual relaunch from the Dock/Start menu before the next
-  // login inherits no environment and is NOT tracked (ADR-039 §Extension,
-  // Dock-launch open question).
+  // Honest lifecycle: the agent starts Copilot with tracking now (darwin
+  // bootstrap runs RunAtLoad, linux is an explicit restart, win32 an
+  // explicit /Run) and on every login. Two sessions the agent cannot
+  // capture: an app window already open before connecting (it keeps the
+  // pre-rotation env), and a manual Dock/Start-menu relaunch before the
+  // next login (inherits no environment). ADR-039 §Extension.
   deps.info(
-    `GitHub Copilot app connected. Usage will be tracked into ${project}. Capture is active for the app launched now and on every login; a manual relaunch before your next login is not tracked.`,
+    `GitHub Copilot app connected. Usage will be tracked into ${project}. Capture starts now and on every login. If a Copilot app window was already open, quit and reopen it — that session is not tracked; the same goes for a manual Dock/Start-menu relaunch before your next login.`,
   );
 
   return {

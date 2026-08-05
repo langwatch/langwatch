@@ -20,7 +20,9 @@ Feature: the login agent owns the Copilot app launch and injects capture env
   notice; never silently tokens-only — parity with `langwatch copilot` (CLI).
 
   Per-OS host: launchd (macOS), systemd --user (Linux), Task Scheduler
-  (Windows). One long-lived process; restarts on login; removed by logout.
+  (Windows). One long-lived process, started at connect and at each login;
+  the agent does not respawn the app if the user quits it mid-session;
+  removed by logout.
 
   Pairs with:
     - specs/ai-governance/cli-wrappers/copilot-app-connect.feature
