@@ -75,6 +75,28 @@ describe("classifyScenarioInfraError", () => {
     });
   });
 
+  describe("when the judge model rejects reasoning with function tools", () => {
+    /** @scenario "A remaining judge reasoning conflict becomes a handled scenario error" */
+    it("classifies the observed OpenAI JSON envelope without exposing provider prose", () => {
+      const raw = JSON.stringify({
+        error: {
+          message:
+            "Function tools with reasoning_effort are not supported in this endpoint. Use /v1/responses or set reasoning_effort to 'none'.",
+          type: "invalid_request_error",
+          code: null,
+        },
+      });
+
+      const result = classifyScenarioInfraError(raw);
+
+      expect(result.code).toBe(
+        ScenarioInfraErrorCode.ModelToolReasoningConflict,
+      );
+      expect(result.message).not.toContain("/v1/responses");
+      expect(result.hint).toMatch(/Responses API|disable reasoning/i);
+    });
+  });
+
   describe("when the raw error is a timeout", () => {
     /** @scenario "A timeout becomes an execution-timeout error" */
     it("classifies it as an execution timeout", () => {

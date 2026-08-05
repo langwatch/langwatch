@@ -283,14 +283,6 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 	litellm.EnsureReasoningMaxTokens(body)
 	litellm.ApplyReasoningOverrides(translatedModel, body)
 	litellm.ClampAnthropicTemperature(provider, body)
-	// A few models reject reasoning combined with function tools on
-	// chat/completions specifically. Everything this executor sends goes
-	// out on chat/completions (see the package doc), and the structured-
-	// output branch above can add tools of its own, so the check runs
-	// after the body is fully assembled rather than off req.Tools.
-	litellm.EnforceReasoningToolCompat(
-		translatedModel, litellm.EndpointChatCompletions, body,
-	).Log(ctx, translatedModel, litellm.EndpointChatCompletions)
 
 	// Build inline credentials from litellm_params.
 	creds, err := litellm.FromLiteLLMParams(provider, req.LiteLLMParams)

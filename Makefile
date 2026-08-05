@@ -1,7 +1,7 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
-.PHONY: herrgen herrgen-check modelcapsgen modelcapsgen-check
+.PHONY: herrgen herrgen-check
 .PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-changed
 .PHONY: _dev-up-deprecation-warning
 
@@ -41,8 +41,6 @@ help:
 	@echo "    make test-scripts                   run bats unit tests under dev/scripts/__tests__/"
 	@echo "    make herrgen                        regenerate the Go error codes for TypeScript"
 	@echo "    make herrgen-check                  fail if those generated codes are stale (CI)"
-	@echo "    make modelcapsgen                   regenerate nlpgo's model reasoning capabilities"
-	@echo "    make modelcapsgen-check             fail if that generated table is stale (CI)"
 	@echo ""
 	@echo "  Lint (deterministic house rules — no AI involved):"
 	@echo "    make lint-rules                     ast-grep + semgrep over the whole repo"
@@ -193,19 +191,6 @@ herrgen:
 
 herrgen-check:
 	@go run ./cmd/herrgen -check
-
-# Mirror the model registry's endpoint-scoped reasoning capabilities into
-# services/nlpgo/adapters/litellm/reasoningcaps.generated.go, so nlpgo can
-# enforce them at dispatch without reading the control plane's source tree.
-# Run after editing a `reasoningConfig.toolsIncompatibleOn` in
-# llmModels.json. `modelcapsgen-check` is the drift check, and go-ci.yaml's
-# `generated` job calls this same target, so what CI runs and what you run
-# cannot drift apart.
-modelcapsgen:
-	@go run ./cmd/modelcapsgen
-
-modelcapsgen-check:
-	@go run ./cmd/modelcapsgen -check
 # ── Deterministic house rules ──────────────────────────────────────────────
 #
 # The ast-grep and semgrep rulesets encode house rules that used to be

@@ -124,7 +124,6 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "pkg",
   "tools/thuishaven",
   "tools/herrgen",
-  "tools/modelcapsgen",
 ];
 
 /**

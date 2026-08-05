@@ -2,7 +2,6 @@ import type {
   CustomModelEntry,
   SupportedParameter,
 } from "./customModel.schema";
-import { llmModels } from "./loadModelCatalog";
 import { getModelMetadata } from "./registry";
 
 type ProviderWithCustomModels = {
@@ -94,41 +93,4 @@ export function filterUnsupportedSamplingParams<
     }
   }
   return out as T;
-}
-
-/**
- * Model ids that claim both a reasoning parameter and function tools but
- * carry no `reasoningConfig`, restricted to the models a dispatcher
- * treats as reasoning-class (the `IsReasoningModel` pattern mirrored in
- * `services/nlpgo/adapters/litellm/modelid.go`).
- *
- * Those are exactly the entries where the registry asserts a combination
- * works without ever having been asked whether it does — which is how the
- * gpt-5.6 family shipped claiming `reasoning_effort` *and* `tools` while
- * the provider rejects the pair on `/v1/chat/completions`. The registry is
- * regenerated from an upstream catalog that has no notion of the
- * constraint, so a new sibling arrives silently; this is the seam a test
- * watches.
- */
-export function findUndeclaredReasoningModels(): string[] {
-  return Object.entries(llmModels.models)
-    .filter(([id, entry]) => isUndeclaredReasoningModel(id, entry))
-    .map(([id]) => id)
-    .sort();
-}
-
-const REASONING_CLASS = /^(o[1345]|gpt-5)(-(mini|nano))?/i;
-
-function isUndeclaredReasoningModel(
-  id: string,
-  entry: { reasoningConfig?: unknown; supportedParameters?: string[] },
-): boolean {
-  if (entry.reasoningConfig) return false;
-  const basename = id.split("/").slice(1).join("/") || id;
-  if (!REASONING_CLASS.test(basename)) return false;
-  const params = new Set(entry.supportedParameters ?? []);
-  const claimsReasoning =
-    params.has("reasoning") || params.has("reasoning_effort");
-  const claimsTools = params.has("tools") || params.has("tool_choice");
-  return claimsReasoning && claimsTools;
 }

@@ -534,19 +534,7 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "high"
-        ],
-        "defaultValue": "high",
-        "canDisable": false,
-        "toolsIncompatibleOn": [
-          "chat_completions"
-        ]
-      }
+      "supportsAudioOutput": false
     },
     "openai/gpt-5.6-luna": {
       "id": "openai/gpt-5.6-luna",
@@ -584,22 +572,7 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high"
-        ],
-        "defaultValue": "none",
-        "canDisable": true,
-        "toolsIncompatibleOn": [
-          "chat_completions"
-        ]
-      }
+      "supportsAudioOutput": false
     },
     "openai/gpt-5.6-terra-pro": {
       "id": "openai/gpt-5.6-terra-pro",
@@ -637,19 +610,7 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "high"
-        ],
-        "defaultValue": "high",
-        "canDisable": false,
-        "toolsIncompatibleOn": [
-          "chat_completions"
-        ]
-      }
+      "supportsAudioOutput": false
     },
     "openai/gpt-5.6-terra": {
       "id": "openai/gpt-5.6-terra",
@@ -687,22 +648,7 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high"
-        ],
-        "defaultValue": "none",
-        "canDisable": true,
-        "toolsIncompatibleOn": [
-          "chat_completions"
-        ]
-      }
+      "supportsAudioOutput": false
     },
     "openai/gpt-5.6-sol-pro": {
       "id": "openai/gpt-5.6-sol-pro",
@@ -740,19 +686,7 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "high"
-        ],
-        "defaultValue": "high",
-        "canDisable": false,
-        "toolsIncompatibleOn": [
-          "chat_completions"
-        ]
-      }
+      "supportsAudioOutput": false
     },
     "openai/gpt-5.6-sol": {
       "id": "openai/gpt-5.6-sol",
@@ -790,22 +724,7 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "reasoning_effort",
-        "allowedValues": [
-          "none",
-          "low",
-          "medium",
-          "high"
-        ],
-        "defaultValue": "none",
-        "canDisable": true,
-        "toolsIncompatibleOn": [
-          "chat_completions"
-        ]
-      }
+      "supportsAudioOutput": false
     },
     "xai/grok-4.5": {
       "id": "xai/grok-4.5",

@@ -44,24 +44,6 @@ export type ReasoningEffortOption =
   | "xhigh";
 
 /**
- * API surface a request is dispatched on.
- *
- * Reasoning capability is not a property of the model alone — the same
- * model can accept reasoning alongside function tools on one endpoint and
- * reject the combination on another. `chat_completions` is OpenAI's
- * `/v1/chat/completions` (and every OpenAI-compatible clone of it),
- * `responses` is OpenAI's `/v1/responses`, `messages` is Anthropic's
- * `/v1/messages`.
- */
-export type ModelEndpoint = "chat_completions" | "responses" | "messages";
-
-export const MODEL_ENDPOINTS: readonly ModelEndpoint[] = [
-  "chat_completions",
-  "responses",
-  "messages",
-] as const;
-
-/**
  * Reasoning/thinking parameter configuration for a model
  */
 export type ReasoningConfig = {
@@ -75,35 +57,6 @@ export type ReasoningConfig = {
   defaultValue: ReasoningEffortOption;
   /** Whether reasoning can be disabled (set to none) */
   canDisable: boolean;
-  /**
-   * Endpoints on which the provider rejects reasoning *combined with*
-   * function tools. Absent or empty means the combination is fine
-   * everywhere, which is the case for almost every reasoning model —
-   * do not add this field speculatively.
-   *
-   * Endpoint-scoped on purpose. The provider's own rejection is scoped
-   * that way ("use /v1/responses, or set reasoning_effort to 'none'"),
-   * so a model-level boolean would either over-apply (silently
-   * downgrading a model that reasons happily with tools on /v1/responses)
-   * or hardcode one endpoint's rule into a name that does not say so.
-   *
-   * Declaring this is only half an answer: `canDisable` decides what a
-   * dispatcher can do about it. The three-way rule and the runtime that
-   * enforces it both live in Go, in
-   * `services/nlpgo/adapters/litellm/reasoningcaps.go` — there is
-   * deliberately no TypeScript twin of the rule, because two
-   * implementations of it drifted apart the moment they existed.
-   *
-   * `ModelEndpoint` is wider than what the runtime can currently act on.
-   * Only `chat_completions` is honoured: the rewrite sets a top-level
-   * `reasoning_effort` string, which is the wrong shape for
-   * `/v1/responses` (nested `reasoning` object) and `/v1/messages`
-   * (Anthropic's `thinking`). `tools/modelcapsgen/registry.go` refuses to
-   * generate a table entry for the other two rather than let a
-   * declaration be silently mis-rewritten at dispatch, so declaring one
-   * of them fails the build until the runtime learns that endpoint.
-   */
-  toolsIncompatibleOn?: ModelEndpoint[];
 };
 
 // ============================================================================
