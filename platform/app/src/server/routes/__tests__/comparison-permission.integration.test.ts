@@ -176,5 +176,59 @@ describe("POST /api/experiments/:slug/comparison permission enforcement", () => 
 
       expect(response.status).toBe(401);
     });
+
+    it("answers the missing credential before it looks at the body", async () => {
+      const response = await request(`/api/experiments/${slug}/comparison`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ variants: [] }),
+      });
+
+      // A schema rejection here would describe the request shape to a caller
+      // who never proved they may see it.
+      expect(response.status).toBe(401);
+    });
+  });
+
+  /** The project's own key, which clears the ceiling this route asks for. */
+  const authorized = async () => ({
+    "Content-Type": "application/json",
+    "X-Auth-Token": (
+      await prisma.project.findFirstOrThrow({ where: { id: projectId } })
+    ).apiKey,
+  });
+
+  describe("when the body is not JSON at all", () => {
+    it("separates a document that never parsed from one that failed the schema", async () => {
+      const response = await request(`/api/experiments/${slug}/comparison`, {
+        method: "POST",
+        headers: await authorized(),
+        body: "{not valid json",
+      });
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toBe("malformed_request");
+    });
+  });
+
+  describe("when more variants are sent than a comparison can judge", () => {
+    it("refuses the request rather than resolving each one in turn", async () => {
+      const response = await request(`/api/experiments/${slug}/comparison`, {
+        method: "POST",
+        headers: await authorized(),
+        body: JSON.stringify({
+          variants: Array.from({ length: 11 }, (_, i) => ({
+            kind: "prompt",
+            handle: `draft-v${i}`,
+          })),
+        }),
+      });
+
+      expect(response.status).toBe(422);
+      const body = await response.json();
+      expect(body.error).toBe("validation_error");
+      expect(body.fields).toContain("variants");
+    });
   });
 });

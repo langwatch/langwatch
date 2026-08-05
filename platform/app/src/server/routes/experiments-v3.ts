@@ -30,7 +30,10 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { Permission } from "~/server/api/rbac";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import {
+  validateJsonBody,
+  validator as zValidator,
+} from "~/server/api/validation";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -93,7 +96,7 @@ const apiKeyAuthRead = handlerManagedAuth({
 // holds it (the Langy session key stops short of it on purpose), and
 // `hasPermissionWithHierarchy` already lets a `:manage` holder satisfy
 // `:create`, so asking for the narrower grain takes access away from nobody.
-const apiKeyAuthRun = handlerManagedAuth({
+const apiKeyAuthWrite = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
   permissions: ["evaluations:create"],
@@ -397,7 +400,7 @@ secured.access(sessionAuth).post("/abort", async (c) => {
 
 // ── POST /:slug/run  (CI/CD execution) ──────────────────────────────
 
-secured.access(apiKeyAuthRun).post("/:slug/run", async (c) => {
+secured.access(apiKeyAuthWrite).post("/:slug/run", async (c) => {
   const { slug } = c.req.param();
 
   // Starting a run CREATES a run row against an experiment that already
@@ -584,108 +587,101 @@ secured.access(apiKeyAuthRun).post("/:slug/run", async (c) => {
 
 // ── POST /:slug/comparison (attach a comparison target via API key) ─
 
-secured
-  .access(apiKeyAuthRun)
-  .post(
-    "/:slug/comparison",
-    zValidator("json", attachComparisonBodySchema),
-    async (c) => {
-      const { slug } = c.req.param();
+secured.access(apiKeyAuthWrite).post("/:slug/comparison", async (c) => {
+  const { slug } = c.req.param();
 
-      const authResult = await authenticateRequest(c, "evaluations:create");
-      if ("error" in authResult) {
-        return c.json(authResult.body ?? { error: authResult.error }, {
-          status: authResult.status,
-        });
-      }
-      const { project, markUsed } = authResult;
+  // Authentication runs before the body is looked at, matching the sibling
+  // run endpoint. Validating first would describe the request shape to a
+  // caller who never proved they may see it.
+  const authResult = await authenticateRequest(c, "evaluations:create");
+  if ("error" in authResult) {
+    return c.json(authResult.body ?? { error: authResult.error }, {
+      status: authResult.status,
+    });
+  }
+  const { project, markUsed } = authResult;
 
-      const experimentService = ExperimentService.create(prisma);
-      const experiment = await experimentService.findBySlugAndType({
+  const experimentService = ExperimentService.create(prisma);
+  const experiment = await experimentService.findBySlugAndType({
+    projectId: project.id,
+    slug,
+    type: ExperimentType.EVALUATIONS_V3,
+  });
+
+  if (!experiment) {
+    throw new ExperimentNotFoundError(slug);
+  }
+
+  const parseResult = persistedEvaluationsV3StateSchema.safeParse(
+    experiment.workbenchState,
+  );
+  if (!parseResult.success) {
+    logger.error(
+      { slug, errors: parseResult.error.errors },
+      "Invalid workbenchState",
+    );
+    throw new InvalidExperimentConfigurationError(slug);
+  }
+  const workbenchState = parseResult.data;
+
+  const body = await validateJsonBody(c, attachComparisonBodySchema);
+
+  try {
+    const { targets, comparisonTargetId, createdTargetIds, reusedTargetIds } =
+      await attachComparison({
+        prisma,
         projectId: project.id,
-        slug,
-        type: ExperimentType.EVALUATIONS_V3,
+        targets: workbenchState.targets as TargetConfig[],
+        datasets: workbenchState.datasets as DatasetReference[],
+        activeDatasetId: workbenchState.activeDatasetId,
+        body,
       });
 
-      if (!experiment) {
-        throw new ExperimentNotFoundError(slug);
-      }
+    // `updatedAt` was read with the state above, so a Workbench autosave
+    // landing in between refuses this write instead of being overwritten
+    // by it.
+    await experimentService.updateWorkbenchState({
+      projectId: project.id,
+      id: experiment.id,
+      workbenchState: {
+        ...workbenchState,
+        // The DSL's `TargetConfig` and the persisted schema's inferred
+        // target differ only in how loosely each types free-form JSON
+        // (`json_schema`). The service re-parses the whole state before
+        // writing, so the schema stays the authority on what lands.
+        targets: targets as PersistedEvaluationsV3State["targets"],
+      },
+      expectedUpdatedAt: experiment.updatedAt,
+    });
 
-      const parseResult = persistedEvaluationsV3StateSchema.safeParse(
-        experiment.workbenchState,
-      );
-      if (!parseResult.success) {
-        logger.error(
-          { slug, errors: parseResult.error.errors },
-          "Invalid workbenchState",
-        );
-        throw new InvalidExperimentConfigurationError(slug);
-      }
-      const workbenchState = parseResult.data;
+    logger.info(
+      { projectId: project.id, slug, comparisonTargetId, createdTargetIds },
+      "Attached comparison target via API key",
+    );
+    markUsed();
 
-      const body = c.req.valid("json");
-
-      try {
-        const {
-          targets,
-          comparisonTargetId,
-          createdTargetIds,
-          reusedTargetIds,
-        } = await attachComparison({
-          prisma,
-          projectId: project.id,
-          targets: workbenchState.targets as TargetConfig[],
-          datasets: workbenchState.datasets as DatasetReference[],
-          activeDatasetId: workbenchState.activeDatasetId,
-          body,
-        });
-
-        // `updatedAt` was read with the state above, so a Workbench autosave
-        // landing in between refuses this write instead of being overwritten
-        // by it.
-        await experimentService.updateWorkbenchState({
-          projectId: project.id,
-          id: experiment.id,
-          workbenchState: {
-            ...workbenchState,
-            // The DSL's `TargetConfig` and the persisted schema's inferred
-            // target differ only in how loosely each types free-form JSON
-            // (`json_schema`). The service re-parses the whole state before
-            // writing, so the schema stays the authority on what lands.
-            targets: targets as PersistedEvaluationsV3State["targets"],
-          },
-          expectedUpdatedAt: experiment.updatedAt,
-        });
-
-        logger.info(
-          { projectId: project.id, slug, comparisonTargetId, createdTargetIds },
-          "Attached comparison target via API key",
-        );
-        markUsed();
-
-        return c.json({
-          comparisonTargetId,
-          createdTargetIds,
-          reusedTargetIds,
-          targets,
-        });
-      } catch (error) {
-        // Handled errors already name their cause and carry the status the
-        // boundary serialises; only the rest are ours to report.
-        if (HandledError.isHandled(error)) {
-          throw error;
-        }
-        logger.error(
-          { error, projectId: project.id, slug },
-          "Failed to attach comparison target",
-        );
-        captureException(toError(error), {
-          extra: { projectId: project.id, slug },
-        });
-        throw error;
-      }
-    },
-  );
+    return c.json({
+      comparisonTargetId,
+      createdTargetIds,
+      reusedTargetIds,
+      targets,
+    });
+  } catch (error) {
+    // Handled errors already name their cause and carry the status the
+    // boundary serialises; only the rest are ours to report.
+    if (HandledError.isHandled(error)) {
+      throw error;
+    }
+    logger.error(
+      { error, projectId: project.id, slug },
+      "Failed to attach comparison target",
+    );
+    captureException(toError(error), {
+      extra: { projectId: project.id, slug },
+    });
+    throw error;
+  }
+});
 
 // ── GET /runs?experimentSlug=... (list runs for an experiment) ──────
 

@@ -65,22 +65,29 @@ export type VariantResolution = {
 };
 
 /** Records a freshly built target against the experiment and the response. */
-const adoptNewTarget = (
-  target: TargetConfig,
-  resolution: VariantResolution,
-  spec: Extract<VariantSpec, { kind: "prompt" | "agent" }>,
-): TargetConfig => {
-  finishNewTarget(target, resolution, spec);
+const adoptNewTarget = ({
+  target,
+  resolution,
+  spec,
+}: {
+  target: TargetConfig;
+  resolution: VariantResolution;
+  spec: Extract<VariantSpec, { kind: "prompt" | "agent" }>;
+}): TargetConfig => {
+  finishNewTarget({ target, resolution, spec });
   resolution.allTargets.push(target);
   resolution.createdTargetIds.push(target.id);
   return target;
 };
 
 /** A `target:<id>` variant: already in the experiment, or not a variant at all. */
-const resolveExistingTargetVariant = (
-  spec: Extract<VariantSpec, { kind: "existingTarget" }>,
-  { allTargets }: VariantResolution,
-): TargetConfig => {
+const resolveExistingTargetVariant = ({
+  spec,
+  resolution: { allTargets },
+}: {
+  spec: Extract<VariantSpec, { kind: "existingTarget" }>;
+  resolution: VariantResolution;
+}): TargetConfig => {
   const found = allTargets.find((t) => t.id === spec.targetId);
   if (!found) {
     throw new ComparisonVariantTargetNotFoundError({
@@ -127,8 +134,8 @@ const resolvePromptVariant = async ({
     return existing;
   }
 
-  return adoptNewTarget(
-    {
+  return adoptNewTarget({
+    target: {
       id: `target_${nanoid()}`,
       type: "prompt",
       promptId: prompt.id,
@@ -144,7 +151,7 @@ const resolvePromptVariant = async ({
     },
     resolution,
     spec,
-  );
+  });
 };
 
 /** The agent row behind an `agent:<id>` variant, or a handled not-found. */
@@ -201,25 +208,28 @@ const resolveAgentVariant = async ({
     outputs?: Field[];
   } & Partial<HttpComponentConfig>;
 
-  return adoptNewTarget(
-    agent.type === "http"
-      ? buildHttpAgentTarget({
-          id: `target_${nanoid()}`,
-          dbAgentId: agent.id,
-          httpConfig: convertHttpComponentConfig(config as HttpComponentConfig),
-        })
-      : {
-          id: `target_${nanoid()}`,
-          type: "agent",
-          agentType: agent.type,
-          dbAgentId: agent.id,
-          inputs: config.inputs?.length ? config.inputs : [DEFAULT_INPUT],
-          outputs: config.outputs?.length ? config.outputs : [DEFAULT_OUTPUT],
-          mappings: {},
-        },
+  return adoptNewTarget({
+    target:
+      agent.type === "http"
+        ? buildHttpAgentTarget({
+            id: `target_${nanoid()}`,
+            dbAgentId: agent.id,
+            httpConfig: convertHttpComponentConfig(
+              config as HttpComponentConfig,
+            ),
+          })
+        : {
+            id: `target_${nanoid()}`,
+            type: "agent",
+            agentType: agent.type,
+            dbAgentId: agent.id,
+            inputs: config.inputs?.length ? config.inputs : [DEFAULT_INPUT],
+            outputs: config.outputs?.length ? config.outputs : [DEFAULT_OUTPUT],
+            mappings: {},
+          },
     resolution,
     spec,
-  );
+  });
 };
 
 /**
@@ -242,7 +252,7 @@ const resolveVariant = async ({
 }): Promise<TargetConfig> => {
   switch (spec.kind) {
     case "existingTarget":
-      return resolveExistingTargetVariant(spec, resolution);
+      return resolveExistingTargetVariant({ spec, resolution });
     case "prompt":
       return resolvePromptVariant({
         spec,
@@ -266,11 +276,15 @@ const resolveVariant = async ({
  * rows from that dataset alone, so a second dataset the experiment carries for
  * other purposes has no say in whether this variant can run.
  */
-const finishNewTarget = (
-  target: TargetConfig,
-  { datasets, activeDataset }: VariantResolution,
-  spec: Extract<VariantSpec, { kind: "prompt" | "agent" }>,
-): void => {
+const finishNewTarget = ({
+  target,
+  resolution: { datasets, activeDataset },
+  spec,
+}: {
+  target: TargetConfig;
+  resolution: VariantResolution;
+  spec: Extract<VariantSpec, { kind: "prompt" | "agent" }>;
+}): void => {
   target.mappings = inferAllTargetMappings(target, datasets);
 
   const validation = getTargetMissingMappings(target, activeDataset.id);

@@ -56,8 +56,10 @@ export const variantSpecSchema = z.discriminatedUnion("kind", [
 ]);
 export type VariantSpec = z.infer<typeof variantSpecSchema>;
 
+export const MAX_COMPARISON_VARIANTS = 10;
+
 export const attachComparisonBodySchema = z.object({
-  variants: z.array(variantSpecSchema).min(2),
+  variants: z.array(variantSpecSchema).min(2).max(MAX_COMPARISON_VARIANTS),
   goldenField: z.string().optional(),
   hasGoldenAnswer: z.boolean().optional(),
   inputField: z.string().optional(),
