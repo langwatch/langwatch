@@ -136,6 +136,29 @@ const DISTINCT_FIELD_NAMES_LIMIT = 10_000;
  * actually reaches this many spans is logged as a potential truncation.
  */
 const MAX_SPANS_PER_TRACE = 10_000;
+
+/**
+ * Caps the joined span read's own memory instead of letting it draw on the
+ * server's total budget.
+ *
+ * This read selects every heavy column (`SpanAttributes`, `ResourceAttributes`,
+ * `Events.Attributes`, `Links.*`), and its `fallback: "none"` window means a
+ * page of traces whose summaries carry no usable `OccurredAt` scans every
+ * partition, cold S3 tiers included. Uncapped, the pathological tail was
+ * stopped by the server's OvercommitTracker, which picks a victim across the
+ * whole cluster - so one bad trace read degraded unrelated queries.
+ *
+ * With an explicit cap the offending read fails on its own and surfaces as a
+ * query error on that request. Mirrors the single-trace read path in
+ * `app-layer/traces/repositories/span-storage.clickhouse.repository.ts`.
+ *
+ * The durable fix is upstream: anchor `OccurredAt` on trace_summaries so the
+ * window is never null (#6306 did this for trace_analytics only).
+ */
+const JOINED_SPAN_READ_SETTINGS = {
+  // ClickHouse settings are string-typed over the wire.
+  max_memory_usage: String(2 * 1024 * 1024 * 1024), // 2 GiB
+} as const;
 /** Per-trace cap on projected events (events are a small subset of spans). */
 const MAX_EVENTS_PER_TRACE = 1_000;
 /** Bounds the bounded events stored_spans scan to the page's occurrence weeks. */
@@ -2979,6 +3002,7 @@ export class ClickHouseTraceService {
                   traceIds: batchTraceIds,
                   ...(window?.params ?? {}),
                 },
+                clickhouse_settings: JOINED_SPAN_READ_SETTINGS,
                 format: "JSONEachRow",
               });
               return (await spansResult.json()) as SpanRow[];
