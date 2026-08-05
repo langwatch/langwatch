@@ -81,6 +81,7 @@ import {
   gqRetryEncodeFailuresTotal,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
+import { isPlausibleReadyScore, resolveReadyScore } from "./readyScore";
 import {
   type DispatchResult,
   type DrainedJob,
@@ -483,7 +484,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     const groupId = this.groupKey(payload);
     const stagedJobId = this.generateStagedJobId(payload);
-    const score = this.score?.(payload) ?? Date.now();
+    // Not `?? Date.now()`: a score function returning 0 or NaN (a payload with
+    // no usable occurrence time) survives `??` and stages the job at the epoch.
+    const score = resolveReadyScore({ score: this.score?.(payload) });
     const dispatchAfterMs = score + (delay ?? 0);
 
     // Get dedup config
@@ -614,7 +617,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       payloads.map(async (payload, index) => {
         const groupId = this.groupKey(payload);
         const stagedJobId = this.generateStagedJobId(payload);
-        const score = this.score?.(payload) ?? now;
+        // Same guard as send(); `now` is shared so a batch that falls back
+        // keeps its FIFO order.
+        const score = resolveReadyScore({
+          score: this.score?.(payload),
+          nowMs: now,
+        });
         // Add index to ensure FIFO order within the batch even if timestamps are identical
         const dispatchAfterMs = score + (delay ?? 0) + index;
 
@@ -1791,10 +1799,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     contextMetadata: JobContextMetadata | undefined;
     routingLabels: Record<string, string>;
   }): Promise<void> {
-    const score =
-      typeof originalScore === "number"
-        ? originalScore
-        : (this.score?.(payload) ?? Date.now());
+    // The re-staged job keeps its original ready score so an operator sees it
+    // where it belongs in the queue - unless that score is not a usable
+    // timestamp, in which case re-staging it would park the group at the epoch
+    // for as long as it stays blocked.
+    const score = isPlausibleReadyScore(originalScore)
+      ? originalScore
+      : resolveReadyScore({ score: this.score?.(payload) });
 
     // Re-stage under the id the job was dispatched under (ADR-080), so the
     // staged job an operator inspects is named by the id its producer knows.
@@ -2023,8 +2034,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     reason: "claim_strikes" | "oversized_payload";
     errorMessage: string;
   }): Promise<void> {
-    const score =
-      typeof originalScore === "number" ? originalScore : Date.now();
+    // Same reasoning as handleExhaustedRetries: keep the original score when it
+    // is a real timestamp, otherwise the parked group reads as decades old.
+    const score = resolveReadyScore({ score: originalScore });
     await this.scripts.restageAndBlock({
       groupId,
       // Parked under the id it was dispatched under (ADR-080). This used to

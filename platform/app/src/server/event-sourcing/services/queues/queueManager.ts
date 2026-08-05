@@ -15,6 +15,7 @@ import type {
   QueueSendOptions,
 } from "../../queues";
 import { resolveDeduplicationStrategy } from "../../queues";
+import { resolveReadyScore } from "../../queues/groupQueue/readyScore";
 import type { JobDelivery } from "../../queues/queue.types";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import {
@@ -25,6 +26,24 @@ import {
 import { ConfigurationError, ValidationError } from "../errorHandling";
 
 const logger = createLogger("langwatch:event-sourcing:queue-manager");
+
+/**
+ * Ready score for a payload whose own occurrence time orders its dispatch.
+ *
+ * A missing or implausible `occurredAt` means "we never recorded when this
+ * happened", not "this happened in January 1970". The previous `?? 0` fallback
+ * meant the latter: it staged the job with a ready score of epoch-plus-delay,
+ * which both ranks it ahead of every real job and makes
+ * `gq_oldest_pending_age_milliseconds` report about 56 years of backlog for the
+ * whole queue (production, 2026-07-31 and 2026-08-03).
+ *
+ * Falling back to now matches every other producer in this file - the
+ * `serializeByAggregate` branch scores `Date.now()` outright, and
+ * `GroupQueue.send` does the same when no score function is registered.
+ */
+function occurredAtScore(payload: { occurredAt?: unknown }): number {
+  return resolveReadyScore({ score: payload.occurredAt });
+}
 
 /**
  * Metadata stored per job type in the global job registry.
@@ -654,7 +673,7 @@ export class QueueManager<EventType extends Event = Event> {
         groupKeyFn: commandGroupKeyFn,
         scoreFn: cmdEntry.options.serializeByAggregate
           ? () => Date.now()
-          : (payload: any) => payload.occurredAt as number,
+          : (payload: any) => occurredAtScore(payload),
         process: async (payload: any) => {
           await processCommand({ ...commandProcessParams, payload });
         },
@@ -939,7 +958,7 @@ export class QueueManager<EventType extends Event = Event> {
         : (payload: any) => `${String(payload.tenantId)}/job/${name}`,
       scoreFn: scoreFn
         ? (scoreFn as any)
-        : (payload: any) => (payload.occurredAt as number) ?? 0,
+        : (payload: any) => occurredAtScore(payload),
       process: process as any,
       delay,
       deduplication: deduplication

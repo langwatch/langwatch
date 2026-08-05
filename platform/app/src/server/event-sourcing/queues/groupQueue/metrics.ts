@@ -23,6 +23,7 @@ const metricNames = [
   "gq_job_duration_milliseconds",
   "gq_oldest_pending_age_milliseconds",
   "gq_oldest_backlog_age_milliseconds",
+  "gq_ready_score_implausible_total",
   // ADR-030 hardening + review 2026-06-24
   "gq_blob_reclaim_s3_failures_total",
   "gq_blob_decode_cap_exceeded_total",
@@ -203,6 +204,23 @@ export const gqOldestPendingAgeMilliseconds = new Gauge({
 export const gqOldestBacklogAgeMilliseconds = new Gauge({
   name: "gq_oldest_backlog_age_milliseconds",
   help: "Age of the oldest due job across sampled groups regardless of dispatch eligibility (catches groups pinned in retry backoff)",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * Ready rows the age probe refused to read as a timestamp.
+ *
+ * A ready score below MIN_PLAUSIBLE_EPOCH_MS cannot be an occurrence time, so
+ * the gauges skip it rather than report `now - 0` as decades of backlog. The
+ * skip is the right call for the gauge and the wrong thing to do silently: a
+ * score that low means a producer staged a job with a broken score, which also
+ * puts that job ahead of every real one in the dispatch order. Counted once per
+ * collect cycle per offending row, so `increase(...[5m]) > 0` means "a queue is
+ * carrying implausibly-scored work right now", not "N jobs were mis-scored".
+ */
+export const gqReadyScoreImplausibleTotal = new Counter({
+  name: "gq_ready_score_implausible_total",
+  help: "Ready rows skipped by the age probes for a score below the plausible-epoch floor, counted once per collect cycle each",
   labelNames: ["queue_name"] as const,
 });
 

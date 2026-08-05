@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
+  gqReadyScoreImplausibleTotal,
 } from "../metrics";
 import { GroupQueueMetricsCollector } from "../metricsCollector";
+import { MIN_PLAUSIBLE_EPOCH_MS } from "../readyScore";
 import type { GroupStagingScripts } from "../scripts";
 
 const QUEUE = "test-queue";
@@ -34,8 +36,16 @@ function zrangebyscoreModel({
 }): string[] {
   const minStr = String(min);
   const isExclusive = minStr.startsWith("(");
-  const minVal = Number(isExclusive ? minStr.slice(1) : minStr);
-  const maxVal = max === "+inf" ? Infinity : Number(max);
+  const minVal =
+    minStr === "-inf"
+      ? -Infinity
+      : Number(isExclusive ? minStr.slice(1) : minStr);
+  const maxStr = String(max);
+  const isMaxExclusive = maxStr.startsWith("(");
+  const maxVal =
+    maxStr === "+inf"
+      ? Infinity
+      : Number(isMaxExclusive ? maxStr.slice(1) : maxStr);
 
   const shouldIncludeScores = rest.includes("WITHSCORES");
   const limitIdx = rest.indexOf("LIMIT");
@@ -46,7 +56,7 @@ function zrangebyscoreModel({
     .filter(
       (e) =>
         (isExclusive ? e.score > minVal : e.score >= minVal) &&
-        e.score <= maxVal,
+        (isMaxExclusive ? e.score < maxVal : e.score <= maxVal),
     )
     .sort((a, b) => a.score - b.score)
     .slice(offset, offset + count)
@@ -78,6 +88,17 @@ function makeRedis(
         max: args[2] as string | number,
         rest: args.slice(3),
       }),
+    ),
+    // ZCOUNT over the same bounds the range model understands, so the
+    // implausible-score band is counted by the same semantics it is read by.
+    zcount: vi.fn(
+      async (_key: string, min: string | number, max: string | number) =>
+        zrangebyscoreModel({
+          entries: opts.readyZset ?? [],
+          min,
+          max,
+          rest: [],
+        }).length,
     ),
     pipeline: vi.fn(() => {
       const cmds: string[] = [];
@@ -142,26 +163,31 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
 
     expect(await readGauge()).toBe(5_000);
 
-    // The query must exclude the unblock sentinel (score 1) via an exclusive
-    // lower bound, cap at "now", and read only the single oldest member.
-    // This is the FIRST zrangebyscore call (the eligible probe); the second
-    // is the deferred-backlog sample.
+    // The query must start at the plausible-epoch floor (which drops the
+    // unblock sentinel and every mis-scored row alike), cap at "now", and read
+    // only the single oldest member. This is the FIRST zrangebyscore call (the
+    // eligible probe); the second is the deferred-backlog sample.
     const args = redis.zrangebyscore.mock.calls[0]!;
     expect(args[0]).toBe(`${PREFIX}ready`);
-    expect(args[1]).toBe("(1");
+    expect(args[1]).toBe(MIN_PLAUSIBLE_EPOCH_MS);
     expect(args[2]).toBe(Date.now());
     expect(args).toContain("WITHSCORES");
     expect(args.slice(-3)).toEqual(["LIMIT", 0, 1]);
   });
 
+  /**
+   * A just-unblocked group carries the sentinel score (1), which the
+   * plausible-epoch floor drops rather than surface as eligible. The sentinel
+   * is deliberate, so it must not be counted as corruption either.
+   */
+  /** @scenario "the unblock sentinel is not counted as an implausible score" */
   it("reports 0 when no group is eligible (empty / all in-flight / just unblocked)", async () => {
-    // A just-unblocked group carries the sentinel score (1), which the
-    // exclusive "(1" lower bound must drop rather than surface as eligible.
     const redis = makeRedis({
       readyZset: [{ member: "just-unblocked", score: 1 }],
     });
     await runCollect(redis);
     expect(await readGauge()).toBe(0);
+    expect(await readImplausibleCounter()).toBeUndefined();
   });
 
   it("never emits a negative age (clock skew / future score)", async () => {
@@ -171,6 +197,106 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
     await runCollect(redis);
     const age = await readGauge();
     expect(age).toBeGreaterThanOrEqual(0);
+  });
+});
+
+async function readImplausibleCounter(): Promise<number | undefined> {
+  const m = await gqReadyScoreImplausibleTotal.get();
+  return m.values.find((v) => v.labels.queue_name === QUEUE)?.value;
+}
+
+describe("GroupQueueMetricsCollector - implausible ready scores", () => {
+  beforeEach(() => {
+    register.resetMetrics();
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("given a group staged a few seconds after the Unix epoch", () => {
+    /**
+     * Regression for the 2026-07-31 / 2026-08-03 spurious alert fires: a score
+     * of ~2 to 57,000 made the gauge read `now - ~0`, i.e. about 56 years, and
+     * the Events Backed Up rule divides that by 1000 and fires. The floor makes
+     * the gauge structurally unable to report it.
+     */
+    /** @scenario "the oldest-pending-age gauge skips a score from just after the Unix epoch" */
+    it("does not report its age, and probes from the plausible-epoch floor", async () => {
+      const redis = makeRedis({
+        readyZset: [{ member: "mis-scored", score: 57_000 }],
+      });
+
+      await runCollect(redis);
+
+      expect(await readGauge()).toBe(0);
+      expect(await readBacklogGauge()).toBe(0);
+      expect(redis.zrangebyscore.mock.calls[0]![1]).toBe(
+        MIN_PLAUSIBLE_EPOCH_MS,
+      );
+    });
+
+    /** @scenario "an implausible ready score raises a counter instead of being swallowed" */
+    it("raises the implausible-ready-score counter rather than skipping in silence", async () => {
+      const redis = makeRedis({
+        readyZset: [
+          { member: "mis-scored", score: 57_000 },
+          { member: "also-mis-scored", score: 0 },
+          { member: "just-unblocked", score: 1 },
+          { member: "healthy", score: Date.now() - 5_000 },
+        ],
+      });
+
+      await runCollect(redis);
+
+      // Both mis-scored rows, and only those: the deliberate unblock sentinel
+      // is subtracted back out and the healthy group is above the floor.
+      expect(await readImplausibleCounter()).toBe(2);
+      // The healthy group still drives the gauge, undisturbed by its neighbours.
+      expect(await readGauge()).toBe(5_000);
+    });
+
+    it("keeps counting for as long as the mis-scored row stays in the queue", async () => {
+      const redis = makeRedis({
+        readyZset: [{ member: "mis-scored", score: 57_000 }],
+      });
+
+      await runCollect(redis);
+      await runCollect(redis);
+
+      expect(await readImplausibleCounter()).toBe(2);
+    });
+  });
+
+  describe("given a sampled group whose head job score is not a timestamp", () => {
+    it("drops the head from the backlog age and counts it", async () => {
+      const redis = makeRedis({
+        readyZset: [
+          { member: "tenant/sub/trace:abc", score: Date.now() + 5_000 },
+        ],
+        headJobScores: {
+          [`${PREFIX}group:tenant/sub/trace:abc:jobs`]: ["job-1", "0"],
+        },
+      });
+
+      await runCollect(redis);
+
+      expect(await readBacklogGauge()).toBe(0);
+      expect(await readImplausibleCounter()).toBe(1);
+    });
+  });
+
+  describe("given every ready group carries a real timestamp", () => {
+    it("leaves the counter untouched", async () => {
+      const redis = makeRedis({
+        readyZset: [{ member: "healthy", score: Date.now() - 1_000 }],
+      });
+
+      await runCollect(redis);
+
+      expect(await readImplausibleCounter()).toBeUndefined();
+    });
   });
 });
 
