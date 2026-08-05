@@ -1000,17 +1000,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           // would be resurrected on the next drain: the exact loop
           // #5857 set out to fix (#5883 P1 regression).
           //
-          // Propagate the first rejection (in array order) so the
-          // existing Transient/PayloadTooLarge error routing in the
-          // catch block still fires.
+          // Prioritize PayloadTooLargeError over transient rejections: an
+          // oversized sibling must park the group immediately (replaying it
+          // would re-materialize the over-cap value and seize the event loop).
+          // Otherwise propagate the first transient rejection so the existing
+          // Transient/PayloadTooLarge error routing in the catch block fires.
           const settled = await Promise.allSettled(
             drainedSiblings.map((sibling) =>
               this.parseDrainedPayload({ sibling, groupId }),
             ),
           );
-          const firstRejection = settled.find(
+          const rejections = settled.filter(
             (r): r is PromiseRejectedResult => r.status === "rejected",
           );
+          const firstRejection =
+            rejections.find(
+              ({ reason }) => reason instanceof PayloadTooLargeError,
+            ) ?? rejections[0];
           if (firstRejection) {
             throw firstRejection.reason;
           }
@@ -1664,16 +1670,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           ? err.reason === "missing_blob"
           : false),
       });
-      await this.blobLifecycle.releaseLease({
-        values: [sibling.jobDataJson],
-        groupId,
-      });
       // Tag the sibling so `restageDrainedSiblings` skips it if the batch later
       // throws (e.g. the dispatched job itself fails). Without this, a sibling
       // already moved to the drop path gets re-staged → re-dispatched →
       // re-decoded → re-dropped, resurrecting a job the system judged terminal
-      // and inflating the drop counter (#5857).
+      // and inflating the drop counter (#5857). Set BEFORE the lease release:
+      // a failing releaseLease must not cost the marker for a drop already
+      // counted (#5883 CodeRabbit follow-up).
       sibling.dropped = true;
+      await this.blobLifecycle.releaseLease({
+        values: [sibling.jobDataJson],
+        groupId,
+      });
       return null;
     }
   }
