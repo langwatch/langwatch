@@ -140,6 +140,11 @@ spec:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
             {{- include "langwatch.shutdownEnv" (dict "component" .Values.app "name" "app") | nindent 12 }}
 
+            # ClickHouse connection-pool sizing. Per-role rather than shared:
+            # the pool is derived from this Deployment's own replica count, and
+            # the app and the workers scale independently.
+            {{- include "langwatch.clickhousePoolSizingEnv" (dict "replicas" .Values.app.replicaCount "ctx" .) | nindent 12 }}
+
             # Names this process in telemetry. It becomes the OTel resource
             # `service.name` and the `service` field on every stdout log line,
             # which log shipping promotes to the Loki `service_name` label.

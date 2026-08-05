@@ -163,6 +163,13 @@ jobs:
         if: "!cancelled()"
         run: ./tests/restricted-rbac.sh
 
+      # A missing pool-sizing input renders as valid YAML and a healthy pod,
+      # and silently returns the client to the fixed pool size that exhausted
+      # the ClickHouse server. Only the rendered environment shows it.
+      - name: "assert rendered ClickHouse pool-sizing inputs"
+        if: "!cancelled()"
+        run: ./tests/clickhouse-pool-sizing.sh
+
       # The overlays above never enable email, so nothing there would notice a
       # gateway that reaches only one Deployment. This renders both and compares
       # them, and checks that an unconfigurable provider stops the render.
