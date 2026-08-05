@@ -239,12 +239,30 @@ export async function resolveWrapperPath(
 
   // 1. Explicit override (flag or env) wins outright - no prompt, no persist.
   if (override) {
+    // Explicit or not, a copilot gateway route shifts spend off the user's
+    // Copilot seat — every route that lands there names the shift (ADR-039
+    // D3): here, the pinned branch below, the policy branches, and
+    // resolveWrapperMode's downgrade.
+    if (override === "gateway") {
+      const suffix = copilotSeatBypassSuffix(tool);
+      if (suffix) {
+        writeImpl(`${lwTag()} using the gateway (--tool-mode).${suffix}\n`);
+      }
+    }
     return { mode: override, prompted: false };
   }
 
   // 2. Remembered answer pinned in cfg.tool_mode[tool].
   const pinned = cfg.tool_mode?.[tool];
   if (pinned === "gateway" || pinned === "ingestion") {
+    if (pinned === "gateway") {
+      const suffix = copilotSeatBypassSuffix(tool);
+      if (suffix) {
+        writeImpl(
+          `${lwTag()} using your saved gateway preference for ${tool}.${suffix}\n`,
+        );
+      }
+    }
     return { mode: pinned, prompted: false };
   }
 

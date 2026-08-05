@@ -287,7 +287,6 @@ function shouldAutoLogin(): boolean {
  */
 export function buildShellReapply(args: {
 	tool: string;
-	mode: "gateway" | "ingestion";
 	clears: string[];
 	vars: Record<string, string>;
 }): string {
@@ -648,7 +647,6 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	if (aliasShell) {
 		const reapply = buildShellReapply({
 			tool,
-			mode: modeResult.mode,
 			clears: modeResult.clears ?? [],
 			vars: modeResult.vars,
 		});

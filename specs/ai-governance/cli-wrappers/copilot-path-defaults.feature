@@ -49,6 +49,7 @@ Feature: `langwatch copilot` defaults to direct OTLP so Copilot seat billing is 
       When the user runs `langwatch copilot --tool-mode=gateway`
       Then the resolved path is the gateway
       And the flag is not forwarded to the copilot binary
+      And the notice states that usage will bill the org's provider keys instead of the user's Copilot seat
 
     @unit
     Scenario: A pinned gateway mode for copilot is honored without prompting
@@ -56,6 +57,7 @@ Feature: `langwatch copilot` defaults to direct OTLP so Copilot seat billing is 
       When the user runs `langwatch copilot`
       Then the resolved path is the gateway
       And no prompt is shown
+      And the notice states that usage will bill the org's provider keys instead of the user's Copilot seat
 
   Rule: gateway routing for copilot explains the billing shift
 

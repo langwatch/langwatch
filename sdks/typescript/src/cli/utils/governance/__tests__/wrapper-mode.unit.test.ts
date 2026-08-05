@@ -792,7 +792,7 @@ describe("resolveWrapperMode", () => {
 		});
 	});
 
-	describe("copilotSeatBypassSuffix()", () => {
+	describe("when evaluating the Copilot seat-bypass suffix", () => {
 		// The policy-forced gateway notices (wrapper-mode's downgrade branch
 		// and wrapper-path-choice's single-allowed-path branch) append this
 		// suffix; asserting the helper here keeps the who-pays wording pinned
