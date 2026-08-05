@@ -32,12 +32,11 @@
  * follow-up (per the license-split decision — alert destinations
  * are ee/-only).
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import type { AnomalyRule, Prisma, PrismaClient } from "@prisma/client";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { AnomalyAlertDispatcherService } from "./activity-monitor/anomalyAlertDispatcher.service";
 import { safeParseSpendSpikeThresholdConfig } from "./activity-monitor/thresholdConfig.schema";
+import type { GovernanceKpisClickHouseRepository } from "./governanceKpis.clickhouse.repository";
 import { PROJECT_KIND } from "./governanceProject.service";
 
 const logger = createLogger(
@@ -138,11 +137,23 @@ export function evaluateSpendSpike(input: {
 export class SpendSpikeAnomalyEvaluator {
   constructor(
     private readonly prisma: PrismaClient,
+    /**
+     * The governance_kpis reader, from the App. `undefined` on a
+     * deployment without ClickHouse — each rule then evaluates to
+     * `skip_no_data`, same as the pre-repository "ClickHouse not
+     * configured for this organization" fallback.
+     */
+    private readonly kpisRepository:
+      | GovernanceKpisClickHouseRepository
+      | undefined,
     private readonly dispatcher: AnomalyAlertDispatcherService = AnomalyAlertDispatcherService.create(),
   ) {}
 
-  static create(prisma: PrismaClient): SpendSpikeAnomalyEvaluator {
-    return new SpendSpikeAnomalyEvaluator(prisma);
+  static create(
+    prisma: PrismaClient,
+    kpisRepository: GovernanceKpisClickHouseRepository | undefined,
+  ): SpendSpikeAnomalyEvaluator {
+    return new SpendSpikeAnomalyEvaluator(prisma, kpisRepository);
   }
 
   async evaluateAll(input: { now?: Date } = {}): Promise<{
@@ -245,8 +256,7 @@ export class SpendSpikeAnomalyEvaluator {
       };
     }
 
-    const ch = await getClickHouseClientForOrganization(rule.organizationId);
-    if (!ch) {
+    if (!this.kpisRepository) {
       return {
         ruleId: rule.id,
         organizationId: rule.organizationId,
@@ -259,14 +269,14 @@ export class SpendSpikeAnomalyEvaluator {
       };
     }
 
-    const { currentSpend, baselineSpend } = await this.queryGovernanceKpis({
-      ch,
-      tenantId: govProjectId,
-      windowStart,
-      windowEnd,
-      baselineStart,
-      sourceFilter: buildSourceFilter(rule),
-    });
+    const { currentSpend, baselineSpend } =
+      await this.kpisRepository.findSpendTotals({
+        tenantId: govProjectId,
+        windowStart,
+        windowEnd,
+        baselineStart,
+        sourceFilter: buildSourceFilter(rule),
+      });
 
     const baselineAverage = baselineSpend / BASELINE_WINDOWS;
 
@@ -303,45 +313,6 @@ export class SpendSpikeAnomalyEvaluator {
       select: { id: true },
     });
     return project?.id ?? null;
-  }
-
-  private async queryGovernanceKpis(input: {
-    ch: ClickHouseClient;
-    tenantId: string;
-    windowStart: Date;
-    windowEnd: Date;
-    baselineStart: Date;
-    sourceFilter: { sql: string; params: Record<string, unknown> };
-  }): Promise<{ currentSpend: number; baselineSpend: number }> {
-    const result = await input.ch.query({
-      query: `
-        SELECT
-          sumIf(SpendUsd, HourBucket >= fromUnixTimestamp64Milli({windowStartMs:UInt64})) AS currentSpend,
-          sumIf(SpendUsd, HourBucket < fromUnixTimestamp64Milli({windowStartMs:UInt64}) AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})) AS baselineSpend
-        FROM governance_kpis
-        WHERE TenantId = {tenantId:String}
-          AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})
-          AND HourBucket < fromUnixTimestamp64Milli({windowEndMs:UInt64})
-          ${input.sourceFilter.sql}
-      `,
-      query_params: {
-        tenantId: input.tenantId,
-        windowStartMs: input.windowStart.getTime(),
-        windowEndMs: input.windowEnd.getTime(),
-        baselineStartMs: input.baselineStart.getTime(),
-        ...input.sourceFilter.params,
-      },
-      format: "JSONEachRow",
-    });
-    const rows = (await result.json()) as Array<{
-      currentSpend: number | string | null;
-      baselineSpend: number | string | null;
-    }>;
-    const row = rows[0];
-    return {
-      currentSpend: Number(row?.currentSpend ?? 0),
-      baselineSpend: Number(row?.baselineSpend ?? 0),
-    };
   }
 
   private async persistAlert(

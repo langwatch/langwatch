@@ -10,35 +10,22 @@
  * scoped to that user — no userId column on trace_summaries needed,
  * no fan-out across the org.
  *
- * Every method:
- *   - Filters on the partition key (`OccurredAt`) so ClickHouse
- *     prunes partitions and skips cold-storage scans (per
- *     dev/docs/best_practices/clickhouse-queries.md).
- *   - Uses the IN-tuple dedup pattern when reading dedup-required
- *     fields (we lean on the trace_summary `argMax`-already-applied
- *     latest-version semantics; for sums + counts duplicates would
- *     be safe but we still defensively dedupe by TraceId via
- *     `argMax(TotalCost, UpdatedAt)`).
- *   - Settings: max_bytes_before_external_group_by lets large GROUP
- *     BYs spill to disk vs OOM under concurrent load.
- *
  * The dashboard reads the same shape regardless of whether the user
  * has 0 or 10k traces — we surface clear empty-state so the UI can
  * render "no usage yet" cards without special-case branching.
+ *
+ * The queries themselves live in {@link PersonalUsageClickHouseRepository}
+ * — this service owns the merge-two-sources business logic (trace_summaries
+ * vs the gateway ledger's PRINCIPAL rows) and the fail-safe behaviour: the
+ * ingestion-ledger union is best-effort and degrades to "no ingestion data"
+ * on any query error, same as it always has.
  */
-import type { ClickHouseClient } from "@clickhouse/client";
-import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import type {
+  PersonalUsageClickHouseRepository,
+  PersonalUsageWindow,
+} from "./personalUsage.clickhouse.repository";
 
-export interface PersonalUsageWindow {
-  /** Inclusive UTC start of the rollup window. */
-  start: Date;
-  /** Exclusive UTC end of the rollup window. */
-  end: Date;
-}
+export type { PersonalUsageWindow } from "./personalUsage.clickhouse.repository";
 
 export interface PersonalUsageSummary {
   /** Theoretical (list-price) spend — the grand total regardless of plan. */
@@ -111,87 +98,36 @@ export interface PersonalUsageQueryInput {
   ingestionTenantId?: string;
 }
 
-/**
- * gateway_budget_ledger_events schema — captured here so callers
- * outside the budget repository can reason about it.
- *
- * Receivers (gateway VK fold + claude_code OTLP receiver) write one
- * row per (request, applicable budget). The ReplacingMergeTree
- * collapses replays on (TenantId, BudgetId, GatewayRequestId).
- *
- *   TenantId: hidden Governance Project id (for ingestion sources) or
- *             the trace's tenantId (for gateway VKs).
- *   Scope:    one of ORGANIZATION / TEAM / PROJECT / VIRTUAL_KEY /
- *             PRINCIPAL — matches the budget that was applicable.
- *   ScopeId:  the budget's scopeId (org/team/project/vk id, or for
- *             PRINCIPAL the User.id).
- *   AmountUSD, TokensInput, TokensOutput, Model, OccurredAt, etc.
- *
- * Personal-usage queries pin TenantId=<org's hidden Governance Project>
- * AND Scope='principal' (lowercase, matching `scopeToClickHouse` in
- * budget.clickhouse.repository.ts) AND ScopeId=userId so we get exactly
- * the per-user ledger rows for THIS org. The TenantId pin both prunes
- * partitions (it is the leading ORDER BY key) and scopes a multi-org user
- * to the current org — without it the query would sum the user's principal
- * spend across every org they belong to.
- *
- * The Scope/ScopeId pair does NOT narrow to one row per request. A user
- * carrying two PRINCIPAL budgets — a hard cap and a soft cap, the standard
- * pairing — gets one principal-scope row per budget per request, each
- * carrying the request's full cost. Summing them reports the user spending
- * twice what they spent. Every query below therefore collapses to one row
- * per GatewayRequestId first; see `PRINCIPAL_REQUESTS_SUBQUERY`.
- */
-
-/**
- * The user's principal-scope ledger rows, collapsed to one row per gateway
- * request.
- *
- * Two things make this exact rather than approximate. Every row a single
- * request writes carries that request's own cost, tokens and model, so
- * `any()` over the group returns the request's values whichever row it
- * picks. And the group key is the request id, so N budgets contributing N
- * identical rows collapse to the one row the request actually is. It also
- * absorbs an un-merged ReplacingMergeTree replay, which a bare `sum` over
- * the raw table would have counted twice.
- *
- * The aliases are deliberately not the column names they aggregate:
- * ClickHouse resolves an alias back into the same SELECT's WHERE, so
- * `any(OccurredAt) AS OccurredAt` puts an aggregate in the WHERE clause and
- * the whole read fails.
- */
-const PRINCIPAL_REQUESTS_SUBQUERY = `
-  SELECT
-    GatewayRequestId,
-    any(AmountUSD)    AS RequestAmountUSD,
-    any(TokensInput)  AS RequestTokensInput,
-    any(TokensOutput) AS RequestTokensOutput,
-    any(Model)        AS RequestModel,
-    any(OccurredAt)   AS RequestOccurredAt
-  FROM gateway_budget_ledger_events
-  WHERE TenantId = {tenantId:String}
-    AND Scope = 'principal'
-    AND ScopeId = {userId:String}
-    AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-    AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
-  GROUP BY GatewayRequestId
-`;
-
 export class PersonalUsageService {
+  constructor(
+    /**
+     * The personal-usage reader, from the App. `undefined` on a
+     * deployment without ClickHouse — every method degrades to its
+     * empty-state shape, same as the pre-repository "no client" fallback.
+     */
+    private readonly repository: PersonalUsageClickHouseRepository | undefined,
+  ) {}
+
+  static create(
+    repository: PersonalUsageClickHouseRepository | undefined,
+  ): PersonalUsageService {
+    return new PersonalUsageService(repository);
+  }
+
   /**
    * Returns aggregated spend + token + model summary for the window.
    * Empty state safe — returns zeros + null model if no traces.
    */
   async summary(input: PersonalUsageQueryInput): Promise<PersonalUsageSummary> {
     const window = input.window ?? defaultMonthWindow();
-    const client = await getClickHouseClientForProject(input.personalProjectId);
-    if (!client) return emptySummary();
+    if (!this.repository) return emptySummary();
+    const repository = this.repository;
 
-    const summaryRow = await this.querySummary(client, {
+    const summaryRow = await repository.findSummary({
       tenantId: input.personalProjectId,
       window,
     });
-    const topModel = await this.queryTopModel(client, {
+    const topModel = await repository.findTopModel({
       tenantId: input.personalProjectId,
       window,
     });
@@ -202,7 +138,7 @@ export class PersonalUsageService {
     // per-principal ledger rows and merge.
     const ingestion =
       input.userId && input.ingestionTenantId
-        ? await this.queryIngestionPrincipalSummary(client, {
+        ? await this.queryIngestionPrincipalSummary(repository, {
             tenantId: input.ingestionTenantId,
             userId: input.userId,
             window,
@@ -263,72 +199,33 @@ export class PersonalUsageService {
     input: PersonalUsageQueryInput,
   ): Promise<PersonalUsageBucket[]> {
     const window = input.window ?? defaultLast14DaysWindow();
-    const client = await getClickHouseClientForProject(input.personalProjectId);
-    if (!client) return fillEmptyBuckets(window);
+    if (!this.repository) return fillEmptyBuckets(window);
+    const repository = this.repository;
 
-    const result = await client.query({
-      query: `
-        SELECT
-          toDate(LatestOccurredAt) AS Day,
-          sum(TraceSpentUsd)       AS SpentUsd,
-          sum(coalesce(TraceSpentUsd, 0) - NonBilledUsd) AS BilledUsd,
-          count()                  AS Requests
-        FROM (
-          SELECT
-            TraceId,
-            argMax(OccurredAt, UpdatedAt) AS LatestOccurredAt,
-            argMax(TotalCost, UpdatedAt)  AS TraceSpentUsd,
-            argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt) AS NonBilledUsd
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-          GROUP BY TraceId
-        )
-        GROUP BY Day
-        ORDER BY Day
-        SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-      `,
-      query_params: {
-        tenantId: input.personalProjectId,
-        fromMs: window.start.getTime(),
-        toMs: window.end.getTime(),
-      },
-      format: "JSONEachRow",
+    const rows = await repository.findDailyBuckets({
+      tenantId: input.personalProjectId,
+      window,
     });
-
-    type RawBucket = {
-      Day: string;
-      SpentUsd: number;
-      BilledUsd: number;
-      Requests: number;
-    };
-    const rows = (await result.json()) as RawBucket[];
 
     const byDay = new Map<
       string,
       { spentUsd: number; billedUsd: number; requests: number }
     >();
     for (const r of rows) {
-      const existing = byDay.get(r.Day) ?? {
-        spentUsd: 0,
-        billedUsd: 0,
-        requests: 0,
-      };
-      existing.spentUsd += Number(r.SpentUsd) || 0;
-      existing.billedUsd += Number(r.BilledUsd) || 0;
-      existing.requests += Number(r.Requests) || 0;
-      byDay.set(r.Day, existing);
+      byDay.set(r.day, {
+        spentUsd: r.spentUsd,
+        billedUsd: r.billedUsd,
+        requests: r.requests,
+      });
     }
 
     // Ingestion-source ledger union: per-day spend for the user's
     // PRINCIPAL-scope rows, merged into the same byDay map.
     if (input.userId && input.ingestionTenantId) {
-      const ledgerBuckets = await this.queryIngestionPrincipalBuckets(client, {
-        tenantId: input.ingestionTenantId,
-        userId: input.userId,
-        window,
-      });
+      const ledgerBuckets = await this.queryIngestionPrincipalBuckets(
+        repository,
+        { tenantId: input.ingestionTenantId, userId: input.userId, window },
+      );
       for (const r of ledgerBuckets) {
         const existing = byDay.get(r.day) ?? {
           spentUsd: 0,
@@ -346,43 +243,11 @@ export class PersonalUsageService {
   }
 
   private async queryIngestionPrincipalBuckets(
-    client: ClickHouseClient,
+    repository: PersonalUsageClickHouseRepository,
     params: { tenantId: string; userId: string; window: PersonalUsageWindow },
   ): Promise<PersonalUsageBucket[]> {
-    if (!isClickHouseEnabled()) return [];
     try {
-      const result = await client.query({
-        query: `
-          SELECT
-            toDate(RequestOccurredAt) AS Day,
-            sum(RequestAmountUSD)     AS SpentUsd,
-            count()                   AS Requests
-          FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
-          GROUP BY Day
-          ORDER BY Day
-          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-        `,
-        query_params: {
-          tenantId: params.tenantId,
-          userId: params.userId,
-          fromMs: params.window.start.getTime(),
-          toMs: params.window.end.getTime(),
-        },
-        format: "JSONEachRow",
-      });
-      type Raw = { Day: string; SpentUsd: number; Requests: number };
-      const rows = (await result.json()) as Raw[];
-      return rows.map((r) => {
-        const spentUsd = Number(r.SpentUsd) || 0;
-        // The gateway ledger records real per-token spend (virtual-key
-        // traffic the customer pays for), so it is fully billed.
-        return {
-          day: r.Day,
-          spentUsd,
-          billedUsd: spentUsd,
-          requests: Number(r.Requests) || 0,
-        };
-      });
+      return await repository.findIngestionPrincipalBuckets(params);
     } catch {
       return [];
     }
@@ -391,7 +256,8 @@ export class PersonalUsageService {
   /**
    * Per-model spend breakdown. Powers the "By tool" / "By model"
    * card on /me. Models come from `trace_summaries.Models` (an array
-   * — we explode it via arrayJoin after the per-trace argMax dedup).
+   * — the repository explodes it via arrayJoin after the per-trace
+   * argMax dedup).
    *
    * Cost-attribution policy: a multi-model trace contributes its FULL
    * TotalCost to each model that appears in its Models array (so a
@@ -407,71 +273,30 @@ export class PersonalUsageService {
     limit = 8,
   ): Promise<PersonalUsageBreakdown[]> {
     const window = input.window ?? defaultMonthWindow();
-    const client = await getClickHouseClientForProject(input.personalProjectId);
-    if (!client) return [];
+    if (!this.repository) return [];
+    const repository = this.repository;
 
-    const result = await client.query({
-      query: `
-        SELECT
-          Model,
-          sum(TraceSpentUsd) AS SpentUsd,
-          sum(coalesce(TraceSpentUsd, 0) - NonBilledUsd) AS BilledUsd,
-          count()       AS Requests
-        FROM (
-          SELECT
-            TraceId,
-            arrayJoin(argMax(Models, UpdatedAt)) AS Model,
-            argMax(TotalCost, UpdatedAt)         AS TraceSpentUsd,
-            argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt) AS NonBilledUsd
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-            AND notEmpty(Models)
-          GROUP BY TraceId
-        )
-        GROUP BY Model
-        ORDER BY SpentUsd DESC
-        LIMIT {lim:UInt32}
-        SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-      `,
-      query_params: {
-        tenantId: input.personalProjectId,
-        fromMs: window.start.getTime(),
-        toMs: window.end.getTime(),
-        lim: limit,
-      },
-      format: "JSONEachRow",
+    const rows = await repository.findModelBreakdown({
+      tenantId: input.personalProjectId,
+      window,
+      limit,
     });
 
-    type RawBreakdown = {
-      Model: string;
-      SpentUsd: number;
-      BilledUsd: number;
-      Requests: number;
-    };
-    const rows = (await result.json()) as RawBreakdown[];
-
-    // Aggregate per-model since GROUP BY TraceId, Model returned per-trace rows.
     const aggregated = new Map<string, PersonalUsageBreakdown>();
     for (const r of rows) {
-      const existing = aggregated.get(r.Model) ?? {
-        label: r.Model,
-        spentUsd: 0,
-        billedUsd: 0,
-        requests: 0,
-      };
-      existing.spentUsd += Number(r.SpentUsd) || 0;
-      existing.billedUsd += Number(r.BilledUsd) || 0;
-      existing.requests += Number(r.Requests) || 0;
-      aggregated.set(r.Model, existing);
+      aggregated.set(r.label, {
+        label: r.label,
+        spentUsd: r.spentUsd,
+        billedUsd: r.billedUsd,
+        requests: r.requests,
+      });
     }
 
     // Ingestion-source ledger union: per-model spend for the user's
     // PRINCIPAL-scope rows, merged into the same map.
     if (input.userId && input.ingestionTenantId) {
       const ledgerBreakdown = await this.queryIngestionPrincipalBreakdown(
-        client,
+        repository,
         { tenantId: input.ingestionTenantId, userId: input.userId, window },
       );
       for (const r of ledgerBreakdown) {
@@ -494,114 +319,14 @@ export class PersonalUsageService {
   }
 
   private async queryIngestionPrincipalBreakdown(
-    client: ClickHouseClient,
+    repository: PersonalUsageClickHouseRepository,
     params: { tenantId: string; userId: string; window: PersonalUsageWindow },
   ): Promise<PersonalUsageBreakdown[]> {
-    if (!isClickHouseEnabled()) return [];
     try {
-      const result = await client.query({
-        query: `
-          SELECT
-            RequestModel          AS Label,
-            sum(RequestAmountUSD) AS SpentUsd,
-            count()               AS Requests
-          FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
-          GROUP BY Label
-          ORDER BY SpentUsd DESC
-          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-        `,
-        query_params: {
-          tenantId: params.tenantId,
-          userId: params.userId,
-          fromMs: params.window.start.getTime(),
-          toMs: params.window.end.getTime(),
-        },
-        format: "JSONEachRow",
-      });
-      type Raw = { Label: string; SpentUsd: number; Requests: number };
-      const rows = (await result.json()) as Raw[];
-      return rows.map((r) => {
-        const spentUsd = Number(r.SpentUsd) || 0;
-        // Gateway ledger spend is real per-token spend, so fully billed.
-        return {
-          label: r.Label,
-          spentUsd,
-          billedUsd: spentUsd,
-          requests: Number(r.Requests) || 0,
-        };
-      });
+      return await repository.findIngestionPrincipalBreakdown(params);
     } catch {
       return [];
     }
-  }
-
-  // --- internals ---------------------------------------------------------
-
-  private async querySummary(
-    client: ClickHouseClient,
-    params: { tenantId: string; window: PersonalUsageWindow },
-  ): Promise<{
-    totalCost: number;
-    billedCost: number;
-    requestCount: number;
-    promptTokens: number;
-    completionTokens: number;
-  }> {
-    const result = await client.query({
-      query: `
-        SELECT
-          sum(SpentUsd)        AS TotalCost,
-          sum(coalesce(SpentUsd, 0) - NonBilledUsd) AS BilledCost,
-          countDistinct(TraceId) AS RequestCount,
-          sum(PromptTokens)    AS PromptTokens,
-          sum(CompletionTokens) AS CompletionTokens
-        FROM (
-          SELECT
-            TraceId,
-            argMax(TotalCost, UpdatedAt)               AS SpentUsd,
-            argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt) AS NonBilledUsd,
-            argMax(TotalPromptTokenCount, UpdatedAt)   AS PromptTokens,
-            argMax(TotalCompletionTokenCount, UpdatedAt) AS CompletionTokens
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-          GROUP BY TraceId
-        )
-        SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-      `,
-      query_params: {
-        tenantId: params.tenantId,
-        fromMs: params.window.start.getTime(),
-        toMs: params.window.end.getTime(),
-      },
-      format: "JSONEachRow",
-    });
-
-    type RawSummary = {
-      TotalCost: number | null;
-      BilledCost: number | null;
-      RequestCount: number | null;
-      PromptTokens: number | null;
-      CompletionTokens: number | null;
-    };
-    const [row] = (await result.json()) as RawSummary[];
-    if (!row) {
-      return {
-        totalCost: 0,
-        billedCost: 0,
-        requestCount: 0,
-        promptTokens: 0,
-        completionTokens: 0,
-      };
-    }
-    return {
-      totalCost: Number(row.TotalCost) || 0,
-      billedCost: Number(row.BilledCost) || 0,
-      requestCount: Number(row.RequestCount) || 0,
-      promptTokens: Number(row.PromptTokens) || 0,
-      completionTokens: Number(row.CompletionTokens) || 0,
-    };
   }
 
   /**
@@ -617,14 +342,9 @@ export class PersonalUsageService {
    *     scope (or pivot the receiver to write to user's personal
    *     project tenant directly so the existing trace_summaries query
    *     captures them).
-   *   - Scope='principal' narrows to the user, not to one row per
-   *     request: a user with two PRINCIPAL budgets writes two rows per
-   *     request, each carrying the full cost. The read collapses on
-   *     GatewayRequestId before it sums; see
-   *     `PRINCIPAL_REQUESTS_SUBQUERY`.
    */
   private async queryIngestionPrincipalSummary(
-    client: ClickHouseClient,
+    repository: PersonalUsageClickHouseRepository,
     params: { tenantId: string; userId: string; window: PersonalUsageWindow },
   ): Promise<{
     totalCost: number;
@@ -633,113 +353,14 @@ export class PersonalUsageService {
     completionTokens: number;
     topModel: { name: string; requests: number } | null;
   } | null> {
-    if (!isClickHouseEnabled()) return null;
     try {
-      const result = await client.query({
-        query: `
-          SELECT
-            sum(RequestAmountUSD)    AS TotalCost,
-            count()                  AS RequestCount,
-            sum(RequestTokensInput)  AS PromptTokens,
-            sum(RequestTokensOutput) AS CompletionTokens
-          FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
-          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-        `,
-        query_params: {
-          tenantId: params.tenantId,
-          userId: params.userId,
-          fromMs: params.window.start.getTime(),
-          toMs: params.window.end.getTime(),
-        },
-        format: "JSONEachRow",
-      });
-
-      type RawSummary = {
-        TotalCost: number | null;
-        RequestCount: number | null;
-        PromptTokens: number | null;
-        CompletionTokens: number | null;
-      };
-      const [row] = (await result.json()) as RawSummary[];
-      if (!row || !Number(row.RequestCount)) return null;
-
-      const topModelResult = await client.query({
-        query: `
-          SELECT
-            RequestModel AS Name,
-            count()       AS Requests
-          FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
-          GROUP BY RequestModel
-          ORDER BY Requests DESC
-          LIMIT 1
-          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-        `,
-        query_params: {
-          tenantId: params.tenantId,
-          userId: params.userId,
-          fromMs: params.window.start.getTime(),
-          toMs: params.window.end.getTime(),
-        },
-        format: "JSONEachRow",
-      });
-      type RawTop = { Name: string; Requests: number | null };
-      const [topRow] = (await topModelResult.json()) as RawTop[];
-
-      return {
-        totalCost: Number(row.TotalCost) || 0,
-        requestCount: Number(row.RequestCount) || 0,
-        promptTokens: Number(row.PromptTokens) || 0,
-        completionTokens: Number(row.CompletionTokens) || 0,
-        topModel: topRow
-          ? { name: topRow.Name, requests: Number(topRow.Requests) || 0 }
-          : null,
-      };
+      return await repository.findIngestionPrincipalSummary(params);
     } catch {
       // CH unavailable / table not provisioned. Personal usage
       // queries already render zeros gracefully when the trace path
       // misses; do the same for the ingestion-ledger union.
       return null;
     }
-  }
-
-  private async queryTopModel(
-    client: ClickHouseClient,
-    params: { tenantId: string; window: PersonalUsageWindow },
-  ): Promise<{ model: string; requests: number } | null> {
-    const result = await client.query({
-      query: `
-        SELECT
-          Model,
-          count() AS Requests
-        FROM (
-          SELECT
-            TraceId,
-            arrayJoin(argMax(Models, UpdatedAt)) AS Model
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-            AND notEmpty(Models)
-          GROUP BY TraceId
-        )
-        GROUP BY Model
-        ORDER BY Requests DESC
-        LIMIT 1
-        SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-      `,
-      query_params: {
-        tenantId: params.tenantId,
-        fromMs: params.window.start.getTime(),
-        toMs: params.window.end.getTime(),
-      },
-      format: "JSONEachRow",
-    });
-
-    type RawTopModel = { Model: string; Requests: number };
-    const rows = (await result.json()) as RawTopModel[];
-    const top = rows[0];
-    if (!top) return null;
-    return { model: top.Model, requests: Number(top.Requests) || 0 };
   }
 }
 
@@ -793,10 +414,4 @@ function emptySummary(): PersonalUsageSummary {
     completionTokens: 0,
     mostUsedModel: null,
   };
-}
-
-function formatSettings(settings: Record<string, number | string>): string {
-  return Object.entries(settings)
-    .map(([k, v]) => `${k} = ${v}`)
-    .join(", ");
 }

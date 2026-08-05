@@ -1,7 +1,10 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
+import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
@@ -797,19 +800,48 @@ export function initializeDefaultApp(options?: {
         }
       : undefined;
 
-  const governanceKpisSync = clickhouseEnabled
-    ? {
-        governanceKpisRepository: new GovernanceKpisClickHouseRepository(
-          resolveClickHouseClient,
-        ),
-      }
+  // Governance's KPI rollup. One instance for the whole App: the reactor
+  // sync writes through it, the spend-spike anomaly evaluator reads through
+  // it — the same repository reference the process manager below takes and
+  // `app.governance.kpis` hands out.
+  const governanceKpisRepository = clickhouseEnabled
+    ? new GovernanceKpisClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const governanceKpisSync = governanceKpisRepository
+    ? { governanceKpisRepository }
     : undefined;
 
-  const governanceOcsfEventsSync = clickhouseEnabled
-    ? {
-        governanceOcsfEventsRepository:
-          new GovernanceOcsfEventsClickHouseRepository(resolveClickHouseClient),
-      }
+  // Governance's OCSF SIEM-export sink. One instance for the whole App: the
+  // reactor sync writes through it, the puller worker and the workspace-view
+  // audit trail write through it, and the SIEM export procedure reads
+  // through it — the same repository reference the process manager below
+  // takes and `app.governance.ocsfEvents` hands out.
+  const governanceOcsfEventsRepository = clickhouseEnabled
+    ? new GovernanceOcsfEventsClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const governanceOcsfEventsSync = governanceOcsfEventsRepository
+    ? { governanceOcsfEventsRepository }
+    : undefined;
+
+  // Governance-domain reads over the shared `trace_summaries` table (the
+  // persona-detection activity probe, the quarantine-fill breakdown).
+  const governanceTraceActivityRepository = clickhouseEnabled
+    ? new GovernanceTraceActivityClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
+  // The /me dashboard's spend/token/model rollups, over trace_summaries
+  // and the gateway ledger's PRINCIPAL rows.
+  const personalUsageRepository = clickhouseEnabled
+    ? new PersonalUsageClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
+  // Billing-month usage rollups (billable_events + trace_summaries),
+  // read by the billing pipeline and the usage-limit services.
+  const billableEventsRepository = clickhouseEnabled
+    ? new BillableEventsClickHouseRepository(
+        resolveClickHouseClient,
+        getClickHouseClientForOrganization,
+      )
     : undefined;
 
   const es = new EventSourcing({
@@ -1335,6 +1367,13 @@ export function initializeDefaultApp(options?: {
           : null,
       ),
     },
+    governance: {
+      ocsfEvents: governanceOcsfEventsRepository,
+      traceActivity: governanceTraceActivityRepository,
+      kpis: governanceKpisRepository,
+      personalUsage: personalUsageRepository,
+    },
+    billableEvents: billableEventsRepository,
     codingAgents: {
       sessions: traced(
         new CodingAgentSessionService(
@@ -1553,6 +1592,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     gateway: { budgets: undefined, virtualKeySpend: undefined },
     filters: { options: new FilterService(null) },
+    governance: {
+      ocsfEvents: undefined,
+      traceActivity: undefined,
+      kpis: undefined,
+      personalUsage: undefined,
+    },
+    billableEvents: undefined,
     codingAgents: {
       sessions: new CodingAgentSessionService(
         new NullCodingAgentSessionRepository(),

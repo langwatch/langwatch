@@ -1216,7 +1216,7 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
       401,
     );
   }
-  const service = CliBootstrapService.create(prisma);
+  const service = CliBootstrapService.create(prisma, getApp().gateway.budgets);
   const result = await service.resolve({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
@@ -1635,7 +1635,10 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
     ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
   );
   if (gate) return gate;
-  const setupService = GovernanceSetupStateService.create(prisma);
+  const setupService = GovernanceSetupStateService.create(
+    prisma,
+    getApp().governance.traceActivity,
+  );
   const setup = await setupService.resolve(tokenRecord.organization_id);
   return c.json({ setup });
 });

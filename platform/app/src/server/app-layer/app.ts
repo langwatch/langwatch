@@ -29,6 +29,8 @@ export class App {
     AppCommands["codingAgents"];
   readonly gateway: AppDependencies["gateway"];
   readonly filters: AppDependencies["filters"];
+  readonly governance: AppDependencies["governance"];
+  readonly billableEvents: AppDependencies["billableEvents"];
   readonly commands: AppCommands;
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
@@ -98,6 +100,8 @@ export class App {
     };
     this.gateway = deps.gateway;
     this.filters = deps.filters;
+    this.governance = deps.governance;
+    this.billableEvents = deps.billableEvents;
     this.commands = deps.commands;
     this.langy = deps.langy;
     this.ops = deps.ops;
