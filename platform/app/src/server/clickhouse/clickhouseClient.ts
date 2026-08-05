@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import { prisma } from "../db";
 import { _getSharedClickHouseClient } from "./client";
 import { createManagedClickHouseClient } from "./managedClient";
+import { unregisterClickHouseLimiter } from "./metrics";
 
 const logger = createLogger("langwatch:clickhouse:routing");
 
@@ -219,8 +220,11 @@ function getOrCreateCustomClient(
  */
 export async function clearCustomClientCache(): Promise<void> {
   const closePromises: Promise<void>[] = [];
-  for (const client of customClientCache.values()) {
+  for (const [organizationId, client] of customClientCache) {
     closePromises.push(client.close());
+    // Each private instance registered its limiter under its own org id; drop
+    // the probe with the client so the gauges describe only live limiters.
+    unregisterClickHouseLimiter(organizationId);
   }
   await Promise.all(closePromises);
   customClientCache.clear();

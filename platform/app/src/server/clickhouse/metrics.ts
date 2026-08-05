@@ -164,6 +164,10 @@ const clickhouseStatementsInFlight = new Gauge({
   help: "ClickHouse statements this process currently has in flight",
   labelNames: ["instance"] as const,
   collect() {
+    // Reset first. `labels().set()` only ever writes, so a client that has
+    // been closed would keep publishing its final value for the life of the
+    // process - a gauge describing a limiter that no longer fronts anything.
+    this.reset();
     for (const [instance, probe] of limiterProbes) {
       this.labels(instance).set(probe().inFlight);
     }
@@ -176,6 +180,7 @@ const clickhouseStatementsQueued = new Gauge({
   help: "ClickHouse statements waiting for a concurrency slot in this process",
   labelNames: ["instance"] as const,
   collect() {
+    this.reset();
     for (const [instance, probe] of limiterProbes) {
       this.labels(instance).set(probe().queued);
     }

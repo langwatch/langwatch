@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FilterOptionsClickHouseRepository } from "~/server/app-layer/filters/repositories/filter-options.clickhouse.repository";
+import { ClickHouseOverloadedError } from "~/server/app-layer/traces/errors";
 import type { ClickHouseFilterQueryParams } from "../clickhouse";
 import { FilterService, type GetFilterOptionsInput } from "../filter.service";
 
@@ -163,6 +164,27 @@ describe("FilterService.getFilterOptions", () => {
       const result = await service.getFilterOptions(makeInput());
 
       expect(result).toEqual(extractedOptions);
+    });
+  });
+
+  describe("when the platform sheds the query", () => {
+    it("keeps the overload error instead of flattening it", async () => {
+      // The typed error exists so the client can offer retry guidance rather
+      // than "something went wrong". A catch-all that rewrapped it would
+      // throw away the only thing distinguishing shedding from a bad filter.
+      const client = {
+        query: vi.fn().mockRejectedValue(new ClickHouseOverloadedError()),
+      };
+      const service = serviceOver(client);
+
+      const error = await service
+        .getFilterOptions(makeInput())
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ClickHouseOverloadedError);
+      expect((error as ClickHouseOverloadedError).code).toBe(
+        "clickhouse_overloaded",
+      );
     });
   });
 
