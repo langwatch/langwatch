@@ -154,7 +154,7 @@ describe("CopilotExtractor", () => {
     it("GenAI lifts the standard core and Copilot adds only the extras", () => {
       const result = canonicalize({
         "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": "gpt-5",
+        "gen_ai.request.model": "gpt-5-mini",
         "gen_ai.usage.input_tokens": 1200,
         "gen_ai.usage.output_tokens": 350,
         "github.copilot.total_premium_requests": 1,
@@ -168,7 +168,7 @@ describe("CopilotExtractor", () => {
       expect(result.appliedRules.some((r) => r.startsWith("genai:"))).toBe(
         true,
       );
-      expect(result.attributes["gen_ai.request.model"]).toBe("gpt-5");
+      expect(result.attributes["gen_ai.request.model"]).toBe("gpt-5-mini");
       expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(1200);
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(350);
       // Extras — Copilot's work.
@@ -179,9 +179,17 @@ describe("CopilotExtractor", () => {
       expect(result.attributes["langwatch.user.id"]).toBe("hash");
     });
 
-    /** @scenario Captured content payloads are lifted as span input and output */
-    it("content on gen_ai.input/output.messages survives to the canonical attributes", () => {
+    /** @scenario Captured content payloads survive canonicalisation as span input and output */
+    it("content on gen_ai.input/output.messages survives the chain unmodified", () => {
+      // Copilot emits content on ALREADY-canonical gen_ai.input/output.messages
+      // keys. The chain's processing here is (1) parseJsonStringValues turning
+      // the JSON strings into structured messages and (2) the remaining()
+      // merge carrying them to the result — genAi.ts deliberately skips
+      // re-extraction of canonical keys. Asserting the parsed structure pins
+      // both: a chain member that take()s the content without re-emitting it,
+      // or a parse regression, fails this test.
       const result = canonicalize({
+        "gen_ai.operation.name": "chat",
         "gen_ai.input.messages": JSON.stringify([
           { role: "user", content: "fix the bug" },
         ]),
@@ -191,8 +199,12 @@ describe("CopilotExtractor", () => {
         "github.copilot.turn_id": "t1",
       });
 
-      expect(result.attributes["gen_ai.input.messages"]).toBeDefined();
-      expect(result.attributes["gen_ai.output.messages"]).toBeDefined();
+      expect(result.attributes["gen_ai.input.messages"]).toEqual([
+        { role: "user", content: "fix the bug" },
+      ]);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual([
+        { role: "assistant", content: "done" },
+      ]);
     });
   });
 });

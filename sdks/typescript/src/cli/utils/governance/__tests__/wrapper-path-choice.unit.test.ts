@@ -406,7 +406,8 @@ describe("resolveWrapperPath", () => {
     });
 
     /** @scenario An explicit --tool-mode=gateway flag routes copilot through the gateway */
-    it("honors an explicit gateway override for copilot", async () => {
+    it("honors an explicit gateway override for copilot and names the seat bypass", async () => {
+      const write = vi.fn();
       const out = await resolveWrapperPath({
         cfg: baseCfg(),
         tool: "copilot",
@@ -414,23 +415,32 @@ describe("resolveWrapperPath", () => {
         override: "gateway",
         isTTY: false,
         promptImpl: neverPrompt,
+        writeImpl: write,
         env: {},
       });
       expect(out.mode).toBe("gateway");
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
     });
 
     /** @scenario A pinned gateway mode for copilot is honored without prompting */
-    it("honors a pinned gateway mode for copilot without prompting", async () => {
+    it("honors a pinned gateway mode for copilot without prompting and names the seat bypass", async () => {
+      const write = vi.fn();
       const out = await resolveWrapperPath({
         cfg: baseCfg({ tool_mode: { copilot: "gateway" } }),
         tool: "copilot",
         args: [],
         isTTY: true,
         promptImpl: neverPrompt,
+        writeImpl: write,
         env: {},
       });
       expect(out.mode).toBe("gateway");
       expect(out.prompted).toBe(false);
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
     });
 
     /** @scenario Policy-forced gateway routing for copilot names the seat bypass */

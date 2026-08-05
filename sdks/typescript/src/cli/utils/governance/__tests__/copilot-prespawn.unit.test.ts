@@ -148,4 +148,17 @@ describe("copilotManagedSettingsPaths()", () => {
       "/etc/github-copilot/policy.d",
     ]);
   });
+
+  it("builds the managed-settings path from ProgramData on windows", () => {
+    const prev = process.env.ProgramData;
+    process.env.ProgramData = "D:\\ProgramData";
+    try {
+      expect(copilotManagedSettingsPaths("win32")).toEqual([
+        path.join("D:\\ProgramData", "GitHubCopilot", "managed-settings.json"),
+      ]);
+    } finally {
+      if (prev === undefined) delete process.env.ProgramData;
+      else process.env.ProgramData = prev;
+    }
+  });
 });

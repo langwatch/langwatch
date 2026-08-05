@@ -171,7 +171,7 @@ describe("capOversizedAttributes with copilot content-capture payloads", () => {
   it("caps an oversized gen_ai content value on a span event and keeps the span intact", () => {
     const big = "m".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
     const span = makeSpan([
-      { key: "gen_ai.request.model", value: { stringValue: "gpt-5" } },
+      { key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } },
     ]);
     (span as unknown as { events: unknown[] }).events = [
       {
@@ -194,7 +194,7 @@ describe("capOversizedAttributes with copilot content-capture payloads", () => {
     ).events[0]!.attributes[0]!;
     expect(eventAttr.value.stringValue).toMatch(/^\[truncated: \d+ bytes/);
     // The span itself (model attr) is untouched.
-    expect(span.attributes[0]!.value.stringValue).toBe("gpt-5");
+    expect(span.attributes[0]!.value.stringValue).toBe("gpt-5-mini");
   });
 
   /** @scenario A long session of content-carrying spans ingests without unbounded accumulation */
