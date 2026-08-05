@@ -32,6 +32,14 @@ export async function bestEffort({
   try {
     await run();
   } catch (err) {
-    logger.error({ ...context, err }, `[bestEffort] ${label} failed`);
+    try {
+      logger.error({ ...context, err }, `[bestEffort] ${label} failed`);
+    } catch {
+      // The contract is unconditional, so the reporting of a failure cannot be
+      // allowed to become one. Spreading `context` and serialising `err` both
+      // run arbitrary getters, and a transport can be closed under us; any of
+      // those throwing here would fail the webhook for the sake of a log line
+      // and hand Stripe a 5xx that replays the whole handler.
+    }
   }
 }
