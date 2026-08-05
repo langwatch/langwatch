@@ -240,4 +240,34 @@ describe("given a self-hosted deployment federating to an OIDC identity provider
       );
     });
   });
+
+  /**
+   * The unit test pins what the config carries, but the identity provider
+   * only ever sees the emitted URL, and the redirect it compares against its
+   * registration is a query parameter on that URL. This is the only suite
+   * that can look at it.
+   */
+  describe("when the deployment URL is written with a trailing slash", () => {
+    let redirectUri: string | null = null;
+
+    beforeAll(async () => {
+      process.env.NEXTAUTH_PROVIDER = "cognito";
+      process.env.NEXTAUTH_URL = `${APP_URL}/`;
+      vi.resetModules();
+      ({ app } = await import("~/server/routes/auth"));
+      const started = await startSignIn(app, "cognito");
+      redirectUri = started.url
+        ? new URL(started.url).searchParams.get("redirect_uri")
+        : null;
+    });
+
+    afterAll(() => {
+      process.env.NEXTAUTH_URL = APP_URL;
+    });
+
+    /** @scenario A trailing slash on the deployment URL does not change the callback URL */
+    it("sends the identity provider the callback URL the operator registered", () => {
+      expect(redirectUri).toBe(`${APP_URL}/api/auth/callback/cognito`);
+    });
+  });
 });
