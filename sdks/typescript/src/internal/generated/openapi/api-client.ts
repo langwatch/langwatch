@@ -326,40 +326,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/experiments/runs/{runId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Get the current status of an evaluation run for polling. Returns progress while running, and summary when completed. */
-        get: operations["getEvaluationsV3RunStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/experiments/{slug}/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @description Start execution of a saved Evaluations V3 experiment by slug. Returns immediately with a runId for polling, or streams SSE events if Accept: text/event-stream header is provided. */
-        post: operations["postEvaluationsV3Run"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -1387,6 +1353,123 @@ export interface paths {
         put?: never;
         /** @description Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types validate against their schemas; custom event types pass through `trackEventRESTParamsValidatorSchema`. */
         post: operations["postApiEventsTrack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List experiments for the project. Includes a runs count and last-run timestamp per experiment. */
+        get: operations["getApiExperiments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/{slug}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run an experiment
+         * @description Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.
+         */
+        post: operations["postApiExperimentsBySlugRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List runs of an experiment
+         * @description Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`.
+         */
+        get: operations["getApiExperimentsRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Poll a run
+         * @description Current state of one run. Returns progress while it is going and a summary once it finishes, so a CI job can poll this until `status` leaves `running`.
+         */
+        get: operations["getApiExperimentsRunsByRunId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/runs/{runId}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read run results
+         * @description Every dataset row of a run with what the target predicted, plus one entry per evaluator per row. Runs older than the status cache need `experimentSlug` as well, since a run id is only unique within its experiment.
+         */
+        get: operations["getApiExperimentsRunsByRunIdResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiment/init": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an experiment
+         * @description Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you.
+         */
+        post: operations["postApiExperimentInit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3312,134 +3395,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    getEvaluationsV3RunStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The run ID returned from POST /api/experiments/{slug}/run */
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Run status */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId: string;
-                        /** @enum {string} */
-                        status: "pending" | "running" | "completed" | "failed" | "stopped";
-                        /** @description Number of cells completed */
-                        progress: number;
-                        /** @description Total number of cells */
-                        total: number;
-                        /** @description Unix timestamp when run started */
-                        startedAt?: number;
-                        /** @description Unix timestamp when run finished (only present when completed/failed/stopped) */
-                        finishedAt?: number;
-                        /** @description Execution summary (only present when completed) */
-                        summary?: {
-                            runId?: string;
-                            totalCells?: number;
-                            completedCells?: number;
-                            failedCells?: number;
-                            /** @description Total execution time in milliseconds */
-                            duration?: number;
-                            /** @description URL to view the run in LangWatch */
-                            runUrl?: string;
-                        };
-                        /** @description Error message (only present when failed) */
-                        error?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized - Missing or invalid API key */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Run not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    postEvaluationsV3Run: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The slug of the evaluation to run */
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Run started successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @description Unique identifier for this run */
-                        runId: string;
-                        /**
-                         * @description Initial status of the run
-                         * @enum {string}
-                         */
-                        status: "running";
-                        /** @description Total number of cells to execute */
-                        total: number;
-                        /** @description URL to view the run in LangWatch */
-                        runUrl?: string;
-                    };
-                    "text/event-stream": string;
-                };
-            };
-            /** @description Unauthorized - Missing or invalid API key */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Evaluation not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
             };
         };
     };
@@ -5926,6 +5881,523 @@ export interface operations {
             };
         };
     };
+    getApiExperiments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        experiments: {
+                            id: string;
+                            slug: string;
+                            name: string | null;
+                            type: string;
+                            workflowId: string | null;
+                            createdAt: string;
+                            updatedAt: string;
+                            runsCount: number;
+                            lastRunAt: string | null;
+                        }[];
+                        pagination: {
+                            page: number;
+                            pageSize: number;
+                            totalHits: number;
+                            hasMore: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiExperimentsBySlugRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Run started */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Identifier to poll this run with */
+                        runId: string;
+                        /** @constant */
+                        status: "running";
+                        /** @description Number of cells this run will execute */
+                        total: number;
+                        /** @description Link to the run in the LangWatch app */
+                        runUrl?: string;
+                    };
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiExperimentsRuns: {
+        parameters: {
+            query: {
+                /** @description Slug of the experiment whose runs you want */
+                experimentSlug: string;
+                /** @description 1-based page number */
+                page?: number;
+                /** @description Runs per page, capped at 200 */
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs for the experiment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        experimentId: string;
+                        experimentSlug: string;
+                        runs: {
+                            experimentId: string;
+                            runId: string;
+                            workflowVersion: {
+                                id: string;
+                                version: string;
+                                commitMessage: string;
+                                author: {
+                                    name: string | null;
+                                    image: string | null;
+                                } | null;
+                            } | null;
+                            timestamps: {
+                                createdAt: number;
+                                updatedAt: number;
+                                finishedAt?: number | null;
+                                stoppedAt?: number | null;
+                            };
+                            progress?: number | null;
+                            total?: number | null;
+                            summary: {
+                                datasetCost?: number;
+                                evaluationsCost?: number;
+                                datasetAverageCost?: number;
+                                datasetAverageDuration?: number;
+                                evaluationsAverageCost?: number;
+                                evaluationsAverageDuration?: number;
+                                evaluations: {
+                                    [key: string]: {
+                                        name: string;
+                                        averageScore: number | null;
+                                        averagePassed?: number;
+                                    };
+                                };
+                            };
+                        }[];
+                        pagination: {
+                            page: number;
+                            pageSize: number;
+                            totalHits: number;
+                            hasMore: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description experimentSlug was not supplied */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiExperimentsRunsByRunId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Run state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runId: string;
+                        /** @enum {string} */
+                        status: "pending" | "running" | "completed" | "failed" | "stopped";
+                        /** @description Cells finished so far */
+                        progress: number;
+                        /** @description Cells in the run */
+                        total: number;
+                        /** @description Unix milliseconds */
+                        startedAt?: number;
+                        /** @description Unix milliseconds; set once the run is no longer running */
+                        finishedAt?: number;
+                        /** @description Present when completed */
+                        summary?: {
+                            runId: string;
+                            /** @description Cells the run set out to execute */
+                            totalCells: number;
+                            completedCells: number;
+                            failedCells: number;
+                            /** @description Wall-clock milliseconds */
+                            duration: number;
+                            /** @description Non-zero means some rows may be missing from the stored results */
+                            chDispatchFailures?: number;
+                            timestamps: {
+                                startedAt: number;
+                                finishedAt?: number;
+                                stoppedAt?: number;
+                            };
+                            targets?: {
+                                targetId: string;
+                                name: string;
+                                passed: number;
+                                failed: number;
+                                avgLatency: number;
+                                totalCost: number;
+                            }[];
+                            evaluators?: {
+                                evaluatorId: string;
+                                name: string;
+                                passed: number;
+                                failed: number;
+                                passRate: number;
+                                avgScore?: number;
+                            }[];
+                            totalPassed?: number;
+                            totalFailed?: number;
+                            passRate?: number;
+                            totalCost?: number;
+                            /** @description Link to the run in the LangWatch app */
+                            runUrl?: string;
+                        };
+                        /** @description Stable failure code, present when failed. Not display copy: render your own wording keyed on it. */
+                        error?: string;
+                        /** @description Trace id for failures that carry no code, to quote in support */
+                        traceId?: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiExperimentsRunsByRunIdResults: {
+        parameters: {
+            query?: {
+                /** @description Owning experiment. Required once the run has aged out of the status cache. */
+                experimentSlug?: string;
+            };
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rows and evaluations for the run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        experimentId: string;
+                        runId: string;
+                        projectId: string;
+                        workflowVersionId?: string | null;
+                        progress?: number | null;
+                        total?: number | null;
+                        /** @description One row per dataset entry, with what the target predicted */
+                        dataset: {
+                            index: number;
+                            targetId?: string | null;
+                            entry: {
+                                [key: string]: unknown;
+                            };
+                            predicted?: {
+                                [key: string]: unknown;
+                            };
+                            cost?: number | null;
+                            duration?: number | null;
+                            error?: string | null;
+                            traceId?: string | null;
+                        }[];
+                        /** @description One row per evaluator per dataset entry */
+                        evaluations: {
+                            evaluator: string;
+                            name?: string | null;
+                            targetId?: string | null;
+                            /** @enum {string} */
+                            status: "processed" | "skipped" | "error";
+                            index: number;
+                            score?: number | null;
+                            label?: string | null;
+                            passed?: boolean | null;
+                            details?: string | null;
+                            cost?: number | null;
+                            duration?: number | null;
+                            inputs?: {
+                                [key: string]: unknown;
+                            } | null;
+                        }[];
+                        timestamps: {
+                            createdAt: number;
+                            updatedAt: number;
+                            finishedAt?: number | null;
+                            stoppedAt?: number | null;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiExperimentInit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Stable slug you choose. Reusing it returns the same experiment instead of creating another, which is what makes repeated runs land together. */
+                    experiment_slug?: string;
+                    /** @description Existing experiment id, as an alternative to the slug */
+                    experiment_id?: string;
+                    /**
+                     * @description BATCH_EVALUATION_V2 for SDK batch evaluations, DSPY for optimizer runs
+                     * @enum {string}
+                     */
+                    experiment_type: "DSPY" | "BATCH_EVALUATION" | "BATCH_EVALUATION_V2";
+                    /** @description Display name, used only when the experiment is created */
+                    experiment_name?: string;
+                    /** @description Optimization Studio workflow this experiment belongs to */
+                    workflowId?: string;
+                } & (unknown | unknown);
+            };
+        };
+        responses: {
+            /** @description The experiment, created or already existing */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Slug of the experiment, created or existing */
+                        slug: string;
+                        /** @description Path to the experiment in the LangWatch app */
+                        path: string;
+                    };
+                };
+            };
+            /** @description Neither experiment_slug nor experiment_id was supplied */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The plan's experiment limit is already reached */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message: string;
+                        limitType: string;
+                        current: number;
+                        max: number;
+                    };
+                };
+            };
+        };
+    };
     "getApiGatewayV1Virtual-keys": {
         parameters: {
             query?: {
@@ -7696,7 +8168,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
@@ -7897,7 +8369,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
@@ -8059,7 +8531,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
@@ -8222,7 +8694,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
@@ -8379,7 +8851,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
@@ -8530,7 +9002,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;

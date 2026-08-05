@@ -47,7 +47,16 @@ const evaluationSummarySchema = z.object({
   averagePassed: z.number().optional(),
 });
 
-const runSummarySchema = z.object({
+/**
+ * The aggregate a run row carries in the LIST response — costs and durations
+ * rolled up per evaluator.
+ *
+ * Not to be confused with {@link executionSummarySchema}: both are called
+ * `summary` on the wire, and they are different objects. This one is
+ * `ExperimentRunSummary`, folded from ClickHouse; the other is the live
+ * execution's tally, held in Redis for the poll endpoint.
+ */
+const runAggregateSummarySchema = z.object({
   datasetCost: z.number().optional(),
   evaluationsCost: z.number().optional(),
   datasetAverageCost: z.number().optional(),
@@ -80,7 +89,7 @@ const runListEntrySchema = z.object({
   timestamps: runTimestampsSchema,
   progress: z.number().nullable().optional(),
   total: z.number().nullable().optional(),
-  summary: runSummarySchema,
+  summary: runAggregateSummarySchema,
 });
 
 export const listRunsResponseSchema = z.object({
@@ -88,6 +97,63 @@ export const listRunsResponseSchema = z.object({
   experimentSlug: z.string(),
   runs: z.array(runListEntrySchema),
   pagination: paginationSchema,
+});
+
+/**
+ * What a completed run tallied, as the poll endpoint reports it: the engine's
+ * `ExecutionSummary` plus the per-target and per-evaluator breakdown a CI job
+ * prints. This is the run-state object held in Redis, NOT the ClickHouse
+ * aggregate of the same name in {@link runAggregateSummarySchema}.
+ */
+const executionSummarySchema = z.object({
+  runId: z.string(),
+  totalCells: z.number().describe("Cells the run set out to execute"),
+  completedCells: z.number(),
+  failedCells: z.number(),
+  duration: z.number().describe("Wall-clock milliseconds"),
+  chDispatchFailures: z
+    .number()
+    .optional()
+    .describe(
+      "Non-zero means some rows may be missing from the stored results",
+    ),
+  timestamps: z.object({
+    startedAt: z.number(),
+    finishedAt: z.number().optional(),
+    stoppedAt: z.number().optional(),
+  }),
+  targets: z
+    .array(
+      z.object({
+        targetId: z.string(),
+        name: z.string(),
+        passed: z.number(),
+        failed: z.number(),
+        avgLatency: z.number(),
+        totalCost: z.number(),
+      }),
+    )
+    .optional(),
+  evaluators: z
+    .array(
+      z.object({
+        evaluatorId: z.string(),
+        name: z.string(),
+        passed: z.number(),
+        failed: z.number(),
+        passRate: z.number(),
+        avgScore: z.number().optional(),
+      }),
+    )
+    .optional(),
+  totalPassed: z.number().optional(),
+  totalFailed: z.number().optional(),
+  passRate: z.number().optional(),
+  totalCost: z.number().optional(),
+  runUrl: z
+    .string()
+    .optional()
+    .describe("Link to the run in the LangWatch app"),
 });
 
 /**
@@ -106,7 +172,7 @@ export const runStatusResponseSchema = z.object({
     .number()
     .optional()
     .describe("Unix milliseconds; set once the run is no longer running"),
-  summary: runSummarySchema.optional().describe("Present when completed"),
+  summary: executionSummarySchema.optional().describe("Present when completed"),
   error: z
     .string()
     .optional()

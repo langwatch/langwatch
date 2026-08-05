@@ -7965,51 +7965,135 @@
                     "summary": {
                       "type": "object",
                       "properties": {
-                        "datasetCost": {
+                        "runId": {
+                          "type": "string"
+                        },
+                        "totalCells": {
+                          "type": "number",
+                          "description": "Cells the run set out to execute"
+                        },
+                        "completedCells": {
                           "type": "number"
                         },
-                        "evaluationsCost": {
+                        "failedCells": {
                           "type": "number"
                         },
-                        "datasetAverageCost": {
-                          "type": "number"
+                        "duration": {
+                          "type": "number",
+                          "description": "Wall-clock milliseconds"
                         },
-                        "datasetAverageDuration": {
-                          "type": "number"
+                        "chDispatchFailures": {
+                          "type": "number",
+                          "description": "Non-zero means some rows may be missing from the stored results"
                         },
-                        "evaluationsAverageCost": {
-                          "type": "number"
-                        },
-                        "evaluationsAverageDuration": {
-                          "type": "number"
-                        },
-                        "evaluations": {
+                        "timestamps": {
                           "type": "object",
-                          "additionalProperties": {
+                          "properties": {
+                            "startedAt": {
+                              "type": "number"
+                            },
+                            "finishedAt": {
+                              "type": "number"
+                            },
+                            "stoppedAt": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "startedAt"
+                          ]
+                        },
+                        "targets": {
+                          "type": "array",
+                          "items": {
                             "type": "object",
                             "properties": {
+                              "targetId": {
+                                "type": "string"
+                              },
                               "name": {
                                 "type": "string"
                               },
-                              "averageScore": {
-                                "type": [
-                                  "number",
-                                  "null"
-                                ]
+                              "passed": {
+                                "type": "number"
                               },
-                              "averagePassed": {
+                              "failed": {
+                                "type": "number"
+                              },
+                              "avgLatency": {
+                                "type": "number"
+                              },
+                              "totalCost": {
                                 "type": "number"
                               }
                             },
                             "required": [
+                              "targetId",
                               "name",
-                              "averageScore"
+                              "passed",
+                              "failed",
+                              "avgLatency",
+                              "totalCost"
                             ]
                           }
+                        },
+                        "evaluators": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "evaluatorId": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "passed": {
+                                "type": "number"
+                              },
+                              "failed": {
+                                "type": "number"
+                              },
+                              "passRate": {
+                                "type": "number"
+                              },
+                              "avgScore": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "evaluatorId",
+                              "name",
+                              "passed",
+                              "failed",
+                              "passRate"
+                            ]
+                          }
+                        },
+                        "totalPassed": {
+                          "type": "number"
+                        },
+                        "totalFailed": {
+                          "type": "number"
+                        },
+                        "passRate": {
+                          "type": "number"
+                        },
+                        "totalCost": {
+                          "type": "number"
+                        },
+                        "runUrl": {
+                          "type": "string",
+                          "description": "Link to the run in the LangWatch app"
                         }
                       },
                       "required": [
-                        "evaluations"
+                        "runId",
+                        "totalCells",
+                        "completedCells",
+                        "failedCells",
+                        "duration",
+                        "timestamps"
                       ],
                       "description": "Present when completed"
                     },
