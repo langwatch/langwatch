@@ -43,6 +43,10 @@ import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.
 import type { MintStorageUri } from "~/server/stored-objects/stored-objects.service";
 import { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import { mintFileUri } from "~/server/stored-objects/uri";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
@@ -156,6 +160,10 @@ beforeAll(async () => {
   const client = getTestClickHouseClient();
   if (!client) throw new Error("ClickHouse test container not available");
   ch = client;
+
+  // The path under test takes its ClickHouse repositories from the App rather
+  // than resolving a client, so the fixture has to provide one.
+  installClickHouseTestApp({ resolveClient: async () => ch });
   vi.mocked(
     clickhouseClientModule.getClickHouseClientForProject,
   ).mockResolvedValue(ch);
@@ -167,6 +175,7 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  await clearClickHouseTestApp();
   if (ch) {
     await ch.exec({
       query: `ALTER TABLE evaluation_runs DELETE WHERE TenantId = {tenantId:String}`,

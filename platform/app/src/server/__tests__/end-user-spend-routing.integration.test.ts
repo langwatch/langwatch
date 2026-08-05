@@ -51,9 +51,14 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import {
+  getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const suffix = nanoid(8);
@@ -72,6 +77,12 @@ describe("end-user spend on the composed router", () => {
 
   beforeAll(async () => {
     await startTestContainers();
+    // The routes and workers under test take their ClickHouse repositories
+    // from the App rather than resolving a client, so the fixture has to
+    // provide one or they fail with "App not initialized".
+    installClickHouseTestApp({
+      resolveClient: async () => getTestClickHouseClient(),
+    });
     const { getTestClickHouseClient } = await import(
       "~/server/event-sourcing/__tests__/integration/testContainers"
     );
@@ -145,6 +156,7 @@ describe("end-user spend on the composed router", () => {
   }, 120_000);
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     if (!ORG_ID) return;
     await prisma.roleBinding.deleteMany({
       where: { organizationId: ORG_ID },
