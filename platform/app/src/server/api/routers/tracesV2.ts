@@ -603,16 +603,24 @@ function turnsHiddenForViewer(protections: V2Protections): {
  * transcript bodies, for this viewer.
  *
  * These compile into `positionCaseInsensitive` predicates over `log_records`,
- * which hold captured prompts, tool content and raw request bodies. Whether a
- * session matches a term IS that content: a viewer who cannot read it must not
- * be able to probe it either, one guess at a time, through which rows come
- * back and what the total says. Redacting the previews afterwards does not
- * help, because the answer already rode out in the row list.
+ * against BOTH `BodyText` (captured prompts, tool content, raw request
+ * bodies) and `AttributesFlatJson` (every attribute on the record, flattened
+ * to one JSON blob). Whether a session matches a term IS that content: a
+ * viewer who cannot read it must not be able to probe it either, one guess at
+ * a time, through which rows come back and what the total says. Redacting the
+ * previews afterwards does not help, because the answer already rode out in
+ * the row list.
  *
  * So a viewer under ANY content protection searches the trace-level columns
  * only, the same ones the filter translator already applies to them, and the
  * transcript reach is dropped rather than narrowed: the body is one blob, it
- * cannot be matched per category.
+ * cannot be matched per category or per attribute key. This covers three
+ * independent protection dimensions, and any one of them drops the whole
+ * search: whole-category visibility (`canSeeCapturedInput`/`Output`),
+ * per-turn-role visibility (`contentCategories`, system/tools), and custom
+ * attribute restrict rules (`hiddenAttributes`) — a rule can hide one
+ * attribute's value while leaving input/output and every category fully
+ * visible, and `AttributesFlatJson` carries that value the same as any other.
  */
 export function contentSearchTermsForViewer({
   terms,
@@ -630,6 +638,7 @@ export function contentSearchTermsForViewer({
   }
   const { roles, stripToolCalls } = turnsHiddenForViewer(protections);
   if (roles.size > 0 || stripToolCalls) return [];
+  if ((protections.hiddenAttributes?.length ?? 0) > 0) return [];
   return terms;
 }
 

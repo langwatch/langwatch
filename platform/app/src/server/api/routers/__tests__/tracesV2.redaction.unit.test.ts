@@ -780,4 +780,28 @@ describe("contentSearchTermsForViewer", () => {
       ).toEqual([]);
     });
   });
+
+  describe("given a viewer with a custom attribute rule hidden from them", () => {
+    // hiddenAttributes redacts by KEY (attributes/params), but the transcript
+    // search matches a substring against log_records' AttributesFlatJson,
+    // which is the whole flattened blob, no per-key scoping possible. A term
+    // that only appears inside the hidden attribute's value would still light
+    // up a match, the same oracle the category checks above exist to prevent.
+    /** @scenario A viewer with a hidden custom attribute cannot search it */
+    it("drops the terms even though input, output and every category are visible", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+            contentCategories: cats(),
+            hiddenAttributes: [
+              { pattern: "app.billing.*", visibleTo: "Admins" },
+            ],
+          },
+        }),
+      ).toEqual([]);
+    });
+  });
 });

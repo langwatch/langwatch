@@ -83,6 +83,12 @@ Rule: Free-text search also matches session transcript content
     Then the term never reaches the transcript bodies
 
   @unit
+  Scenario: A viewer with a hidden custom attribute cannot search it
+    Given a viewer with a custom attribute rule hidden from them, everything else visible
+    When that viewer searches sessions for a term
+    Then the term never reaches the transcript bodies
+
+  @unit
   Scenario: A viewer allowed the whole transcript still searches it
     Given a viewer who may read captured content and every turn
     When that viewer searches sessions for a term
