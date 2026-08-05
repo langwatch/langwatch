@@ -132,9 +132,11 @@ const BASE_EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
   assistant_response: "assistant_response",
   api_request: "api_request",
   // Gemini's completion event; carries the reply text (`response_text`) when
-  // prompt logging is on. Claude splits the same fact into api_request (cost
-  // anchor) + api_response_body (raw payload), neither of which lands here.
+  // prompt logging is on. Claude splits the same fact into api_request (the
+  // cost anchor) and api_response_body (the raw payload), so its second half
+  // lands here too: one canonical "the model answered" fact, two carriers.
   api_response: "api_response",
+  api_response_body: "api_response",
   api_error: "api_error",
   api_refusal: "api_refusal",
   refusal: "api_refusal",
@@ -157,6 +159,12 @@ const BASE_EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
   at_mention: "at_mention",
   internal_error: "internal_error",
   session_created: "session_created",
+  // The LangWatch companion event. It arrives fully qualified
+  // (`langwatch.session_context`), and `langwatch.` is nobody's agent prefix,
+  // so the dot-flattened spelling is what the lookup sees; the bare form maps
+  // too, for an emitter that drops the namespace.
+  session_context: "session_context",
+  langwatch_session_context: "session_context",
   session_idle: "session_idle",
   session_error: "session_error",
   subtask_invoked: "subtask_invoked",
@@ -251,6 +259,15 @@ export function isCodingAgentMetricName(metricName: string): boolean {
 export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "event.name",
   "session.id",
+  // The LangWatch companion event's vocabulary: the agent it declares itself
+  // to be, and the repository / branch / worktree the session ran against.
+  // Operational identity, not conversation content.
+  "coding_agent.name",
+  "vcs.repository.host",
+  "vcs.repository.owner",
+  "vcs.repository.name",
+  "vcs.ref.head.name",
+  "vcs.worktree.name",
   "user.id",
   "user.email",
   "user.account_uuid",
@@ -328,6 +345,41 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
 ];
 
 /**
+ * The companion event a LangWatch-installed hook emits, carrying the session's
+ * repository, branch and worktree identity. Fully qualified on the wire, under
+ * the `langwatch.coding_agent.hook` instrumentation scope: it belongs to
+ * LangWatch, and imitating a vendor's scope to sneak past detection would make
+ * every downstream reader unable to tell the two apart.
+ */
+export const SESSION_CONTEXT_EVENT_NAME = "langwatch.session_context";
+
+/**
+ * The fact key the generated conversation title rides on. Derived rather than
+ * lifted: it is parsed out of a response body by the dispatcher and stamped
+ * onto the contribution's facts, so the fold reads it like any other fact.
+ */
+export const SESSION_TITLE_FACT_KEY = "langwatch.session.title";
+
+/**
+ * The agent a record DECLARES itself to be, when that name is one LangWatch
+ * knows. Only the companion event declares anything; every other record is
+ * named by {@link detectCodingAgent} from evidence the agent itself emitted.
+ *
+ * Unknown names answer null rather than passing through: the declaration is
+ * attacker-supplied in the same sense every wire attribute is, and a label the
+ * registry cannot resolve would become a permanent agent id on the session row
+ * (agent labeling is first-writer-wins in the fold).
+ */
+export function declaredCodingAgent(
+  facts: Record<string, unknown>,
+): CodingAgent | null {
+  const declared = facts["coding_agent.name"];
+  if (typeof declared !== "string" || declared.length === 0) return null;
+  const match = CODING_AGENT_REGISTRY.find((agent) => agent.id === declared);
+  return match?.id ?? null;
+}
+
+/**
  * The coding-agent facts off one log record, for its trace contribution —
  * or null when the record is not a coding agent's, which doubles as the
  * consumer-side gate (a contribution without the lift never reaches the
@@ -349,6 +401,15 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
  * names and pass on those. An agent that genuinely needs naming by service
  * alone needs a `ServiceName` column extracted on the canonical log record
  * first; do not close it by parsing resource attributes in this path.
+ *
+ * LANGWATCH COMPANION-EVENT ADMISSION: {@link SESSION_CONTEXT_EVENT_NAME} is
+ * admitted by its own name, ahead of detection. It is the event a LangWatch
+ * hook emits to carry the repository, branch and worktree identity no agent
+ * exports itself, and it is deliberately NOT dressed up in a vendor's
+ * instrumentation scope, so detection would decline it. The gate stays one
+ * string equality on the firehose, which is the same cost ADR-069 already
+ * accepts here; WHICH agent the event belongs to is what the event declares,
+ * read by {@link declaredCodingAgent} at the contribution.
  */
 export function liftCodingAgentLogFacts({
   scopeName,
@@ -359,6 +420,7 @@ export function liftCodingAgentLogFacts({
 }): Record<string, string | number | boolean> | null {
   const eventName = attributes["event.name"];
   if (
+    eventName !== SESSION_CONTEXT_EVENT_NAME &&
     detectCodingAgent({
       scopeName,
       recordName: typeof eventName === "string" ? eventName : null,

@@ -199,6 +199,25 @@ describe("CodingAgentSessionEventsMapProjection", () => {
       }
     });
 
+    /** @scenario A session context event contributes no session-events row */
+    it("maps the LangWatch session context event to null", () => {
+      const projection = makeProjection();
+
+      // The companion event describes the session, not something that happened
+      // IN it. It folds onto the session row and writes no fact-table row, in
+      // either spelling.
+      for (const name of ["langwatch.session_context", "session_context"]) {
+        expect(
+          projection.mapCodingAgentSessionLogFactsContributed(
+            logFactsEvent({
+              "event.name": name,
+              "vcs.repository.owner": "acme",
+            }),
+          ),
+        ).toBeNull();
+      }
+    });
+
     /** @scenario contributions without a mappable event name degrade to no rows */
     it("maps a contribution without an event name to null", () => {
       expect(

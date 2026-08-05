@@ -77,6 +77,28 @@ export interface CodingAgentSessionData {
    */
   parentSessionId: string | null;
   isFork: boolean;
+  /**
+   * Where the session ran and what it was called, from the LangWatch companion
+   * event (`langwatch.session_context`) and the agent's generated title.
+   *
+   * Semantics differ per field, on purpose:
+   *   - repository host / owner / name and worktree are ONCE-SET. A session is
+   *     one checkout; a later event naming a different repository is a
+   *     correlation accident, not a move, so the first answer stands.
+   *   - branch is LAST-WRITE-WINS. A session that starts on the default branch
+   *     and cuts a feature branch mid-run belongs to the branch it ended on,
+   *     which is the one its pull request comes from.
+   *   - title is LAST-NON-EMPTY-WINS, like every other regenerated label.
+   *
+   * Degradation, stated: agents with no companion emitter carry nulls here.
+   * Null means nothing reported it, never "this session has no repository".
+   */
+  repositoryHost: string | null;
+  repositoryOwner: string | null;
+  repositoryName: string | null;
+  gitBranch: string | null;
+  gitWorktree: string | null;
+  title: string | null;
 
   // ── Shape ─────────────────────────────────────────────────────────────
   modelCalls: number;

@@ -33,11 +33,49 @@ const DEFAULT_SORT: { column: SessionGroupSortColumn; direction: "desc" } = {
 /** How many coding-agent session lookups run concurrently per page. */
 const ENRICHMENT_CONCURRENCY = 10;
 
+/** A session row stores "nothing reported this" as an empty string. */
+const emptyToNull = (value: string | null | undefined): string | null =>
+  value === null || value === undefined || value === "" ? null : value;
+
+/**
+ * One session past the caller's visibility window: the conversation content it
+ * carries is teased, its rollup numbers are untouched, mirroring the trace
+ * list's gate. The generated title is written FROM the conversation, so it is
+ * teased with the previews; the git identity is operational metadata about
+ * where the session ran and stays whole.
+ */
+function teasedSession(session: SessionGroupDto): SessionGroupDto {
+  return {
+    ...session,
+    input: session.input ? teaserOf(session.input) : session.input,
+    output: session.output ? teaserOf(session.output) : session.output,
+    codingAgent: session.codingAgent
+      ? {
+          ...session.codingAgent,
+          title: session.codingAgent.title
+            ? teaserOf(session.codingAgent.title)
+            : session.codingAgent.title,
+        }
+      : session.codingAgent,
+  };
+}
+
 export interface SessionGroupCodingAgentDto {
   modelCalls: number;
   compactions: number;
   peakContextTokens: number;
   subAgents: number;
+  /**
+   * Where the session ran, from the LangWatch companion event, and the title
+   * the agent generated for it. Null for every session whose agent has no
+   * companion emitter, which is most of them.
+   */
+  repositoryHost: string | null;
+  repositoryOwner: string | null;
+  repositoryName: string | null;
+  gitBranch: string | null;
+  gitWorktree: string | null;
+  title: string | null;
 }
 
 export interface SessionGroupDto {
@@ -283,25 +321,15 @@ export class SessionGroupsService {
       rows: visibleRows,
     });
 
+    const cutoffMs = params.visibilityCutoffMs ?? null;
     const sessions = visibleRows.map((row, index) => {
       const dto = mapSessionGroupRowToDto({
         row,
         codingAgent: enrichments[index] ?? null,
       });
-      // Tease previews of sessions beyond the caller's visibility window,
-      // rollup numbers stay untouched, mirroring the trace list's gate.
-      if (
-        params.visibilityCutoffMs !== null &&
-        params.visibilityCutoffMs !== undefined &&
-        row.lastActivityMs < params.visibilityCutoffMs
-      ) {
-        return {
-          ...dto,
-          input: dto.input ? teaserOf(dto.input) : dto.input,
-          output: dto.output ? teaserOf(dto.output) : dto.output,
-        };
-      }
-      return dto;
+      return cutoffMs !== null && row.lastActivityMs < cutoffMs
+        ? teasedSession(dto)
+        : dto;
     });
 
     const lastRow = visibleRows[visibleRows.length - 1];
@@ -353,6 +381,14 @@ export class SessionGroupsService {
                     compactions: session.compactions,
                     peakContextTokens: session.peakContextTokens,
                     subAgents: session.subAgents,
+                    // The row stores "unset" as an empty string; the lens
+                    // renders absence, so it reads back as null here.
+                    repositoryHost: emptyToNull(session.repositoryHost),
+                    repositoryOwner: emptyToNull(session.repositoryOwner),
+                    repositoryName: emptyToNull(session.repositoryName),
+                    gitBranch: emptyToNull(session.gitBranch),
+                    gitWorktree: emptyToNull(session.gitWorktree),
+                    title: emptyToNull(session.title),
                   }
                 : null,
             )

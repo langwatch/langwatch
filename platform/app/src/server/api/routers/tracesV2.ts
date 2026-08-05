@@ -92,6 +92,7 @@ import {
   gateHeaderCost,
   gateResources,
   gateSessionCost,
+  gateSessionTitle,
   gateTreeCost,
 } from "./tracesV2.gates";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
@@ -1218,12 +1219,16 @@ export const tracesV2Router = createTRPCRouter({
       });
       return {
         ...result,
-        // Previews are captured content, spend follows cost:view. The same
-        // two viewer gates the trace header applies (ADR-057).
+        // Previews and the generated session title are captured content,
+        // spend follows cost:view. The same viewer gates the trace header
+        // applies (ADR-057).
         sessions: gateSessionCost({
-          sessions: result.sessions.map((session) =>
-            redactV2Content(session, protections),
-          ),
+          sessions: gateSessionTitle({
+            sessions: result.sessions.map((session) =>
+              redactV2Content(session, protections),
+            ),
+            protections,
+          }),
           protections,
         }),
       };

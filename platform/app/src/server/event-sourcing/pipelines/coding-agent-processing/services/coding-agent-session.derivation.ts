@@ -3,6 +3,7 @@ import {
   normalizeEventName,
   normalizeMetricName,
   parseMcpToolName,
+  SESSION_TITLE_FACT_KEY,
 } from "./coding-agent-normalization";
 import type {
   CodingAgentSessionData,
@@ -73,6 +74,7 @@ const CLAUDE = {
     USER_PROMPT: "user_prompt",
     ASSISTANT_RESPONSE: "assistant_response",
     API_REQUEST: "api_request",
+    API_RESPONSE: "api_response",
     TOOL_RESULT: "tool_result",
     TOOL_DECISION: "tool_decision",
     API_ERROR: "api_error",
@@ -86,6 +88,27 @@ const CLAUDE = {
     HOOK_COMPLETE: "hook_execution_complete",
     AT_MENTION: "at_mention",
     INTERNAL_ERROR: "internal_error",
+  },
+} as const;
+
+/**
+ * The LangWatch vocabulary, the sibling of the {@link CLAUDE} adapter for the
+ * facts no vendor emits: the companion event carrying the session's git
+ * identity, and the keys it and the derived title ride on. Agent-generic by
+ * construction: every agent that installs the hook sends these exact
+ * spellings, so this is one table rather than one per agent.
+ */
+const LANGWATCH = {
+  EVENT: {
+    SESSION_CONTEXT: "session_context",
+  },
+  ATTR: {
+    REPOSITORY_HOST: "vcs.repository.host",
+    REPOSITORY_OWNER: "vcs.repository.owner",
+    REPOSITORY_NAME: "vcs.repository.name",
+    BRANCH: "vcs.ref.head.name",
+    WORKTREE: "vcs.worktree.name",
+    TITLE: SESSION_TITLE_FACT_KEY,
   },
 } as const;
 
@@ -139,6 +162,12 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     userId: null,
     parentSessionId: null,
     isFork: false,
+    repositoryHost: null,
+    repositoryOwner: null,
+    repositoryName: null,
+    gitBranch: null,
+    gitWorktree: null,
+    title: null,
 
     modelCalls: 0,
     toolCalls: 0,
@@ -703,6 +732,33 @@ export function applyLogToCodingAgentSession({
       // For a logs-only agent this event IS the model call — the same facts
       // the llm_request span carries for Claude Code fold from here instead.
       return isLogsOnly ? foldModelCall(withCost, attrs, 0) : withCost;
+    }
+
+    case CLAUDE.EVENT.API_RESPONSE: {
+      // The generated conversation title, already parsed out of the response
+      // body by the dispatcher. Last non-empty wins: the agent regenerates
+      // the title as the conversation turns, and the newest one describes it.
+      const title = str(attrs[LANGWATCH.ATTR.TITLE]);
+      return title !== null ? { ...base, title } : base;
+    }
+
+    case LANGWATCH.EVENT.SESSION_CONTEXT: {
+      // Repository identity and worktree are once-set: a session is one
+      // checkout, so the first answer stands. The branch is the exception:
+      // it moves during a session, and the branch a session ENDS on is the
+      // one its pull request comes from.
+      const branch = str(attrs[LANGWATCH.ATTR.BRANCH]);
+      return {
+        ...base,
+        repositoryHost:
+          base.repositoryHost ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]),
+        repositoryOwner:
+          base.repositoryOwner ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]),
+        repositoryName:
+          base.repositoryName ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]),
+        gitWorktree: base.gitWorktree ?? str(attrs[LANGWATCH.ATTR.WORKTREE]),
+        gitBranch: branch ?? base.gitBranch,
+      };
     }
 
     case CLAUDE.EVENT.TOOL_RESULT: {

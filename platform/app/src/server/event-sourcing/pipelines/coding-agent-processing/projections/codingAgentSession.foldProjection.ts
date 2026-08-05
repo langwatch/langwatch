@@ -64,6 +64,15 @@ const codingAgentSessionEvents = [
  *  stamped earlier decode without them, so the bump refolds each session once
  *  to backfill the counters from its stored contributions.
  *
+ *  The same stamp also covers the git-context columns of migration 00072
+ *  (`RepositoryHost` / `RepositoryOwner` / `RepositoryName`, `GitBranch`,
+ *  `GitWorktree`, `Title`), deliberately rather than by omission: it has not
+ *  been released, so no row in the wild carries it without them, and every
+ *  one of the six is a String whose `DEFAULT ''` decodes as null, the honest
+ *  "nothing reported this", which is also the answer for every agent with no
+ *  companion emitter. A second stamp would buy a refold wave over the whole
+ *  population to rediscover exactly that.
+ *
  *  2026-07-28 — the logs-only double-count gate became symmetric: a logs-only
  *  agent's model calls and tool runs no longer fold from BOTH its log events
  *  and the equivalent spans. Rows stamped `2026-07-27` were folded by the
@@ -383,6 +392,13 @@ export interface CodingAgentSessionRow {
   entrypoint: string;
   parentSessionId: string;
   isFork: boolean;
+  /** Git identity from the companion event, and the generated title (00072). */
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  gitBranch: string;
+  gitWorktree: string;
+  title: string;
 
   modelCalls: number;
   toolCalls: number;
@@ -510,6 +526,7 @@ export function projectCodingAgentSessionToRow({
     entrypoint: state.entrypoint ?? "",
     parentSessionId: state.parentSessionId ?? "",
     isFork: state.isFork,
+    ...gitContextColumns(state),
 
     modelCalls: state.modelCalls,
     toolCalls: state.toolCalls,
@@ -604,6 +621,29 @@ export function projectCodingAgentSessionToRow({
   };
 }
 
+/**
+ * The git identity and title columns (migration 00072). The empty string is
+ * the honest unset for all six: an agent with no companion emitter reports
+ * none of them, and `nullIfEmpty` maps them straight back on read.
+ */
+function gitContextColumns(state: CodingAgentSessionState): {
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  gitBranch: string;
+  gitWorktree: string;
+  title: string;
+} {
+  return {
+    repositoryHost: state.repositoryHost ?? "",
+    repositoryOwner: state.repositoryOwner ?? "",
+    repositoryName: state.repositoryName ?? "",
+    gitBranch: state.gitBranch ?? "",
+    gitWorktree: state.gitWorktree ?? "",
+    title: state.title ?? "",
+  };
+}
+
 /** An empty string in a row column reads back as "unset" (null) in state. */
 const nullIfEmpty = (value: string): string | null =>
   value === "" ? null : value;
@@ -658,6 +698,12 @@ export function codingAgentSessionStateFromRow(
     userId: nullIfEmpty(row.userId),
     parentSessionId: nullIfEmpty(row.parentSessionId),
     isFork: row.isFork,
+    repositoryHost: nullIfEmpty(row.repositoryHost),
+    repositoryOwner: nullIfEmpty(row.repositoryOwner),
+    repositoryName: nullIfEmpty(row.repositoryName),
+    gitBranch: nullIfEmpty(row.gitBranch),
+    gitWorktree: nullIfEmpty(row.gitWorktree),
+    title: nullIfEmpty(row.title),
 
     modelCalls: row.modelCalls,
     toolCalls: row.toolCalls,

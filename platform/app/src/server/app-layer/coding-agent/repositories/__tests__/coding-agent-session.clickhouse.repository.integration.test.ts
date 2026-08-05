@@ -13,8 +13,11 @@
  * store.get() reconstruct working state without touching event_log, the
  * 00054 AppliedEventIds watermark that survives cache loss (including the
  * mixed-deploy read of a pre-00054 row whose body omits the column entirely),
- * and the 00071 context-economics columns (reported rate-limit events,
- * compactions by trigger, spawn lineage).
+ * the 00071 context-economics columns (reported rate-limit events,
+ * compactions by trigger, spawn lineage), and the 00072 git-context columns
+ * (repository, branch, worktree, title).
+ *
+ * @see specs/coding-agent/session-git-context.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
@@ -56,6 +59,12 @@ function sessionRow(
     entrypoint: "cli",
     parentSessionId: `${tag}-parent`,
     isFork: true,
+    repositoryHost: "github.com",
+    repositoryOwner: "acme",
+    repositoryName: "widgets",
+    gitBranch: "feat/session-git-context",
+    gitWorktree: "widgets-feat",
+    title: "Add git context to the session row",
     modelCalls: 3,
     toolCalls: 5,
     subAgents: 1,
@@ -238,6 +247,69 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     // DateTime64 columns come back without a timezone, so exact-equality is
     // machine-dependent; assert the column is populated and roughly right.
     expect(read!.lastEventOccurredAt).toBeGreaterThan(0);
+  });
+
+  /** @scenario A session folds repo, branch, worktree and title into its row and reads back */
+  it("writes the git context and title and reads them back verbatim", async () => {
+    const row = sessionRow({ sessionId: `${tag}-git` });
+    await sessions.upsert(row, 30);
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-git`,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.repositoryHost).toBe("github.com");
+    expect(read!.repositoryOwner).toBe("acme");
+    expect(read!.repositoryName).toBe("widgets");
+    expect(read!.gitBranch).toBe("feat/session-git-context");
+    expect(read!.gitWorktree).toBe("widgets-feat");
+    expect(read!.title).toBe("Add git context to the session row");
+  });
+
+  /** @scenario A session row from before the git context columns decodes with empty context */
+  it("decodes a row written before the git context columns with empty context", async () => {
+    const sessionId = `${tag}-pre-git`;
+    // The genuine mixed-deploy read: a writer from before migration 00072
+    // emits a JSONEachRow body with none of the six fields, so ClickHouse
+    // supplies each column's DEFAULT ''. Inserted through the same client the
+    // repository resolves.
+    await ch.insert({
+      table: "coding_agent_sessions",
+      values: [
+        {
+          TenantId: tenantId,
+          SessionId: sessionId,
+          StartedAt: new Date(baseMs),
+          Version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+          Agent: "claude_code",
+          ModelCalls: 7,
+          CostUsd: 1.5,
+        },
+      ],
+      format: "JSONEachRow",
+    });
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.repositoryHost).toBe("");
+    expect(read!.repositoryOwner).toBe("");
+    expect(read!.repositoryName).toBe("");
+    expect(read!.gitBranch).toBe("");
+    expect(read!.gitWorktree).toBe("");
+    expect(read!.title).toBe("");
+    // The rest of the session is intact: the missing columns cost nothing
+    // else on the read.
+    expect(read!.agent).toBe("claude_code");
+    expect(read!.modelCalls).toBe(7);
+    expect(read!.costUsd).toBeCloseTo(1.5);
   });
 
   it("dedups a re-folded session to one row (ReplacingMergeTree, no FINAL)", async () => {

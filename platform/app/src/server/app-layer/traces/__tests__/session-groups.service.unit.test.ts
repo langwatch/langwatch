@@ -19,6 +19,7 @@ import {
   encodeSessionGroupsCursor,
   SessionGroupsService,
 } from "../session-groups.service";
+import { teaserOf } from "../visibility-window.service";
 
 const TENANT = "project-1";
 
@@ -45,6 +46,38 @@ function makeRow(overrides: Partial<SessionGroupRow> = {}): SessionGroupRow {
     ...overrides,
   };
 }
+
+/**
+ * The enrichment as the SESSION ROW carries it: a column nothing reported is
+ * an empty string, and mapping those to null is the service's job.
+ */
+function codingAgentRow(
+  over: Partial<SessionGroupCodingAgentDto> = {},
+): SessionGroupCodingAgentDto {
+  return {
+    modelCalls: 0,
+    compactions: 0,
+    peakContextTokens: 0,
+    subAgents: 0,
+    repositoryHost: "",
+    repositoryOwner: "",
+    repositoryName: "",
+    gitBranch: "",
+    gitWorktree: "",
+    title: "",
+    ...over,
+  };
+}
+
+/** Git context as the DTO spells "nothing reported this". */
+const NO_GIT_CONTEXT = {
+  repositoryHost: null,
+  repositoryOwner: null,
+  repositoryName: null,
+  gitBranch: null,
+  gitWorktree: null,
+  title: null,
+};
 
 class FakeRepository implements SessionGroupsRepository {
   lastQuery: SessionGroupsQuery | null = null;
@@ -130,12 +163,12 @@ describe("SessionGroupsService", () => {
         ),
         lookupReturning(
           {
-            "session-a": {
+            "session-a": codingAgentRow({
               modelCalls: 41,
               compactions: 2,
               peakContextTokens: 180_000,
               subAgents: 3,
-            },
+            }),
           },
           calls,
         ),
@@ -153,8 +186,55 @@ describe("SessionGroupsService", () => {
         compactions: 2,
         peakContextTokens: 180_000,
         subAgents: 3,
+        ...NO_GIT_CONTEXT,
       });
       expect(result.sessions[1]?.codingAgent).toBeNull();
+    });
+
+    /** @scenario Coding agent enrichment carries repository, branch, worktree and title */
+    it("carries the repository, branch, worktree and title, empty where unreported", async () => {
+      const service = new SessionGroupsService(
+        new FakeRepository(
+          [makeRow(), makeRow({ conversationId: "session-b" })],
+          2,
+        ),
+        lookupReturning({
+          "session-a": codingAgentRow({
+            repositoryHost: "github.com",
+            repositoryOwner: "acme",
+            repositoryName: "widgets",
+            gitBranch: "feat/git-context",
+            gitWorktree: "widgets-feat",
+            title: "Add git context to the session row",
+          }),
+          // A session whose agent has no companion emitter: the row stores
+          // empty strings, and the lens reads them as nothing reported.
+          "session-b": codingAgentRow(),
+        }),
+      );
+
+      const result = await service.getSessionGroups({
+        tenantId: TENANT,
+        timeRange: { from: 0, to: 2_000_000_000_000 },
+        pageSize: 10,
+      });
+
+      expect(result.sessions[0]?.codingAgent).toMatchObject({
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        gitBranch: "feat/git-context",
+        gitWorktree: "widgets-feat",
+        title: "Add git context to the session row",
+      });
+      expect(result.sessions[1]?.codingAgent).toMatchObject({
+        repositoryHost: null,
+        repositoryOwner: null,
+        repositoryName: null,
+        gitBranch: null,
+        gitWorktree: null,
+        title: null,
+      });
     });
 
     it("keeps the list alive when an enrichment lookup throws", async () => {
@@ -366,6 +446,39 @@ describe("SessionGroupsService", () => {
       );
       expect(session.totalTokens).toBe(4200);
       expect(session.traceCount).toBe(3);
+    });
+
+    /** @scenario A session beyond the visibility window teases its title */
+    it("teases the generated title the same way, and leaves the git context whole", async () => {
+      const title =
+        "Rebuild the flaky session fold test and its ClickHouse fixture";
+      const service = new SessionGroupsService(
+        new FakeRepository([makeRow({ lastActivityMs: 1000 })]),
+        lookupReturning({
+          "session-a": codingAgentRow({
+            title,
+            repositoryOwner: "acme",
+            repositoryName: "widgets",
+            gitBranch: "feat/git-context",
+          }),
+        }),
+      );
+
+      const result = await service.getSessionGroups({
+        tenantId: TENANT,
+        timeRange: { from: 0, to: 2_000_000_000_000 },
+        pageSize: 10,
+        visibilityCutoffMs: 2000,
+      });
+
+      const codingAgent = result.sessions[0]!.codingAgent!;
+      expect(codingAgent.title).toBe(teaserOf(title));
+      expect(codingAgent.title).not.toBe(title);
+      // Where the session ran is operational metadata, not conversation
+      // content, so the window does not touch it.
+      expect(codingAgent.repositoryOwner).toBe("acme");
+      expect(codingAgent.repositoryName).toBe("widgets");
+      expect(codingAgent.gitBranch).toBe("feat/git-context");
     });
   });
 });

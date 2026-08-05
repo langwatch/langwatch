@@ -61,6 +61,12 @@ interface ClickHouseWriteRecord {
   Entrypoint: string;
   ParentSessionId: string;
   IsFork: boolean;
+  RepositoryHost: string;
+  RepositoryOwner: string;
+  RepositoryName: string;
+  GitBranch: string;
+  GitWorktree: string;
+  Title: string;
 
   ModelCalls: number;
   ToolCalls: number;
@@ -190,6 +196,12 @@ function toRecord({
     Entrypoint: row.entrypoint,
     ParentSessionId: row.parentSessionId,
     IsFork: row.isFork,
+    RepositoryHost: row.repositoryHost,
+    RepositoryOwner: row.repositoryOwner,
+    RepositoryName: row.repositoryName,
+    GitBranch: row.gitBranch,
+    GitWorktree: row.gitWorktree,
+    Title: row.title,
 
     ModelCalls: row.modelCalls,
     ToolCalls: row.toolCalls,
@@ -849,6 +861,12 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     entrypoint: String(record.Entrypoint ?? ""),
     parentSessionId: String(record.ParentSessionId ?? ""),
     isFork: Boolean(record.IsFork),
+    repositoryHost: String(record.RepositoryHost ?? ""),
+    repositoryOwner: String(record.RepositoryOwner ?? ""),
+    repositoryName: String(record.RepositoryName ?? ""),
+    gitBranch: String(record.GitBranch ?? ""),
+    gitWorktree: String(record.GitWorktree ?? ""),
+    title: String(record.Title ?? ""),
 
     modelCalls: asNumber(record.ModelCalls),
     toolCalls: asNumber(record.ToolCalls),

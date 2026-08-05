@@ -31,6 +31,15 @@ export interface SessionGroupPayloadItem {
     compactions: number;
     peakContextTokens: number;
     subAgents: number;
+    repositoryHost: string | null;
+    repositoryOwner: string | null;
+    repositoryName: string | null;
+    gitBranch: string | null;
+    gitWorktree: string | null;
+    /** Null both when there is no title and when the viewer may not read it. */
+    title: string | null;
+    /** True only when a title existed and the viewer may not read it. */
+    titleRedacted: boolean;
   } | null;
 }
 
@@ -76,8 +85,52 @@ export function mapSessionGroupToConversationGroup(
     // peaks at 0, and that 0 is the accurate answer, not a missing value.
     contextSizeTokens:
       item.codingAgent?.peakContextTokens ?? item.contextSizeTokens,
-    modelCalls: item.codingAgent?.modelCalls ?? null,
-    compactions: item.codingAgent?.compactions ?? null,
+    ...codingAgentFields(item.codingAgent),
+  };
+}
+
+/**
+ * The coding-agent enrichment flattened onto the view model. An ordinary
+ * conversation has no coding-agent row at all, and every field is then empty:
+ * `titleRedacted` false, because there was no title to withhold.
+ */
+function codingAgentFields(
+  codingAgent: SessionGroupPayloadItem["codingAgent"],
+): Pick<
+  ConversationGroup,
+  | "modelCalls"
+  | "compactions"
+  | "repositoryHost"
+  | "repositoryOwner"
+  | "repositoryName"
+  | "gitBranch"
+  | "gitWorktree"
+  | "title"
+  | "titleRedacted"
+> {
+  if (codingAgent === null) {
+    return {
+      modelCalls: null,
+      compactions: null,
+      repositoryHost: null,
+      repositoryOwner: null,
+      repositoryName: null,
+      gitBranch: null,
+      gitWorktree: null,
+      title: null,
+      titleRedacted: false,
+    };
+  }
+  return {
+    modelCalls: codingAgent.modelCalls,
+    compactions: codingAgent.compactions,
+    repositoryHost: codingAgent.repositoryHost,
+    repositoryOwner: codingAgent.repositoryOwner,
+    repositoryName: codingAgent.repositoryName,
+    gitBranch: codingAgent.gitBranch,
+    gitWorktree: codingAgent.gitWorktree,
+    title: codingAgent.title,
+    titleRedacted: codingAgent.titleRedacted,
   };
 }
 

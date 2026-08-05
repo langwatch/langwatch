@@ -150,6 +150,49 @@ Rule: Coding-agent session rows enrich the rollup
     Then the session carries model calls, compactions, peak context tokens and sub agents
     And sessions without a coding-agent row keep the enrichment empty
 
+  @unit
+  Scenario: Coding agent enrichment carries repository, branch, worktree and title
+    Given a coding-agent session row with git context and a title
+    When session groups are assembled by the service
+    Then the session carries the repository, branch, worktree and title
+    And sessions without git context keep those fields empty
+
+Rule: The session title follows the viewer's content protections
+
+  @unit
+  Scenario: A viewer who cannot read captured content sees no session title
+    Given a session with a title and a viewer whose captured content is hidden
+    When the session page is gated for that viewer
+    Then the title is stripped and marked as redacted
+
+  @unit
+  Scenario: A viewer with full content visibility sees the title verbatim
+    Given a session with a title and a viewer who may read captured content
+    When the session page is gated for that viewer
+    Then the title survives unchanged
+
+  @unit
+  Scenario: A session beyond the visibility window teases its title
+    Given a session older than the plan's visibility window
+    When session groups are assembled by the service
+    Then the title is teased the same way the previews are
+
+Rule: Sessions link to their repository and pull request
+
+  @unit
+  Scenario: The sessions lens offers repository and pull request columns
+    Given session rows enriched with a repository and a mapped pull request
+    When the sessions lens renders with those columns enabled
+    Then the repository column shows the owner and name
+    And the pull request column links the pull request number
+
+  @unit
+  Scenario: A session with a visible title shows it as its label
+    Given a session row whose title is present and not redacted
+    When the sessions lens renders the session cell
+    Then the title is the session's label
+    And a session without a title keeps today's label
+
 Rule: The sessions lens renders true totals
 
   @unit

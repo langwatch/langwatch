@@ -32,10 +32,11 @@
  * derivations (which read the bare names directly) were unaffected.
  *
  * The body-parsing helpers (extractAssistantTextFromResponseBody,
- * extractAssistantOutputFromResponseBody, buildInputMessagesFromRequestBody)
- * and the isConversationalQuerySource gate live here as the home of
- * claude_code body knowledge, and are imported by the ingest-time derivation
- * and the read-time span enrichment. The langwatch wrapper sets all 4
+ * extractAssistantOutputFromResponseBody, buildInputMessagesFromRequestBody,
+ * extractSessionTitleFromResponseBody) and the isConversationalQuerySource
+ * gate live here as the home of claude_code body knowledge, and are imported
+ * by the ingest-time derivation, the coding-agent log dispatcher and the
+ * read-time span enrichment. The langwatch wrapper sets all 4
  * OTEL_LOG_* unlock knobs (USER_PROMPTS + TOOL_CONTENT + TOOL_DETAILS +
  * RAW_API_BODIES) so the bodies carry input/output text on every turn.
  */
@@ -286,6 +287,42 @@ export function extractAssistantTextFromResponseBody(
   // a future claude release lifts the 60KB inline cap or a different
   // emitter ships an api_response_body without one.
   return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
+}
+
+/**
+ * How much of a generated title is kept. Titles are a phrase, so anything past
+ * this is either a model that ignored the instruction or a body that is not a
+ * title at all; the cap bounds what lands in a durable session column either
+ * way.
+ */
+const MAX_SESSION_TITLE_CHARS = 512;
+
+/**
+ * The conversation title out of a `generate_session_title` response body.
+ *
+ * Claude generates the title with a haiku utility call whose reply is a
+ * `{"title": "..."}` JSON object inside the assistant text block. Any deviation
+ * answers null: an unparseable or truncated body, a reply that is not JSON, a
+ * shape without a string `title`, or an empty one. Never throws: the caller is
+ * on the ingest path, where one odd body must not cost a record.
+ *
+ * The CALLER decides which bodies are titles (the `query_source` gate); this
+ * only reads the shape.
+ */
+export function extractSessionTitleFromResponseBody(
+  raw: string,
+): string | null {
+  const text = extractAssistantTextFromResponseBody(raw);
+  if (text === null) return null;
+  const parsed = safeParse(text);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const title = (parsed as { title?: unknown }).title;
+  if (typeof title !== "string") return null;
+  const trimmed = title.trim();
+  if (trimmed.length === 0) return null;
+  return trimmed.slice(0, MAX_SESSION_TITLE_CHARS);
 }
 
 /**

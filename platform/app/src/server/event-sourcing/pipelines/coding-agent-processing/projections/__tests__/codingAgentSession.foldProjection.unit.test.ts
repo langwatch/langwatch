@@ -417,6 +417,123 @@ describe("CodingAgentSessionFoldProjection", () => {
     });
   });
 
+  describe("when the LangWatch companion event names the session's checkout", () => {
+    const contextFacts = (
+      overrides: Record<string, string | number | boolean> = {},
+    ): Record<string, string | number | boolean> => ({
+      "event.name": "langwatch.session_context",
+      "vcs.repository.host": "github.com",
+      "vcs.repository.owner": "acme",
+      "vcs.repository.name": "widgets",
+      "vcs.ref.head.name": "main",
+      "vcs.worktree.name": "widgets",
+      ...overrides,
+    });
+
+    /** @scenario Repository identity and worktree set once and do not move */
+    it("keeps the first repository and worktree when a later event names another", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: contextFacts() }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: contextFacts({
+            "vcs.repository.host": "gitlab.com",
+            "vcs.repository.owner": "other",
+            "vcs.repository.name": "gadgets",
+            "vcs.worktree.name": "gadgets-hotfix",
+          }),
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
+      expect(state.repositoryHost).toBe("github.com");
+      expect(state.repositoryOwner).toBe("acme");
+      expect(state.repositoryName).toBe("widgets");
+      expect(state.gitWorktree).toBe("widgets");
+    });
+
+    /** @scenario The branch follows the latest session context event */
+    it("moves the branch to the one the session ended on", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: contextFacts() }),
+        state,
+      );
+      expect(state.gitBranch).toBe("main");
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: contextFacts({ "vcs.ref.head.name": "feat/git-context" }),
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
+      expect(state.gitBranch).toBe("feat/git-context");
+      // A later event that reports no branch at all leaves the last one alone.
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: contextFacts({ "vcs.ref.head.name": "" }),
+          timeMs: 3_500,
+        }),
+        state,
+      );
+      expect(state.gitBranch).toBe("feat/git-context");
+    });
+  });
+
+  describe("when the generated conversation title arrives", () => {
+    /** @scenario The title lifts from a generate_session_title response body, capped */
+    it("takes the latest non-empty title", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Fix the flaky fold test",
+          },
+        }),
+        state,
+      );
+      expect(state.title).toBe("Fix the flaky fold test");
+
+      // A model call with no title stamped leaves the last one standing.
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: { "event.name": "claude_code.api_response_body" },
+          timeMs: 2_500,
+        }),
+        state,
+      );
+      expect(state.title).toBe("Fix the flaky fold test");
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Add git context to the session row",
+          },
+          timeMs: 3_500,
+        }),
+        state,
+      );
+      expect(state.title).toBe("Add git context to the session row");
+      // The title rides a log event, never a model call: the response body is
+      // Claude's second half of a call its api_request already counted.
+      expect(state.modelCalls).toBe(0);
+    });
+  });
+
   describe("when a session sends only metrics", () => {
     /** @scenario a session that sent only metrics still appears */
     it("materializes the session from metric contributions alone", () => {
@@ -584,6 +701,62 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(row.sessionKeySource).toBe("provider");
       expect(row.traceIds).toEqual([TRACE_A]);
       expect(row.inputTokens).toBe(10);
+    });
+
+    it("writes the git context and title as columns, empty when unreported", () => {
+      const projection = makeProjection();
+      let state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "vcs.repository.host": "github.com",
+            "vcs.repository.owner": "acme",
+            "vcs.repository.name": "widgets",
+            "vcs.ref.head.name": "feat/git-context",
+            "vcs.worktree.name": "widgets-feat",
+          },
+        }),
+        initStateOf(projection),
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Add git context to the session row",
+          },
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
+      const row = projectCodingAgentSessionToRow({
+        state,
+        tenantId: "tenant-1",
+        sessionId: SESSION_ID,
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+      });
+
+      expect(row.repositoryHost).toBe("github.com");
+      expect(row.repositoryOwner).toBe("acme");
+      expect(row.repositoryName).toBe("widgets");
+      expect(row.gitBranch).toBe("feat/git-context");
+      expect(row.gitWorktree).toBe("widgets-feat");
+      expect(row.title).toBe("Add git context to the session row");
+
+      // A session whose agent has no companion emitter writes the empty
+      // string, and reads back as "nothing reported this".
+      const bare = projectCodingAgentSessionToRow({
+        state: initStateOf(projection),
+        tenantId: "tenant-1",
+        sessionId: SESSION_ID,
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+      });
+      expect(bare.repositoryHost).toBe("");
+      expect(bare.gitBranch).toBe("");
+      expect(bare.title).toBe("");
+      expect(codingAgentSessionStateFromRow(bare).repositoryHost).toBeNull();
+      expect(codingAgentSessionStateFromRow(bare).gitBranch).toBeNull();
+      expect(codingAgentSessionStateFromRow(bare).title).toBeNull();
     });
   });
 });

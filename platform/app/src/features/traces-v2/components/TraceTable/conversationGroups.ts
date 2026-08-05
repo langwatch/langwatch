@@ -34,6 +34,18 @@ export interface ConversationGroup {
   /** Pre-folded coding-agent counters; null when the session has no coding-agent row. */
   modelCalls?: number | null;
   compactions?: number | null;
+  /**
+   * Where the session ran, and what the agent called it. Null when nothing
+   * reported it; `title` is also null when the viewer may not read captured
+   * content, which `titleRedacted` is what tells apart.
+   */
+  repositoryHost?: string | null;
+  repositoryOwner?: string | null;
+  repositoryName?: string | null;
+  gitBranch?: string | null;
+  gitWorktree?: string | null;
+  title?: string | null;
+  titleRedacted?: boolean;
 }
 
 /** Evaluation outcomes summed across one conversation's traces. */

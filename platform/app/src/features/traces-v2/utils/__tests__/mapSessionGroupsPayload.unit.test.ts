@@ -32,6 +32,28 @@ function payloadItem(
   };
 }
 
+type CodingAgentPayload = NonNullable<SessionGroupPayloadItem["codingAgent"]>;
+
+/** The enrichment as the sessions procedure sends it, git context and all. */
+function codingAgentPayload(
+  overrides: Partial<CodingAgentPayload> = {},
+): CodingAgentPayload {
+  return {
+    modelCalls: 0,
+    compactions: 0,
+    peakContextTokens: 0,
+    subAgents: 0,
+    repositoryHost: null,
+    repositoryOwner: null,
+    repositoryName: null,
+    gitBranch: null,
+    gitWorktree: null,
+    title: null,
+    titleRedacted: false,
+    ...overrides,
+  };
+}
+
 describe("given a session group payload from the sessions procedure", () => {
   describe("when mapping it onto the conversation group view model", () => {
     /** @scenario Session rows map to the conversation group view model */
@@ -62,12 +84,12 @@ describe("given a session group payload from the sessions procedure", () => {
       const group = mapSessionGroupToConversationGroup(
         payloadItem({
           contextSizeTokens: 50_000,
-          codingAgent: {
+          codingAgent: codingAgentPayload({
             modelCalls: 63,
             compactions: 4,
             peakContextTokens: 173_000,
             subAgents: 2,
-          },
+          }),
         }),
       );
 
@@ -81,16 +103,56 @@ describe("given a session group payload from the sessions procedure", () => {
       const group = mapSessionGroupToConversationGroup(
         payloadItem({
           contextSizeTokens: 50_000,
-          codingAgent: {
-            modelCalls: 1,
-            compactions: 0,
-            peakContextTokens: 0,
-            subAgents: 0,
-          },
+          codingAgent: codingAgentPayload({ modelCalls: 1 }),
         }),
       );
 
       expect(group.contextSizeTokens).toBe(0);
+    });
+
+    it("carries the git context and the title through to the view model", () => {
+      const group = mapSessionGroupToConversationGroup(
+        payloadItem({
+          codingAgent: codingAgentPayload({
+            repositoryHost: "github.com",
+            repositoryOwner: "acme",
+            repositoryName: "widgets",
+            gitBranch: "feat/git-context",
+            gitWorktree: "widgets-feat",
+            title: "Add git context to the session row",
+          }),
+        }),
+      );
+
+      expect(group).toMatchObject({
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        gitBranch: "feat/git-context",
+        gitWorktree: "widgets-feat",
+        title: "Add git context to the session row",
+        titleRedacted: false,
+      });
+    });
+
+    it("reports a redacted title as absent, with the flag that says why", () => {
+      const group = mapSessionGroupToConversationGroup(
+        payloadItem({
+          codingAgent: codingAgentPayload({ title: null, titleRedacted: true }),
+        }),
+      );
+
+      expect(group.title).toBeNull();
+      expect(group.titleRedacted).toBe(true);
+    });
+
+    it("leaves the git context empty for a session with no coding-agent row", () => {
+      const group = mapSessionGroupToConversationGroup(payloadItem());
+
+      expect(group.repositoryOwner).toBeNull();
+      expect(group.gitBranch).toBeNull();
+      expect(group.title).toBeNull();
+      expect(group.titleRedacted).toBe(false);
     });
 
     it("keeps enrichment fields null for ordinary conversations", () => {

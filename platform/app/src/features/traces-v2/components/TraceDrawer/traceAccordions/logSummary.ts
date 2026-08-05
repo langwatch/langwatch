@@ -77,13 +77,10 @@ function describe(
         ? `Internal error: ${attrs.error}`
         : "The session hit an internal error";
     case "session_created":
-      return "Session started";
+    case "session_context":
     case "session_idle":
-      return "Session went idle";
     case "session_error":
-      return attrs.error
-        ? `Session error: ${attrs.error}`
-        : "The session hit an error";
+      return describeSessionEvent({ event, attrs });
     case "subtask_invoked":
       return `Sub-agent invoked${attrs.subagent_type ? `: ${attrs.subagent_type}` : ""}`;
     case "commit":
@@ -93,6 +90,46 @@ function describe(
       return exhaustive;
     }
   }
+}
+
+/** The session's own lifecycle: it started, it reported where it runs, it ended. */
+function describeSessionEvent({
+  event,
+  attrs,
+}: {
+  event:
+    | "session_created"
+    | "session_context"
+    | "session_idle"
+    | "session_error";
+  attrs: Record<string, string>;
+}): string {
+  switch (event) {
+    case "session_created":
+      return "Session started";
+    case "session_context":
+      return describeSessionContext(attrs);
+    case "session_idle":
+      return "Session went idle";
+    case "session_error":
+      return attrs.error
+        ? `Session error: ${attrs.error}`
+        : "The session hit an error";
+  }
+}
+
+/** Where the session ran, as the companion event reported it. */
+function describeSessionContext(attrs: Record<string, string>): string {
+  const repository = [
+    attrs["vcs.repository.owner"],
+    attrs["vcs.repository.name"],
+  ]
+    .filter(Boolean)
+    .join("/");
+  const branch = attrs["vcs.ref.head.name"];
+  if (repository && branch) return `Working on ${repository} (${branch})`;
+  if (repository) return `Working on ${repository}`;
+  return branch ? `Working on branch ${branch}` : "Session context reported";
 }
 
 function formatCount(raw: string): string {

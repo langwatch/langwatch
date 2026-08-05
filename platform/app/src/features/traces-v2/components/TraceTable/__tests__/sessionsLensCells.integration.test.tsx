@@ -74,6 +74,13 @@ function serverSession(
       compactions: 4,
       peakContextTokens: 173_000,
       subAgents: 2,
+      repositoryHost: "github.com",
+      repositoryOwner: "acme",
+      repositoryName: "widgets",
+      gitBranch: "feat/git-context",
+      gitWorktree: "widgets-feat",
+      title: "Add git context to the session row",
+      titleRedacted: false,
     },
     ...overrides,
   });
