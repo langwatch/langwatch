@@ -7,7 +7,22 @@ import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 import { USAGE_UNKNOWN } from "../../../traces/usage-count";
 import type { OrganizationService } from "../../organizations/organization.service";
 import type { PlanResolver } from "../../subscription/plan-provider";
-import { UsageService } from "../usage.service";
+import { type UsageLimitResult, UsageService } from "../usage.service";
+
+/**
+ * Narrows a UsageLimitResult to its exceeded branch. An `expect().toBe(true)`
+ * here would assert but not narrow the discriminated union for callers, and
+ * biome's noMisplacedAssertion rejects an `expect()` outside an `it()` body
+ * anyway, so this throws instead - still fails the test loudly if the
+ * invariant doesn't hold.
+ */
+function assertExceeded(
+  result: UsageLimitResult,
+): asserts result is Extract<UsageLimitResult, { exceeded: true }> {
+  if (!result.exceeded) {
+    throw new Error("expected checkLimit() to report exceeded: true");
+  }
+}
 
 const ENTERPRISE_LICENSE_PLAN: PlanInfo = {
   ...FREE_PLAN,
@@ -177,7 +192,7 @@ describe("UsageService", () => {
         ]);
         const result = await service.checkLimit({ teamId: "team-123" });
 
-        expect(result.exceeded).toBe(true);
+        assertExceeded(result);
       });
     });
 
@@ -200,7 +215,7 @@ describe("UsageService", () => {
       it("returns message with Free prefix, events unit, and SaaS upgrade URL", async () => {
         const result = await service.checkLimit({ teamId: "team-123" });
 
-        expect(result.exceeded).toBe(true);
+        assertExceeded(result);
         expect(result.message).toContain("Free limit of 50000 events reached");
         expect(result.message).toContain(
           "upgrade your plan at https://app.langwatch.ai/settings/subscription",
@@ -228,7 +243,7 @@ describe("UsageService", () => {
       it("returns message with Free prefix, events unit, and self-hosted license URL", async () => {
         const result = await service.checkLimit({ teamId: "team-123" });
 
-        expect(result.exceeded).toBe(true);
+        assertExceeded(result);
         expect(result.message).toContain("Free limit of 50000 events reached");
         expect(result.message).toContain(
           "buy a license at https://my-langwatch.example.com/settings/license",
@@ -255,7 +270,7 @@ describe("UsageService", () => {
       it("returns message with Monthly prefix, traces unit, and SaaS upgrade URL", async () => {
         const result = await service.checkLimit({ teamId: "team-123" });
 
-        expect(result.exceeded).toBe(true);
+        assertExceeded(result);
         expect(result.message).toContain(
           "Monthly limit of 10000 traces reached",
         );
@@ -285,7 +300,7 @@ describe("UsageService", () => {
       it("returns message with Monthly prefix, traces unit, and self-hosted license URL", async () => {
         const result = await service.checkLimit({ teamId: "team-123" });
 
-        expect(result.exceeded).toBe(true);
+        assertExceeded(result);
         expect(result.message).toContain(
           "Monthly limit of 10000 traces reached",
         );
@@ -314,7 +329,7 @@ describe("UsageService", () => {
       it("returns exceeded: true with count and plan details", async () => {
         const result = await service.checkLimit({ teamId: "team-123" });
 
-        expect(result.exceeded).toBe(true);
+        assertExceeded(result);
         expect(result.count).toBe(1000);
         expect(result.maxMessagesPerMonth).toBe(1000);
         expect(result.planName).toBe("Free");
@@ -348,7 +363,7 @@ describe("UsageService", () => {
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
-        expect(result.exceeded).toBe(true);
+        assertExceeded(result);
         expect(result.maxMessagesPerMonth).toBe(1000);
         // "Monthly"/"events" only come from firstPlan (free: false, license
         // override with usageUnit "events"); laterPlan would render "Free"/"traces".
