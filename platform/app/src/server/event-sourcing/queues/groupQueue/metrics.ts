@@ -22,6 +22,7 @@ const metricNames = [
   "gq_retry_backoff_milliseconds",
   "gq_job_duration_milliseconds",
   "gq_oldest_pending_age_milliseconds",
+  "gq_oldest_backlog_age_milliseconds",
   // ADR-030 hardening + review 2026-06-24
   "gq_blob_reclaim_s3_failures_total",
   "gq_blob_decode_cap_exceeded_total",
