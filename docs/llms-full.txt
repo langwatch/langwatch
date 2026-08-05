@@ -53251,7 +53251,6 @@ Either a single connection URL or the discrete settings. The URL wins when both 
 ```yaml
 app:
   email:
-    enabled: true
     defaultFrom: "LangWatch <langwatch@yourcompany.com>"
     provider: smtp
     providers:
@@ -53265,7 +53264,6 @@ app:
 ```yaml
 app:
   email:
-    enabled: true
     defaultFrom: "LangWatch <langwatch@yourcompany.com>"
     provider: smtp
     providers:
@@ -53295,7 +53293,6 @@ Omitting `SMTP_USER` sends unauthenticated, which is what most internal relays e
 ```yaml
 app:
   email:
-    enabled: true
     defaultFrom: "LangWatch <langwatch@yourcompany.com>"
     provider: ses
     providers:
@@ -53320,7 +53317,6 @@ A SES account still in the sandbox can only send to verified addresses, which in
 ```yaml
 app:
   email:
-    enabled: true
     defaultFrom: "LangWatch <langwatch@yourcompany.com>"
     provider: sendgrid
     providers:
@@ -53340,7 +53336,6 @@ app:
 ```yaml
 app:
   email:
-    enabled: true
     defaultFrom: "LangWatch <langwatch@yourcompany.com>"
     provider: resend
     providers:

@@ -140,28 +140,34 @@ Feature: Email gateway providers
 
   @unit
   Scenario: Background jobs can send email as well as the web application
-    Given email is enabled and a gateway is configured
+    Given a gateway is named and configured
     When the deployment is rendered
     Then the background job workers receive the same gateway configuration as the web application
 
   @unit
   Scenario: A gateway named but never configured is caught before install
-    Given email is enabled
-    And the named gateway has no settings and none are supplied out of band
+    Given a gateway is named
+    And it has no settings and none are supplied out of band
     When the deployment is rendered
     Then rendering fails naming the gateway and the setting to fill in
 
   @unit
   Scenario: Settings supplied out of band are accepted
-    Given email is enabled
-    And the named gateway has no settings in the chart
+    Given a gateway is named
+    And it has no settings in the chart
     But additional environment variables are supplied to the containers
     When the deployment is rendered
     Then rendering succeeds, because the chart cannot see what those variables carry
 
   @unit
   Scenario: Forcing an unencrypted starting connection is not silently dropped
-    Given email is enabled and an SMTP relay is configured
+    Given an SMTP relay is named and configured
     And the operator turns the implicit encryption setting off
     When the deployment is rendered
     Then the containers receive that setting rather than falling back to the port default
+
+  @unit
+  Scenario: The retired enable toggle is refused rather than ignored
+    Given a deployment configured with the enable toggle that email used to need
+    When the deployment is rendered
+    Then rendering fails explaining that naming a gateway is what turns email on

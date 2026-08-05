@@ -293,15 +293,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{/* Validate email provider secrets */}}
-{{- if .Values.app.email.enabled }}
-  {{- if eq .Values.app.email.provider "sendgrid" }}
-    {{- if .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.name }}
-      {{- if empty .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.key }}
-        {{- $errors = append $errors "app.email.providers.sendgrid.apiKey.secretKeyRef.name is set but key is empty" }}
-      {{- end }}
-    {{- else if empty .Values.app.email.providers.sendgrid.apiKey.value }}
-      {{- $errors = append $errors "app.email.enabled is true with sendgrid provider but apiKey is not configured" }}
+{{/* Validate email provider secrets. Whether a gateway is configured at all is
+     langwatch.emailProviderGuard's job; this only catches a half-written
+     secret reference, which looks configured and resolves to nothing. */}}
+{{- if eq .Values.app.email.provider "sendgrid" }}
+  {{- if .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.name }}
+    {{- if empty .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.key }}
+      {{- $errors = append $errors "app.email.providers.sendgrid.apiKey.secretKeyRef.name is set but key is empty" }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -569,19 +567,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      provider's settings (an SMTP_URL from a pre-existing Secret, AWS_REGION
      alongside IRSA credentials) and the chart cannot see inside them. */}}
 {{- define "langwatch.emailProviderGuard" -}}
+{{- if hasKey .Values.app.email "enabled" }}
+{{- fail "app.email.enabled no longer exists: naming app.email.provider is what turns email on. Set app.email.provider to sendgrid, ses, smtp or resend and remove app.email.enabled." }}
+{{- end }}
+{{- $provider := .Values.app.email.provider }}
+{{- if $provider }}
 {{- $providers := .Values.app.email.providers }}
 {{- $configured := dict
       "sendgrid" (or $providers.sendgrid.apiKey.value $providers.sendgrid.apiKey.secretKeyRef.name)
       "resend"   (or $providers.resend.apiKey.value $providers.resend.apiKey.secretKeyRef.name)
       "smtp"     (or $providers.smtp.url.value $providers.smtp.url.secretKeyRef.name $providers.smtp.host)
       "ses"      $providers.ses.region }}
-{{- $provider := .Values.app.email.provider }}
 {{- if not (hasKey $configured $provider) }}
 {{- fail (printf "app.email.provider is %q, which is not one of: sendgrid, ses, smtp, resend." $provider) }}
 {{- end }}
 {{- $escapeHatch := or .Values.app.extraEnvs .Values.app.extraEnvFrom .Values.workers.extraEnvs .Values.workers.extraEnvFrom }}
 {{- if and (not (get $configured $provider)) (not $escapeHatch) }}
-{{- fail (printf "app.email.enabled is true and app.email.provider is %q, but app.email.providers.%s is empty. Configure it, pick another provider, or supply its settings through app.extraEnvs / app.extraEnvFrom." $provider $provider) }}
+{{- fail (printf "app.email.provider is %q, but app.email.providers.%s is empty. Configure it, pick another provider, or supply its settings through app.extraEnvs / app.extraEnvFrom." $provider $provider) }}
+{{- end }}
 {{- end }}
 {{- end -}}
 
@@ -861,11 +864,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 
-# Email gateway. In sharedEnv rather than the app Deployment because scheduled
-# reports and alert notifications are dispatched by the workers, so a workers
-# pod without a gateway configured fails every send it is responsible for.
-{{- if .Values.app.email.enabled }}
+# Email gateway. Naming a provider is what turns email on. In sharedEnv rather
+# than the app Deployment because scheduled reports and alert notifications are
+# dispatched by the workers, so a workers pod without a gateway configured
+# fails every send it is responsible for.
 {{- include "langwatch.emailProviderGuard" . }}
+{{- if .Values.app.email.provider }}
 - name: EMAIL_DEFAULT_FROM
   value: {{ .Values.app.email.defaultFrom | quote }}
 - name: EMAIL_PROVIDER

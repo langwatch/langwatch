@@ -27,7 +27,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-readonly BASE="--set autogen.enabled=true --set app.email.enabled=true"
+readonly BASE="--set autogen.enabled=true"
 
 failures=0
 
@@ -177,22 +177,37 @@ test_an_explicit_false_reaches_the_containers() {
   fi
 }
 
-# Email disabled is the default, and must stay a complete no-op.
-test_disabled_email_emits_nothing() {
+# No provider named is the default, and must stay a complete no-op.
+test_no_provider_emits_nothing() {
   local got
-  got=$(email_env_of "--set autogen.enabled=true" "app/deployment.yaml")
+  got=$(email_env_of "$BASE" "app/deployment.yaml")
   if [ -n "$got" ]; then
-    fail "email disabled" "emitted $(echo "$got" | tr '\n' ' ')with email off"
+    fail "no provider" "emitted $(echo "$got" | tr '\n' ' ')with no provider named"
   else
-    echo "ok   [email disabled] no email configuration emitted"
+    echo "ok   [no provider] no email configuration emitted"
   fi
+}
+
+# @scenario "The retired enable toggle is refused rather than ignored"
+test_the_retired_enabled_toggle_is_refused() {
+  local err
+  if [ "$(render_status "$BASE --set app.email.enabled=true --set app.email.provider=sendgrid --set app.email.providers.sendgrid.apiKey.value=SG.example")" = "ok" ]; then
+    fail "stale app.email.enabled" "rendered successfully, so a values file carrying the old toggle would look correct"
+    return
+  fi
+  err=$(render_error "$BASE --set app.email.enabled=true --set app.email.provider=sendgrid --set app.email.providers.sendgrid.apiKey.value=SG.example")
+  case "$err" in
+    *"app.email.enabled no longer exists"*) echo "ok   [stale app.email.enabled] render refused with the migration message" ;;
+    *) fail "stale app.email.enabled" "render failed without explaining the change: ${err:-<no Error: line>}" ;;
+  esac
 }
 
 test_workers_receive_the_same_gateway_as_the_app
 test_an_unconfigured_gateway_stops_the_render
 test_extra_environment_variables_are_an_accepted_source
 test_an_explicit_false_reaches_the_containers
-test_disabled_email_emits_nothing
+test_no_provider_emits_nothing
+test_the_retired_enabled_toggle_is_refused
 
 if [ "$failures" -gt 0 ]; then
   echo
