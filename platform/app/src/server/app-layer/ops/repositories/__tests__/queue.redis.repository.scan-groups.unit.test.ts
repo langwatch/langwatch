@@ -22,10 +22,10 @@ class FakeRedis {
 
   private static flat(
     entries: Array<{ member: string; score: number }>,
-    withScores: boolean,
+    shouldIncludeScores: boolean,
   ): string[] {
     return entries.flatMap((e) =>
-      withScores ? [e.member, String(e.score)] : [e.member],
+      shouldIncludeScores ? [e.member, String(e.score)] : [e.member],
     );
   }
 
@@ -143,115 +143,135 @@ function stageGroup({
   redis,
   groupId,
   readyScore,
+  headJobScore,
   headJobId,
 }: {
   redis: FakeRedis;
   groupId: string;
   readyScore: number;
+  headJobScore: number;
   headJobId: string;
 }): void {
   const ready = redis.zsets.get(`${PREFIX}ready`) ?? [];
   ready.push({ member: groupId, score: readyScore });
   redis.zsets.set(`${PREFIX}ready`, ready);
   redis.zsets.set(`${PREFIX}group:${groupId}:jobs`, [
-    { member: headJobId, score: readyScore },
+    { member: headJobId, score: headJobScore },
   ]);
 }
 
-async function scan(redis: FakeRedis, topN: number) {
+async function scan({ redis, topN }: { redis: FakeRedis; topN: number }) {
   const repo = new QueueRedisRepository(redis as unknown as Redis);
   const queues = await repo.scanQueues({ queueNames: [QUEUE_NAME], topN });
   return queues[0]!;
 }
 
 describe("QueueRedisRepository.scanQueues — group summary", () => {
-  describe("when the ready zset holds more groups than the scan limit", () => {
-    it("samples both ends, so the most-eligible and most-deferred groups are listed", async () => {
-      const redis = new FakeRedis();
-      const now = Date.now();
-      // Ascending eligibility: oldest-due first, most-deferred last.
-      stageGroup({
-        redis,
-        groupId: "group-eligible-old",
-        readyScore: now - 86_400_000,
-        headJobId: "job-a",
-      });
-      stageGroup({
-        redis,
-        groupId: "group-mid-1",
-        readyScore: now - 5_000,
-        headJobId: "job-b",
-      });
-      stageGroup({
-        redis,
-        groupId: "group-mid-2",
-        readyScore: now - 1_000,
-        headJobId: "job-c",
-      });
-      stageGroup({
-        redis,
-        groupId: "group-deferred",
-        readyScore: now + 300_000,
-        headJobId: "job-d",
-      });
+  describe("given more ready groups than the scan limit", () => {
+    describe("when the queue is scanned", () => {
+      it("samples both ends, so the most-eligible and most-deferred groups are listed", async () => {
+        const redis = new FakeRedis();
+        const now = Date.now();
+        // Ascending eligibility: oldest-due first, most-deferred last.
+        stageGroup({
+          redis,
+          groupId: "group-eligible-old",
+          readyScore: now - 86_400_000,
+          headJobScore: now - 86_400_000,
+          headJobId: "job-a",
+        });
+        stageGroup({
+          redis,
+          groupId: "group-mid-1",
+          readyScore: now - 5_000,
+          headJobScore: now - 5_000,
+          headJobId: "job-b",
+        });
+        stageGroup({
+          redis,
+          groupId: "group-mid-2",
+          readyScore: now - 1_000,
+          headJobScore: now - 1_000,
+          headJobId: "job-c",
+        });
+        // Deferred group models a group whose ready score sits far in the
+        // future (retry backoff / delayed stage) while its head job's
+        // ORIGINAL due time (preserved across retries) is already overdue.
+        stageGroup({
+          redis,
+          groupId: "group-deferred",
+          readyScore: now + 300_000,
+          headJobScore: now - 60_000,
+          headJobId: "job-d",
+        });
 
-      const queue = await scan(redis, 1);
+        const queue = await scan({ redis, topN: 1 });
 
-      const listed = queue.groups.map((g) => g.groupId);
-      expect(listed).toContain("group-eligible-old");
-      expect(listed).toContain("group-deferred");
+        const listed = queue.groups.map((g) => g.groupId);
+        expect(listed).toContain("group-eligible-old");
+        expect(listed).toContain("group-deferred");
+      });
     });
   });
 
-  describe("when the head job has retried since ADR-080", () => {
-    it("reads the retry count from the group's attempt key, not the job id", async () => {
-      const redis = new FakeRedis();
-      stageGroup({
-        redis,
-        groupId: "group-retrying",
-        readyScore: Date.now() + 60_000,
-        headJobId: "evt-plain-id",
+  describe("given a head job that retried since ADR-080", () => {
+    describe("when the queue is scanned", () => {
+      it("reads the retry count from the group's attempt key, not the job id", async () => {
+        const redis = new FakeRedis();
+        stageGroup({
+          redis,
+          groupId: "group-retrying",
+          readyScore: Date.now() + 60_000,
+          headJobScore: Date.now() + 60_000,
+          headJobId: "evt-plain-id",
+        });
+        redis.strings.set(`${PREFIX}group:group-retrying:attempt`, "4");
+
+        const queue = await scan({ redis, topN: 10 });
+
+        const group = queue.groups.find((g) => g.groupId === "group-retrying");
+        expect(group?.retryCount).toBe(4);
       });
-      redis.strings.set(`${PREFIX}group:group-retrying:attempt`, "4");
-
-      const queue = await scan(redis, 10);
-
-      const group = queue.groups.find((g) => g.groupId === "group-retrying");
-      expect(group?.retryCount).toBe(4);
     });
   });
 
-  describe("when only a pre-ADR-080 job id marker exists", () => {
-    it("falls back to the legacy /r/<n> id parse", async () => {
-      const redis = new FakeRedis();
-      stageGroup({
-        redis,
-        groupId: "group-legacy",
-        readyScore: Date.now(),
-        headJobId: "evt-1/r/2",
+  describe("given only a pre-ADR-080 job id marker", () => {
+    describe("when the queue is scanned", () => {
+      it("falls back to the legacy /r/<n> id parse", async () => {
+        const redis = new FakeRedis();
+        stageGroup({
+          redis,
+          groupId: "group-legacy",
+          readyScore: Date.now(),
+          headJobScore: Date.now(),
+          headJobId: "evt-1/r/2",
+        });
+
+        const queue = await scan({ redis, topN: 10 });
+
+        const group = queue.groups.find((g) => g.groupId === "group-legacy");
+        expect(group?.retryCount).toBe(2);
       });
-
-      const queue = await scan(redis, 10);
-
-      const group = queue.groups.find((g) => g.groupId === "group-legacy");
-      expect(group?.retryCount).toBe(2);
     });
   });
 
-  describe("when the head job has never been retried", () => {
-    it("reports no retry count", async () => {
-      const redis = new FakeRedis();
-      stageGroup({
-        redis,
-        groupId: "group-fresh",
-        readyScore: Date.now(),
-        headJobId: "evt-fresh",
+  describe("given a head job that never retried", () => {
+    describe("when the queue is scanned", () => {
+      it("reports no retry count", async () => {
+        const redis = new FakeRedis();
+        stageGroup({
+          redis,
+          groupId: "group-fresh",
+          readyScore: Date.now(),
+          headJobScore: Date.now(),
+          headJobId: "evt-fresh",
+        });
+
+        const queue = await scan({ redis, topN: 10 });
+
+        const group = queue.groups.find((g) => g.groupId === "group-fresh");
+        expect(group?.retryCount).toBeNull();
       });
-
-      const queue = await scan(redis, 10);
-
-      const group = queue.groups.find((g) => g.groupId === "group-fresh");
-      expect(group?.retryCount).toBeNull();
     });
   });
 });

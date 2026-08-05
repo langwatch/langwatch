@@ -23,12 +23,14 @@ import type { DispatchResult, GroupStagingScripts } from "./scripts";
 const READY_UNBLOCK_SENTINEL_SCORE = 1;
 
 /**
- * How many of the most-deferred ready groups the backlog-age gauge samples per
- * collect. Retry-pinned groups sit at the deferred END of the ready zset (their
- * score is now+backoff, larger than any eligible group's), so a small sample
- * from that end catches them; in-flight groups sampled alongside contribute
- * nothing because their head job is not due. Bounded so a collect cycle stays
- * O(sample) pipeline commands whatever the backlog size.
+ * How many of the soonest-future-scored ("nearest deferred") ready groups the
+ * backlog-age gauge samples per collect. Retry-pinned groups' scores sit
+ * within maxBackoffMs (600s) of now, so an ascending scan from just-past-now
+ * finds them first; long-delayed groups (monitor timers, hours out) rank far
+ * later in that same scan and can no longer displace them, unlike a sample
+ * taken from the opposite (largest-score) end. In-flight groups sampled
+ * alongside contribute nothing because their head job is not due. Bounded so
+ * a collect cycle stays O(sample) pipeline commands whatever the backlog size.
  */
 const OLDEST_BACKLOG_SAMPLE_GROUPS = 50;
 
@@ -114,7 +116,7 @@ export class GroupQueueMetricsCollector {
         this.params.activeJobCountFn(),
       );
 
-      await this.collectOldestAges(readyKey, keyPrefix);
+      await this.collectOldestAges({ readyKey, keyPrefix });
     } catch (error) {
       this.params.logger.debug(
         {
@@ -167,15 +169,20 @@ export class GroupQueueMetricsCollector {
    * (excluded) or freshly re-scored (reads as seconds old) — a head job due
    * for a day never surfaces (2026-08-05 incident: day-old
    * codingAgentSpanFactsDispatch backlogs under a ~2.5s gauge). The
-   * per-group jobs zset keeps the job's ORIGINAL due time across retries,
-   * so clock off that instead, sampling the deferred end of ready where
-   * retry-pinned groups live, and folding in the eligible head so an old
-   * eligible group past the sample bound still registers.
+   * per-group jobs zset keeps the job's ORIGINAL due time across retries, so
+   * clock off that instead, sampling the soonest-future-scored ("nearest
+   * deferred") groups of ready — where retry-pinned groups live, their scores
+   * within maxBackoffMs of now — while long-delayed groups (hours out) rank
+   * far later and can no longer displace them, and folding in the eligible
+   * head so an old eligible group past the sample bound still registers.
    */
-  private async collectOldestAges(
-    readyKey: string,
-    keyPrefix: string,
-  ): Promise<void> {
+  private async collectOldestAges({
+    readyKey,
+    keyPrefix,
+  }: {
+    readyKey: string;
+    keyPrefix: string;
+  }): Promise<void> {
     const nowMs = Date.now();
     const oldestEligible = await this.params.redisConnection.zrangebyscore(
       readyKey,
@@ -194,10 +201,13 @@ export class GroupQueueMetricsCollector {
     );
 
     let oldestDueMs = eligibleDueMs;
-    const deferredGroups = await this.params.redisConnection.zrevrange(
+    const deferredGroups = await this.params.redisConnection.zrangebyscore(
       readyKey,
+      `(${nowMs}`,
+      "+inf",
+      "LIMIT",
       0,
-      OLDEST_BACKLOG_SAMPLE_GROUPS - 1,
+      OLDEST_BACKLOG_SAMPLE_GROUPS,
     );
     if (deferredGroups.length > 0) {
       const headPipeline = this.params.redisConnection.pipeline();

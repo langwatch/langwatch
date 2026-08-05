@@ -417,10 +417,13 @@ function stripHashTag(name: string): string {
  * legacy id parse stays as the last-resort fallback for jobs staged before an
  * ADR-080 deploy.
  */
-function resolveRetryCount(
-  attemptRaw: string | null,
-  jobId: string | null,
-): number | null {
+function resolveRetryCount({
+  attemptRaw,
+  jobId,
+}: {
+  attemptRaw: string | null;
+  jobId: string | null;
+}): number | null {
   const attempt = attemptRaw === null ? Number.NaN : parseInt(attemptRaw, 10);
   if (Number.isInteger(attempt) && attempt > 0) return attempt;
   if (!jobId) return null;
@@ -691,7 +694,10 @@ export class QueueRedisRepository implements QueueRepository {
         errorTimestamp: errorInfo?.timestamp
           ? parseFloat(errorInfo.timestamp)
           : null,
-        retryCount: resolveRetryCount(attemptRaw, firstJobIds[i]!.jobId),
+        retryCount: resolveRetryCount({
+          attemptRaw,
+          jobId: firstJobIds[i]!.jobId,
+        }),
         activeKeyTtlSec: activeKeyTtlSec > 0 ? activeKeyTtlSec : null,
         processingDurationMs: null,
       });
