@@ -45,6 +45,24 @@ const RESOLVES_CLIENT =
   /\b(getClickHouseClientForProject|getClickHouseClientForOrganization|getSharedClickHouseClient|getAllClickHouseInstances)\b/;
 
 /**
+ * `getApp().clickhouse.resolveClient` is the same escape hatch wearing the
+ * App's clothes: it hands back a live client, and the names above cannot see
+ * it. Without this it would satisfy the rule while defeating it.
+ *
+ * It exists because two call sites legitimately build repositories outside the
+ * composition root, and sharing one resolution policy beats each re-deriving
+ * its own closure. That is a narrow allowance, not a general one, so the files
+ * permitted to use it are named - it is exactly as bounded as the backlog, and
+ * shrinks the same way.
+ */
+const RESOLVES_VIA_APP = /getApp\(\)\s*\.\s*clickhouse\s*\.\s*resolveClient/;
+
+const MAY_RESOLVE_VIA_APP = new Set([
+  "src/server/traces/trace-blob-resolution.deps.ts",
+  "src/server/event-sourcing/replay/replayPreset.ts",
+]);
+
+/**
  * Allowed to construct.
  *
  * `managedClient.ts` is the one construction site. The other three are
@@ -109,21 +127,14 @@ const RESOLVES_DIRECTLY_BACKLOG = new Set([
   "src/server/app-layer/analytics/analytics.service.ts",
   "src/server/app-layer/automations/graph-trigger-heartbeat.ts",
   "src/server/app-layer/topic-clustering/clustering.ts",
-  "src/server/app-layer/traces/log-record-storage.service.ts",
   "src/server/collectUsageStats.ts",
   "src/server/evaluations/evaluation.service.ts",
-  "src/server/event-sourcing/pipelineRegistry.ts",
-  "src/server/event-sourcing/projections/global/orgBillableEventsMeter.store.ts",
-  "src/server/event-sourcing/replay/replayPreset.ts",
   "src/server/experiments-v3/services/experiment-run.service.ts",
   "src/server/routes/gateway-internal.ts",
   "src/server/routes/ingest/ingestionRoutes.ts",
   "src/server/routes/ops.ts",
-  "src/server/scenarios/orphaned-run-reconciliation.clickhouse.ts",
-  "src/server/scenarios/scenario.processor.ts",
   "src/server/stored-objects/stored-objects-cross-tenant-lookup.ts",
   "src/server/traces/clickhouse-trace.service.ts",
-  "src/server/traces/trace-blob-resolution.deps.ts",
   "src/server/workers/startWorkers.ts",
 ]);
 
@@ -155,6 +166,7 @@ interface ScannedFile {
   path: string;
   constructs: boolean;
   resolves: boolean;
+  resolvesViaApp: boolean;
 }
 
 function scan(): ScannedFile[] {
@@ -165,12 +177,14 @@ function scan(): ScannedFile[] {
       const constructs =
         DRIVER_MODULE.test(source) && CONSTRUCTS_CLIENT.test(source);
       const resolves = RESOLVES_CLIENT.test(source);
-      if (!constructs && !resolves) continue;
+      const resolvesViaApp = RESOLVES_VIA_APP.test(source);
+      if (!constructs && !resolves && !resolvesViaApp) continue;
       files.push({
         // POSIX separators so the sets read the same on every platform.
         path: relative(PACKAGE_ROOT, absolute).split(/[\\/]/).join("/"),
         constructs,
         resolves,
+        resolvesViaApp,
       });
     }
   }
@@ -241,6 +255,37 @@ describe("the ClickHouse client access boundary", () => {
       expect(
         stale,
         "These files no longer resolve a client directly. Delete them from RESOLVES_DIRECTLY_BACKLOG.",
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a file takes the resolver from the App", () => {
+    it("is one of the two call sites allowed to", () => {
+      const offenders = scanned
+        .filter(
+          (file) =>
+            file.resolvesViaApp &&
+            !MAY_RESOLVE_VIA_APP.has(file.path) &&
+            !mayResolveByLocation(file.path),
+        )
+        .map((file) => file.path);
+
+      expect(
+        offenders,
+        "getApp().clickhouse.resolveClient hands back a live client, so it is the same " +
+          "bypass as resolving one directly. Take a repository from the App instead.",
+      ).toEqual([]);
+    });
+
+    it("keeps that allowance shrinking too", () => {
+      const users = new Set(
+        scanned.filter((file) => file.resolvesViaApp).map((file) => file.path),
+      );
+      const stale = [...MAY_RESOLVE_VIA_APP].filter((path) => !users.has(path));
+
+      expect(
+        stale,
+        "These no longer take the resolver from the App. Remove them from MAY_RESOLVE_VIA_APP.",
       ).toEqual([]);
     });
   });
