@@ -97,6 +97,10 @@ jobs:
           assert_docker_tag() {
             case "$2" in
               "") echo "::error::$1 is empty"; exit 1 ;;
+              # The one tag this workflow must never write. Nothing else here
+              # can produce it — but a dispatcher can type it into the input
+              # box, and a `langwatch@vlatest` tag would reach the same place.
+              latest) echo "::error::$1 must not be 'latest'; the SaaS pipeline owns that tag"; exit 1 ;;
               *[!A-Za-z0-9._-]* | [!A-Za-z0-9_]*)
                 echo "::error::$1 must match ^[A-Za-z0-9_][A-Za-z0-9._-]*$"; exit 1 ;;
             esac
@@ -404,10 +408,16 @@ jobs:
             # `-arm64` tags are pushed just before their index and are not
             # multi-arch, so matching one here would publish a single-arch image
             # under a tag consumers expect to be multi-arch.
-            PREVIOUS=$(aws ecr describe-images --repository-name "${IMAGE}" \
+            # The lookup and the match are separate statements on purpose. With
+            # both in one pipeline, the `|| true` that keeps a no-match from
+            # tripping `set -e` also swallows a failed `describe-images` — and
+            # the job would then report success having written no tag at all.
+            # awk exits 0 on no match, so only a genuine AWS failure stops here.
+            CANDIDATES=$(aws ecr describe-images --repository-name "${IMAGE}" \
               --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
-              --output text \
-              | tr '\t' '\n' | grep -E '^git-[0-9a-f]+$' | head -n 1 || true)
+              --output text)
+            PREVIOUS=$(printf '%s' "${CANDIDATES}" | tr '\t' '\n' \
+              | awk '/^git-[0-9a-f]+$/ { print; exit }')
 
             if [ -z "${PREVIOUS}" ]; then
               # Expected until every image has been published once. A dispatch
