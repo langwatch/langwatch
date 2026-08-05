@@ -41,10 +41,9 @@ const isKnownProvider = (value: string): value is EmailProviderName =>
 
 /**
  * When the named gateway is unusable but another one is fully configured, the
- * likely cause is a name that was never reviewed: the helm chart has always
- * emitted `EMAIL_PROVIDER=sendgrid` by default, and installs that ran SES
- * through extra environment variables were silently inferred before this
- * setting was read. Naming the alternative lets that shape diagnose itself.
+ * likely cause is a name that disagrees with the settings actually supplied,
+ * which reads as a missing credential and is really a wrong gateway. Naming
+ * the alternative lets that shape diagnose itself.
  */
 const inferredProviderHint = (configured: EmailProviderName): string => {
   const alternative = EMAIL_PROVIDER_NAMES.find(

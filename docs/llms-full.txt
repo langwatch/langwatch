@@ -53306,7 +53306,7 @@ app:
 | `AWS_REGION` | Region the SES identity lives in | - |
 | `AWS_SES_ENDPOINT` | Send to a VPC endpoint or an internal relay instead of the public regional endpoint | public regional endpoint |
 
-Credentials come from the standard AWS chain, so a pod with an IRSA role needs no keys in the chart. Supply `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` through `app.extraEnvs` if you are not using a role.
+Credentials come from the standard AWS chain, so a pod with an IRSA role needs no keys in the chart. If you are not using a role, supply `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` through both `app.extraEnvs` and `workers.extraEnvs`, since each Deployment reads only its own extra environment and both send mail.
 
 <Note>
 A SES account still in the sandbox can only send to verified addresses, which includes the address alerts are delivered to. Request production access before relying on it.
@@ -53352,15 +53352,20 @@ app:
 
 ## Sending Through an Outbound Proxy
 
-Deployments whose only egress is a corporate HTTP proxy set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables through `app.extraEnvs`. The `ses`, `resend` and `sendgrid` gateways route their API calls through it, and `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
+Deployments whose only egress is a corporate HTTP proxy set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses`, `resend` and `sendgrid` gateways route their API calls through it, and `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
+
+Set them on both Deployments. Scheduled reports and alert notifications are sent by the workers, so a proxy configured on the web application alone leaves exactly those sends trying to reach the provider directly, where they hang until they time out.
 
 ```yaml
 app:
-  extraEnvs:
+  extraEnvs: &proxy
     - name: HTTPS_PROXY
       value: "http://proxy.internal:3128"
     - name: NO_PROXY
       value: ".internal,.cluster.local"
+
+workers:
+  extraEnvs: *proxy
 ```
 
 The `smtp` gateway ignores these variables deliberately, because a relay is normally an internal host reached directly. Point it at the relay's real address, or use a vendor's SMTP endpoint if that is what the proxy allows out.
@@ -53371,7 +53376,7 @@ The chart refuses to render when `app.email.provider` names a gateway nothing co
 
 Settings can instead arrive through `extraEnvs` or `extraEnvFrom`, which the chart cannot see inside and therefore accepts. Supply them to both `app` and `workers`: each Deployment reads only its own extra environment, and both send mail.
 
-A gateway that is configured but unusable fails at send time with a message naming the setting to fill in. When another gateway is fully configured, the message names it too, which is the usual case for an install that set SES up through `app.extraEnvs` while leaving `app.email.provider` at its default:
+A gateway that is named but unusable fails at send time with a message naming the setting to fill in. When a different gateway is fully configured, the message names that one too, which is what an install sees when it names one gateway and supplies another's settings:
 
 ```
 EMAIL_PROVIDER is "sendgrid" but it is not configured: set SENDGRID_API_KEY. Settings for "ses" are present, did you mean EMAIL_PROVIDER=ses?
