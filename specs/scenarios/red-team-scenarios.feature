@@ -10,13 +10,13 @@ Feature: Red Team Scenarios
   # Configuring a red-team scenario
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Switch a scenario to red team
     Given I am editing a scenario
     When I select the "Red team" scenario type
     Then I see an option to configure the attack
 
-  @integration @unimplemented
+  @integration
   Scenario: Configure the attack
     Given I am editing a red-team scenario
     When I open the attack configuration
@@ -26,7 +26,7 @@ Feature: Red Team Scenarios
     And I save the configuration
     Then the scenario records the strategy, objective, and turn count
 
-  @integration @unimplemented
+  @integration
   Scenario: An attack objective is required
     Given I am editing a red-team scenario
     When I open the attack configuration
@@ -91,7 +91,7 @@ Feature: Red Team Scenarios
       past its length limit
     Then the request is rejected
 
-  @integration @unimplemented
+  @integration
   Scenario: A standard scenario carries no red-team configuration
     Given I am editing a scenario
     When I select the "Standard" scenario type
@@ -183,13 +183,13 @@ Feature: Red Team Scenarios
   # A red-team attacker is a user simulator, so it runs through the same
   # pipeline as any other scenario. Only the simulator differs.
 
-  @unit @unimplemented
+  @unit
   Scenario: A red-team run uses the attacker instead of the standard user simulator
     Given a red-team scenario with a strategy
     When the run executes
     Then the attacker drives the conversation instead of the standard user simulator
 
-  @unit @unimplemented
+  @unit
   Scenario: A standard run is unaffected
     Given a scenario with no strategy
     When the run executes
@@ -198,12 +198,20 @@ Feature: Red Team Scenarios
   # An attack that ends early because the pipeline ran out of room still
   # reports a verdict, and that verdict reads as "the agent held up". The turn
   # budget the person configured has to be the budget the attack actually gets.
-  @unit @unimplemented
+  @unit
   Scenario: The attack gets every turn it was configured for
     Given a red-team scenario configured for 30 turns
     When the run executes
     Then the attacker is given 30 turns to work with
-    And a run that ends sooner ends because the objective was met
+
+  # The budget above and the reason a run stops short are separate facts. The
+  # budget is the platform's to get right; ending early on a met objective is
+  # the attacker's own scoring, and nothing here exercises it yet.
+  @unit @unimplemented
+  Scenario: A run that ends before its budget ended because the objective was met
+    Given a red-team run that stopped before its configured turn count
+    When the reason is inspected
+    Then the run ended because the attacker reached its objective
 
   @unit @unimplemented
   Scenario: Success criteria are still judged

@@ -20,6 +20,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { UseFormReturn } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { RED_TEAM_DEFAULT_TURNS } from "~/server/scenarios/execution/types";
 import { withApplicableRedTeamConfig } from "~/server/scenarios/red-team-input";
 import { ScenarioForm, type ScenarioFormData } from "../ScenarioForm";
 
@@ -182,6 +183,135 @@ describe("the attack section", () => {
         await save();
 
         expect(onValid).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given a standard scenario", () => {
+    describe("when the type is switched to red team", () => {
+      /** @scenario Switch a scenario to red team */
+      it("reveals the attack configuration", async () => {
+        const user = userEvent.setup();
+        renderForm({ name: "Bank support agent", situation: "A support agent." });
+
+        expect(screen.queryByText("Attack")).not.toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: /red team/i }));
+
+        expect(await screen.findByText("Attack")).toBeInTheDocument();
+        expect(
+          screen.getByText("What should the attacker try to do?"),
+        ).toBeInTheDocument();
+      });
+
+      /** @scenario Switch a scenario to red team */
+      it("opens on a usable strategy and turn budget rather than empty", async () => {
+        const user = userEvent.setup();
+        const { getValues } = renderForm({ name: "Bank support agent" });
+
+        await user.click(screen.getByRole("button", { name: /red team/i }));
+
+        await waitFor(() => {
+          expect(getValues("redTeamStrategy")).toBe("crescendo");
+        });
+        expect(getValues("redTeamTotalTurns")).toBe(RED_TEAM_DEFAULT_TURNS);
+      });
+    });
+  });
+
+  describe("given a red-team scenario being configured from scratch", () => {
+    describe("when a strategy, objective and turn count are entered", () => {
+      /** @scenario Configure the attack */
+      it("hands all three to the save", async () => {
+        const user = userEvent.setup();
+        const { save, onValid, getValues } = renderForm({
+          name: "Bank support agent",
+        });
+
+        await user.click(screen.getByRole("button", { name: /red team/i }));
+        await waitFor(() => {
+          expect(getValues("redTeamStrategy")).toBe("crescendo");
+        });
+
+        await user.click(screen.getByText("GOAT"));
+        await user.type(
+          screen.getByRole("textbox", {
+            name: /what should the attacker try to do/i,
+          }),
+          "get the agent to reveal its override code",
+        );
+        const turns = screen.getByRole("spinbutton", { name: /turns/i });
+        await user.clear(turns);
+        await user.type(turns, "30");
+        await save();
+
+        expect(onValid).toHaveBeenCalledTimes(1);
+        const [data] = onValid.mock.calls[0]!;
+        expect(data).toMatchObject({
+          redTeamStrategy: "goat",
+          redTeamTarget: "get the agent to reveal its override code",
+          redTeamTotalTurns: 30,
+        });
+      });
+    });
+  });
+
+  describe("given a red-team scenario with no objective", () => {
+    describe("when saving", () => {
+      /** @scenario An attack objective is required */
+      it("refuses, and reports it on the objective", async () => {
+        // Without an objective the run falls back to the cooperative user
+        // simulator: the scenario looks configured, the attack never happens,
+        // and the judge reports that the agent held up.
+        const { save, onValid, onInvalid } = renderForm({
+          ...crescendoWithPlan,
+          redTeamConfig: undefined,
+          redTeamTarget: "",
+        });
+
+        await save();
+
+        expect(onValid).not.toHaveBeenCalled();
+        expect(onInvalid).toHaveBeenCalledTimes(1);
+        const [errors] = onInvalid.mock.calls[0]!;
+        expect(errors).toHaveProperty("redTeamTarget");
+      });
+    });
+  });
+
+  describe("given a red-team scenario switched back to standard", () => {
+    describe("when saving", () => {
+      /** @scenario A standard scenario carries no red-team configuration */
+      it("carries no strategy, objective, turn count or tuning", async () => {
+        const user = userEvent.setup();
+        const { save, onValid } = renderForm(crescendoWithPlan);
+
+        await user.click(
+          screen.getByRole("button", { name: /standard scenario/i }),
+        );
+        await save();
+
+        expect(onValid).toHaveBeenCalledTimes(1);
+        const [data] = onValid.mock.calls[0]!;
+        expect(data).toMatchObject({
+          redTeamStrategy: null,
+          redTeamTarget: null,
+          redTeamTotalTurns: null,
+          redTeamConfig: null,
+        });
+      });
+
+      /** @scenario A standard scenario carries no red-team configuration */
+      it("takes the attack configuration off screen with it", async () => {
+        const user = userEvent.setup();
+        renderForm(crescendoWithPlan);
+
+        await user.click(
+          screen.getByRole("button", { name: /standard scenario/i }),
+        );
+
+        await waitFor(() => {
+          expect(screen.queryByText("Attack")).not.toBeInTheDocument();
+        });
       });
     });
   });

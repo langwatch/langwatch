@@ -11,11 +11,10 @@
  * verdict reads as "the agent held up" — indistinguishable from a real pass.
  * A source read is not enough evidence for that; this executes it.
  *
- * Binds nothing in red-team-scenarios.feature on purpose. It is most of "The
- * attack gets every turn it was configured for", which is still
- * @unimplemented, but not the second half of it — that a shorter run ended
- * because the objective was met. These tests disable early exit to isolate the
- * budget, so claiming that scenario would overstate what is proven here.
+ * These tests disable early exit to isolate the budget, so they bind "The
+ * attack gets every turn it was configured for" and not the separate scenario
+ * about a run ending early because the objective was met, which nothing here
+ * exercises.
  */
 import * as ScenarioRunner from "@langwatch/scenario";
 import { MockLanguageModelV3 } from "ai/test";
@@ -57,6 +56,7 @@ function recordingAgent(received: string[][]) {
 
 describe("a red-team attack's turn budget", () => {
   describe("given an attacker whose script drives the run", () => {
+    /** @scenario The attack gets every turn it was configured for */
     it("spends every configured turn against the agent", async () => {
       const TOTAL_TURNS = 6;
       const agentTurns: string[][] = [];
@@ -96,6 +96,7 @@ describe("a red-team attack's turn budget", () => {
       expect(result).toBeDefined();
     }, 120_000);
 
+    /** @scenario The attack gets every turn it was configured for */
     it("stops at the budget rather than running on", async () => {
       const agentTurns: string[][] = [];
       const attacker = ScenarioRunner.redTeamGoat({

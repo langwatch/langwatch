@@ -296,7 +296,7 @@ describe("the scenarios REST API", () => {
   });
 
   describe("given planner settings on a GOAT update", () => {
-    /** @scenario Planner settings are refused on GOAT */
+    /** @scenario Planner settings are refused on a strategy that ignores them */
     it("names the offending field rather than saving inert settings", async () => {
       getById.mockResolvedValue(
         scenarioRow({

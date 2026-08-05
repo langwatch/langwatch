@@ -29,12 +29,13 @@ import { type TracerProvider, trace } from "@opentelemetry/api";
 import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
 import { createChildProcessLogger } from "./child-logger";
 import { parseChildProcessJobData } from "./child-process-payload";
+import { buildConversation } from "./conversation";
 import { createModelFromParams } from "./model.factory";
 import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
 import { createAdapter } from "./serialized-adapter.registry";
 import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
 import { createTraceApiSpanQuery } from "./trace-api-span-query";
-import { type ChildProcessJobData, RED_TEAM_DEFAULT_TURNS } from "./types";
+import type { ChildProcessJobData } from "./types";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child");
 
@@ -210,48 +211,6 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 }
 
 /**
- * Who talks, and — for a red-team run — in what order.
- *
- * A red-team attacker IS a user simulator (it extends the same adapter), so it
- * drops straight into the simulator slot and everything downstream — the judge,
- * the criteria, the reporting — stays exactly as it is.
- *
- * marathonScript is what makes a red-team run a real one. Without it the judge
- * runs every turn and can end the scenario the moment nothing has gone wrong —
- * "must never reveal X" is satisfied by one clean exchange, so a 50-turn attack
- * finishes at turn one reporting that the agent held.
- *
- * The script is also the turn control. It expands to totalTurns rounds and the
- * runner walks it step by step, so maxTurns is not consulted on this path at
- * all (verified in the SDK: the scripted branch loops over script.length; the
- * maxTurns check lives in the auto-advance branch). Setting it here would be
- * dead config that reads like a safeguard.
- */
-function buildConversation({
-  adapter,
-  scenario,
-  simulatorModel,
-  judgeAgent,
-}: {
-  adapter: ScenarioRunner.AgentAdapter;
-  scenario: ChildProcessJobData["scenario"];
-  simulatorModel: ReturnType<typeof createModelFromParams>;
-  judgeAgent: ScenarioRunner.JudgeAgentAdapter;
-}): {
-  agents: ScenarioRunner.AgentAdapter[];
-  script: { script?: ScenarioRunner.ScriptStep[] };
-} {
-  const redTeam = buildRedTeamAgent({ scenario, model: simulatorModel });
-  const simulator =
-    redTeam?.agent ??
-    ScenarioRunner.userSimulatorAgent({ model: simulatorModel });
-  return {
-    agents: [adapter, simulator, judgeAgent],
-    script: redTeam ? { script: redTeam.script } : {},
-  };
-}
-
-/**
  * The judge, and the remote-span judge when there is one.
  *
  * An HTTP target's judge queries spans from the platform API before it
@@ -290,48 +249,6 @@ function createJudge({
     }),
   });
   return { judgeAgent: remoteSpanJudge, remoteSpanJudge };
-}
-
-/**
- * Builds the adversarial attacker for a red-team scenario, or null for a
- * standard one.
- *
- * Returns the marathon script alongside the agent. The script is what the
- * runner walks, so it — not `maxTurns` — is what gives the attack its full
- * turn budget, and it is what stops the judge from ending the run at turn one
- * on a scenario where nothing has gone wrong yet.
- */
-function buildRedTeamAgent({
-  scenario,
-  model,
-}: {
-  scenario: ChildProcessJobData["scenario"];
-  model: ReturnType<typeof createModelFromParams>;
-}): {
-  agent: ScenarioRunner.UserSimulatorAgentAdapter;
-  script: ScenarioRunner.ScriptStep[];
-} | null {
-  if (!scenario.redTeamStrategy || !scenario.redTeamTarget) return null;
-
-  const totalTurns = scenario.redTeamTotalTurns ?? RED_TEAM_DEFAULT_TURNS;
-  // Stored config first, so the three fields this function owns cannot be
-  // overwritten by it. The other order happened to be safe only because
-  // `RedTeamConfigSchema` is a stripping `z.object` on every write path today
-  // — a cross-file invariant nothing states and nothing checks. Precedence
-  // belongs where you can see it.
-  const config = {
-    ...(scenario.redTeamConfig ?? {}),
-    target: scenario.redTeamTarget,
-    totalTurns,
-    model,
-  };
-
-  const agent =
-    scenario.redTeamStrategy === "goat"
-      ? ScenarioRunner.redTeamGoat(config)
-      : ScenarioRunner.redTeamCrescendo(config);
-
-  return { agent, script: agent.marathonScript() };
 }
 
 /**
