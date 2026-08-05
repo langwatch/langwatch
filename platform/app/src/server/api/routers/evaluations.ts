@@ -30,9 +30,10 @@ export const evaluationsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("evaluations:view"))
     .query(async ({ input }) => {
-      // Azure Safety evaluators are gated by the per-project azure_safety
-      // Model Provider — we no longer read process.env for those. Compute
-      // once and reuse for all three Azure evaluator types.
+      // Azure Safety evaluators resolve their credentials solely from the
+      // project's azure_safety Model Provider. There is no process.env
+      // fallback, so an unconfigured provider reports them as missing.
+      // Computed once and reused for all three Azure evaluator types.
       const azureSafetyEnv = await getAzureSafetyEnvFromProject(
         input.projectId,
       );
