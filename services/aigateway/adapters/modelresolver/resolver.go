@@ -85,23 +85,5 @@ func normalizeProvider(raw string) domain.ProviderID {
 }
 
 func modelAllowed(config domain.BundleConfig, model string) bool {
-	if len(config.AllowedModels) == 0 {
-		return true
-	}
-	for _, pat := range config.AllowedModels {
-		if matchGlob(pat, model) {
-			return true
-		}
-	}
-	return false
-}
-
-func matchGlob(pattern, s string) bool {
-	if pattern == s {
-		return true
-	}
-	if strings.HasSuffix(pattern, "*") {
-		return strings.HasPrefix(s, strings.TrimSuffix(pattern, "*"))
-	}
-	return false
+	return config.AllowsModel(model)
 }

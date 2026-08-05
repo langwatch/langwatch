@@ -1,0 +1,322 @@
+---
+title: Langy Assistant
+description: "Run LangWatch's in-product AI assistant on your own cluster"
+sidebarTitle: Setup
+---
+
+Langy is the assistant inside LangWatch: it answers questions about your traces,
+runs LangWatch's own CLI on your behalf, and can open pull requests against your
+repositories. On a self-hosted install it runs as one extra pod, alongside the
+app, and it ships enabled: a plain `helm install` deploys it.
+
+## What it needs
+
+The chart handles the deployment: the agent pod, the secret the app and the
+agent use to authenticate to each other, and the in-cluster addresses they use
+to reach the LangWatch AI Gateway and to send answers back.
+
+The one thing Langy needs from you is a model to talk to. Configure a
+[model provider](/platform/model-providers) for the project, then open the
+assistant from any page.
+
+```bash
+kubectl -n langwatch get pods -l app.kubernetes.io/name=langyagent
+```
+
+<Note>
+Langy is single-tenant by nature here: every person with access to your
+LangWatch install can use it, and it runs with the permissions of whoever is
+asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
+</Note>
+
+## How Langy is isolated
+
+Langy's workers run shell written by a language model, and each one holds the
+credentials of the person who asked. Two controls bound that, both on by
+default on every cluster:
+
+- **Per-worker identity.** Each conversation's worker runs under its own UID
+  with its own credentials and its own opencode password. Workers cannot read
+  each other's keys or reach each other's control ports.
+- **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
+  the gateway, and nothing else. Egress to the internet is off until you turn it
+  on, and private ranges plus the cloud metadata endpoint stay blocked even
+  then.
+
+Those are the controls that bound the realistic attack: a worker reached by
+prompt injection through data it was asked to look at, using its own legitimate
+access to exfiltrate. They need no configuration and behave the same everywhere.
+
+The rung above them is a **sandboxed runtime**, which protects the node's kernel
+from a worker that escapes its container. That needs a kernel exploit on top of
+the injection, and it is the one control whose behaviour depends on your node
+image, container runtime and sandbox build, so it is a deliberate step rather
+than a default. Take it below.
+
+## Hardening: a sandboxed runtime
+
+Pin the agent pod to a sandboxed RuntimeClass:
+
+```yaml
+langyagent:
+  runtimeClassName: "gvisor"
+  acceptUnsandboxedRuntime: false
+```
+
+Setting `acceptUnsandboxedRuntime: false` alongside it means the chart refuses to
+render if the class is ever blanked, so a cluster that has hardened cannot
+silently lose its sandbox.
+
+Your cluster has to define that class first, and if it does not, the pod is
+rejected at admission: no pod is created at all, `kubectl get pods -l
+app.kubernetes.io/name=langyagent` lists nothing, and the reason sits on the
+Deployment.
+
+```bash
+kubectl -n langwatch get deploy langwatch-langyagent \
+  -o jsonpath='{.status.conditions[?(@.type=="ReplicaFailure")].message}'
+# pods "langwatch-langyagent-..." is forbidden: pod rejected:
+# RuntimeClass "gvisor" not found
+```
+
+Where the class comes from:
+
+| Cluster | What to do |
+|---------|------------|
+| GKE | Enable GKE Sandbox on a node pool, or use Autopilot, which schedules `gvisor` pods directly. The class is named `gvisor`. |
+| AKS | Use a Kata VM isolation pool and set `runtimeClassName: kata-mshv-vm-isolation`. Any sandboxed class works. |
+| EKS | No managed option. Install gVisor on a dedicated node group ([below](#eks-install-gvisor-on-a-node-group)). |
+
+### EKS: install gVisor on a node group
+
+AWS offers no managed gVisor, so the RuntimeClass takes one platform step. This
+is the setup LangWatch runs its own hosted Langy on.
+
+1. **A dedicated, tainted node group** for the agent pod. Installing `runsc`
+   reconfigures and restarts containerd on the node, so isolating Langy onto
+   its own nodes keeps that restart, and gVisor's syscall-interception
+   overhead, away from the rest of the cluster. One `m8g.xlarge` handles
+   roughly 5 to 15 concurrent sessions. Label and taint it (for example
+   `workload=langy-gvisor`), and set the matching `nodeSelector` and
+   `tolerations` on `langyagent`:
+
+   ```yaml
+   langyagent:
+     runtimeClassName: "gvisor"
+     acceptUnsandboxedRuntime: false
+     nodeSelector:
+       workload: langy-gvisor
+     tolerations:
+       - key: dedicated
+         operator: Equal
+         value: langy-gvisor
+         effect: NoSchedule
+   ```
+
+2. **A `gvisor-installer` DaemonSet**, nodeSelector-scoped to that node group
+   only, that downloads a pinned `runsc` and `containerd-shim-runsc-v1`
+   release, verifies the published SHA-512 digests, registers the runtime in
+   the containerd config, and restarts containerd. Pin the release; do not
+   track `latest` for the binary that sandboxes a root, LLM-driven workload.
+
+   <Accordion title="gvisor-installer DaemonSet">
+
+   Bump `GVISOR_RELEASE` to a release you have reviewed; the digest check fails
+   the install if a download does not match what upstream published for it. The
+   containerd plugin path differs between containerd 1.x and 2.x, so the script
+   detects it rather than assuming: writing the wrong one fails **silently**,
+   leaving containerd healthy and the runtime unregistered. The AL2023 image
+   matches the EKS-optimized AMI; swap it and the `dnf` line for a different
+   node distribution.
+
+   ```yaml
+   apiVersion: apps/v1
+   kind: DaemonSet
+   metadata:
+     name: gvisor-installer
+     namespace: kube-system
+   spec:
+     selector:
+       matchLabels:
+         app: gvisor-installer
+     template:
+       metadata:
+         labels:
+           app: gvisor-installer
+       spec:
+         hostPID: true
+         nodeSelector:
+           workload: langy-gvisor
+         tolerations:
+           - key: dedicated
+             operator: Equal
+             value: langy-gvisor
+             effect: NoSchedule
+         containers:
+           - name: installer
+             image: public.ecr.aws/amazonlinux/amazonlinux:2023
+             securityContext:
+               privileged: true
+             command: ["/bin/bash", "-c"]
+             args:
+               - |
+                 set -euxo pipefail
+                 dnf install -y util-linux-core
+
+                 case "$(uname -m)" in
+                   aarch64) GVISOR_ARCH=aarch64 ;;
+                   x86_64)  GVISOR_ARCH=x86_64 ;;
+                   *) echo "unsupported arch"; exit 1 ;;
+                 esac
+
+                 MARKER=/host/var/lib/gvisor-installer.done
+                 if [ -f "$MARKER" ]; then echo "already installed"; sleep infinity; fi
+
+                 GVISOR_RELEASE=20260706
+                 URL="https://storage.googleapis.com/gvisor/releases/release/${GVISOR_RELEASE}/${GVISOR_ARCH}"
+
+                 cd /tmp
+                 for f in runsc containerd-shim-runsc-v1; do
+                   curl -fsSL "${URL}/${f}" -o "$f"
+                   curl -fsSL "${URL}/${f}.sha512" -o "${f}.sha512"
+                   sha512sum -c "${f}.sha512"
+                   install -m 0755 "$f" "/host/usr/local/bin/${f}"
+                 done
+
+                 # containerd 2.x renamed the CRI plugin. Writing the stanza for
+                 # the wrong major leaves containerd healthy and the runtime
+                 # unregistered, so pick it from the running version.
+                 CTRD_MAJOR=$(nsenter --target 1 --mount --uts --ipc --net --pid -- \
+                   containerd --version | awk '{print $3}' | sed 's/^v//' | cut -d. -f1)
+                 if [ "${CTRD_MAJOR}" -ge 2 ]; then
+                   PLUGIN='io.containerd.cri.v1.runtime'
+                 else
+                   PLUGIN='io.containerd.grpc.v1.cri'
+                 fi
+
+                 CONFIG=/host/etc/containerd/config.toml
+                 if ! grep -q 'runtimes.runsc' "$CONFIG" 2>/dev/null; then
+                   cat >> "$CONFIG" <<EOF
+
+                 [plugins."${PLUGIN}".containerd.runtimes.runsc]
+                   runtime_type = "io.containerd.runsc.v1"
+                 EOF
+                 fi
+
+                 nsenter --target 1 --mount --uts --ipc --net --pid -- systemctl restart containerd
+                 sleep 5
+                 nsenter --target 1 --mount --uts --ipc --net --pid -- systemctl is-active containerd
+
+                 touch "$MARKER"
+                 sleep infinity
+             volumeMounts:
+               - name: host
+                 mountPath: /host
+         volumes:
+           - name: host
+             hostPath:
+               path: /
+   ```
+
+   </Accordion>
+
+3. **The RuntimeClass**:
+
+   ```yaml
+   apiVersion: node.k8s.io/v1
+   kind: RuntimeClass
+   metadata:
+     name: gvisor
+   handler: runsc
+   ```
+
+The first boot on a cold node takes a few minutes (node up, then the async
+runsc install, then the pod's sandbox creation retries until it lands); the
+pod reaches Ready on its own. Confirm the sandbox is real:
+
+```bash
+kubectl -n langwatch exec deploy/langwatch-langyagent -- cat /proc/version
+# Linux version 4.19.0-gvisor ...
+```
+
+## Letting Langy reach the internet
+
+Langy's tools shell out to `git`, `gh`, and package managers. Egress to the
+internet is off by default, because these workers hold the requesting user's API
+key and GitHub token:
+
+```yaml
+langyagent:
+  networkPolicy:
+    allowExternalHttps: true
+```
+
+Private address ranges and the cloud metadata endpoint stay blocked either way,
+so a worker cannot use this to reach your internal services. Without it, Langy
+still answers questions about your data; what stops working is anything that
+talks to GitHub or installs a package.
+
+## Watching Langy work
+
+Langy's own turns can be traced into one of your own LangWatch projects, so you
+can see the model calls it made, the tools it ran, and what each one cost.
+
+Create an API key in the project you want to mirror into, then:
+
+```bash
+read -rsp "Mirror project API key: " KEY
+kubectl -n langwatch create secret generic langwatch-langyagent-mirror \
+  --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"
+unset KEY
+```
+
+Reading the key rather than passing it as an argument keeps it out of your
+shell history and out of the process list on the machine you run this from.
+
+```yaml
+langyagent:
+  mirror:
+    existingSecretName: langwatch-langyagent-mirror
+```
+
+The endpoint resolves to your own install automatically. Set
+`langyagent.mirror.traceEndpoint` only to mirror into a different LangWatch
+deployment.
+
+## Staged rollout
+
+To open Langy to a few projects before everyone, keep the rollout flag
+authoritative:
+
+```yaml
+langyagent:
+  enableForAllUsers: false
+```
+
+Langy then stays dark until you enable `release_langy_enabled`, or add targeting
+rules for specific projects and organizations, from `/ops/feature-flags` in your
+install.
+
+## Bringing your own secrets
+
+With `autogen.enabled: false` you supply the app Secret yourself. Add a
+`LANGY_INTERNAL_SECRET` key to it, which the app, the workers, and the agent all
+read to authenticate to each other:
+
+```bash
+kubectl -n langwatch patch secret langwatch-app-secrets \
+  -p "{\"stringData\":{\"LANGY_INTERNAL_SECRET\":\"$(openssl rand -hex 32)\"}}"
+```
+
+The install checks for the key and stops with a message naming it, rather than
+leaving three pods in `CreateContainerConfigError`.
+
+## Turning it off
+
+```yaml
+langyagent:
+  chartManaged: false
+```
+
+The agent pod and every reference to it are removed on the next upgrade. Nothing
+else in your install changes.

@@ -57,6 +57,18 @@ ingress:
   host: gateway.langwatch.ai
   path: /v1
   pathType: Prefix
+  # Public status-page surface. An Exact match publishes this one path and
+  # nothing else, so /healthz, /readyz, /metrics and /internal stay
+  # in-cluster. Methods are bounded by the gateway route, which serves GET
+  # and HEAD and answers 405 otherwise, not by the ingress.
+  # The endpoint is unauthenticated by design: it reports the gateway
+  # process plus the control-plane connectivity verdict cached by a
+  # background probe, returns no tenant data, makes no upstream call per
+  # poll, and can never go red from a model-provider outage. Point the
+  # status-page HTTP monitor at https://<ingress.host>/health.
+  healthPath:
+    enabled: true
+    path: /health
   tls:
     enabled: true
     secretName: gateway-tls
@@ -67,11 +79,18 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 
-# Control-plane connection (LangWatch app). Port 5560 matches the
-# langwatch Helm chart's main-app Service (consistent with the local-
-# dev port: app=5560, nlp=5561, langevals=5562, gateway=5563).
+# Control-plane connection (LangWatch app). Left empty, this resolves to the
+# app Service of the install the gateway is part of, `<release>-app:5560` —
+# the cluster names that Service after the release, so a fixed address would
+# only resolve on an install that happens to share ours. Port 5560 is the
+# langwatch chart's main-app Service (consistent with the local-dev port:
+# app=5560, nlp=5561, langevals=5562, gateway=5563).
+#
+# Set it when the control plane is somewhere the derivation cannot reach: a
+# gateway installed on its own rather than as part of the umbrella chart, an
+# app served on another port, or a split topology where the two live apart.
 controlPlane:
-  baseUrl: http://langwatch-app:5560
+  baseUrl: ""
   requestTimeout: 2s
   longPollTimeout: 25s
 
@@ -154,15 +173,36 @@ admin:
   existingAuthSecretName: ""
   authSecretKey: token
 
-# Rate limit live-check tier (contract §4.4). VK-level rate limits
-# (rpm/rpd) are always enforced locally; these knobs gate the live
-# /budget/check reconciliation call that only fires when a cached
-# scope is within `liveThresholdPct` of its hard limit.
+# Budget enforcement. VK-level rate limits (rpm/rpd) and the budget
+# precheck are both enforced locally against the cached bundle snapshot;
+# there is no control-plane call on the hot path. Debits come from the
+# spend records below: the control plane folds them into the ClickHouse
+# ledger, and the new totals reach this pod on the next /changes refresh.
+# Watch `gateway_budget_blocks_total{scope}` to confirm a hard cap is
+# firing.
 budget:
-  outboxFlushInterval: 2s
-  outboxMaxRetries: 10
-  liveThresholdPct: "0.9"  # 90%
-  liveTimeout: 200ms
+  # Fraction of the hard limit at which a `warn`-mode scope starts
+  # reporting a warn verdict.
+  warnThresholdPct: "0.9"  # 90%
+
+# Spend emission. Every request writes a spend record to a bounded on-disk
+# spool that a background drainer ships to the control plane, which is where
+# every gateway budget debit comes from. On by default: a gateway with this
+# off serves traffic that costs money and debits nothing, so its budgets go
+# stale at zero and stop enforcing.
+#
+# The spool lives under /tmp, on the writable emptyDir this chart already
+# mounts (see scratchSizeLimit), and bounds itself at 64 MiB. Deliberately
+# not a PersistentVolume: a pod deleted with records still unshipped loses
+# roughly a second of drain lag, and a volume per pod would trade that
+# second for a stateful gateway. Watch `gateway_spend_spool_dropped_total`,
+# where every drop is spend nobody bills.
+#
+# Turn it off only while the control plane is older than the gateway and has
+# no spend-command ingest route yet. Even then, leaving it on is degraded but
+# safe: the drainer retries on backoff and the spool is bounded.
+spend:
+  enabled: true
 
 guardrails:
   preTimeout: 800ms
@@ -170,6 +210,9 @@ guardrails:
   streamChunkWindow: 50ms
 
 # Pod-level security.
+## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
+scratchSizeLimit: 1Gi
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 65532
@@ -179,6 +222,9 @@ podSecurityContext:
     type: RuntimeDefault
 
 containerSecurityContext:
+  # runAsNonRoot is also set on the pod above; some Gatekeeper constraints
+  # inspect the container-level field directly, so set it here too.
+  runAsNonRoot: true
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:

@@ -39,8 +39,8 @@ const rateLimitErrBody = `{"type":"error","error":{"type":"rate_limit_error","me
 // @scenario "Gateway-origin budget block carries an admin-actionable message a generic agent client renders"
 func TestRouter_GovBudgetBlock_CarriesAdminActionableMessage(t *testing.T) {
 	block := &mockBudget{
-		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetVerdict, error) {
-			return domain.BudgetBlock, nil
+		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetDecision, error) {
+			return domain.BudgetDecision{Verdict: domain.BudgetBlock}, nil
 		},
 	}
 	provider := &mockProvider{

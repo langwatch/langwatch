@@ -4,6 +4,8 @@ sidebarTitle: LangWatch CLI
 description: The `langwatch` CLI is a single tool that gives you—and your coding assistant—full access to LangWatch from the terminal. Instrument code, version prompts, run scenarios, inspect traces, query analytics, and more.
 ---
 
+import AgentReportNotice from "/snippets/agent-report-notice.mdx";
+
 Everything in the LangWatch app is available from the CLI, it's designed to be driven by a coding assistant.
 
 Every subcommand supports `--help`, and every command accepts the output-contract flags (`-o json`, `--json <fields>`, `--jq <expr>` — see [Agent usage](#agent-usage)). Run `langwatch --help` to see the full command tree.
@@ -554,9 +556,27 @@ See the [Skills Directory](/skills/directory) for what each skill covers.
 
 Non-TTY invocations (agents, pipes, CI) are served by the background daemon described below — output is identical, just fast. `LANGWATCH_NO_DAEMON=1` opts out per invocation.
 
+## Report issues to LangWatch
+
+If anything did not work (broken commands, confusing docs, unexpected errors, things that took trial and error), send it straight to the LangWatch team. No login or API key needed:
+
+```bash
+# Summary report: what you tried, verbatim errors, what you had to figure out
+npx langwatch report --user-approved \
+  --title "scenario create 500" \
+  --summary "langwatch scenario create returned HTTP 500 with ..."
+
+# Full session report (best): attach the transcript, redacted locally
+npx langwatch report --user-approved \
+  --title "agent stuck instrumenting" \
+  --session ~/.claude/projects/<project-dir>/<session-id>.jsonl
+```
+
+Agents must ask the user for permission first, then pass `--user-approved`. Secrets, API keys, emails, and phone numbers are redacted locally before anything is sent; the [redaction rules are auditable](https://github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts) and `--dry-run` previews the exact payload. See the [reporting guide](/support#reporting-issues-from-coding-agents) for transcript locations and details.
+
 ## The background daemon
 
-Non-interactive invocations — an agent piping output, CI, any call whose stdin/stdout/stderr is not a TTY — are served by a warm background daemon instead of paying node's cold start on every call. Interactive (terminal) invocations always run in-process and are unaffected, as are commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `request-increase`, `init-shell`, the `claude`/`codex`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and long-running flags (`--follow`, `--watch`). Windows is excluded too — the daemon is not supported there, so on Windows every invocation runs in-process.
+Non-interactive invocations — an agent piping output, CI, any call whose stdin/stdout/stderr is not a TTY — are served by a warm background daemon instead of paying node's cold start on every call. Interactive (terminal) invocations always run in-process and are unaffected, as are commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `request-increase`, `init-shell`, `report`, the `claude`/`codex`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and long-running flags (`--follow`, `--watch`). Windows is excluded too — the daemon is not supported there, so on Windows every invocation runs in-process.
 
 What to know:
 
@@ -588,3 +608,5 @@ langwatch config set daemon off              # persistent, user-global (~/.langw
 The CLI was designed so that an AI coding assistant can operate LangWatch end-to-end on your behalf. Skills like [Tracing, Evaluations, Scenarios, and Prompt Versioning](/skills/directory) are built on top of it, the assistant reads docs via `langwatch docs`, runs platform operations via the subcommands, and verifies its own work by searching traces and inspecting simulation runs.
 
 If you're building your own agent workflows, the pattern works the same way: give the assistant the CLI and ask it what you want. It's a small surface area with a big reach, and everything it does is auditable in the LangWatch app afterwards.
+
+<AgentReportNotice />

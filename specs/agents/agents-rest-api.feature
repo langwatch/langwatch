@@ -37,13 +37,6 @@ Feature: Agent REST API
     And the response includes the agent id, name, type, and config
 
   @integration
-  Scenario: Create an agent enforces plan limits
-    Given the project has reached its agent plan limit
-    When I call POST /api/agents with valid agent data
-    Then the request fails with 403 Forbidden
-    And the error indicates the agent limit has been reached
-
-  @integration
   Scenario: Create an agent validates config against type schema
     When I call POST /api/agents with type "signature" and an invalid config
     Then the request fails with 422 Unprocessable Entity

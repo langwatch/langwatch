@@ -63,6 +63,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
+	"github.com/langwatch/langwatch/services/langyagent/domain"
 	langyotel "github.com/langwatch/langwatch/services/langyagent/otel"
 )
 
@@ -106,6 +107,18 @@ type WorkerInfo struct {
 	// virtual key is injected by the relay, never by the worker.
 	GatewayBaseURL string
 	LLMVirtualKey  string
+	// MirrorTier is the resolved ADR-061 mirror fidelity for this conversation's
+	// organization ("content" | "structural" | "skip"). Bound at Register from
+	// the credentials envelope; a tier change recycles the worker (it is folded
+	// into the credential signature) so this value is never stale for a live
+	// worker. Empty ⇒ skip.
+	MirrorTier string
+	// SourceOrganizationID + SourceProjectID name the CUSTOMER tenant this turn
+	// runs for. Stamped onto the mirror copy for per-customer attribution
+	// (ADR-061 §5); never forwarded to the customer's own project. Manager-held,
+	// never read from the worker's OTLP.
+	SourceOrganizationID string
+	SourceProjectID      string
 }
 
 // workerEntry is one registered worker: its info plus the conversation's
@@ -122,13 +135,30 @@ type workerEntry struct {
 	// cause behind the agent's laundered error event, captured so the turn's
 	// terminal error frame can carry the full typed chain through.
 	llmErr *herr.E
+	// rateLimitStrikes counts CONSECUTIVE rate-limited (429) mediated LLM
+	// calls for this conversation. A successful call resets it, as does a new
+	// turn. At the cut threshold handleLLM stops the worker SDK's retry loop:
+	// a hard plan limit answers every retry identically, and the SDK's
+	// ever-growing backoff otherwise leaves the turn spinning silently.
+	rateLimitStrikes int
+	// llmStreamCut is the provider error payload captured from an in-stream
+	// error event on a 200 LLM stream (OpenAI signals insufficient_quota this
+	// way). Status-based cutting never sees these, every SDK retry re-opens
+	// a fresh 200 stream and dies identically, so when set, handleLLM
+	// answers the NEXT call with a terminal 400 carrying this body instead of
+	// proxying. Cleared by a clean stream, a new turn, or clearLLMError.
+	llmStreamCut []byte
 }
 
 func (e *workerEntry) setTurn(sc trace.SpanContext) {
 	e.mu.Lock()
 	e.turn = sc
-	// A new turn must never inherit the previous turn's failure as its cause.
+	// A new turn must never inherit the previous turn's failure as its cause,
+	// nor its rate-limit strikes: the user asked something new, so let the SDK
+	// retry from a clean slate (a hard limit will re-strike immediately).
 	e.llmErr = nil
+	e.rateLimitStrikes = 0
+	e.llmStreamCut = nil
 	e.mu.Unlock()
 }
 
@@ -147,6 +177,47 @@ func (e *workerEntry) setLLMError(err herr.E) {
 func (e *workerEntry) clearLLMError() {
 	e.mu.Lock()
 	e.llmErr = nil
+	e.rateLimitStrikes = 0
+	e.llmStreamCut = nil
+	e.mu.Unlock()
+}
+
+// latchLLMStreamCut arms the terminal answer for the conversation's next
+// mediated LLM call with the provider's own in-stream error payload.
+func (e *workerEntry) latchLLMStreamCut(body []byte) {
+	e.mu.Lock()
+	e.llmStreamCut = body
+	e.mu.Unlock()
+}
+
+// takeLLMStreamCut consumes the armed cut. One terminal answer per latch: the
+// SDK treats it as final and fails the turn; if a later call in the same
+// conversation dies the same in-stream way, the sniffer re-latches. A
+// consumed latch never poisons an unrelated later call.
+func (e *workerEntry) takeLLMStreamCut() ([]byte, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if len(e.llmStreamCut) == 0 {
+		return nil, false
+	}
+	body := e.llmStreamCut
+	e.llmStreamCut = nil
+	return body, true
+}
+
+func (e *workerEntry) strikeRateLimit() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.rateLimitStrikes++
+	return e.rateLimitStrikes
+}
+
+// resetRateLimitStrikes zeroes the consecutive-429 count without touching the
+// captured llmErr: any non-429 answer breaks the run, but a captured 5xx
+// cause must survive as the turn's most recent real failure.
+func (e *workerEntry) resetRateLimitStrikes() {
+	e.mu.Lock()
+	e.rateLimitStrikes = 0
 	e.mu.Unlock()
 }
 
@@ -169,16 +240,27 @@ type Relay struct {
 
 	// internalEndpoint/internalHeaders address LangWatch's OWN collector. When
 	// set, each worker batch is ALSO delivered there in content-stripped form
-	// (see services/langyagent/otel). Empty disables the second export
-	// entirely — the customer path is unaffected either way.
+	// (see services/langyagent/otel). Empty disables that destination — the
+	// customer path is unaffected either way.
 	internalEndpoint string
 	internalHeaders  map[string]string
-	internalCtx      context.Context
-	internalCancel   context.CancelFunc
-	internalJobs     chan internalExportJob
-	internalWG       sync.WaitGroup
-	internalDropped  metric.Int64Counter
-	forwardFailures  metric.Int64Counter
+	// mirrorEndpoint/mirrorKey address the operator-designated mirror project —
+	// the mirror lane (ADR-061): a SECONDARY EXPORTER for the turn's gen_ai
+	// trace data, so the operator can watch Langy turns with the product's own
+	// tools. When set, each worker batch is ALSO posted to
+	// <mirrorEndpoint>/api/otel/v1/traces with the key as a Bearer token,
+	// through the SAME bounded queue as the collector copy, so a mirror outage
+	// is exactly as invisible to the worker and the customer lane as a
+	// collector outage always was. Empty (the default) keeps the lane dormant.
+	mirrorEndpoint  string
+	mirrorKey       string
+	internalCtx     context.Context
+	internalCancel  context.CancelFunc
+	internalJobs    chan internalExportJob
+	internalWG      sync.WaitGroup
+	internalDropped metric.Int64Counter
+	mirrorFailures  metric.Int64Counter
+	forwardFailures metric.Int64Counter
 
 	mu      sync.Mutex
 	workers map[string]*workerEntry
@@ -189,15 +271,29 @@ type internalExportJob struct {
 	model          string
 	turn           trace.SpanContext
 	payload        []byte
+	// mirror carries the ADR-061 mirror decision captured at handleTraces time,
+	// so the async exporter builds the right-fidelity copy for the right source
+	// tenant. The collector copy (deliverInternal) ignores all of this.
+	mirrorTier      string
+	sourceOrgID     string
+	sourceProjectID string
 }
 
-// Options configures the relay. The zero value is valid: no internal export.
+// Options configures the relay. The zero value is valid: no second export.
 type Options struct {
 	// InternalOTLPEndpoint is the base URL of LangWatch's own OTLP collector
-	// ("/v1/traces" is appended). Empty means the manager keeps no copy of
-	// worker telemetry.
+	// ("/v1/traces" is appended). Empty means no collector copy of worker
+	// telemetry.
 	InternalOTLPEndpoint string
 	InternalOTLPHeaders  map[string]string
+	// MirrorEndpoint is the base URL of the LangWatch deployment holding the
+	// operator-designated mirror project ("/api/otel/v1/traces" is appended) — the
+	// mirror lane (ADR-061), a secondary exporter that ships a copy of the
+	// turn's gen_ai trace data into that project. MirrorKey is the project's
+	// static API key, sent as a Bearer token. Empty endpoint means the mirror
+	// lane is dormant.
+	MirrorEndpoint string
+	MirrorKey      string
 }
 
 // New binds a loopback listener on an ephemeral port and starts serving.
@@ -213,6 +309,8 @@ func New(ctx context.Context, opts Options) (*Relay, error) {
 		port:             ln.Addr().(*net.TCPAddr).Port,
 		internalEndpoint: opts.InternalOTLPEndpoint,
 		internalHeaders:  opts.InternalOTLPHeaders,
+		mirrorEndpoint:   opts.MirrorEndpoint,
+		mirrorKey:        opts.MirrorKey,
 		workers:          map[string]*workerEntry{},
 		upstream: &http.Client{
 			Timeout: forwardTimeout,
@@ -223,11 +321,12 @@ func New(ctx context.Context, opts Options) (*Relay, error) {
 		},
 	}
 	r.forwardFailures = newForwardFailureCounter()
-	if r.internalEndpoint != "" {
+	if r.internalEndpoint != "" || r.mirrorEndpoint != "" {
 		// The cancel function is invoked by Shutdown after the workers stop.
 		r.internalCtx, r.internalCancel = context.WithCancel(ctx) //nolint:gosec // lifecycle-owned by Relay.Shutdown
 		r.internalJobs = make(chan internalExportJob, internalExportQueueSize)
 		r.internalDropped = newInternalDropCounter()
+		r.mirrorFailures = newMirrorForwardFailureCounter()
 		for range internalExportWorkers {
 			r.internalWG.Add(1)
 			go r.runInternalExporter()
@@ -321,9 +420,15 @@ func (r *Relay) Unregister(token string) {
 // The span id is the internal langy.turn span's — the SAME id in both
 // stores is the deliberate cross-store correlation key.
 //
+// failure (nil on success) marks the span with OTel error status plus an
+// exception event carrying the vetted failure message, so a failed turn's
+// trace SHOWS the failure — the ingest folds the exception message into the
+// trace-level error the UI renders. The message is client-safe by the
+// TurnFailure contract.
+//
 // Detached and best-effort like every other telemetry leg: a failed forward
 // warns and bumps the same counter, never the turn.
-func (r *Relay) ForwardTurnSpan(token string, sc trace.SpanContext, start, end time.Time) {
+func (r *Relay) ForwardTurnSpan(token string, sc trace.SpanContext, start, end time.Time, failure *domain.TurnFailure) {
 	entry := r.lookup(token)
 	if entry == nil || !sc.IsValid() {
 		return
@@ -346,10 +451,32 @@ func (r *Relay) ForwardTurnSpan(token string, sc trace.SpanContext, start, end t
 	// resolution accepts — the root span carrying it makes the whole trace
 	// resolve to Langy deterministically.
 	span.Attributes().PutStr(otelsetup.AttrLangWatchOrigin, originLangy)
+	// The turn root speaks semconv too: the thread filter reads span-level
+	// gen_ai.conversation.id, and the root span is the one every view of the
+	// trace is guaranteed to hold.
+	span.Attributes().PutStr(attrGenAIConversationID, entry.info.ConversationID)
+	if entry.info.ActorUserID != "" {
+		span.Attributes().PutStr(attrEndUserID, entry.info.ActorUserID)
+	}
 	span.SetTraceID(pcommon.TraceID(sc.TraceID()))
 	span.SetSpanID(pcommon.SpanID(sc.SpanID()))
 	span.SetStartTimestamp(pcommon.NewTimestampFromTime(start))
 	span.SetEndTimestamp(pcommon.NewTimestampFromTime(end))
+	if failure != nil {
+		span.Status().SetCode(ptrace.StatusCodeError)
+		span.Status().SetMessage(failure.Message)
+		span.Attributes().PutStr("langy.outcome", failure.Code)
+		// The ingest reads the newest exception event's exception.message as
+		// the trace-level error (span-status.service.ts), so the failure text
+		// lands where the trace views actually look.
+		event := span.Events().AppendEmpty()
+		event.SetName("exception")
+		event.SetTimestamp(pcommon.NewTimestampFromTime(end))
+		event.Attributes().PutStr("exception.type", failure.Code)
+		event.Attributes().PutStr("exception.message", failure.Message)
+	} else {
+		span.Status().SetCode(ptrace.StatusCodeOk)
+	}
 	applyCustomerTracePolicy(td, customerTracePolicy)
 	// The customer-facing identity of the turn itself — stamped AFTER the
 	// policy pass, which reserves platform names precisely so a WORKER can
@@ -530,13 +657,21 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 	}
 	conversationID, turn := entry.info.ConversationID, entry.turnContext()
 
-	// LangWatch's own copy, content-stripped, built from the batch BEFORE it is
+	// LangWatch's own second-lane copies, built from the batch BEFORE it is
 	// re-parented in place for the customer. Best-effort and detached: our
 	// observability must never delay or fail the customer's telemetry.
 	// Marshaled here (not the raw body) so the internal leg always carries
 	// protobuf, whatever encoding the worker chose.
 	if internalBody, imErr := (&ptrace.ProtoMarshaler{}).MarshalTraces(td); imErr == nil {
-		r.exportInternal(conversationID, entry.info.Model, turn, internalBody)
+		r.exportInternal(internalExportJob{
+			conversationID:  conversationID,
+			model:           entry.info.Model,
+			turn:            turn,
+			payload:         internalBody,
+			mirrorTier:      entry.info.MirrorTier,
+			sourceOrgID:     entry.info.SourceOrganizationID,
+			sourceProjectID: entry.info.SourceProjectID,
+		})
 	}
 
 	FilterCustomerSpans(td)
@@ -548,6 +683,20 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	ReparentTraces(td, conversationID, entry.info.ActorUserID, turn)
+	// The gateway's gen_ai span is the meter for every mediated LLM call; the
+	// worker SDK's model-call spans repeat the same usage and would double the
+	// trace totals without the dedup stamp.
+	StampMediatedUsageDedup(td)
+	// One model name per model: every model-call span names the manager-held,
+	// provider-prefixed id, whatever spelling the worker's SDK ran on.
+	SubstituteTrustedModel(td, entry.info.Model)
+	// Codex turns run on the user's ChatGPT plan, not a paid API key: mark the
+	// relayed model-call spans bundled so cost tracking never bills them as
+	// API spend. The manager-held model id is the only trusted codex signal
+	// (ReparentTraces already swept any worker-supplied claim of the flag).
+	if strings.HasPrefix(entry.info.Model, codexModelPrefix) {
+		StampCodexNonBillable(td)
+	}
 	applyCustomerTracePolicy(td, customerTracePolicy)
 	out, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
 	if err != nil {
@@ -590,29 +739,25 @@ func readOTLPBody(req *http.Request) ([]byte, error) {
 	return body, nil
 }
 
-// exportInternal ships LangWatch's content-stripped copy of a worker batch to
-// its own collector. No-op when no internal endpoint is configured.
+// exportInternal queues LangWatch's second-lane copies of a worker batch: the
+// content-stripped collector copy, and the tiered mirror copy (ADR-061). No-op
+// when there is nothing to do — no collector endpoint AND either no mirror
+// endpoint or a skip tier for this turn.
 //
 // The original immutable protobuf body is queued rather than the mutable pdata
 // tree. Copying, sanitizing, marshaling, and HTTP all happen behind the bounded
-// worker pool, so internal observability never delays customer forwarding.
-func (r *Relay) exportInternal(
-	conversationID string,
-	model string,
-	turn trace.SpanContext,
-	payload []byte,
-) {
-	if r.internalEndpoint == "" {
+// worker pool, so neither LangWatch copy ever delays customer forwarding.
+func (r *Relay) exportInternal(job internalExportJob) {
+	// The mirror fires only when it is configured AND the turn's tier is not
+	// skip; the self-skip (a turn inside the mirror project itself) arrives here
+	// as MirrorTierSkip, resolved control-plane side.
+	mirrorWanted := r.mirrorEndpoint != "" &&
+		domain.NormalizeMirrorTier(job.mirrorTier) != domain.MirrorTierSkip
+	if r.internalEndpoint == "" && !mirrorWanted {
 		return
 	}
 	if r.internalCtx.Err() != nil {
 		return
-	}
-	job := internalExportJob{
-		conversationID: conversationID,
-		model:          model,
-		turn:           turn,
-		payload:        payload,
 	}
 	select {
 	case r.internalJobs <- job:
@@ -621,7 +766,7 @@ func (r *Relay) exportInternal(
 			attribute.String("reason", "queue_full"),
 		))
 		clog.Get(r.baseCtx).Warn("otelrelay internal trace dropped",
-			zap.String("conversation", conversationID),
+			zap.String("conversation", job.conversationID),
 			zap.String("reason", "queue_full"),
 		)
 	}
@@ -658,6 +803,17 @@ func (r *Relay) processInternalJob(job internalExportJob) {
 			zap.String("conversation", job.conversationID), zap.Error(err))
 		return
 	}
+	if r.internalEndpoint != "" {
+		r.deliverInternal(job, td)
+	}
+	tier := domain.NormalizeMirrorTier(job.mirrorTier)
+	if r.mirrorEndpoint != "" && tier != domain.MirrorTierSkip {
+		r.deliverMirror(job, td, tier)
+	}
+}
+
+// deliverInternal ships the content-stripped collector copy of one batch.
+func (r *Relay) deliverInternal(job internalExportJob, td ptrace.Traces) {
 	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(
 		langyotel.InternalCopy(td, job.conversationID, job.model, job.turn),
 	)
@@ -670,6 +826,39 @@ func (r *Relay) processInternalJob(job internalExportJob) {
 	defer cancel()
 	if err := r.postInternal(ctx, payload); err != nil && r.internalCtx.Err() == nil {
 		clog.Get(r.baseCtx).Warn("otelrelay internal trace forward failed",
+			zap.String("conversation", job.conversationID), zap.Error(err))
+	}
+}
+
+// deliverMirror ships the FULL-FIDELITY mirror copy of one batch into the
+// designated mirror project (ADR-061). Unlike deliverInternal's content-stripped
+// ops copy, the mirror preserves the worker's whole trace and gates only content
+// on the customer's tier: content ⇒ the copy carries prompts/completions/tool
+// payloads, structural ⇒ the same trace with content removed. The caller has
+// already excluded the skip tier. Best-effort like every second-lane leg: a
+// failed POST warns and bumps the mirror counter, and is never visible to the
+// worker or the customer lane.
+func (r *Relay) deliverMirror(job internalExportJob, td ptrace.Traces, tier domain.MirrorTier) {
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(
+		langyotel.MirrorCopy(td, langyotel.MirrorParams{
+			ConversationID:  job.conversationID,
+			TrustedModel:    job.model,
+			Turn:            job.turn,
+			SourceOrgID:     job.sourceOrgID,
+			SourceProjectID: job.sourceProjectID,
+			IncludeContent:  tier == domain.MirrorTierContent,
+		}),
+	)
+	if err != nil {
+		clog.Get(r.baseCtx).Warn("otelrelay mirror copy marshal failed",
+			zap.String("conversation", job.conversationID), zap.Error(err))
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.internalCtx, forwardTimeout)
+	defer cancel()
+	if err := r.postMirror(ctx, payload); err != nil && r.internalCtx.Err() == nil {
+		r.mirrorFailures.Add(r.baseCtx, 1)
+		clog.Get(r.baseCtx).Warn("otelrelay mirror trace forward failed",
 			zap.String("conversation", job.conversationID), zap.Error(err))
 	}
 }
@@ -704,6 +893,22 @@ func newInternalDropCounter() metric.Int64Counter {
 	return fallback
 }
 
+// newMirrorForwardFailureCounter counts failed mirror POSTs into the prod
+// Langy project (ADR-061). Its own counter — a mirror outage and a collector
+// outage are different pages.
+func newMirrorForwardFailureCounter() metric.Int64Counter {
+	const name = "langwatch.langy.mirror_trace.forward_failures"
+	counter, err := otel.Meter("langwatch-langyagent").Int64Counter(
+		name,
+		metric.WithDescription("Mirror trace batches that failed to POST into the designated mirror project."),
+	)
+	if err == nil {
+		return counter
+	}
+	fallback, _ := noop.NewMeterProvider().Meter("langwatch-langyagent").Int64Counter(name)
+	return fallback
+}
+
 func (r *Relay) postInternal(ctx context.Context, payload []byte) error {
 	url := strings.TrimRight(r.internalEndpoint, "/")
 	if !strings.HasSuffix(url, "/v1/traces") {
@@ -725,6 +930,39 @@ func (r *Relay) postInternal(ctx context.Context, payload []byte) error {
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 2048))
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("internal collector answered %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// postMirror POSTs one mirror payload — the secondary export of the turn's
+// gen_ai trace data — to the designated mirror project's LangWatch ingest. Same wire
+// shape as the customer forward (protobuf to /api/otel/v1/traces, Bearer
+// auth), because the mirror IS an ordinary LangWatch project ingest, just
+// LangWatch's own (ADR-061).
+//
+// Deliberately NOT an OTel SDK exporter: otlptracehttp exports SDK
+// ReadOnlySpans, and everything this relay touches is pdata (ptrace.Traces
+// unmarshaled from the worker's wire bytes) — converting pdata → SDK spans
+// just to re-serialize them is the long way round, and the pdata-native OTLP
+// exporter lives in the collector framework, whose component/consumer stack
+// is far too much dependency for one bounded POST. forwardTraces and
+// postInternal hand-roll the same POST for the same reason.
+func (r *Relay) postMirror(ctx context.Context, payload []byte) error {
+	url := strings.TrimRight(r.mirrorEndpoint, "/") + "/api/otel/v1/traces"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	req.Header.Set("Authorization", "Bearer "+r.mirrorKey)
+	resp, err := r.upstream.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 2048))
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("mirror ingest answered %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -779,6 +1017,12 @@ var customerTracePolicy = customertracebridge.Policy{
 		attrThreadID,
 		attrUserID,
 		attrTags,
+		// The OTel GenAI semconv twins of the reserved pair above — same
+		// values, standard names, stamped by the relay (stampResource) so the
+		// trace speaks semconv to any consumer. Allowlisted or the policy
+		// pass would strip the relay's own stamps.
+		attrGenAIConversationID,
+		attrEndUserID,
 		"service.name",
 	},
 	Stamp: []attribute.KeyValue{

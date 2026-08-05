@@ -12,7 +12,7 @@ Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The ch
 - `kubectl` configured for your cluster
 - A StorageClass that supports dynamic provisioning (for persistent volumes)
 - A domain name (for Ingress with TLS)
-- **Default resource requirements:** ~6 CPU and ~18 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
+- **Default resource requirements:** ~5 CPU and ~17 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
 
 ## Quick Start
 
@@ -49,7 +49,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 
 ## Low-Resources Deployment
 
-The default install requests ~6 CPU and ~18 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2 CPU and ~4 Gi RAM**:
+The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
 
 ```bash
 curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
@@ -88,6 +88,17 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
 ```
 
 If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines.
+
+For chart-managed ClickHouse (the default), create the credentials Secret too. With `autogen.enabled=false` the chart will not materialise this Secret itself. The deployment composes `CLICKHOUSE_URL` at runtime from the password key:
+
+```bash
+kubectl create secret generic langwatch-clickhouse-creds \
+  --namespace langwatch \
+  --from-literal=password="$(openssl rand -hex 32)" \
+  --from-literal=clusterSecret="$(openssl rand -hex 24)"
+```
+
+The `clusterSecret` key is only used when `clickhouse.replicas > 1` (Keeper inter-node auth), but creating it upfront keeps a future `--set clickhouse.replicas=3` a one-line change. If you run external ClickHouse (`clickhouse.chartManaged: false`), skip this Secret entirely.
 
 For external databases, create additional secrets:
 
@@ -160,8 +171,19 @@ clickhouse:
   memory: "8Gi"
   storage:
     size: 100Gi
+  auth:
+    # Operator-owned Secret (created above). With autogen.enabled=false the
+    # chart will not materialise a ClickHouse Secret; point at the one you
+    # created and the deployment composes CLICKHOUSE_URL at runtime from
+    # its password key.
+    existingSecret: langwatch-clickhouse-creds
 
-# Ingress with TLS
+# Ingress with TLS.
+#
+# `/api/internal` is hard-blocked at the edge by default (ingress.blockedPaths)
+# so the private control plane is never internet-reachable. Blocked requests
+# answer 503 on ingress-nginx. See the Security guide for the opt-out, the
+# AWS/GKE caveat, and what the block does not cover.
 ingress:
   enabled: true
   className: nginx

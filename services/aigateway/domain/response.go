@@ -31,6 +31,14 @@ type Usage struct {
 	CacheCreationTokens int    // tokens written to the prompt cache (priced at the cache-write rate)
 	CostMicroUSD        int64  // cost in microdollars (1/1_000_000 USD)
 	Model               string // resolved model name from the request
+
+	// Audio measures. TTS is priced by input characters and STT by audio
+	// duration on providers that do not report token usage (ElevenLabs,
+	// whisper-1); providers that DO report tokens (gpt-4o-mini-tts,
+	// gpt-4o-transcribe) fill the token fields above as usual. Zero when
+	// not applicable.
+	InputChars   int     // TTS: characters synthesized
+	AudioSeconds float64 // STT: seconds of audio transcribed
 }
 
 // StreamIterator provides pull-based iteration over streaming response chunks.

@@ -58,6 +58,22 @@ Feature: Hono API endpoint authorization and tenant isolation
       Then the route registry records the real permission, not "any authenticated"
 
     @unit
+    Scenario: A canonical family refuses unauthenticated calls canonically
+      Given a project-scoped app declaring the canonical error envelope
+      When a request arrives with no credentials
+      Then the response status is 401
+      And the body is the canonical error envelope with code "missing_credentials"
+      # Authentication runs beneath the family's own error handler, so this is
+      # the layer that answers a flat body unless the envelope is threaded to it.
+
+    @unit
+    Scenario: A legacy family keeps the flat error body its consumers parse
+      Given a project-scoped app that declares no envelope
+      When a request arrives with no credentials
+      Then the response status is 401
+      And the body is the flat legacy error shape
+
+    @unit
     Scenario: An any-method route enforces its policy on every method
       Given a route registered with .all and an internalSecret policy
       When the route is called with GET, POST, or DELETE
@@ -83,6 +99,50 @@ Feature: Hono API endpoint authorization and tenant isolation
       Given a project API key whose role grants the required permission
       When I call the route
       Then the request is not rejected with 401 or 403
+
+  # ============================================================================
+  Rule: A route asks for the grain of the action it performs
+
+    The permission hierarchy resolves create, update and delete out of manage,
+    but never the other way round. A write route that asked for manage therefore
+    refused every credential the product issues at a finer grain: a key scoped to
+    "read and write scenarios" was declined a create it plainly held, and an
+    assistant that could read everything could write nothing.
+
+    So a write route asks for what it does. A create asks to create. An update
+    asks to update. A RUN asks to create, because it produces a run and leaves
+    the definition it ran untouched — running a suite is not administering it.
+    Destruction stays at manage, the only grain that carries it, so a
+    read-and-write credential never inherits the power to delete.
+
+    Nobody loses access when a route moves to a finer grain: manage still implies
+    it. Nobody gains access either, except a principal an administrator
+    deliberately granted that finer permission.
+
+    @integration
+    Scenario: Every route still admits the roles that could already reach it
+      Given the declared permission of every registered route
+      When a principal holding that resource's manage permission is checked against each
+      Then every route admits them
+
+    @integration
+    Scenario: A read-only role gains no write from a finer grain
+      Given the declared permission of every registered route that is not a read
+      When a project viewer is checked against each
+      Then none of them admit the viewer
+
+    @integration
+    Scenario: Every declared permission is reachable by a built-in role
+      Given the declared permission of every registered route
+      When each is checked against the built-in administrator roles
+      Then one of them grants it, so no route is unreachable by design
+
+    @integration
+    Scenario: Running a scenario suite does not require administering it
+      Given a credential that may read and write scenarios but not administer them
+      When it is checked against the suite run route
+      Then it is admitted
+      And it is still refused the route that archives the suite
 
   # ============================================================================
   Rule: A credential for one tenant cannot reach another tenant's data

@@ -670,27 +670,153 @@ Feature: Externalize event byte content to stored_objects
     And the default value works under "make quickstart" without further configuration
 
   # ---------------------------------------------------------------
-  # Cloud provider matrix (AC37 — deferred)
+  # Cloud provider matrix (AC37 — Azure Blob write destination)
   # ---------------------------------------------------------------
   #
-  # Production minting in this PR only emits s3:// and file:// URIs (see
-  # `defaultMintStorageUri` in stored-objects.service.ts, which dispatches
-  # off resolveProjectStorageDestination's "s3" / "file" kinds). The
-  # `AzureBlobDriver` exists so the registry can still dispatch reads of
-  # any legacy `azure-blob://` URIs persisted before this PR, but no
-  # config path picks Azure as the destination on writes today. Wiring an
-  # "azure" destination into resolveProjectStorageDestination + a
-  # corresponding helm/env surface is a follow-up PR (AC37) — see the
-  # follow-up issue tracked off the PR description. (Sergio review
-  # 2026-05-20.)
+  # Azure is selected only by the explicit STORED_OBJECTS_BACKEND=azure
+  # switch — never inferred from AZURE_BLOB_* env presence. Implicit
+  # fallback was rejected in issue #4133: deployment behavior must not
+  # depend on which env vars happen to be set. Precedence: BYOC S3 →
+  # azure toggle → S3_BUCKET_NAME → local FS (a tenant-owned private
+  # bucket is never silently bypassed; the explicit toggle beats the
+  # global bucket). Auth is SharedKey only (matches AzureBlobDriver);
+  # workload identity is #6087, per-project Azure BYOC is #6088. The
+  # azure backend covers datasets too — the resolver is shared, and
+  # datasets fail hard without a working backend, so azure ships with a
+  # dataset storage implementation. Note: TieredBlobStore's "s3" tier
+  # label means "durable object store, any scheme" — azure blobs ride
+  # under it unchanged. Content-MD5 on Azure PUTs is deliberately out of
+  # scope (writes are content-addressed by sha256 already). Landing the
+  # azure arm retires the no-azure trip-wire unit test
+  # (project-storage-destination-no-azure.unit.test.ts) — delete it; the
+  # positive resolver scenarios below replace its contract.
 
   @unit
-  Scenario: Stored-objects writes do not mint azure-blob URIs in this PR
-    Given a project with no S3 bucket and no Azure config in this PR's destination resolver
-    When the service mints a storage URI
-    Then the URI uses either the s3 or file scheme but never azure-blob
-    And the AzureBlobDriver remains registered only to dispatch reads of any
-        pre-existing azure-blob URIs persisted before this change
+  Scenario: Operator selects Azure Blob as the stored-objects write backend
+    Given STORED_OBJECTS_BACKEND is set to azure
+    And AZURE_BLOB_ACCOUNT_NAME, AZURE_BLOB_ACCOUNT_KEY, and AZURE_BLOB_CONTAINER are configured
+    And the project has no per-project private dataplane bucket
+    When the destination resolver runs for the project
+    Then it returns an azure destination carrying the account name and container
+    And the minted URI is azure-blob://{accountName}/{container}/{projectId}/{sha256}
+
+  @unit
+  Scenario: The env schema declares the Azure backend variables as first-class keys
+    Given the runtime env schema
+    Then STORED_OBJECTS_BACKEND is declared with a constrained value set, not a free string
+    And AZURE_BLOB_CONTAINER is declared alongside the existing AZURE_BLOB_* keys
+    And both are exposed through the env runtime map so no code reads process.env directly
+
+  @unit
+  Scenario Outline: Azure backend selection fails loud when the Azure config is incomplete
+    Given STORED_OBJECTS_BACKEND is set to azure
+    And <missing_variable> is not set
+    When the destination resolver runs
+    Then it raises a configuration error naming <missing_variable>
+    And it does not silently fall back to S3 or the local filesystem
+
+    Examples:
+      | missing_variable        |
+      | AZURE_BLOB_ACCOUNT_NAME |
+      | AZURE_BLOB_ACCOUNT_KEY  |
+      | AZURE_BLOB_CONTAINER    |
+
+  @unit
+  Scenario: An unrecognized STORED_OBJECTS_BACKEND value is rejected, not ignored
+    Given STORED_OBJECTS_BACKEND is set to a value outside the supported set
+    When the environment is validated
+    Then startup fails with an error naming the variable and the supported values
+
+  @unit
+  Scenario: Azure env vars alone never flip the write destination
+    Given AZURE_BLOB_ACCOUNT_NAME, AZURE_BLOB_ACCOUNT_KEY, and AZURE_BLOB_CONTAINER are configured
+    But STORED_OBJECTS_BACKEND is not set
+    When the destination resolver runs for a project with no private bucket
+    Then the destination is the global S3 bucket when configured, otherwise the local filesystem
+    And no azure-blob URI is minted
+
+  @unit
+  Scenario: The azure toggle beats the global S3 bucket but not a BYOC bucket
+    Given STORED_OBJECTS_BACKEND is set to azure with complete Azure config
+    And S3_BUCKET_NAME is also configured
+    When the destination resolver runs for a project with no private bucket
+    Then the destination is azure, not the global S3 bucket
+
+  @unit
+  Scenario: A per-project private dataplane bucket still beats the Azure backend toggle
+    Given STORED_OBJECTS_BACKEND is set to azure with complete Azure config
+    And the project has a per-project private dataplane bucket
+    When the destination resolver runs for that project
+    Then the destination is the project's private S3 bucket, not Azure
+
+  @unit
+  Scenario: defaultMintStorageUri and the groupQueue blob store mint azure-blob URIs for an azure destination
+    Given the ProjectStorageDestination union carries an azure arm
+    When defaultMintStorageUri and TieredBlobStore.mintUri run against an azure destination
+    Then both return the azure-blob URI from mintAzureBlobUri
+    And the TieredBlobStore kind switch remains exhaustive with no default fallthrough
+
+  @unit
+  Scenario: The legacy S3 client factory refuses an azure destination instead of inventing a bucket
+    Given a project whose resolved destination is azure
+    And no S3_BUCKET_NAME is configured
+    When createS3Client or the legacy StorageService is invoked for that project
+    Then it throws a configuration error identifying the azure backend
+    And it never falls back to the hardcoded langwatch bucket
+
+  @unit
+  Scenario: Legacy S3 surfaces keep working during an S3-to-Azure migration
+    Given a project whose resolved destination is azure
+    And S3_BUCKET_NAME is still configured from before the migration
+    When createS3Client is invoked for that project
+    Then it returns a client bound to the legacy S3 bucket
+    And persisted s3 URIs, spool refs, and staged payloads stay readable and deletable
+
+  @integration
+  Scenario: Datasets round-trip through Azure Blob when azure is the configured backend
+    Given STORED_OBJECTS_BACKEND is azure with a reachable Azure Blob container
+    When a dataset is created and rows are appended
+    Then the chunked JSONL content is written through the Azure dataset storage implementation
+    And reading the dataset back returns the appended rows
+
+  @integration
+  Scenario: The dataset-content backfill task migrates a postgres-layout dataset onto azure
+    Given STORED_OBJECTS_BACKEND is azure with a reachable Azure Blob container
+    And a dataset whose content still lives in the postgres layout
+    When the backfill task runs for that dataset
+    Then the chunked JSONL lands in the Azure container
+    And the dataset's contentLayout flips to chunked
+    And reading the dataset back returns the original rows
+
+  @integration
+  Scenario: Scenario media round-trips through Azure Blob when azure is the configured backend
+    Given STORED_OBJECTS_BACKEND is azure against an Azurite emulator
+    And the Azurite emulator uses path-style addressing
+    When an event with an inline media attachment is ingested
+    Then the bytes are stored via the AzureBlobDriver with a correctly signed path-style request
+    And the stored_objects row persists an azure-blob storage URI
+    And GET /api/files/:id streams the bytes back through the registry
+
+  @unit
+  Scenario: Helm chart exposes an azureBlob dataplane provider mirroring awsS3
+    Given the chart's app.dataplane.providers block
+    Then it offers azureBlob with accountName, accountKey, and container
+    And each secret-bearing field accepts a literal value or a secretKeyRef
+    And selecting the azureBlob provider emits STORED_OBJECTS_BACKEND=azure on the deployment
+
+  @unit
+  Scenario: Selecting the azureBlob provider satisfies the multi-replica shared-storage guard
+    Given a chart render with replicaCount greater than 1
+    And the azureBlob dataplane provider selected
+    When the chart renders
+    Then the render succeeds because azure is shared storage
+    And the local-filesystem hard-fail applies only when no shared backend is configured
+
+  @unit
+  Scenario: .env.example and self-hosting docs describe the Azure stored-objects backend
+    Given the .env.example file and the self-hosting environment-variables docs
+    Then the AZURE_BLOB_* keys are documented as live write configuration, no longer deferred
+    And AZURE_BLOB_CONTAINER and STORED_OBJECTS_BACKEND are listed with the explicit-toggle rationale
 
   # ---------------------------------------------------------------
   # Project-delete cascade (AC38)
@@ -771,7 +897,22 @@ Feature: Externalize event byte content to stored_objects
   # AC35 "Helm PVC opt-in for single-replica local-FS"                       -> Scenario: Single-replica helm install can opt into a PVC-backed local-FS storage path
   # AC36 "Self-hosting docs cover scenario media + LANGWATCH_LOCAL_STORAGE_PATH" -> Scenario: Self-hosting docs describe stored-objects (scenario media, datasets, ...) externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket
   #                                                                          -> Scenario: .env.example carries LANGWATCH_LOCAL_STORAGE_PATH with a sensible local default
-  # AC37 "Azure Blob support — DEFERRED in this PR"                          -> Scenario: Stored-objects writes do not mint azure-blob URIs in this PR
+  # AC37 "Azure Blob write destination (issue #4133)"                        -> Scenario: Operator selects Azure Blob as the stored-objects write backend
+  #                                                                          -> Scenario: The env schema declares the Azure backend variables as first-class keys
+  #                                                                          -> Scenario: Azure backend selection fails loud when the Azure config is incomplete
+  #                                                                          -> Scenario: An unrecognized STORED_OBJECTS_BACKEND value is rejected, not ignored
+  #                                                                          -> Scenario: Azure env vars alone never flip the write destination
+  #                                                                          -> Scenario: The azure toggle beats the global S3 bucket but not a BYOC bucket
+  #                                                                          -> Scenario: A per-project private dataplane bucket still beats the Azure backend toggle
+  #                                                                          -> Scenario: defaultMintStorageUri and the groupQueue blob store mint azure-blob URIs for an azure destination
+  #                                                                          -> Scenario: The legacy S3 client factory refuses an azure destination instead of inventing a bucket
+  #                                                                          -> Scenario: Legacy S3 surfaces keep working during an S3-to-Azure migration
+  #                                                                          -> Scenario: Datasets round-trip through Azure Blob when azure is the configured backend
+  #                                                                          -> Scenario: The dataset-content backfill task migrates a postgres-layout dataset onto azure
+  #                                                                          -> Scenario: Scenario media round-trips through Azure Blob when azure is the configured backend
+  #                                                                          -> Scenario: Helm chart exposes an azureBlob dataplane provider mirroring awsS3
+  #                                                                          -> Scenario: Selecting the azureBlob provider satisfies the multi-replica shared-storage guard
+  #                                                                          -> Scenario: .env.example and self-hosting docs describe the Azure stored-objects backend
   # AC38 "Project-delete cascade removes rows AND bytes"                     -> Scenario: When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes
   # AC39 "MediaPart playback contract (onLoadedData / non-zero duration)"    -> Scenario: MediaPart audio playback reports a non-zero duration once the browser has decoded the media
   # AC40 "S3 client supports every production credential mode"               -> Scenario: S3 client uses explicit credentials when env keys are present

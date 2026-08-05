@@ -6,7 +6,7 @@ Feature: Explicit application origin for race condition prevention
 
   # All scenarios describe the trace projection's origin tagging during
   # the event-sourcing pipeline. Need targeted unit tests in
-  # `langwatch/src/server/event-sourcing/pipelines/trace-processing/`
+  # `platform/app/src/server/event-sourcing/pipelines/trace-processing/`
   # for the origin-tagging projection. Backend logic is implemented;
   # test cases for these specific race scenarios aren't written yet.
 

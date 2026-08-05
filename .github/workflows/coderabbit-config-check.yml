@@ -14,8 +14,7 @@ on:
   pull_request:
     paths:
       - ".coderabbit.yaml"
-      - ".coderabbit/**"
-      - ".semgrep/**"
+      - "dev/lint/**"
       - ".github/workflows/coderabbit-config-check.yml"
 
 permissions:
@@ -42,15 +41,15 @@ jobs:
         run: ast-grep --version
 
       - name: ast-grep rule fixtures — every rule must match its fixture
-        working-directory: .coderabbit/ast-grep
+        working-directory: dev/lint/ast-grep
         run: ast-grep test -c sgconfig.yml -t rule-tests
 
       - name: semgrep ruleset validates
-        run: semgrep --validate --config .semgrep/langwatch.yml
+        run: semgrep --validate --config dev/lint/semgrep/langwatch.yml
 
       - name: semgrep PII rule still matches its fixture (guard vs silent death)
         run: |
-          python3 -c "import yaml; d=yaml.safe_load(open('.semgrep/langwatch.yml')); r=next(x for x in d['rules'] if x['id']=='pii-in-logger-call'); r.pop('paths', None); yaml.safe_dump({'rules':[r]}, open('/tmp/pii_only.yml','w'))"
-          n=$(semgrep --config /tmp/pii_only.yml .semgrep/tests/pii-in-logger-call.ts --json --quiet | python3 -c "import sys, json; print(len(json.load(sys.stdin)['results']))")
+          python3 -c "import yaml; d=yaml.safe_load(open('dev/lint/semgrep/langwatch.yml')); r=next(x for x in d['rules'] if x['id']=='pii-in-logger-call'); r.pop('paths', None); yaml.safe_dump({'rules':[r]}, open('/tmp/pii_only.yml','w'))"
+          n=$(semgrep --config /tmp/pii_only.yml dev/lint/semgrep/tests/pii-in-logger-call.ts --json --quiet | python3 -c "import sys, json; print(len(json.load(sys.stdin)['results']))")
           echo "pii-in-logger-call matched $n line(s) in the fixture (expect 5)"
           test "$n" -eq 5

@@ -32,6 +32,22 @@ const (
 	// attrDrop marks a span the gateway started but does not want exported
 	// (zero-cost, no-output probe calls). dropFilterExporter omits these.
 	attrDrop = attribute.Key("langwatch.reserved.drop")
+	// attrMirrorTier / attrMirrorSourceOrg are internal signaling set by
+	// EndSpan and consumed by mirrorExporter (ADR-061). They are stripped from
+	// BOTH the customer copy and the mirror copy before export — a reserved
+	// marker must never reach either project.
+	attrMirrorTier      = attribute.Key("langwatch.reserved.mirror_tier")
+	attrMirrorSourceOrg = attribute.Key("langwatch.reserved.mirror_source_org")
+	// attrOrgID names the SOURCE organization on the mirror copy — the same
+	// ADR-053 Track A key convention the gateway's own tracer uses.
+	attrOrgID = attribute.Key("langwatch.organization_id")
+)
+
+// Mirror tier values (ADR-061), mirroring services/langyagent/domain.MirrorTier.
+const (
+	mirrorTierContent    = "content"
+	mirrorTierStructural = "structural"
+	mirrorTierSkip       = "skip"
 )
 
 // Emitter uses a private (non-global) OTel TracerProvider to construct spans
@@ -120,6 +136,28 @@ type EmitterOptions struct {
 	// this package must not decide. The zero value allows nothing and stamps
 	// nothing (fail closed).
 	Policy Policy
+	// Mirror, when set, turns on the ADR-061 mirror leg: a gen_ai span whose
+	// EndSpan carried a non-skip mirror tier is DUPLICATED into the mirror
+	// project (content gated by the tier), alongside the customer's own copy.
+	// The zero value leaves the leg off — the emitter behaves exactly as before.
+	Mirror MirrorConfig
+}
+
+// MirrorConfig points the emitter's mirror leg at the mirror project (ADR-061).
+// All three must be set for the leg to arm; any empty field disarms it.
+type MirrorConfig struct {
+	// Endpoint is the base URL of the LangWatch deployment holding the mirror
+	// project ("/v1/traces" is appended by the router).
+	Endpoint string
+	// Key is the mirror project's static API key, sent as a Bearer token.
+	Key string
+	// ProjectID is the mirror project's id — the value the mirror copy carries
+	// as langwatch.project_id so the router delivers it there.
+	ProjectID string
+}
+
+func (m MirrorConfig) armed() bool {
+	return m.Endpoint != "" && m.Key != "" && m.ProjectID != ""
 }
 
 // NewEmitter creates a customer trace bridge backed by a private TracerProvider.
@@ -128,9 +166,26 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		opts.Registry = NewRegistry()
 	}
 
-	router := dropFilterExporter{
-		inner: resourceScrubExporter{inner: newRouterExporter(ctx, opts.Registry), policy: opts.Policy},
+	// The export chain, outermost first: drop probe spans, THEN (ADR-061)
+	// duplicate mirror-marked spans into the mirror project, THEN scrub the
+	// resource, THEN route by project id. Mirror sits inside drop (a dropped
+	// span is never mirrored) and outside scrub (both copies get the same
+	// resource treatment and reach the router together).
+	var inner sdktrace.SpanExporter = resourceScrubExporter{
+		inner: newRouterExporter(ctx, opts.Registry), policy: opts.Policy,
 	}
+	if opts.Mirror.armed() {
+		// Register the mirror project once so the router can deliver the mirror
+		// copy. A later per-request SetFromBundle for the mirror project's own
+		// traffic may re-point it at the project's own OTLP token — the same
+		// destination, an equally valid credential — so the collision is benign.
+		if err := opts.Registry.Set(opts.Mirror.ProjectID, opts.Mirror.Endpoint,
+			map[string]string{"Authorization": "Bearer " + opts.Mirror.Key}); err != nil {
+			return nil, fmt.Errorf("register mirror project: %w", err)
+		}
+		inner = mirrorExporter{inner: inner, mirrorProjectID: opts.Mirror.ProjectID}
+	}
+	router := dropFilterExporter{inner: inner}
 
 	batchTimeout := opts.BatchTimeout
 	if batchTimeout == 0 {
@@ -215,7 +270,7 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
-		semconv.GenAIRequestModelKey.String(params.Model),
+		semconv.GenAIRequestModelKey.String(canonicalModelID(params.ProviderID, params.Model)),
 		semconv.GenAIUsageInputTokensKey.Int(freshInput),
 		semconv.GenAIUsageOutputTokensKey.Int(params.Usage.CompletionTokens),
 		attrTotalUsage.Int(params.Usage.TotalTokens),
@@ -227,6 +282,15 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if params.Usage.CacheCreationTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
 	}
+	// Audio usage: TTS reports the characters synthesized, STT the seconds
+	// transcribed. Character- and duration-priced audio models have no token
+	// usage, so these attrs are what the cost pipeline prices them from.
+	if params.Usage.InputChars > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputChars, params.Usage.InputChars))
+	}
+	if params.Usage.AudioSeconds > 0 {
+		attrs = append(attrs, attribute.Float64(AttrGenAIUsageAudioSeconds, params.Usage.AudioSeconds))
+	}
 	// VK id + request id let the control plane's trace-processing pipeline
 	// identify gateway traces and fold idempotent budget debits into ClickHouse.
 	// See specs/ai-gateway/_shared/contract.md §4.5.
@@ -236,10 +300,33 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if params.GatewayRequestID != "" {
 		attrs = append(attrs, attribute.String(AttrGatewayReqID, params.GatewayRequestID))
 	}
+	// The provider actually dispatched to (a ModelProvider row id). The
+	// trace fold matches it against each budget's provider filter, so
+	// provider-filtered budgets accrue exactly their own vendor's spend.
+	if params.ModelProviderID != "" {
+		attrs = append(attrs, attribute.String(AttrModelProviderID, params.ModelProviderID))
+	}
+	// VK tags become the trace's labels: the ingestion pipeline maps the
+	// langwatch.labels attribute into metadata.labels, the field the Trace
+	// Explorer filters as "Label".
+	if len(params.VKTags) > 0 {
+		attrs = append(attrs, attribute.StringSlice(AttrLabels, params.VKTags))
+	}
 	// The wrapped tool's own session / conversation id, so multi-turn gateway
 	// traces group under a stable thread instead of having no thread id at all.
 	if sessionID := clientSessionID(ctx, params); sessionID != "" {
 		attrs = append(attrs, attribute.String(AttrGenAIConversationID, sessionID))
+	}
+	// External end-user attribution: the header-resolved id (middleware) wins,
+	// else the OpenAI `user` body param. The trace fold copies this into
+	// per-request spend events and attributed-user budget buckets key on it.
+	if endUser := endUserID(ctx, params); endUser != "" {
+		attrs = append(attrs, attribute.String(AttrEndUserID, endUser))
+	}
+	// The caller's metadata echo, validated at the edge; round-tripped
+	// verbatim into billing spend events as their join key.
+	if md := RequestMetadataJSON(ctx); md != "" {
+		attrs = append(attrs, attribute.String(AttrRequestMetadata, md))
 	}
 
 	// When the request failed upstream, stamp the provider's HTTP status +
@@ -262,22 +349,73 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		span.SetAttributes(attrOutputMessages.String(output))
 	}
 
+	// ADR-061 mirror markers: internal signaling for mirrorExporter, stripped
+	// from every exported copy. Only stamped for a non-skip tier (Langy VKs),
+	// so ordinary customer traffic never grows a mirror copy.
+	if tier := params.MirrorTier; tier == mirrorTierContent || tier == mirrorTierStructural {
+		span.SetAttributes(attrMirrorTier.String(tier))
+		if params.MirrorSourceOrgID != "" {
+			span.SetAttributes(attrMirrorSourceOrg.String(params.MirrorSourceOrgID))
+		}
+	}
+
 	if isError {
 		span.SetStatus(codes.Error, params.UpstreamErrorType)
 	}
 
-	// Suppress zero-cost, no-output, successful spans: these are claude-code's
-	// internal probe calls (system-reminder / skills-list pings) that return no
-	// usage and no assistant content, so they'd otherwise clutter the trace list
-	// with empty $0 rows. Keep anything with output OR cost OR an error. The
-	// drop marker is honored by dropFilterExporter at export time. PATH-A ONLY:
-	// Path B (claude-code direct OTLP) does not route through the gateway, so its
-	// probes are not affected here.
-	if !isError && params.Usage.CompletionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
+	// Suppress zero-cost, no-output, successful CHAT-SHAPED spans: these are
+	// claude-code's internal probe calls (system-reminder / skills-list pings)
+	// that return no usage and no assistant content, so they'd otherwise
+	// clutter the trace list with empty $0 rows. Keep anything with output OR
+	// cost OR an error. The drop marker is honored by dropFilterExporter at
+	// export time. PATH-A ONLY: Path B (claude-code direct OTLP) does not
+	// route through the gateway, so its probes are not affected here.
+	//
+	// Gated to chat/messages because that is the only shape probes have.
+	// Applying it to every type silently swallowed legitimate successful
+	// calls that structurally never carry completion tokens or extracted
+	// output: TTS spans (binary audio response), duration-priced STT spans
+	// (scribe reports seconds, not tokens), and embeddings.
+	isProbeShape := params.RequestType == domain.RequestTypeChat ||
+		params.RequestType == domain.RequestTypeMessages
+	if !isError && isProbeShape && params.Usage.CompletionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
+		span.SetAttributes(attrDrop.Bool(true))
+	}
+
+	// A Langy turn's model call belongs INSIDE the turn's trace. When the call
+	// arrived WITHOUT the turn's traceparent (a relay gap, or a call outside
+	// any turn), this span rooted a standalone trace that duplicates the turn
+	// in the customer's trace explorer; the worker's own spans already show
+	// the call, so the copy adds nothing but a second row with the same cost.
+	// Drop it, errors included: the turn span carries the failure. A Langy
+	// call is recognized by its mirror tier, which the control plane resolves
+	// to non-skip ONLY for Langy virtual keys, so ordinary gateway traffic
+	// (playground, customer API keys) never carries one, so its standalone
+	// root, the only trace such traffic has, is untouched. attrDrop sits
+	// outermost in the export chain, so the unjoinable span's mirror copy is
+	// suppressed with it.
+	if tier := params.MirrorTier; (tier == mirrorTierContent || tier == mirrorTierStructural) &&
+		TraceParent(ctx) == "" {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 
 	span.End()
+}
+
+// canonicalModelID reports the model under the platform's provider-prefixed
+// spelling ("anthropic/claude-haiku-4-5"): the id the selectors, the cost
+// registry, the playground and the NLP executions all carry. Model resolution
+// strips the prefix for provider routing, and stamping the stripped name made
+// the gateway the one surface reporting bare wire-names: a Langy turn's
+// Models filter listed the SAME model twice, once bare (this span), once
+// prefixed (the worker's own span). A model whose provider is unknown
+// (implicit resolution never fills it) or that already carries a path
+// segment is reported as requested.
+func canonicalModelID(provider domain.ProviderID, model string) string {
+	if provider == "" || model == "" || strings.Contains(model, "/") {
+		return model
+	}
+	return string(provider) + "/" + model
 }
 
 // Shutdown flushes pending spans to customer endpoints.
@@ -334,6 +472,39 @@ func parseTraceparent(tp string) (traceID []byte, spanID []byte) {
 	return tid, sid
 }
 
+// endUserID resolves the external end-user id for attribution: the
+// middleware-lifted header value wins (already sanitized), else the OpenAI
+// `user` body param on the request shapes that carry one. Both paths land in
+// SanitizeEndUserID so the stamped value is source-independent.
+func endUserID(ctx context.Context, params domain.AITraceParams) string {
+	if id := EndUserID(ctx); id != "" {
+		return id
+	}
+	switch params.RequestType {
+	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
+		domain.RequestTypeResponses, domain.RequestTypeSpeech:
+		return EndUserIDFromBody(params.RequestBody)
+	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
+		domain.RequestTypeTranscription:
+		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
+		// messages body carries attribution under metadata.user_id, passthrough
+		// bodies are provider-shaped and forwarded verbatim, and transcription
+		// arrives as multipart form data rather than JSON.
+	}
+	return ""
+}
+
+// EndUserIDFromBody reads the OpenAI-wire top-level `user` string (the
+// abuse-attribution param, forwarded upstream unchanged) and sanitizes it.
+// Shared by the span emitter and the spend emitter so both attribute the
+// same request to the same id.
+func EndUserIDFromBody(body []byte) string {
+	if user := gjson.GetBytes(body, "user").String(); user != "" {
+		return SanitizeEndUserID(user)
+	}
+	return ""
+}
+
 // clientSessionID resolves the wrapped tool's own session / conversation id.
 // Header first (stashed on the context by the gateway middleware: claude-code
 // X-Claude-Code-Session-Id, opencode X-Session-Affinity, codex Session-Id),
@@ -358,14 +529,24 @@ func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 		if sid := gjson.GetBytes(params.RequestBody, "prompt_cache_key").String(); sid != "" {
 			return sid
 		}
-	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough:
-		// No inline session id on these request shapes; the header lifted above
-		// (when present) is the only source.
+	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough,
+		domain.RequestTypeSpeech, domain.RequestTypeTranscription:
+		// No inline session id on these request shapes (audio bodies carry no
+		// session field at all); the header lifted above (when present) is
+		// the only source.
 	}
 	return ""
 }
 
 // extractInputMessages returns the JSON-encoded messages array from the request body.
+// jsonString renders s as a JSON string literal. fmt's %q follows Go escape
+// rules, not JSON: a vertical tab becomes \v, which JSON parsers reject, so
+// every message array built in this file must marshal through encoding/json.
+func jsonString(s string) string {
+	b, _ := json.Marshal(s) // marshaling a string never fails
+	return string(b)
+}
+
 func extractInputMessages(body []byte, reqType domain.RequestType) string {
 	if len(body) == 0 {
 		return ""
@@ -383,6 +564,13 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 		// are normalised to a chat-style messages array so downstream
 		// rendering matches the other surfaces.
 		return responsesInputAsMessages(body)
+	case domain.RequestTypeSpeech:
+		// TTS: the synthesized text is the meaningful input. Rendered as a
+		// single user message so the trace viewer shows it like any chat.
+		if in := gjson.GetBytes(body, "input"); in.Exists() && in.String() != "" {
+			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+		}
+		return ""
 	default:
 		r := gjson.GetBytes(body, "messages")
 		if !r.Exists() {
@@ -404,7 +592,7 @@ func responsesInputAsMessages(body []byte) string {
 		return ""
 	}
 	if input.Type == gjson.String {
-		return fmt.Sprintf(`[{"role":"user","content":%q}]`, input.String())
+		return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(input.String()))
 	}
 	if !input.IsArray() {
 		return ""
@@ -420,7 +608,7 @@ func responsesInputAsMessages(body []byte) string {
 			return true
 		}
 		if content.Type == gjson.String {
-			msgs = append(msgs, fmt.Sprintf(`{"role":%q,"content":%q}`, role, content.String()))
+			msgs = append(msgs, fmt.Sprintf(`{"role":%s,"content":%s}`, jsonString(role), jsonString(content.String())))
 			return true
 		}
 		if !content.IsArray() {
@@ -437,7 +625,7 @@ func responsesInputAsMessages(body []byte) string {
 			return true
 		})
 		if text.Len() > 0 {
-			msgs = append(msgs, fmt.Sprintf(`{"role":%q,"content":%q}`, role, text.String()))
+			msgs = append(msgs, fmt.Sprintf(`{"role":%s,"content":%s}`, jsonString(role), jsonString(text.String())))
 		}
 		return true
 	})
@@ -456,7 +644,7 @@ func geminiContentsAsMessages(body []byte) string {
 	if sys := gjson.GetBytes(body, "systemInstruction"); sys.Exists() {
 		text := joinGeminiPartsText(sys.Get("parts"))
 		if text != "" {
-			msgs = append(msgs, fmt.Sprintf(`{"role":"system","content":%q}`, text))
+			msgs = append(msgs, fmt.Sprintf(`{"role":"system","content":%s}`, jsonString(text)))
 		}
 	}
 	contents := gjson.GetBytes(body, "contents")
@@ -478,7 +666,7 @@ func geminiContentsAsMessages(body []byte) string {
 		if text == "" {
 			return true
 		}
-		msgs = append(msgs, fmt.Sprintf(`{"role":%q,"content":%q}`, role, text))
+		msgs = append(msgs, fmt.Sprintf(`{"role":%s,"content":%s}`, jsonString(role), jsonString(text)))
 		return true
 	})
 	if len(msgs) == 0 {
@@ -549,7 +737,17 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 			return out
 		}
 		return geminiOutputFromJSON(body)
+	case domain.RequestTypeTranscription:
+		// STT: the transcript is the meaningful output. The response is the
+		// OpenAI transcription JSON; anything without a text field (or a
+		// non-JSON body) renders as empty rather than as raw bytes.
+		if t := gjson.GetBytes(body, "text"); t.Exists() && t.String() != "" {
+			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(t.String()))
+		}
+		return ""
 	default:
+		// RequestTypeSpeech lands here on purpose: the response body is
+		// binary audio, which has no renderable message form.
 		return ""
 	}
 }
@@ -612,7 +810,7 @@ func openAIChatOutputFromSSE(body []byte) string {
 	if text.Len() == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text.String())
+	return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(text.String()))
 }
 
 func anthropicOutputFromJSON(body []byte) string {
@@ -647,7 +845,7 @@ func anthropicOutputFromSSE(body []byte) string {
 	if text.Len() == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":[{"type":"text","text":%q}]}]`, text.String())
+	return fmt.Sprintf(`[{"role":"assistant","content":[{"type":"text","text":%s}]}]`, jsonString(text.String()))
 }
 
 func responsesOutputFromJSON(body []byte) string {
@@ -680,7 +878,7 @@ func responsesOutputFromJSON(body []byte) string {
 	if text.Len() == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text.String())
+	return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(text.String()))
 }
 
 // responsesOutputFromSSE walks Responses-API SSE
@@ -714,7 +912,7 @@ func responsesOutputFromSSE(body []byte) string {
 	if deltas.Len() == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, deltas.String())
+	return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(deltas.String()))
 }
 
 func geminiOutputFromJSON(body []byte) string {
@@ -722,7 +920,7 @@ func geminiOutputFromJSON(body []byte) string {
 	if text == "" {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text)
+	return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(text))
 }
 
 // geminiOutputFromSSE concatenates candidates[0].content.parts[*].text
@@ -746,7 +944,7 @@ func geminiOutputFromSSE(body []byte) string {
 	if text.Len() == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text.String())
+	return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(text.String()))
 }
 
 // walkStreamEvents yields each per-event JSON payload from a streamed

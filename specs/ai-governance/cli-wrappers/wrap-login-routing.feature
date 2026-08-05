@@ -131,7 +131,7 @@ Feature: CLI wrapper login → token → env injection → routing
   # ─────────────────────────────────────────────────────────────────────
   Scenario: Budget pre-check blocks the wrap when over-limit
     Given the user is logged in
-    And the control-plane `/api/governance/cli/budget/check` returns a `BudgetExceededResponse`
+    And the control-plane `/api/auth/cli/budget/status` returns a `BudgetExceededResponse`
       with `request_increase_url = "http://app.test/orgs/acme/governance/personal-portal"`
     When the user runs `langwatch claude`
     Then the wrapper exits with code 2 BEFORE spawning the child
@@ -141,7 +141,7 @@ Feature: CLI wrapper login → token → env injection → routing
 
   Scenario: Budget pre-check allows the wrap when under-limit
     Given the user is logged in
-    And the control-plane `/api/governance/cli/budget/check` returns `{ exceeded: false }`
+    And the control-plane `/api/auth/cli/budget/status` returns `{ exceeded: false }`
     When the user runs `langwatch claude`
     Then the child process is spawned with the expected env injection
     And the wrapper exits with the child's exit code

@@ -24,6 +24,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
 	"github.com/langwatch/langwatch/services/aigateway/app"
@@ -32,9 +33,12 @@ import (
 
 // RouterDeps are the dependencies for the HTTP router.
 type RouterDeps struct {
-	App                   *app.App
-	Logger                *zap.Logger
-	Health                *health.Registry
+	App    *app.App
+	Logger *zap.Logger
+	Health *health.Registry
+	// Metrics serves /metrics and backs the request middleware. Optional;
+	// when nil no metrics are recorded and /metrics is not mounted.
+	Metrics               *gatewaymetrics.Recorder
 	Version               string
 	TraceRegistry         *customertracebridge.Registry
 	DefaultExportEndpoint string
@@ -63,6 +67,12 @@ type RouterDeps struct {
 	// config.DefaultNonStreamingHeartbeatInterval (45s); negative disables
 	// heartbeating entirely.
 	HeartbeatInterval time.Duration
+	// Status backs the public GET /health status-page endpoint
+	// (specs/ai-gateway/gateway-health.feature). Optional in the type so a
+	// router can be built without it, but a nil reporter makes /health
+	// answer 503: a gateway that cannot observe its control plane must not
+	// report itself healthy to a public status page.
+	Status StatusReporter
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -72,6 +82,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(httpmiddleware.RequestID)
+	// Metrics sit outside Recover so a panic is counted as the 500 the
+	// recovery middleware turns it into, not as whatever status had been
+	// written before the stack unwound. Probes and the scrape endpoint
+	// exclude themselves from the counters.
+	r.Use(gatewaymetrics.Middleware(deps.Metrics))
 	r.Use(httpmiddleware.Recover())
 	r.Use(httpmiddleware.Telemetry())
 	if deps.Version != "" {
@@ -85,14 +100,33 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Get("/startupz", deps.Health.Startup)
 	}
 
+	// Public status-page surface, distinct from the k8s probes above: the
+	// probes gate pod lifecycle in-cluster, while /health is exposed
+	// through the ingress for status.langwatch.ai. HEAD is registered
+	// explicitly because chi does not fall HEAD back to GET, and uptime
+	// monitors commonly probe with HEAD.
+	statusRoute := statusHandler(deps.Status)
+	r.Get("/health", statusRoute)
+	r.Head("/health", statusRoute)
+
+	// Unauthenticated like the probes: the cluster's scraper has no
+	// virtual key, and the endpoint is kept off the public ingress by the
+	// chart rather than by a credential.
+	if deps.Metrics != nil {
+		r.Handle("/metrics", deps.Metrics.Handler())
+	}
+
 	r.Route("/v1", func(v1 chi.Router) {
 		v1.Use(AuthMiddleware(deps.App.Auth()))
+		v1.Use(DispatchMetaMiddleware())
 		v1.Use(CustomerTraceMiddleware())
 		v1.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
 		v1.Post("/chat/completions", chatHandler(deps))
 		v1.Post("/messages", messagesHandler(deps))
 		v1.Post("/responses", responsesHandler(deps))
 		v1.Post("/embeddings", embeddingsHandler(deps))
+		v1.Post("/audio/speech", speechHandler(deps))
+		v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
 		v1.Get("/models", modelsHandler(deps))
 	})
 
@@ -105,6 +139,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// cachedContents/*) is accepted by the same handler.
 	r.Route("/v1beta", func(v1beta chi.Router) {
 		v1beta.Use(AuthMiddleware(deps.App.Auth()))
+		v1beta.Use(DispatchMetaMiddleware())
 		v1beta.Use(CustomerTraceMiddleware())
 		v1beta.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
 		v1beta.HandleFunc("/*", geminiPassthroughHandler(deps))
@@ -114,7 +149,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// secret (`LW_GATEWAY_INTERNAL_SECRET`). Currently used by the
 	// LangWatch governance ingestion pipeline to validate and execute
 	// OTTL statements over inbound OTLP payloads. See
-	// `langwatch/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
+	// `platform/app/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
 	// for the matching client.
 	if deps.OTTLServer != nil {
 		r.Route("/internal", func(in chi.Router) {
@@ -305,6 +340,113 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 	}
 }
 
+// speechHandler terminates POST /v1/audio/speech (OpenAI-wire TTS). The
+// request body is small JSON; the response body is binary audio whose
+// Content-Type the dispatcher attached, so writeJSONResponse forwards it
+// without a JSON envelope. Never streams.
+func speechHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+
+		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		if !ok {
+			return
+		}
+		defer release()
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleSpeech(r.Context(), bundle, body, app.PeekModel(peek))
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// maxTranscriptionBodyBytes caps a /v1/audio/transcriptions upload. OpenAI's
+// own endpoint accepts at most 25 MB of audio; one extra MB covers multipart
+// framing and the small text fields. Requests over the cap get 413 before any
+// provider is contacted.
+const maxTranscriptionBodyBytes = 26 << 20
+
+// transcriptionFormFields are the OpenAI-wire optional text fields forwarded
+// to the provider. Anything else in the form is dropped rather than sent
+// blind.
+var transcriptionFormFields = []string{"language", "prompt", "response_format", "temperature"}
+
+// transcriptionsHandler terminates POST /v1/audio/transcriptions (OpenAI-wire
+// multipart STT). Unlike every other v1 route the body is multipart/form-data,
+// so the handler parses the form here, the only layer with the *http.Request,
+// and hands the app a normalized upload. Never streams.
+func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+
+		if err := prepareRequestBody(w, r, maxTranscriptionBodyBytes); err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		// Memory threshold: files up to 10 MB stay in memory, larger ones
+		// spill to a temp file ParseMultipartForm cleans up on r.Body close.
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
+				writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
+					"message": "audio upload exceeds the 25 MB transcription limit",
+				}))
+				return
+			}
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": "malformed multipart/form-data body: " + err.Error(),
+			}))
+			return
+		}
+
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": `missing required multipart field: "file"`,
+			}))
+			return
+		}
+		defer func() { _ = file.Close() }()
+
+		data, err := io.ReadAll(file)
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": "failed reading uploaded file: " + err.Error(),
+			}))
+			return
+		}
+
+		params := make(map[string]string, len(transcriptionFormFields))
+		for _, f := range transcriptionFormFields {
+			if v := r.FormValue(f); v != "" {
+				params[f] = v
+			}
+		}
+		upload := &domain.TranscriptionUpload{File: data, Filename: header.Filename, Params: params}
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleTranscription(r.Context(), bundle, upload, r.FormValue("model"))
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
 // geminiPassthroughHandler terminates any POST /v1beta/... request.
 // Specifically targets the Gemini-native shape used by gemini-cli
 // (`GOOGLE_GEMINI_BASE_URL=http://…/gateway`) and the @google/genai
@@ -432,18 +574,69 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		models, err := deps.App.ListModels(r.Context(), bundle)
+		models, gaps, err := deps.App.ListModels(r.Context(), bundle)
 		if err != nil {
 			writeError(deps.Logger, w, r.Context(), err)
 			return
 		}
 
+		// Discovery gaps make an empty or partial list diagnosable from
+		// the response itself: a provider the key can dispatch to that
+		// contributed no models is named here with the reason, instead of
+		// silently reading as "no models". A header rather than a body
+		// field so the payload stays exactly the OpenAI list shape.
+		if len(gaps) > 0 {
+			w.Header().Set("X-Langwatch-Models-Discovery-Incomplete", formatDiscoveryGaps(gaps))
+		}
+
+		// OpenAI list shape: model-picker clients (OpenWebUI, LibreChat,
+		// SDKs) expect every field of the Model object and an always-
+		// present data array (null breaks some parsers). `created` and
+		// `owned_by` are required by the OpenAI SDK types, so omitting
+		// them leaves strict clients with a null where they expect an
+		// int / string.
+		data := make([]map[string]any, 0, len(models))
+		for _, m := range models {
+			data = append(data, map[string]any{
+				"id":     m.ID,
+				"object": "model",
+				// A gateway model list has no creation date to report:
+				// aliases are config, and upstream catalogs rarely carry
+				// one. 0 keeps the field present and typed rather than
+				// inventing a timestamp that would churn on every call.
+				"created":  0,
+				"owned_by": modelOwnedBy(m),
+			})
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = sonic.ConfigDefault.NewEncoder(w).Encode(map[string]any{
 			"object": "list",
-			"data":   models,
+			"data":   data,
 		})
 	}
+}
+
+// modelOwnedBy names the owner of a listed model. Models that carry no
+// provider (an allowlist entry on a multi-provider credential chain, for
+// instance) are attributed to the gateway rather than to an empty string:
+// `owned_by` is a required string in the OpenAI Model object, and a
+// blank one renders as an unlabelled row in model pickers.
+func modelOwnedBy(m domain.Model) string {
+	if m.ProviderID == "" {
+		return "langwatch"
+	}
+	return string(m.ProviderID)
+}
+
+// formatDiscoveryGaps renders gaps as "provider:reason" tokens, comma
+// separated ("bedrock:not-enumerable,openai:probe-failed"). The adapter
+// returns them deduped and sorted, so the header is deterministic.
+func formatDiscoveryGaps(gaps []domain.ModelDiscoveryGap) string {
+	tokens := make([]string, 0, len(gaps))
+	for _, gap := range gaps {
+		tokens = append(tokens, string(gap.ProviderID)+":"+string(gap.Reason))
+	}
+	return strings.Join(tokens, ",")
 }
 
 func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (*domain.Bundle, bool) {
@@ -499,15 +692,13 @@ func readFullBody(logger *zap.Logger, w http.ResponseWriter, r *http.Request, ma
 	if maxBytes <= 0 {
 		maxBytes = config.DefaultMaxRequestBodyBytes
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	if err := prepareRequestBody(w, r, maxBytes); err != nil {
+		writeError(logger, w, ctx, err)
+		return nil, false
+	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		code := domain.ErrBadRequest
-		var mbe *http.MaxBytesError
-		if errors.As(err, &mbe) {
-			code = domain.ErrPayloadTooLarge
-		}
-		writeError(logger, w, ctx, herr.New(ctx, code, nil))
+		writeError(logger, w, ctx, herr.New(ctx, bodyReadErrorCode(err), herr.M{"message": err.Error()}))
 		return nil, false
 	}
 	return body, true
@@ -522,13 +713,25 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 	if maxBytes <= 0 {
 		maxBytes = config.DefaultMaxRequestBodyBytes
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	if err := prepareRequestBody(w, r, maxBytes); err != nil {
+		writeError(clog.Get(r.Context()), w, r.Context(), err)
+		return nil, nil, func() {}, false
+	}
 
-	buf := bodyPool.Get().(*bytes.Buffer)
 	peeked := make([]byte, peekSize)
-	n, _ := io.ReadFull(r.Body, peeked)
+	n, err := io.ReadFull(r.Body, peeked)
+	// A body shorter than the peek window is the normal case and reports EOF.
+	// Any other failure comes from the decoder or one of the size ceilings, and
+	// swallowing it would peek at a truncated payload and then surface the real
+	// cause as a downstream application error instead of a 400 / 413.
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		writeError(clog.Get(r.Context()), w, r.Context(),
+			herr.New(r.Context(), bodyReadErrorCode(err), herr.M{"message": err.Error()}))
+		return nil, nil, func() {}, false
+	}
 	peeked = peeked[:n]
 
+	buf := bodyPool.Get().(*bytes.Buffer)
 	body := io.MultiReader(bytes.NewReader(peeked), r.Body)
 
 	// Since we need to materialize for bifrost anyway, we still use the pool
@@ -538,6 +741,7 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 
 	var once sync.Once
 	materializedBody := &lazyPooledBody{
+		ctx:    r.Context(),
 		reader: body,
 		buf:    buf,
 		release: func() {
@@ -552,6 +756,7 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 }
 
 type lazyPooledBody struct {
+	ctx     context.Context
 	reader  io.Reader
 	buf     *bytes.Buffer
 	release func()
@@ -561,6 +766,16 @@ func (l *lazyPooledBody) Read(p []byte) (n int, err error) {
 	n, err = l.reader.Read(p)
 	if n > 0 {
 		l.buf.Write(p[:n])
+	}
+	// This reader is handed to the application pipeline, which materializes it
+	// well past the transport. The rest of the body can still fail there — a
+	// decoded payload only crosses its ceiling once enough of it has been read
+	// — and an unclassified error at that depth answers 500 instead of the
+	// 400 / 413 the transport already knows the request earned. Classifying it
+	// as a herr here keeps that answer intact: MaterializeBody wraps with %w,
+	// so writeError still unwraps to the gateway code.
+	if err != nil && !errors.Is(err, io.EOF) {
+		return n, herr.New(l.ctx, bodyReadErrorCode(err), herr.M{"message": err.Error()})
 	}
 	return n, err
 }
@@ -691,6 +906,16 @@ func withHeartbeat[T any](ctx context.Context, w http.ResponseWriter, interval t
 				// regardless of whether a heartbeat ever fired, making it
 				// useless as a signal.
 				hw.Header().Set("X-LangWatch-Heartbeat-Active", "true")
+				// Last chance to send response metadata: the write below
+				// commits the header block, so anything the handler adds
+				// after dispatch returns is silently dropped. Everything the
+				// interceptor chain decides before the provider call —
+				// budget warnings, cache mode, request id — is already
+				// accumulated, and a long enough call to heartbeat is
+				// exactly when a customer needs to see it.
+				if meta := app.DispatchMetaFrom(ctx); meta != nil {
+					setMetaHeaders(hw, meta.Snapshot())
+				}
 			}
 			_, _ = hw.Write(heartbeatByte)
 			hw.Flush()
@@ -719,22 +944,29 @@ func writeJSONResponse(w http.ResponseWriter, resp *domain.Response) {
 	_, _ = w.Write(resp.Body)
 }
 
+// setMetaHeaders writes the response metadata headers. Called up to twice per
+// non-streaming request — once from the keep-alive before it commits the
+// header block, once after dispatch returns — so it Sets rather than Adds and
+// the second call refreshes the values instead of appending duplicates.
 func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 	h := w.Header()
 	if meta.GatewayRequestID != "" {
-		h.Add("X-LangWatch-Gateway-Request-Id", meta.GatewayRequestID)
+		h.Set("X-LangWatch-Gateway-Request-Id", meta.GatewayRequestID)
 	}
 	if meta.FallbackCount > 0 {
-		h.Add("X-LangWatch-Fallback-Count", strconv.Itoa(meta.FallbackCount))
+		h.Set("X-LangWatch-Fallback-Count", strconv.Itoa(meta.FallbackCount))
 	}
 	if len(meta.BudgetWarnings) > 0 {
-		h.Add("X-LangWatch-Budget-Warning", strings.Join(meta.BudgetWarnings, ","))
+		h.Set("X-LangWatch-Budget-Warning", strings.Join(meta.BudgetWarnings, ","))
 	}
 	if meta.CacheMode != "" {
-		h.Add("X-LangWatch-Cache-Mode", meta.CacheMode)
+		h.Set("X-LangWatch-Cache-Mode", meta.CacheMode)
+	}
+	if len(meta.ParamsDropped) > 0 {
+		h.Set("X-LangWatch-Params-Dropped", strings.Join(meta.ParamsDropped, ","))
 	}
 	if meta.CustomerTraceparent != "" {
-		h.Add("Traceparent", meta.CustomerTraceparent)
+		h.Set("Traceparent", meta.CustomerTraceparent)
 	}
 }
 
@@ -747,6 +979,58 @@ var (
 	sseWarnPrefix  = []byte("event: warning\ndata: ")
 	sseDone        = []byte("data: [DONE]\n\n")
 )
+
+// streamErrorFrame builds the data payload for a terminal `event: error`.
+// SDK clients (OpenAI Responses, Vercel AI SDK) schema-validate every data
+// payload, so the frame must be the documented error-event OBJECT, a bare
+// string under an "error" key matches nothing and crashes the client with a
+// parse error instead of surfacing the failure.
+//
+// Provider-origin errors that carried their own event body (UpstreamError
+// with Body, e.g. OpenAI's mid-stream {"type":"error","error":{...}}) are
+// forwarded verbatim: the gateway is a conduit, not an error rewriter
+// (specs/ai-gateway/error-transparency.feature). Everything else gets the
+// standard {"type":"error","error":{"type":"provider_error","message":...}}
+// object.
+func streamErrorFrame(err error) []byte {
+	var ue *domain.UpstreamError
+	if errors.As(err, &ue) && len(ue.Body) > 0 && sonic.Valid(ue.Body) {
+		return ue.Body
+	}
+	msg := err.Error()
+	errType := "provider_error"
+	if ue != nil {
+		if ue.Message != "" {
+			msg = ue.Message
+		}
+		// Keep the provider's own error discriminant when the adapter parsed
+		// one, so SDK clients that dispatch on error.type still recognize
+		// e.g. insufficient_quota without the native event body.
+		if ue.ErrorType != "" {
+			errType = ue.ErrorType
+		} else if ue.ErrorCode != "" {
+			errType = ue.ErrorCode
+		}
+	}
+	frame, marshalErr := sonic.Marshal(sseErrorPayload{
+		Type:  "error",
+		Error: sseErrorDetail{Type: errType, Message: msg},
+	})
+	if marshalErr != nil {
+		return []byte(`{"type":"error","error":{"type":"provider_error","message":"stream failed"}}`)
+	}
+	return frame
+}
+
+type sseErrorPayload struct {
+	Type  string         `json:"type"`
+	Error sseErrorDetail `json:"error"`
+}
+
+type sseErrorDetail struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
 
 func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIterator) {
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -780,9 +1064,8 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 	}
 
 	if err := iter.Err(); err != nil {
-		errJSON, _ := sonic.Marshal(map[string]string{"error": err.Error()})
 		_, _ = w.Write(sseErrorPrefix)
-		_, _ = w.Write(errJSON)
+		_, _ = w.Write(streamErrorFrame(err))
 		_, _ = w.Write(sseDoubleNL)
 		if flusher != nil {
 			flusher.Flush()
@@ -830,8 +1113,12 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 // The provider's native error body is written byte-for-byte when present, so
 // the client sees the exact upstream envelope under the upstream's real
 // status code (not a masked 502) and can tell terminal from retryable. When
-// only the status + message are available, a minimal JSON envelope carrying
-// both is emitted instead.
+// the native body is unavailable, the minimal envelope still preserves the
+// error's identity: the provider's own error type/code (insufficient_quota,
+// overloaded_error, ...) when the adapter parsed them, and a generic
+// provider_error only when nothing better is known. The originating provider
+// rides a response header either way, since the verbatim body cannot be
+// tampered with to carry it.
 func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	status := ue.StatusCode
 	if status <= 0 {
@@ -839,21 +1126,45 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	}
 	// Forward the upstream's retry-signaling headers (Retry-After,
 	// x-should-retry) so the client can honor the provider's backoff and
-	// terminal-vs-retryable hint, not just the status code.
+	// terminal-vs-retryable hint, not just the status code. Passthrough
+	// lanes forward the upstream's headers wholesale, including its exact
+	// Content-Type (e.g. Google's "application/json; charset=UTF-8"), so
+	// only default the Content-Type when the upstream did not provide one.
 	for k, v := range ue.Headers {
 		w.Header().Set(k, v)
 	}
-	w.Header().Set("Content-Type", "application/json")
+	if ue.Provider != "" {
+		w.Header().Set("X-LangWatch-Provider", ue.Provider)
+	}
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
 	w.WriteHeader(status)
 	if len(ue.Body) > 0 {
 		_, _ = w.Write(ue.Body)
 		return
 	}
+	errType := ue.ErrorType
+	if errType == "" {
+		errType = ue.ErrorCode
+	}
+	if errType == "" {
+		errType = "provider_error"
+	}
+	errCode := ue.ErrorCode
+	if errCode == "" {
+		errCode = errType
+	}
+	meta := map[string]any{"status": status}
+	if ue.Provider != "" {
+		meta["provider"] = ue.Provider
+	}
 	body, _ := sonic.Marshal(map[string]any{
 		"error": map[string]any{
-			"type":    "provider_error",
+			"type":    errType,
+			"code":    errCode,
 			"message": ue.Message,
-			"meta":    map[string]any{"status": status},
+			"meta":    meta,
 		},
 	})
 	_, _ = w.Write(body)
@@ -867,16 +1178,34 @@ func registerErrorStatuses() {
 	}
 	errorsRegistered = true
 	herr.RegisterStatus(domain.ErrInvalidAPIKey, http.StatusUnauthorized)
+	herr.RegisterStatus(domain.ErrKeyRevoked, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrKeyDisabled, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrRateLimited, http.StatusTooManyRequests)
 	herr.RegisterStatus(domain.ErrBudgetExceeded, http.StatusPaymentRequired)
 	herr.RegisterStatus(domain.ErrGuardrailBlocked, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrGuardrailUpstreamUnavailable, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrPolicyViolation, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrModelNotAllowed, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
+	// Fail-closed attribution: the request is missing a required field
+	// (the end-user id) while a per-end-user template is active. A
+	// request-shape error like the two around it, so 400 per the house
+	// table; unregistered it fell to 500 and read as a platform bug.
+	herr.RegisterStatus(domain.ErrEndUserRequired, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrUnsupportedParameter, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(domain.ErrChainExhausted, http.StatusBadGateway)
+	// 503, not 500: an open breaker is the gateway declining to hit an
+	// upstream that has been failing, a retryable provider-side condition.
+	// Unregistered it would default to 500 internal_error, which reads as a
+	// gateway bug and hides that the provider is the thing to look at.
+	herr.RegisterStatus(domain.ErrCircuitOpen, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
 	herr.RegisterStatus(domain.ErrNoProviderConfigured, http.StatusBadRequest)
+	// Retryable by contract: the control plane failed us, not the caller.
+	// A 5xx keeps client SDKs retrying instead of bubbling a config error.
+	herr.RegisterStatus(domain.ErrAuthUpstream, http.StatusServiceUnavailable)
 }

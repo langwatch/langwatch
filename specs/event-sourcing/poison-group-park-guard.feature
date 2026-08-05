@@ -95,14 +95,17 @@ Feature: GroupQueue poison-group park guard
     Then the group is retried under the normal per-job budget instead of being quarantined
     And the group is never parked into the blocked set by the failure-streak guard
 
-  @unimplemented
-  # The clear-on-survival semantics is exercised by the completion/failure
-  # scenarios; a direct drain-mid-shutdown binding needs a close() harness.
   Scenario: graceful shutdown mid-job does not count as a poison strike
     Given a group whose job is in flight when the worker begins a graceful shutdown
     When the shutdown drains or abandons the in-flight job with the event loop alive
     Then the group's claim strike is cleared
     And the group is dispatched normally after the worker restarts
+
+  Scenario: a claim made during a graceful shutdown records no strike
+    Given a worker that has begun a graceful shutdown with jobs still queued
+    When the worker claims one of those jobs while draining
+    Then no claim strike is recorded for the job's group
+    And a group already at the strike threshold is parked by the next boot's claim, not during the drain
 
   Scenario: an oversized staged value is parked without being parsed
     Given a staged value whose serialized size exceeds the decode-side cap
@@ -112,11 +115,12 @@ Feature: GroupQueue poison-group park guard
     And the worker's event loop remains responsive throughout
 
   Scenario: an oversized coalesced sibling parks the group without losing the batch
-    Given a group whose dispatched job is small but a coalesced sibling exceeds the decode-side cap
-    When a worker claims the group and drains the sibling to fold it into the batch
-    Then the group is moved to the blocked set without JSON-parsing the oversized sibling
-    And the stored group error explains the batch was parked unparsed
-    And the batch's other work is re-staged for operator inspection or replay instead of being dropped
+    Given a group whose dispatched job is small but a staged sibling exceeds the decode-side cap
+    When a worker claims the group and coalesces a batch
+    Then the oversized sibling is never folded into the batch
+    And the batch's other work completes normally instead of being held behind the poison
+    And when the oversized sibling's own turn comes, the group is moved to the blocked set without JSON-parsing it
+    And the stored group error explains why it was parked
 
   Scenario: the poison guard is disabled by setting the strike threshold to 0
     Given the strike-threshold kill switch is set to 0

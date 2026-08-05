@@ -47,6 +47,8 @@ type fakeWorker struct {
 	touched          int
 	posted           int
 	postErr          error
+	gotPrompt        string
+	gotHistorySeed   string
 	gotResumeToken   string
 	streamErr        error
 	streamWrites     bool // emit one delta frame on the stream (happy path)
@@ -60,6 +62,11 @@ type fakeWorker struct {
 	llmErrOK bool
 	// servedTurn stubs HasServedTurn — drives the ready-status wording.
 	servedTurn bool
+	// forwardedFailure / forwardedTurnSpans record the deferred customer
+	// turn-span forward: the failure it carried (nil on success) and that the
+	// forward happened at all.
+	forwardedFailure   *domain.TurnFailure
+	forwardedTurnSpans int
 }
 
 func (w *fakeWorker) ClaimTurn(string) ClaimOutcome {
@@ -72,17 +79,22 @@ func (w *fakeWorker) ClaimTurn(string) ClaimOutcome {
 	}
 	return ClaimBusy
 }
-func (w *fakeWorker) Release()                                                { w.released++ }
-func (w *fakeWorker) Touch()                                                  { w.touched++ }
-func (w *fakeWorker) HasServedTurn() bool                                     { return w.servedTurn }
-func (w *fakeWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time) {}
+func (w *fakeWorker) Release()            { w.released++ }
+func (w *fakeWorker) Touch()              { w.touched++ }
+func (w *fakeWorker) HasServedTurn() bool { return w.servedTurn }
+func (w *fakeWorker) ForwardTurnSpan(_ trace.SpanContext, _, _ time.Time, failure *domain.TurnFailure) {
+	w.forwardedFailure = failure
+	w.forwardedTurnSpans++
+}
 
 func (w *fakeWorker) SetTurnTraceContext(sc trace.SpanContext) {
 	w.turnTraceContexts = append(w.turnTraceContexts, sc)
 }
 func (w *fakeWorker) LastLLMError() (herr.E, bool) { return w.llmErr, w.llmErrOK }
-func (w *fakeWorker) PostMessage(_ context.Context, _, _, resumeToken string) error {
+func (w *fakeWorker) PostMessage(_ context.Context, _, prompt, historySeed, resumeToken string) error {
 	w.posted++
+	w.gotPrompt = prompt
+	w.gotHistorySeed = historySeed
 	w.gotResumeToken = resumeToken
 	return w.postErr
 }
@@ -381,6 +393,92 @@ func TestApp_Turn_AgentErrorWithoutCapturedCauseStillEmitsTypedFrame(t *testing.
 	if !sawAgentError {
 		t.Errorf("agent error must push a terminal error frame, got %v", frameTypes(relay.stream.emitted))
 	}
+}
+
+// The customer-facing turn span must SHOW how the turn ended: the deferred
+// forward carries nil on success and the vetted failure (code + client-safe
+// message) on error — with the captured provider message when there is one,
+// so the trace names the real failure instead of a generic wrapper.
+func TestApp_Turn_ForwardsTurnSpanOutcome(t *testing.T) {
+	turnCtx := func() context.Context {
+		return trace.ContextWithRemoteSpanContext(context.Background(),
+			trace.NewSpanContext(trace.SpanContextConfig{
+				TraceID:    trace.TraceID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+				SpanID:     trace.SpanID{1, 2, 3, 4, 5, 6, 7, 8},
+				TraceFlags: trace.FlagsSampled,
+				Remote:     true,
+			}))
+	}
+	drive := func(t *testing.T, worker *fakeWorker) {
+		t.Helper()
+		a := newTestApp(&fakePool{worker: worker}, &fakeRelay{})
+		run, err := a.StartTurn(context.Background(), req())
+		if err != nil {
+			t.Fatalf("StartTurn: %v", err)
+		}
+		// The transport re-injects the extracted traceparent on the detached
+		// runner ctx; with no tracer the remote context IS the turn span
+		// context (the telemetry-off posture driveTurn documents).
+		run(turnCtx())
+		if worker.forwardedTurnSpans != 1 {
+			t.Fatalf("turn span forwards = %d, want exactly one", worker.forwardedTurnSpans)
+		}
+	}
+
+	t.Run("when the turn completes", func(t *testing.T) {
+		worker := &fakeWorker{claimOK: true, streamWrites: true}
+		drive(t, worker)
+		if worker.forwardedFailure != nil {
+			t.Errorf("a completed turn must forward no failure, got %+v", worker.forwardedFailure)
+		}
+	})
+
+	t.Run("when the agent errors with a captured provider cause", func(t *testing.T) {
+		providerMessage := "Your credit balance is too low to access the Anthropic API."
+		worker := &fakeWorker{
+			claimOK:   true,
+			streamErr: herr.NewLight(context.Background(), domain.ErrAgentError, nil),
+			llmErr: herr.E{Code: "llm_upstream_error", Meta: herr.M{
+				"message": providerMessage, "http_status": 400,
+			}},
+			llmErrOK: true,
+		}
+		drive(t, worker)
+		if worker.forwardedFailure == nil {
+			t.Fatal("a failed turn must forward its failure")
+		}
+		if worker.forwardedFailure.Code != "agent_error" {
+			t.Errorf("failure code = %q, want agent_error", worker.forwardedFailure.Code)
+		}
+		if worker.forwardedFailure.Message != providerMessage {
+			t.Errorf("failure message = %q, want the provider's own message", worker.forwardedFailure.Message)
+		}
+	})
+
+	t.Run("when the agent errors with no captured cause", func(t *testing.T) {
+		worker := &fakeWorker{
+			claimOK:   true,
+			streamErr: herr.NewLight(context.Background(), domain.ErrAgentError, nil),
+		}
+		drive(t, worker)
+		if worker.forwardedFailure == nil {
+			t.Fatal("a failed turn must forward its failure")
+		}
+		if worker.forwardedFailure.Message != "the agent hit an error before finishing" {
+			t.Errorf("failure message = %q, want the vetted generic line", worker.forwardedFailure.Message)
+		}
+	})
+
+	t.Run("when the worker stream dies", func(t *testing.T) {
+		worker := &fakeWorker{claimOK: true, streamErr: errors.New("boom-stream")}
+		drive(t, worker)
+		if worker.forwardedFailure == nil || worker.forwardedFailure.Code != "worker_stopped" {
+			t.Fatalf("failure = %+v, want worker_stopped", worker.forwardedFailure)
+		}
+		if worker.forwardedFailure.Message == "boom-stream" {
+			t.Error("the raw stream error must not become the customer span message")
+		}
+	})
 }
 
 func TestApp_Turn_HappyPathEmitsDeltaThenFinalAndReleases(t *testing.T) {

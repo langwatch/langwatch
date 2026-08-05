@@ -74,17 +74,19 @@ Feature: AI Gateway — Per-user (PRINCIPAL) budgets in the strictest-wins casca
     And `scopes` contains 4 entries (org, team, project, virtual_key) with NO principal entry
 
   # ============================================================================
-  # Trace-fold attribution
+  # Debit attribution
   # ============================================================================
 
-  @bdd @phase-1b @principal-cascade @trace-fold
-  Scenario: Trace-fold reactor writes one ledger row per applicable budget INCLUDING PRINCIPAL
+  @bdd @phase-1b @principal-cascade @spend-debits
+  Scenario: The debits process writes one ledger row per applicable budget INCLUDING PRINCIPAL
     Given alice has a $50/month PRINCIPAL budget
     And the org/team/project/VK budgets in the background apply
-    When a finalised trace is processed for an alice-attributed request costing $0.42
-    Then the trace-fold reactor writes 5 rows to `gateway_budget_ledger_events`
+    When an alice-attributed request costing $0.42 confirms
+    Then the debits process writes 5 rows to `gateway_budget_ledger_events`
     And each row carries the same `GatewayRequestId` (idempotency key)
     And the PRINCIPAL row has `BudgetId` matching alice's principal budget and `SpendUSD = 0.42`
+    # The principal rides the spend command: the ingest seam reads it off
+    # the key row, so a debit names the seat without any trace.
 
   # ============================================================================
   # Multi-scope VK — budget cascade with refactored VK shape
@@ -123,3 +125,51 @@ Feature: AI Gateway — Per-user (PRINCIPAL) budgets in the strictest-wins casca
     Then the PROJECT budget is included in `scopes`
     And the trace's JWT carries `project_id="gateway-demo"`
     And per-project trace search surfaces these requests (the one-PROJECT-scope happy path)
+
+  # ============================================================================
+  # Group budgets ride the same cascade, one bucket per member
+  # ============================================================================
+  #
+  # A group (GROUP-scoped) budget is the per-person tier expressed once:
+  # "people in this group each get this much". It resolves through the same
+  # principal machinery: one enforcement bucket per (budget, member), spend
+  # stamped with the member, so an admin does not have to create and maintain
+  # one PRINCIPAL budget per head, and a new joiner is covered without anyone
+  # remembering to add them.
+
+  @bdd @phase-1b @principal-cascade @group
+  Scenario: A group budget resolves to the member's own bucket
+    Given group "engineering" has a $50/month budget and alice is a member
+    When alice's key is resolved
+    Then the budget applies to alice
+    And its spend accrues to alice alone, not to the group as a whole
+
+  @bdd @phase-1b @principal-cascade @group
+  Scenario: Two members of the same group do not share the allowance
+    Given group "engineering" has a $50/month budget with alice and bob in it
+    And alice has spent $49
+    When bob makes a request
+    Then bob is not blocked
+    And alice's remaining allowance is unaffected by bob's spend
+
+  @bdd @phase-1b @principal-cascade @group
+  Scenario: Joining a group picks up its budget on the next resolve
+    Given group "engineering" has a budget and carol is not a member
+    When carol joins the group
+    And her key's configuration is resolved again
+    Then the group budget now applies to carol
+
+  @bdd @phase-1b @principal-cascade @group
+  Scenario: Leaving a group drops its budget
+    Given carol is in group "engineering" which has a budget
+    When carol leaves
+    And her key's configuration is resolved again
+    Then the group budget no longer applies to her
+    And the spend she already recorded stays in the ledger
+
+  @bdd @phase-1b @principal-cascade @group
+  Scenario: A key with no person behind it is out of reach of group budgets
+    Given group "engineering" has a budget
+    When a shared service key with no principal is resolved
+    Then no group budget applies to it
+    # There is no member to charge the per-member allowance to.

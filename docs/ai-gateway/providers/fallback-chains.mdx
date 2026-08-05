@@ -75,7 +75,7 @@ See [Streaming → pre-connection fallback, mid-stream failure](/ai-gateway/stre
 
 Fallback attribution today:
 
-- Prometheus counter `gateway_provider_attempts_total{outcome}` increments once per attempt, with `outcome` in `primary_success | fallback_success | retryable_5xx | rate_limit | timeout | network | circuit_open | non_retryable`.
+- Prometheus counter `gateway_provider_attempts_total{credential_id, outcome}` increments once per attempt, with `outcome` in `success | fallback_success | retryable_5xx | not_found | rate_limit | timeout | network | circuit_open | non_retryable | chain_exhausted | context_done`.
 - Response header `X-LangWatch-Fallback-Count: N`, how many fallbacks were attempted before success.
 - Request-id correlation via `X-LangWatch-Request-Id`, join the metric + log line back to the specific trace.
 
@@ -104,7 +104,7 @@ Override at the service level:
 
 **Per-replica, not shared**: each gateway replica maintains its own breaker state. This is deliberate, under a large-scale outage, N replicas rediscovering the recovered provider independently is resilient; depending on Redis for breaker consensus is not.
 
-Per-provider circuit state is emitted as a Prometheus metric `gateway_circuit_state{provider,state}` where `state ∈ {closed, half_open, open}`. Alert on "primary circuit has been `open` for > 5 minutes" to catch real provider outages (as distinct from transient blips).
+Circuit state is emitted as a Prometheus gauge `gateway_circuit_state{credential_id}`, one series per credential slot. The state is encoded in the gauge **value**, not in a label: `0` closed, `1` open, `2` half-open. Alert on `gateway_circuit_state == 1 for 5m` to catch real provider outages (as distinct from transient blips).
 
 When a request hits a circuit that's currently `open`, the gateway skips to the next entry in the fallback chain immediately, no wasted round-trip to a provider we already know is down.
 
