@@ -275,7 +275,7 @@ const PLAIN_OIDC_PROVIDERS = [
     issuerEnvName: "COGNITO_ISSUER",
     // The issuer is the user pool's own
     // (`https://cognito-idp.<region>.amazonaws.com/<userPoolId>`), not the
-    // hosted-UI domain — the domain is what its discovery document points at.
+    // hosted-UI domain. The domain is what its discovery document points at.
     credentials: (e: GenericOAuthEnv) => ({
       clientId: e.COGNITO_CLIENT_ID,
       clientSecret: e.COGNITO_CLIENT_SECRET,
@@ -301,7 +301,7 @@ const PLAIN_OIDC_PROVIDERS = [
  * (`"auth0"`, `"okta"`, `"cognito"`, `"onelogin"`) so the genericOAuth plugin
  * registers it under that id.
  *
- * Exported for unit testing — lets us assert provider selection directly,
+ * Exported for unit testing, so provider selection can be asserted directly
  * without re-initializing the module under a different `NEXTAUTH_PROVIDER`.
  */
 export const buildGenericOAuthConfigs = (

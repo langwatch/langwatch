@@ -7,8 +7,8 @@
  * Nothing on the path under test is stubbed: this boots the real app auth
  * route, which builds a real BetterAuth instance from our real provider
  * builders, and fires a real sign-in request at it. The only stand-in is the
- * identity provider itself — a local HTTP server publishing a genuine OIDC
- * discovery document — because the point of the feature is that we read the
+ * identity provider itself, a local HTTP server publishing a genuine OIDC
+ * discovery document, because the point of the feature is that we read the
  * endpoints out of that document rather than hard-coding them. The assertions
  * are on the authorization URL the app actually sends the browser to.
  */
@@ -21,7 +21,7 @@ const APP_URL = "http://localhost:5624";
 /**
  * A stand-in identity provider. Publishes the same discovery document shape a
  * real one does, with authorize/token/userinfo on a different host from the
- * issuer — which is exactly the Cognito arrangement (the issuer lives on
+ * issuer, which is exactly the Cognito arrangement (the issuer lives on
  * `cognito-idp.<region>.amazonaws.com`, the endpoints on the hosted-UI domain)
  * and the reason discovery is what we read instead of deriving URLs ourselves.
  */

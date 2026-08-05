@@ -23,7 +23,7 @@ const ONELOGIN_ISSUER = "https://acme.onelogin.com/oidc/2";
 
 /**
  * A deployment env with both providers' credentials present. Individual tests
- * flip `NEXTAUTH_PROVIDER` or drop a credential — the point of most of these is
+ * flip `NEXTAUTH_PROVIDER` or drop a credential. The point of most of these is
  * that having credentials lying around is not what decides which provider
  * mounts.
  */
