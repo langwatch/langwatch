@@ -164,4 +164,4 @@ A gateway that is configured but unusable fails at send time with a message nami
 EMAIL_PROVIDER is "sendgrid" but it is not configured: set SENDGRID_API_KEY. Settings for "ses" are present, did you mean EMAIL_PROVIDER=ses?
 ```
 
-A `read ETIMEDOUT` reaching the provider means egress is being blocked, which is the proxy case above.
+A `read ETIMEDOUT` reaching the provider is a connectivity failure rather than a credential one: blocked egress, an unreachable host or port, or DNS. On a deployment that reaches the internet through a proxy, start with the section above.

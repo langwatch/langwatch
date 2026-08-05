@@ -43,7 +43,7 @@ A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client cr
 
 The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users register with an email and password, and a self-service "Forgot password?" link on the sign-in screen lets them reset a forgotten one.
 
-Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. If no email provider is configured, the request still returns the same neutral confirmation but no email is sent. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
+Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. Without a gateway the screen says the deployment cannot send email and points the person at whoever operates it, rather than offering a form whose link could never arrive. With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
 
 When `NEXTAUTH_PROVIDER` is set to any SSO provider below **and the deployment holds a license**, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled: the identity provider owns credentials from that point on.
 
