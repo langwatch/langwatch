@@ -28,6 +28,7 @@ import { trackServerEvent } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
 import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
 import { UserAvatarService } from "~/server/user-avatar/avatar.service";
+import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
@@ -97,7 +98,14 @@ export const userRouter = createTRPCRouter({
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
-      const { name, email, password } = input;
+      const { name, password } = input;
+      // BetterAuth lowercases the email on every one of its lookups and
+      // writes, and sign-in goes through BetterAuth. An account stored as
+      // typed, capitals and all, is therefore one that sign-in can never find
+      // again, no matter the password. Store the shape sign-in will search
+      // for. Customer report: onboarding signups that autocapitalised the
+      // address were permanently locked out with "User already exists".
+      const email = input.email.toLowerCase();
 
       // Keyed off the RESOLVED provider, not the raw env: on an SSO-capable
       // deployment with no genuine license the platform gate coerces the
@@ -128,17 +136,17 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      const user = await ctx.prisma.user.findUnique({
+      // Case-insensitive on purpose: rows written before the lowercasing
+      // above (or seeded by other means) may carry capitals, and minting a
+      // case-twin beside one would leave two Users answering for one human.
+      const user = await ctx.prisma.user.findFirst({
         where: {
-          email,
+          email: { equals: email, mode: "insensitive" },
         },
       });
 
       if (user) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "User already exists",
-        });
+        throw new EmailAlreadyRegisteredError();
       }
 
       const hashedPassword = await hash(password, 10);

@@ -453,7 +453,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           virtualKeyId: VK_SHARED_ID,
           providerKey: MP_ANTHROPIC_ID,
           gatewayRequestId: requestId,
-          amountUsd: "0.2500",
+          amountNanoUsd: 250_000_000,
           tokensInput: 10,
           tokensOutput: 5,
           tokensCacheRead: 0,
@@ -538,7 +538,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
       // Two members spend against the same GROUP budget row, each in their
       // own bucket.
-      const debit = (member: string, amountUsd: string) => ({
+      const debit = (member: string, amountNanoUsd: number) => ({
         tenantId: PROJECT_ID,
         budgetId: BUDGET_GROUP_ID,
         scope: "GROUP" as const,
@@ -547,7 +547,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         virtualKeyId: VK_PERSONAL_ID,
         providerKey: null,
         gatewayRequestId: `req-${suffix}-grp-${member}`,
-        amountUsd,
+        amountNanoUsd,
         tokensInput: 10,
         tokensOutput: 5,
         tokensCacheRead: 0,
@@ -558,8 +558,8 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       });
       // One insert per request: the repository enforces one
       // gateway_request_id per debit burst.
-      await chRepo.insertDebit([debit(USER_ID, "10.0000")]);
-      await chRepo.insertDebit([debit(OTHER_USER_ID, "30.0000")]);
+      await chRepo.insertDebit([debit(USER_ID, 10_000_000_000)]);
+      await chRepo.insertDebit([debit(OTHER_USER_ID, 30_000_000_000)]);
 
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
@@ -615,7 +615,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           virtualKeyId: VK_PERSONAL_ID,
           providerKey: MP_OPENAI_ID,
           gatewayRequestId: `req-${suffix}-grp-openai`,
-          amountUsd: "2.0000",
+          amountNanoUsd: 2_000_000_000,
           tokensInput: 10,
           tokensOutput: 5,
           tokensCacheRead: 0,

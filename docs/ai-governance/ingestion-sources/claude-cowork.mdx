@@ -14,7 +14,7 @@ Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli per the shared parser).
 - **OTLP shape:** Spans (lands in `recorded_spans` with origin metadata stamped). Same handoff path as `otel_generic`.
-- **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` + `langwatch.governance.retention_class` on every span, hands off to the existing trace pipeline. Cowork tool-call spans land as the OCSF "Action = tool_call"; model-call spans land as "Action = chat" via the governance fold's heuristic.
+- **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` on every span, hands off to the existing trace pipeline. Cowork tool-call spans land as the OCSF "Action = tool_call"; model-call spans land as "Action = chat" via the governance fold's heuristic.
 - **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
 
 ## What the admin configures upstream

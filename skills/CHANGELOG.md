@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/langwatch/langwatch/compare/skills@v1.0.0...skills@v1.1.0) (2026-08-05)
+
+
+### Features
+
+* **gateway:** align the REST provisioning surface with the service layer, six-scope budgets with live spend, per-key spend read, CLI n-by-n ([#6268](https://github.com/langwatch/langwatch/issues/6268)) ([5459a31](https://github.com/langwatch/langwatch/commit/5459a31a0f82a1c2579c084322fbaf46f290c985))
+
 ## [1.0.0](https://github.com/langwatch/langwatch/compare/skills@v0.7.0...skills@v1.0.0) (2026-07-24)
 
 

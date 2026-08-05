@@ -13,11 +13,11 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
-import {
-  type BudgetSpendTarget,
-  budgetPeriodFloorMs,
-  type GatewayBudgetClickHouseRepository,
+import type {
+  BudgetSpendTarget,
+  GatewayBudgetClickHouseRepository,
 } from "./budget.clickhouse.repository";
+import { budgetPeriodFloorMs } from "./budgetPeriod";
 import { resolveApplicableBudgets } from "./budgetResolution.service";
 import { resolveProviderLabels } from "./providerLabels";
 import { resolveTraceProject } from "./scopeResolver";

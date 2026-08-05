@@ -6,20 +6,29 @@ import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
+/**
+ * The most recent delivery attempts for one endpoint, one page at a time.
+ *
+ * The log grows with every send and has no bound worth printing to a
+ * terminal, so `--limit` is the page size and `--cursor` walks backwards
+ * through the history rather than the command collecting all of it.
+ */
 export const webhookDeliveriesCommand = async (
   id: string,
-  options: { limit?: string },
+  options: { cursor?: string; limit?: string },
 ): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Fetching delivery log...").start();
   try {
-    const deliveries = await service.deliveries(id, {
+    const page = await service.deliveriesPage(id, {
+      cursor: options.cursor,
       limit: options.limit !== undefined ? Number(options.limit) : undefined,
     });
-    spinner.succeed(`${deliveries.length} attempt${deliveries.length !== 1 ? "s" : ""}`);
+    const deliveries = page.data;
+    spinner.succeed(`${deliveries.length} attempt${deliveries.length !== 1 ? "s" : ""}${page.next_cursor ? " (more available)" : ""}`);
     return {
-      data: deliveries,
+      data: page,
       table: () => {
         if (deliveries.length === 0) {
           console.log();
@@ -39,6 +48,10 @@ export const webhookDeliveriesCommand = async (
           })),
           headers: ["Fired at", "Attempt", "Events", "Outcome", "Status", "Latency ms", "Error"],
         });
+        if (page.next_cursor) {
+          console.log();
+          console.log(chalk.gray(`Next page: --cursor '${page.next_cursor}'`));
+        }
         console.log();
       },
     };
