@@ -293,16 +293,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{/* Validate email provider secrets */}}
-{{- if .Values.app.email.enabled }}
-  {{- if eq .Values.app.email.provider "sendgrid" }}
-    {{- if .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.name }}
-      {{- if empty .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.key }}
-        {{- $errors = append $errors "app.email.providers.sendgrid.apiKey.secretKeyRef.name is set but key is empty" }}
-      {{- end }}
-    {{- else if empty .Values.app.email.providers.sendgrid.apiKey.value }}
-      {{- $errors = append $errors "app.email.enabled is true with sendgrid provider but apiKey is not configured" }}
-    {{- end }}
+{{/* Validate email provider secrets. Whether a gateway is configured at all is
+     langwatch.emailProviderGuard's job; this only catches a half-written
+     secret reference, which names a Secret but no key inside it. That reads as
+     configured to the guard and resolves to nothing at the container, so
+     without this it survives install and fails at the first send.
+
+     Only the selected gateway is checked, since no other gateway's settings
+     are rendered. */}}
+{{- $emailSecretRefs := dict
+      "sendgrid" (list (dict "path" "sendgrid.apiKey" "ref" .Values.app.email.providers.sendgrid.apiKey.secretKeyRef))
+      "resend"   (list (dict "path" "resend.apiKey"   "ref" .Values.app.email.providers.resend.apiKey.secretKeyRef))
+      "smtp"     (list (dict "path" "smtp.url"        "ref" .Values.app.email.providers.smtp.url.secretKeyRef)
+                       (dict "path" "smtp.password"   "ref" .Values.app.email.providers.smtp.password.secretKeyRef)) }}
+{{- range $field := (get $emailSecretRefs .Values.app.email.provider | default list) }}
+  {{- if and $field.ref.name (empty $field.ref.key) }}
+    {{- $errors = append $errors (printf "app.email.providers.%s.secretKeyRef.name is set but key is empty" $field.path) }}
   {{- end }}
 {{- end }}
 
@@ -567,21 +573,37 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
      Skipped when extraEnvs or extraEnvFrom are in play: those can carry the
      provider's settings (an SMTP_URL from a pre-existing Secret, AWS_REGION
-     alongside IRSA credentials) and the chart cannot see inside them. */}}
+     alongside IRSA credentials) and the chart cannot see inside them. They
+     reach one Deployment each, though, while the gateway is shared by both, so
+     every Deployment that sends email has to have a source of its own for the
+     bypass to hold. */}}
 {{- define "langwatch.emailProviderGuard" -}}
+{{- if hasKey .Values.app.email "enabled" }}
+{{- fail "app.email.enabled no longer exists: naming app.email.provider is what turns email on. Set app.email.provider to sendgrid, ses, smtp or resend and remove app.email.enabled." }}
+{{- end }}
+{{- $provider := .Values.app.email.provider }}
+{{- if $provider }}
 {{- $providers := .Values.app.email.providers }}
 {{- $configured := dict
       "sendgrid" (or $providers.sendgrid.apiKey.value $providers.sendgrid.apiKey.secretKeyRef.name)
       "resend"   (or $providers.resend.apiKey.value $providers.resend.apiKey.secretKeyRef.name)
       "smtp"     (or $providers.smtp.url.value $providers.smtp.url.secretKeyRef.name $providers.smtp.host)
       "ses"      $providers.ses.region }}
-{{- $provider := .Values.app.email.provider }}
 {{- if not (hasKey $configured $provider) }}
 {{- fail (printf "app.email.provider is %q, which is not one of: sendgrid, ses, smtp, resend." $provider) }}
 {{- end }}
-{{- $escapeHatch := or .Values.app.extraEnvs .Values.app.extraEnvFrom .Values.workers.extraEnvs .Values.workers.extraEnvFrom }}
-{{- if and (not (get $configured $provider)) (not $escapeHatch) }}
-{{- fail (printf "app.email.enabled is true and app.email.provider is %q, but app.email.providers.%s is empty. Configure it, pick another provider, or supply its settings through app.extraEnvs / app.extraEnvFrom." $provider $provider) }}
+{{- if not (get $configured $provider) }}
+{{- $needed := list }}
+{{- if not (or .Values.app.extraEnvs .Values.app.extraEnvFrom) }}
+{{- $needed = append $needed "app.extraEnvs / app.extraEnvFrom" }}
+{{- end }}
+{{- if and .Values.workers.enabled (not (or .Values.workers.extraEnvs .Values.workers.extraEnvFrom)) }}
+{{- $needed = append $needed "workers.extraEnvs / workers.extraEnvFrom" }}
+{{- end }}
+{{- if $needed }}
+{{- fail (printf "app.email.provider is %q, but app.email.providers.%s is empty. Configure it, pick another provider, or supply its settings through %s. The web application sends invitations and password resets, the workers send scheduled reports and alert notifications, and each Deployment reads only its own extra environment." $provider $provider (join " and " $needed)) }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- end -}}
 
@@ -871,11 +893,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 
-# Email gateway. In sharedEnv rather than the app Deployment because scheduled
-# reports and alert notifications are dispatched by the workers, so a workers
-# pod without a gateway configured fails every send it is responsible for.
-{{- if .Values.app.email.enabled }}
+# Email gateway. Naming a provider is what turns email on. In sharedEnv rather
+# than the app Deployment because scheduled reports and alert notifications are
+# dispatched by the workers, so a workers pod without a gateway configured
+# fails every send it is responsible for.
 {{- include "langwatch.emailProviderGuard" . }}
+{{- if .Values.app.email.provider }}
 - name: EMAIL_DEFAULT_FROM
   value: {{ .Values.app.email.defaultFrom | quote }}
 - name: EMAIL_PROVIDER
