@@ -22,7 +22,7 @@
 //	      | { ok: false, errors: [...] }
 //
 // Wire shape locked with the control plane's
-// `langwatch/ee/governance/services/activity-monitor/ottlGatewayClient.ts`.
+// `platform/app/ee/governance/services/activity-monitor/ottlGatewayClient.ts`.
 //
 // All endpoints are mounted under `/internal/*` and gated by the same
 // HMAC-signed channel the rest of the control-plane↔gateway internal

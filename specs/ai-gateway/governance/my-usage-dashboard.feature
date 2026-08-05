@@ -27,11 +27,24 @@ Feature: AI Gateway Governance — My Usage personal dashboard
     When I navigate to "/me"
     Then I see three cards in a row:
       | card                  | shape                                              |
-      | Spent this month      | dollar amount + "of $X budget" if budget is set    |
+      | Spent this month      | dollar amount + the bundled portion when there is one |
       | Requests this month   | integer + "↑ N% vs last month" delta when ≥7d data |
       | Most-used model       | model name + "N% of usage"                         |
     And each card pulls data from `user.personalContext` + cost-aggregation tRPC
     And when the personal project has zero traces, each card renders an empty state hint
+
+  # The budget jane can see on the gateway budgets page governs virtual-key
+  # traffic. The spend card totals her tool usage, which that budget does not
+  # cap, so showing the two together read as a limit on spend it never governs.
+  @unit @dashboard @cards
+  Scenario: The spend card reports the bundled portion, never a budget
+    Given jane's organization has an AI-Gateway budget
+    And part of jane's spend this month is bundled with her plan
+    When I navigate to "/me"
+    Then the spend card names the bundled amount
+    And it states no budget figure
+    And the card carries no over-budget emphasis, since the exceeded budget is
+      already announced by its own banner above the cards
 
   # ---------------------------------------------------------------------------
   # Spending over time

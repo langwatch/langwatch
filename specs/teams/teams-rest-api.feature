@@ -142,6 +142,42 @@ Feature: Teams REST API
     Then the response status is 404
 
   # ============================================================================
+  # Personal workspaces
+  # ============================================================================
+  #
+  # A personal team is one member's private workspace: exactly one member, its
+  # owner, and exempt from the organization's team allowance on that basis. It
+  # is also unrecoverable once archived, because uniqueness of one personal
+  # team per (organization, owner) covers archived rows while the workspace
+  # lookup skips them, so the archived team keeps the slot and provisioning can
+  # neither find the workspace nor replace it.
+  #
+  # An org-scoped API key holds every permission these endpoints check, so the
+  # refusal is on the request's merits and comes back as 403, not 401.
+
+  @integration
+  Scenario: Refuses to archive a personal team
+    Given a personal team exists in my organization
+    When I DELETE /api/teams/:id for the personal team
+    Then the response status is 403
+    And the personal team is not archived
+
+  @integration
+  Scenario: Refuses to add a member to a personal team
+    Given a personal team exists in my organization
+    And another member of the organization
+    When I POST /api/teams/:id/members for the personal team
+    Then the response status is 403
+    And the personal team still has only its owner
+
+  @integration
+  Scenario: Refuses to remove a member from a personal team
+    Given a personal team exists in my organization
+    When I DELETE /api/teams/:id/members/:userId for its owner
+    Then the response status is 403
+    And the owner still holds their binding
+
+  # ============================================================================
   # Permission denial
   # ============================================================================
 

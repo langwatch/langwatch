@@ -5,6 +5,14 @@ query param onto the page URL; closing pops it. The shell that renders
 the drawer (`<CurrentDrawer />`, mounted once near the app root) keys
 off that param and resolves the component via `drawerRegistry`.
 
+Always render through the shared `Drawer.Root` wrapper
+(`components/ui/drawer.tsx`), never raw Chakra. Drawers anchor to the right
+(`end`) as usual even while the Langy panel is open: the panel notices the
+open drawer and re-seats ITSELF as a floating companion card beside the
+drawer (same height, same radius, a strip of space between the two), then
+returns to its dock when the drawer closes. Nothing to do per drawer; the
+panel owns that dance. Spec: specs/langy/langy-panel-layout.feature.
+
 This is the only pattern. Don't reach for `useState`-driven open/close
 on a new drawer — the URL form gives you:
 

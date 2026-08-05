@@ -1,0 +1,421 @@
+import { describe, expect, it } from "vitest";
+
+import { TOPIC_CLUSTERING_STALE_RUN_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClustering.process";
+import type {
+  TopicClusteringRunProjectionRow,
+  TopicClusteringStatusRecord,
+  TopicClusteringStatusRepository,
+} from "../repositories/topic-clustering-status.repository";
+import { TopicClusteringStatusService } from "../topic-clustering-status.service";
+
+const NOW = 1_800_000_000_000;
+const PROJECT_ID = "project-1";
+
+function projectionRow(
+  overrides: Partial<TopicClusteringRunProjectionRow> = {},
+): TopicClusteringRunProjectionRow {
+  return {
+    id: "topicrun_1",
+    projectId: PROJECT_ID,
+    CreatedAt: NOW - 1_000_000,
+    UpdatedAt: NOW,
+    OccurredAt: NOW,
+    AcceptedAt: NOW,
+    LastEventId: "event-1",
+    ProjectionVersion: "1",
+    LastRequestedAt: null,
+    LastRequestTrigger: null,
+    LastRunAt: null,
+    LastRunOutcome: null,
+    LastRunMode: null,
+    LastRunSkippedReason: null,
+    LastRunError: null,
+    LastRunErrorCode: null,
+    LastRunErrorUserActionable: false,
+    LastRunTracesProcessed: 0,
+    LastRunTopicsCount: 0,
+    LastRunSubtopicsCount: 0,
+    LastRunPages: 0,
+    InProgressRunId: null,
+    InProgressTraces: 0,
+    InProgressPages: 0,
+    InProgressStartedAt: null,
+    ...overrides,
+  } as TopicClusteringRunProjectionRow;
+}
+
+function serviceReading(
+  record: Partial<TopicClusteringStatusRecord>,
+  now: number = NOW,
+) {
+  const repository: TopicClusteringStatusRepository = {
+    findByProjectId: async () => ({
+      projection: record.projection ?? null,
+      nextWakeAt: record.nextWakeAt ?? null,
+    }),
+    findRunHistoryByProjectId: async () => [],
+  };
+  return new TopicClusteringStatusService(repository, () => now);
+}
+
+function serviceWithHistory(
+  runs: Awaited<
+    ReturnType<TopicClusteringStatusRepository["findRunHistoryByProjectId"]>
+  >,
+  now: number = NOW,
+) {
+  const repository: TopicClusteringStatusRepository = {
+    findByProjectId: async () => ({ projection: null, nextWakeAt: null }),
+    findRunHistoryByProjectId: async () => runs,
+  };
+  return new TopicClusteringStatusService(repository, () => now);
+}
+
+describe("TopicClusteringStatusService", () => {
+  describe("given a project that has never been clustered", () => {
+    it("reports no run, no schedule, and nothing in flight", async () => {
+      const status = await serviceReading({}).getByProjectId({
+        projectId: PROJECT_ID,
+      });
+
+      expect(status).toMatchObject({
+        lastRequestedAt: null,
+        lastRunAt: null,
+        lastRunOutcome: null,
+        lastRunMode: null,
+        lastRunTracesProcessed: 0,
+        lastRunTopicsCount: 0,
+        lastRunSubtopicsCount: 0,
+        isInProgress: false,
+        isRunInFlight: false,
+        nextRunAt: null,
+      });
+    });
+
+    it("reports the scheduled wake once the project is bootstrapped", async () => {
+      const status = await serviceReading({
+        projection: projectionRow(),
+        nextWakeAt: new Date(NOW + 60_000),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.nextRunAt).toBe(NOW + 60_000);
+    });
+  });
+
+  describe("given a run that was requested but has recorded no outcome", () => {
+    /**
+     * The case the projection cannot see directly: no run_started event
+     * exists, and a project small enough to cluster in one page never writes
+     * an in-progress marker either.
+     */
+    it("reports the run as in flight", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRequestedAt: NOW - 5_000,
+          LastRequestTrigger: "manual",
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isRunInFlight).toBe(true);
+      expect(status.isInProgress).toBe(false);
+    });
+
+    it("keeps reporting it in flight right up to the stale-run window", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRequestedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS + 1,
+          LastRequestTrigger: "manual",
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isRunInFlight).toBe(true);
+    });
+
+    it("does not report a bootstrap request as a run in flight", async () => {
+      // A bootstrap request deliberately starts no run — it only ensures the
+      // process exists and its wake is scheduled. Counting it would show
+      // "Running" for a project where nothing runs, and make "Run now"
+      // refuse. It also latches: bootstrap is re-asserted on ingest, so this
+      // would never clear for an active project.
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRequestedAt: NOW - 5_000,
+          LastRequestTrigger: "bootstrap",
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isRunInFlight).toBe(false);
+      expect(status.isInProgress).toBe(false);
+    });
+
+    it("stops reporting it in flight once the scheduler would abandon it", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRequestedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS,
+          LastRequestTrigger: "manual",
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isRunInFlight).toBe(false);
+    });
+  });
+
+  describe("given a request that was already answered by a run", () => {
+    it("reports nothing in flight", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRequestedAt: NOW - 10_000,
+          LastRequestTrigger: "manual",
+          LastRunAt: NOW - 1_000,
+          LastRunOutcome: "completed",
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isRunInFlight).toBe(false);
+    });
+
+    it("treats an outcome recorded at the request instant as answering it", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRequestedAt: NOW - 1_000,
+          LastRequestTrigger: "manual",
+          LastRunAt: NOW - 1_000,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isRunInFlight).toBe(false);
+    });
+  });
+
+  describe("given a backlog walk between pages", () => {
+    it("reports the run as in flight even though no request is outstanding", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRequestedAt: NOW - 10_000,
+          LastRequestTrigger: "manual",
+          LastRunAt: NOW - 5_000,
+          InProgressRunId: "20260717T093000",
+          InProgressStartedAt: NOW - 10_000,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isInProgress).toBe(true);
+      expect(status.isRunInFlight).toBe(true);
+    });
+  });
+
+  describe("given a run whose terminal outcome write was lost", () => {
+    it("keeps reporting it running inside the scheduler's stale-run window", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          InProgressRunId: "20260717T093000",
+          InProgressStartedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS + 1,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isInProgress).toBe(true);
+      expect(status.isRunInFlight).toBe(true);
+    });
+
+    it("stops reporting it running once the scheduler would abandon it", async () => {
+      // The terminal run_completed/run_failed write is best-effort; when it is
+      // lost, InProgressRunId stays set forever. Unbounded, that pinned the
+      // badge to "Running" and made the route refuse "Run now" until the next
+      // daily wake — even though the process itself would have preempted the
+      // dead run. The read must expire on the SAME clock the scheduler uses.
+      const status = await serviceReading({
+        projection: projectionRow({
+          InProgressRunId: "20260717T093000",
+          InProgressStartedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isInProgress).toBe(false);
+      expect(status.isRunInFlight).toBe(false);
+    });
+
+    it("bounds rows folded before the start column existed by their latest event", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          InProgressRunId: "20260717T093000",
+          InProgressStartedAt: null,
+          OccurredAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isInProgress).toBe(false);
+    });
+  });
+
+  describe("given a completed run", () => {
+    it("passes through the run's mode and counts", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRunAt: NOW - 1_000,
+          LastRunOutcome: "completed",
+          LastRunMode: "incremental",
+          LastRunTracesProcessed: 120,
+          LastRunTopicsCount: 8,
+          LastRunSubtopicsCount: 30,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status).toMatchObject({
+        lastRunOutcome: "completed",
+        lastRunMode: "incremental",
+        lastRunTracesProcessed: 120,
+        lastRunTopicsCount: 8,
+        lastRunSubtopicsCount: 30,
+      });
+    });
+  });
+
+  describe("given a run that failed for a reason the customer can fix", () => {
+    it("passes the failure code and its actionability through", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRunAt: NOW - 1_000,
+          LastRunOutcome: "failed",
+          LastRunError: "401 from https://internal.provider/v1 (key sk-abc...)",
+          LastRunErrorCode: "model_provider_auth",
+          LastRunErrorUserActionable: true,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.lastRunErrorCode).toBe("model_provider_auth");
+      expect(status.isLastRunErrorUserActionable).toBe(true);
+    });
+
+    it("never exposes the raw provider error text", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRunAt: NOW - 1_000,
+          LastRunOutcome: "failed",
+          LastRunError: "401 from https://internal.provider/v1 (key sk-abc...)",
+          LastRunErrorCode: "model_provider_auth",
+          LastRunErrorUserActionable: true,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(JSON.stringify(status)).not.toContain("sk-abc");
+      expect(Object.keys(status)).not.toContain("lastRunError");
+    });
+  });
+
+  describe("given a run that failed on our side", () => {
+    it("reports the failure as not the customer's to fix", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRunAt: NOW - 1_000,
+          LastRunOutcome: "failed",
+          LastRunErrorCode: "clustering_service",
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.lastRunErrorCode).toBe("clustering_service");
+      expect(status.isLastRunErrorUserActionable).toBe(false);
+    });
+  });
+
+  describe("when the manual trigger asks whether a run is already underway", () => {
+    it("answers yes while a request is outstanding", async () => {
+      const service = serviceReading({
+        projection: projectionRow({
+          LastRequestedAt: NOW - 5_000,
+          LastRequestTrigger: "manual",
+        }),
+      });
+
+      await expect(
+        service.isRunInFlight({ projectId: PROJECT_ID }),
+      ).resolves.toBe(true);
+    });
+
+    it("answers no once the run has reported back", async () => {
+      const service = serviceReading({
+        projection: projectionRow({
+          LastRequestedAt: NOW - 5_000,
+          LastRequestTrigger: "manual",
+          LastRunAt: NOW - 1_000,
+          LastRunOutcome: "completed",
+        }),
+      });
+
+      await expect(
+        service.isRunInFlight({ projectId: PROJECT_ID }),
+      ).resolves.toBe(false);
+    });
+  });
+});
+
+describe("TopicClusteringStatusService run history", () => {
+  const finishedRun = {
+    runId: "20260720T093000",
+    trigger: "scheduled",
+    startedAt: NOW - 3_600_000,
+    finishedAt: NOW - 3_500_000,
+    outcome: "completed",
+    mode: "batch",
+    skippedReason: null,
+    errorCode: null,
+    isErrorUserActionable: false,
+    tracesProcessed: 2_500,
+    topicsCount: 12,
+    subtopicsCount: 40,
+    pages: 2,
+  };
+
+  describe("given recorded runs", () => {
+    describe("when the history is read", () => {
+      it("returns them in the stored order, newest first", async () => {
+        const olderRun = {
+          ...finishedRun,
+          runId: "20260719T093000",
+          startedAt: finishedRun.startedAt - 86_400_000,
+          finishedAt: (finishedRun.finishedAt ?? 0) - 86_400_000,
+        };
+        const runs = await serviceWithHistory([
+          finishedRun,
+          olderRun,
+        ]).getRunHistoryByProjectId({ projectId: PROJECT_ID });
+        expect(runs).toEqual([finishedRun, olderRun]);
+      });
+    });
+  });
+
+  describe("given a run still reading as running inside the stale window", () => {
+    describe("when the history is read", () => {
+      it("keeps presenting it as running", async () => {
+        const running = {
+          ...finishedRun,
+          runId: "run-live",
+          outcome: "running",
+          finishedAt: null,
+          startedAt: NOW - 60_000,
+        };
+        const runs = await serviceWithHistory([
+          running,
+        ]).getRunHistoryByProjectId({ projectId: PROJECT_ID });
+        expect(runs[0]?.outcome).toBe("running");
+      });
+    });
+  });
+
+  describe("given a running entry older than the stale-run window", () => {
+    describe("when the history is read", () => {
+      it("presents it as abandoned so the UI never shows it working forever", async () => {
+        const wedged = {
+          ...finishedRun,
+          runId: "run-wedged",
+          outcome: "running",
+          finishedAt: null,
+          startedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS - 1,
+        };
+        const runs = await serviceWithHistory([
+          wedged,
+        ]).getRunHistoryByProjectId({ projectId: PROJECT_ID });
+        expect(runs[0]?.outcome).toBe("abandoned");
+      });
+    });
+  });
+});

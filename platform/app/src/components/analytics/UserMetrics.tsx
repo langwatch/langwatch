@@ -1,0 +1,229 @@
+import {
+  Card,
+  EmptyState,
+  Grid,
+  GridItem,
+  Heading,
+  Tabs,
+  VStack,
+} from "@chakra-ui/react";
+import { analyticsMetrics } from "../../server/analytics/registry";
+import { TopicsSelector } from "../filters/TopicsSelector";
+import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
+
+// Time unit conversion constants
+const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
+const ONE_DAY = MINUTES_IN_DAY;
+
+// Thread-focused: metrics without user grouping
+const threadMetrics: CustomGraphInput = {
+  graphId: "threadMetrics",
+  graphType: "summary",
+  series: [
+    {
+      name: "Threads count",
+      colorSet: "greenTones",
+      metric: "metadata.thread_id",
+      aggregation: "cardinality",
+    },
+    {
+      name: "Avg messages per thread",
+      colorSet: "orangeTones",
+      metric: "metadata.trace_id",
+      aggregation: "cardinality",
+      pipeline: { field: "thread_id", aggregation: "avg" },
+    },
+    {
+      name: "Avg thread duration",
+      colorSet: "purpleTones",
+      metric: "threads.average_duration_per_thread",
+      aggregation: "avg",
+    },
+  ],
+  includePrevious: false,
+  timeScale: ONE_DAY,
+  height: 300,
+};
+
+const userEmptyState = (
+  <EmptyState.Root size="sm" paddingY={10}>
+    <EmptyState.Content>
+      <VStack textAlign="center">
+        <EmptyState.Title textStyle="sm">No user data yet</EmptyState.Title>
+        <EmptyState.Description textStyle="xs">
+          Start tracking users to see metrics here.{" "}
+          <a
+            href="https://langwatch.ai/docs/integration/metadata-and-labels"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: "underline" }}
+          >
+            Learn how to set up
+          </a>
+        </EmptyState.Description>
+      </VStack>
+    </EmptyState.Content>
+  </EmptyState.Root>
+);
+
+export function UserMetrics() {
+  const messagesGraph: CustomGraphInput = {
+    graphId: "messagesCountGraph",
+    graphType: "line",
+    series: [
+      {
+        name: "Traces",
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+        colorSet: analyticsMetrics.metadata.trace_id.colorSet,
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: true,
+    timeScale: ONE_DAY,
+  };
+
+  const threadsGraph: CustomGraphInput = {
+    graphId: "threadsCountGraph",
+    graphType: "line",
+    series: [
+      {
+        name: "Threads",
+        metric: "metadata.thread_id",
+        aggregation: "cardinality",
+        colorSet: analyticsMetrics.metadata.thread_id.colorSet,
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: true,
+    timeScale: ONE_DAY,
+  };
+
+  const usersGraph: CustomGraphInput = {
+    graphId: "usersCountGraph",
+    graphType: "line",
+    series: [
+      {
+        name: "Users",
+        metric: "metadata.user_id",
+        aggregation: "cardinality",
+        colorSet: analyticsMetrics.metadata.user_id.colorSet,
+        noDataUrl: "https://langwatch.ai/docs/integration/metadata-and-labels",
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: true,
+    timeScale: ONE_DAY,
+  };
+
+  return (
+    <Grid
+      width="full"
+      templateColumns={[
+        "minmax(350px, 1fr)",
+        "minmax(350px, 1fr)",
+        "minmax(350px, 1fr)",
+        "minmax(350px, 2fr) minmax(250px, 1fr)",
+      ]}
+      gap={6}
+    >
+      <GridItem>
+        <Card.Root border="1px solid" borderColor="border.emphasized">
+          <Card.Body paddingTop={2}>
+            <Tabs.Root
+              variant="plain"
+              defaultValue="messages"
+              // Every panel here is a read-only CustomGraph analytics
+              // query with no user-entered state, so fully unmounting
+              // inactive tabs is safe and avoids holding queries for
+              // graphs the user never looks at.
+              lazyMount
+              unmountOnExit
+            >
+              <Tabs.List gap={8}>
+                <Tabs.Trigger
+                  value="messages"
+                  paddingX={0}
+                  paddingBottom={0}
+                  height="fit-content"
+                >
+                  <CustomGraph
+                    input={{ ...messagesGraph, graphType: "summary" }}
+                    titleProps={{
+                      textStyle: "sm",
+                      color: "fg",
+                    }}
+                  />
+                </Tabs.Trigger>
+                <Tabs.Trigger
+                  value="threads"
+                  paddingX={0}
+                  paddingBottom={0}
+                  height="fit-content"
+                >
+                  <CustomGraph
+                    input={{ ...threadsGraph, graphType: "summary" }}
+                    titleProps={{
+                      textStyle: "sm",
+                      color: "fg",
+                    }}
+                  />
+                </Tabs.Trigger>
+                <Tabs.Trigger
+                  value="users"
+                  paddingX={0}
+                  paddingBottom={0}
+                  height="fit-content"
+                >
+                  <CustomGraph
+                    input={{ ...usersGraph, graphType: "summary" }}
+                    titleProps={{
+                      textStyle: "sm",
+                      color: "fg",
+                    }}
+                  />
+                </Tabs.Trigger>
+                <Tabs.Indicator
+                  mt="-1.5px"
+                  height="4px"
+                  bg="orange.400"
+                  borderRadius="1px"
+                  bottom={0}
+                />
+              </Tabs.List>
+              <Tabs.Content value="messages">
+                <CustomGraph input={messagesGraph} />
+              </Tabs.Content>
+              <Tabs.Content value="threads">
+                <CustomGraph input={threadsGraph} />
+              </Tabs.Content>
+              <Tabs.Content value="users">
+                <CustomGraph input={usersGraph} emptyState={userEmptyState} />
+              </Tabs.Content>
+            </Tabs.Root>
+          </Card.Body>
+        </Card.Root>
+      </GridItem>
+      <GridItem rowSpan={2}>
+        <Card.Root width="100%" height="100%">
+          <Card.Header paddingBottom={4}>
+            <Heading size="sm">Top Topics</Heading>
+          </Card.Header>
+          <Card.Body overflowY="auto">
+            <TopicsSelector showTitle={false} />
+          </Card.Body>
+        </Card.Root>
+      </GridItem>
+      <GridItem>
+        <Card.Root overflow="auto">
+          <Card.Header>
+            <Heading size="sm">Thread Metrics</Heading>
+          </Card.Header>
+          <Card.Body>
+            <CustomGraph input={threadMetrics} />
+          </Card.Body>
+        </Card.Root>
+      </GridItem>
+    </Grid>
+  );
+}

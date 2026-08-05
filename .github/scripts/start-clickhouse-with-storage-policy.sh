@@ -41,6 +41,11 @@ EOF
 # ---------------------------------------------------------------------------
 # Step 2: Start ClickHouse container with config mounted (loads at startup)
 # ---------------------------------------------------------------------------
+# Pinned to match the local testcontainers version (globalSetup.ts). The
+# previous `:latest` tag silently moved to 26.6.1 on 2026-07-10 and broke the
+# simulation_runs batch-history window query (boundary row dropped from a
+# multi-part partition on a fresh table) — a CH regression, not a code change.
+# Bump both this pin and globalSetup.ts together, deliberately.
 docker run -d \
   --name clickhouse \
   --network host \
@@ -48,7 +53,7 @@ docker run -d \
   -e CLICKHOUSE_USER=default \
   -e CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD}" \
   -v /tmp/storage_policy.xml:/etc/clickhouse-server/config.d/storage_policy.xml:ro \
-  clickhouse/clickhouse-server:latest
+  clickhouse/clickhouse-server:25.10.2.65
 
 # ---------------------------------------------------------------------------
 # Step 3: Readiness loop — wait for ClickHouse HTTP interface to respond

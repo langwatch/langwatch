@@ -27,19 +27,19 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd python-sdk
+          cd sdks/python
           make install
           uv pip install build
 
       - name: Build package
         run: |
-          cd python-sdk
+          cd sdks/python
           uv run python -m build
 
       - name: Publish package
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
         with:
-          packages_dir: python-sdk/dist/
+          packages_dir: sdks/python/dist/
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
 
@@ -49,7 +49,7 @@ jobs:
           if [ "${{ github.event_name }}" = "release" ]; then
             VERSION=${GITHUB_REF#refs/tags/python-sdk@v}
           else
-            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."python-sdk"')
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."sdks/python"')
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -58,6 +58,6 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
         run: |
           bash .github/scripts/notify-slack-release.sh \
-            python-sdk/CHANGELOG.md \
+            sdks/python/CHANGELOG.md \
             "Python SDK" \
             "${{ steps.get_version.outputs.version }}"

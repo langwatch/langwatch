@@ -13,10 +13,10 @@ Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAd
     Given alice is an org ADMIN
     When alice clicks "Add ingestion source" → "Microsoft Copilot Studio" → enters her tenant credentials → Save
     Then a new IngestionSource row lands with `sourceType = "copilot_studio"` + `pullConfig = <auto-populated reference config>` + `pullSchedule = "*/15 * * * *"` (15 min default)
-    And the BullMQ worker picks up the first scheduled run within ~15 min
+    And the process outbox picks up the first scheduled run within ~15 min
 
   Scenario: Reference config is locked + auditable
-    Given the copilot_studio reference puller exists at `langwatch/ee/governance/services/pullers/copilotStudio.puller.ts`
+    Given the copilot_studio reference puller exists at `platform/app/ee/governance/services/pullers/copilotStudio.puller.ts`
     Then it exports a constant `COPILOT_STUDIO_PULL_CONFIG` defining: URL (Microsoft's audit-log endpoint), authMode ("oauth2_microsoft"), cursorJsonPath, eventsJsonPath, eventMapping per Microsoft's response shape
     And admins cannot override the URL / auth shape (only credentials) — the reference impl is the trusted shape
 

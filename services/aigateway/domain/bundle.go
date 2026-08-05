@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"slices"
+	"strings"
+	"time"
+)
 
 // Bundle is the resolved virtual-key configuration used for the request lifecycle.
 type Bundle struct {
@@ -49,19 +53,107 @@ type BundleConfig struct {
 	// CacheRules lists priority-ordered cache control rules.
 	CacheRules []CacheRule
 
-	// ProjectOTLPToken is the project's auth token for AI trace export.
+	// TraceProjectID is the project customer traces are EXPORTED to. It is NOT
+	// necessarily the VK's own project: resolveTraceProject (control plane) falls
+	// back to the organization's internal_governance project whenever the VK is
+	// not scoped to exactly one project, so this can name a different project on
+	// a different team than Bundle.ProjectID.
+	//
+	// It is materialized in the SAME config payload as ProjectOTLPToken, so the
+	// two always describe one project. Pair the token with THIS field and never
+	// with Bundle.ProjectID: that one is carried on the auth JWT, refreshed on a
+	// different clock, and a skew between the two clocks exports one project's
+	// prompts and completions under another project's ingest token.
+	TraceProjectID string
+
+	// ProjectOTLPToken is the auth token for AI trace export into TraceProjectID.
 	ProjectOTLPToken string
+
+	// MirrorTier is the ADR-061 mirror fidelity resolved for this VK's
+	// organization ("content" | "structural" | "skip" | ""). Non-skip only for
+	// Langy virtual keys — the control-plane materialiser leaves it empty for
+	// ordinary customer VKs, so their gen_ai spans are never mirrored. When
+	// non-skip, the customer trace bridge emits a SECOND gen_ai span into the
+	// mirror project at the tier's fidelity (see pkg/customertracebridge).
+	MirrorTier string
 
 	// VKDisplayPrefix is the VK's public display prefix (e.g. "vk-lw-…").
 	// Carried so rule matchers can target VKs by prefix without leaking the
 	// secret. Sourced from the control-plane config payload.
 	VKDisplayPrefix string
 
-	// VKTags carries VK-level labels honored by cache rule matchers
-	// (vk_tags). Currently always empty — the schema doesn't store tags
-	// yet — but plumbed end-to-end so future tag wiring is a one-line add
-	// in the control-plane materialiser.
+	// VKTags carries the VK's operator-assigned tags (config.metadata.tags
+	// on the control plane). Consumed by cache rule matchers (vk_tags) and
+	// stamped on customer spans as langwatch.labels so the Trace Explorer
+	// can filter gateway traffic by tag.
 	VKTags []string
+
+	// ProvidersAllowed is the key's explicit provider allowlist, as
+	// ModelProvider row ids (the same ids Credentials carry). Empty means
+	// every provider in the bundle: that is what the control plane sends for
+	// "All providers" keys, whose bundles already contain only eligible
+	// providers. A non-empty list is enforced at dispatch too, so a stale or
+	// hand-crafted credential chain cannot reach a provider the key was
+	// narrowed away from. Contract §4.2 providers_allowed.
+	ProvidersAllowed []string
+
+	// RoutingMode is how the key behaves when its provider fails: no
+	// failover, walk every eligible provider, or follow a routing policy.
+	// Enforcement rides Fallback.MaxAttempts (pinned to 1 for
+	// RoutingModeNone by the control plane AND at wire decode, so a drifted
+	// control plane cannot silently re-arm fallback on a no-fallback key).
+	RoutingMode string
+}
+
+// Routing modes carried on the bundle wire (contract §4.2 routing_mode).
+const (
+	RoutingModeNone        = "none"
+	RoutingModeFallbackAll = "fallback_all"
+	RoutingModePolicy      = "policy"
+)
+
+// AllowsProvider reports whether a ModelProvider row id is inside the key's
+// provider allowlist. An empty allowlist allows every provider (the "All
+// providers, current and future" persistence per contract §4.2).
+func (c BundleConfig) AllowsProvider(id string) bool {
+	if len(c.ProvidersAllowed) == 0 {
+		return true
+	}
+	return slices.Contains(c.ProvidersAllowed, id)
+}
+
+// AllowsModel reports whether a model ID satisfies models_allowed. An
+// empty allowlist allows everything. Entries are either a literal model
+// ID or a trailing-"*" prefix pattern.
+func (c BundleConfig) AllowsModel(model string) bool {
+	if len(c.AllowedModels) == 0 {
+		return true
+	}
+	for _, pattern := range c.AllowedModels {
+		if ModelPatternMatches(pattern, model) {
+			return true
+		}
+	}
+	return false
+}
+
+// ModelPatternMatches applies one models_allowed entry to a model ID.
+func ModelPatternMatches(pattern, model string) bool {
+	if pattern == model {
+		return true
+	}
+	if ModelPatternIsWildcard(pattern) {
+		return strings.HasPrefix(model, strings.TrimSuffix(pattern, "*"))
+	}
+	return false
+}
+
+// ModelPatternIsWildcard reports whether a models_allowed entry is a
+// pattern rather than a concrete model ID. Callers that surface the
+// allowlist to users (GET /v1/models) must not present a wildcard as if
+// it were a model a client can request.
+func ModelPatternIsWildcard(pattern string) bool {
+	return strings.HasSuffix(pattern, "*")
 }
 
 // ModelAlias maps a friendly name to a provider + model.
@@ -127,7 +219,30 @@ type BudgetConfig struct {
 
 // BudgetScope is a single budget limit with its current spend (microdollars).
 type BudgetScope struct {
-	Scope         string `json:"scope"`
+	// ID is the control-plane GatewayBudget row id, carried so a block can
+	// name the budget that caused it.
+	ID    string `json:"id"`
+	Scope string `json:"scope"`
+	// ScopeID is the bucket spend accumulates under. Equal to the budget's
+	// target for every scope except "group", where it is "<groupId>:<userId>"
+	// so each group member gets their own allowance; provider-filtered
+	// budgets additionally suffix "|provider:<modelProviderId>". The control
+	// plane computes it; the gateway only reports it back.
+	ScopeID string `json:"scope_id"`
+	// PrincipalID names the member a "group" bucket belongs to. Empty for
+	// every other scope.
+	PrincipalID string `json:"principal_id"`
+	// PerUser marks an attributed-user TEMPLATE: ScopeID is the ANCHOR (a
+	// virtual key or project id) and the limit applies per distinct
+	// external end-user id. Enforcement resolves the request's bucket
+	// through the cached bucket-spend read; SpentMicroUSD is meaningless
+	// on template entries.
+	PerUser bool `json:"per_user,omitempty"`
+	// ProviderKey is the ModelProvider row id this budget is filtered to.
+	// Empty means the budget counts and constrains every dispatch; set means
+	// it counts only dispatches to that provider, so a breach removes the
+	// provider from the candidate chain instead of blocking the request.
+	ProviderKey   string `json:"provider_key"`
 	Window        string `json:"window"`
 	LimitMicroUSD int64  `json:"limit_micro_usd"`
 	SpentMicroUSD int64  `json:"spent_micro_usd"`

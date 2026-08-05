@@ -15,10 +15,12 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
-  LANGWATCH_API_KEY: sk-lw-1234567890
   LANGWATCH_ENDPOINT: http://localhost:5560
 
 jobs:
@@ -31,11 +33,23 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the test
+          # and e2e steps spend real LLM money, so they must not run on
+          # pushes or release PRs that touched nothing under
+          # sdks/typescript/. An SDK release PR still matches via
+          # sdks/typescript/CHANGELOG.md.
+          push-strategy: diff
           filters: |
             relevant:
-              - 'typescript-sdk/**'
+              - 'sdks/typescript/**'
+              # The single lockfile, workspace definition, root manifest and
+              # hoist config live at the repo root since ADR-076; a dependency
+              # or override change touches only these.
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
               - '.github/workflows/sdk-javascript-ci.yml'
-              - '.github/.release-please-manifest.json'
 
   ci:
     needs: changes
@@ -47,7 +61,7 @@ jobs:
     # Run lint, typecheck, tests, and build for TypeScript SDK
     defaults:
       run:
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
@@ -56,12 +70,20 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
-          install-dir: typescript-sdk
+          install: "langwatch..."
 
-      - name: Install TypeScript Native Preview
-        run: pnpm install -D @typescript/native-preview
-
+      # The "Install TypeScript Native Preview" step that used to sit here is
+      # gone. It ran `pnpm install -D -w @typescript/native-preview`, and `-w`
+      # means "the workspace root" — which used to BE typescript-sdk/ when it
+      # was its own install root. Since ADR-076 the root is the repo, so it
+      # would have written the dependency into the root manifest and the
+      # SHARED lockfile mid-job, leaving every later step running against a
+      # lockfile that no longer matches the repo.
+      #
+      # Dropping it rather than rescoping it, because nothing in this package
+      # uses it: `lint` is `eslint .` and `typecheck` is `tsc --noEmit`, and
+      # the SDK references neither `tsgo` nor native-preview anywhere. It was
+      # installing a toolchain no step invokes.
       - name: Run lint check
         run: pnpm run lint
 
@@ -79,7 +101,12 @@ jobs:
            || github.event_name == 'pull_request_target')
         env:
           LANGWATCH_ENDPOINT: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_ENDPOINT }}
-          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
+          # OpenAI traffic rides the LangWatch AI Gateway: the key is a
+          # LangWatch virtual key and both base-URL spellings point the
+          # openai and langchain client families at it.
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
+          OPENAI_API_BASE: https://gateway.langwatch.ai/v1
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
 
@@ -108,7 +135,7 @@ jobs:
 
     services:
       clickhouse:
-        image: clickhouse/clickhouse-server:latest
+        image: clickhouse/clickhouse-server:25.10.2.65
         ports:
           - 8123:8123
         env:
@@ -147,7 +174,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
 
     steps:
       - name: Checkout
@@ -168,10 +195,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-          cache-dependency-path: |
-            typescript-sdk/pnpm-lock.yaml
-            langwatch/pnpm-lock.yaml
-            mcp-server/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With
@@ -181,45 +205,57 @@ jobs:
       - name: Install node-gyp (for node-pty postinstall)
         run: npm install -g node-gyp@12.3.0
 
-      - name: Build mcp-server
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile && pnpm run build
+      # One install covering the app, the MCP server (a workspace dependency
+      # of the app) and the SDK under test. See ADR-076.
+      - name: Install dependencies
+        run: >
+          CI=true pnpm install --frozen-lockfile
+          --filter "@langwatch/web..."
+          --filter "langwatch..."
 
-      - name: Install LangWatch app dependencies
-        working-directory: langwatch
-        run: CI=true pnpm install --frozen-lockfile
+      - name: Build mcp-server
+        run: pnpm --filter @langwatch/mcp-server run build
 
       - name: Prepare LangWatch files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       - name: Setup database
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Seed test project
-        working-directory: langwatch
+        working-directory: platform/app
+        env:
+          # Seed the credential the SDK test process receives without putting
+          # LANGWATCH_API_KEY on the platform process itself.
+          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-1234567890
         run: pnpm prisma:seed
 
       - name: Install goose
-        # Override job-level defaults.run.working-directory (typescript-sdk)
+        # Override job-level defaults.run.working-directory (sdks/typescript)
         # so the script path resolves from the repo root.
         working-directory: .
         run: bash .github/scripts/install-goose.sh
 
       - name: Setup ClickHouse
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm clickhouse:migrate
 
       # Build the app so we can run a production server (dev mode is
       # unreliable in CI — turbopack JIT compilation can hang under
       # memory pressure, causing the server to become unresponsive).
       - name: Build LangWatch app
-        working-directory: langwatch
+        working-directory: platform/app
         run: NODE_ENV=test pnpm build
 
       - name: Start LangWatch server and worker
-        working-directory: langwatch
+        working-directory: platform/app
+        env:
+          # The workflow-global LANGWATCH_API_KEY is for the SDK under test.
+          # Platform processes refuse to boot with it set (the self-referencing
+          # ingest guard in langwatchPlatformGuard.ts), so blank it here.
+          LANGWATCH_API_KEY: ""
         run: |
           NODE_ENV=production pnpm run start &
           # Start the worker process so the event-sourcing pipeline
@@ -229,8 +265,7 @@ jobs:
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"
 
-      - name: Install SDK dependencies
-        run: pnpm install --frozen-lockfile
+      # Already installed above alongside the app; nothing further to fetch.
 
       - name: Build SDK
         run: pnpm run build
@@ -245,7 +280,13 @@ jobs:
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
         env:
-          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
+          LANGWATCH_API_KEY: sk-lw-1234567890
+          # OpenAI traffic rides the LangWatch AI Gateway (virtual key +
+          # gateway base URL). Step-scoped on purpose: the LangWatch app
+          # booted above must not inherit a gateway base URL.
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
+          OPENAI_API_BASE: https://gateway.langwatch.ai/v1
           E2E_TIMEOUT: 120000
           E2E_POLL_TIMEOUT: 120000
         run: pnpm test:e2e

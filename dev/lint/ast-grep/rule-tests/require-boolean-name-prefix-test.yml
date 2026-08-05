@@ -1,0 +1,48 @@
+id: require-boolean-name-prefix-ts
+valid:
+  # `is` prefix on an interface member.
+  - |
+    interface Props {
+      isLoading: boolean;
+    }
+  # `has` prefix.
+  - |
+    interface State {
+      hasFirstMessage: boolean;
+    }
+  # `should` prefix on a parameter.
+  - |
+    function render(shouldExpand: boolean) {}
+  # Domain-equivalent adjectives are accepted.
+  - |
+    interface Config {
+      enabled: boolean;
+      visible: boolean;
+    }
+  # Non-boolean members are out of scope entirely.
+  - |
+    interface Row {
+      perMember: string;
+      count: number;
+    }
+  # Declared const with an `is` prefix.
+  - |
+    const isPersonalTeam: boolean = team.ownerUserId !== null;
+invalid:
+  # Noun-shaped boolean property — the finding that prompted this rule.
+  - |
+    interface Budget {
+      perMember: boolean;
+    }
+  # Past-participle name with no prefix.
+  - |
+    interface Seeded {
+      seeded: boolean;
+    }
+  # Boolean parameter named as a noun. (`public` itself is a TS modifier
+  # keyword and does not parse as a plain parameter name.)
+  - |
+    function publish(channelPublic: boolean) {}
+  # Declared const with a bare noun name.
+  - |
+    const authorTyped: boolean = event.author === user.id;

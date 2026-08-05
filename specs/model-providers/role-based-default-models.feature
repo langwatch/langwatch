@@ -6,7 +6,7 @@ Feature: Role-based default models with per-scope overrides
   # The data, resolver, and ModelNotConfiguredError shape live with B3.1
   # (specs/model-providers/model-resolver-and-registry.feature). This file
   # describes the settings UI in
-  # `langwatch/src/components/settings/DefaultModelsSection.tsx` and the
+  # `platform/app/src/components/settings/DefaultModelsSection.tsx` and the
   # tRPC payload that drives it.
   #
   # Mental model:
@@ -234,3 +234,16 @@ Feature: Role-based default models with per-scope overrides
     Then the Fast role line shows an inline warning that the configured model is no longer available
     And the line carries a "Pick a model" CTA pointing at the role selector
     And any feature consuming Fast throws ModelNotConfigured until the role is reconfigured
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Read visibility parity across membership systems
+  # ────────────────────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: Default Models list is visible to members whose access comes from role bindings
+    Given user "konrad" has a RoleBinding: Member on the team owning project "web-app"
+    And "konrad" has no TeamUser membership rows at all
+    And a PROJECT-scoped default models config exists for "web-app"
+    When "konrad" opens the Model Providers settings page for "web-app"
+    Then the Default Models table lists the "web-app" config row
+    And the view matches what a legacy TeamUser member of the same team sees

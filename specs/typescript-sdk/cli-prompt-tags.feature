@@ -10,7 +10,7 @@ Feature: CLI Prompt Tag Commands
   # delete subcommands, --force flag, prompt-list Tags column,
   # prompt-versions JSON output) are exercised by the per-command
   # test files at
-  # `typescript-sdk/src/cli/commands/{prompt,tag}/__tests__/`. Those
+  # `sdks/typescript/src/cli/commands/{prompt,tag}/__tests__/`. Those
   # test files exist but have not yet been individually @scenario-
   # bound (the audit manifest classifies each as KEEP). Cheap
   # follow-up: pass through each command file once and add JSDoc

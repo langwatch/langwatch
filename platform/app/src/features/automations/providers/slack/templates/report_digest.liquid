@@ -1,0 +1,21 @@
+{%- capture _sub -%}
+{{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}
+{%- endcapture -%}
+{%- capture _rows_md -%}
+{% for t in traces limit: 20 %}• <{{ t.url }}|`{{ t.traceId | truncate: 10 }}`> {{ t.input | truncate: 90 | mrkdwn_escape }}
+   _{{ t.model | default: "unknown model" }} · ${{ t.costUsd | round: 4 }} · {{ t.durationMs | round: 0 }} ms_{% unless forloop.last %}
+{% endunless %}{% endfor %}
+{%- endcapture -%}
+{%- capture _view -%}
+<{{ viewUrl }}|View in LangWatch ↗> · {{ occurredAt | date: "%b %d, %H:%M" }}
+{%- endcapture -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | prepend: "📊 " | truncate: 140 | json }}, "emoji": true } },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _sub | json }} }] }
+  {%- if report.isEmpty -%}
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": "_Nothing matched in this window._" } }
+  {%- else -%}
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _rows_md | json }} } }
+  {%- endif -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _view | json }} }] }
+]

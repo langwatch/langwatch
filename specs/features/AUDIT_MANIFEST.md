@@ -52,8 +52,8 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
-| specs/features/dataset-python-sdk.feature | "List datasets returns first page for the project" | KEEP | DatasetsFacade.list_datasets exists in python-sdk/src/langwatch/dataset/dataset_facade.py, integration test covers behavior unbound |
-| specs/features/dataset-python-sdk.feature | "List datasets with explicit pagination" | KEEP | list_datasets accepts page/limit; tests in python-sdk/tests/dataset/test_dataset_api_service_integration.py unbound |
+| specs/features/dataset-python-sdk.feature | "List datasets returns first page for the project" | KEEP | DatasetsFacade.list_datasets exists in sdks/python/src/langwatch/dataset/dataset_facade.py, integration test covers behavior unbound |
+| specs/features/dataset-python-sdk.feature | "List datasets with explicit pagination" | KEEP | list_datasets accepts page/limit; tests in sdks/python/tests/dataset/test_dataset_api_service_integration.py unbound |
 | specs/features/dataset-python-sdk.feature | "List datasets returns empty result when project has no datasets" | KEEP | Behavior covered by test_returns_empty_result_when_no_datasets, no @scenario binding |
 | specs/features/dataset-python-sdk.feature | "List datasets propagates authentication errors" | KEEP | DatasetApiError raised on 401 in dataset_api_service.py, test_raises_dataset_api_error_on_auth_failure exists |
 | specs/features/dataset-python-sdk.feature | "Create a dataset with name and column types" | KEEP | DatasetsFacade.create_dataset implemented; test_creates_dataset_with_name_and_columns covers it |
@@ -100,7 +100,6 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/dataset-rest-api.feature | "List datasets returns empty array for project with no datasets" | KEEP | Test "returns a paginated response with 0 datasets" exists unbound |
 | specs/features/dataset-rest-api.feature | "Create a dataset with name and column types" | KEEP | POST /api/dataset implemented; test "creates a dataset with the correct slug" exists |
 | specs/features/dataset-rest-api.feature | "Create a dataset auto-generates a unique slug from the name" | KEEP | 409 conflict handling exists; test "returns 409 Conflict" exists |
-| specs/features/dataset-rest-api.feature | "Create a dataset enforces plan limits" | KEEP | resourceLimitMiddleware applied on POST; test "returns 403 Forbidden" exists |
 | specs/features/dataset-rest-api.feature | "Create a dataset validates column types" | KEEP | Zod schema in schemas.ts; test "returns 422 Unprocessable Entity" exists |
 | specs/features/dataset-rest-api.feature | "Create a dataset requires a name" | KEEP | Zod schema validation; test "returns 422 Unprocessable Entity" exists for missing name |
 | specs/features/dataset-rest-api.feature | "Get a dataset by slug" | KEEP | GET /api/dataset/:slugOrId implemented; test "returns the dataset by slug with its records" exists |
@@ -206,7 +205,6 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/dataset-file-upload-api.feature | "Create + upload renames reserved column names" | KEEP | renameReservedColumns in upload-utils.ts:102; integration test "renames 'id' to 'id_' and 'selected' to 'selected_'" exists |
 | specs/features/dataset-file-upload-api.feature | "Create + upload requires a name field" | KEEP | Zod schema validation; integration test "returns 422 Unprocessable Entity" for missing name exists |
 | specs/features/dataset-file-upload-api.feature | "Create + upload requires a file field" | KEEP | Multipart validation; integration test "returns 422 Unprocessable Entity" for missing file exists |
-| specs/features/dataset-file-upload-api.feature | "Create + upload enforces dataset plan limits" | KEEP | resourceLimitMiddleware on create+upload; integration test "returns 403 Forbidden" exists |
 | specs/features/dataset-file-upload-api.feature | "Create + upload fails when slug conflicts with existing dataset" | KEEP | Conflict handling; integration test "returns 409 Conflict" exists |
 | specs/features/dataset-file-upload-api.feature | "Create + upload rejects file exceeding row limit" | KEEP | MAX_ROWS_LIMIT enforced; integration test "returns 400 Bad Request" for create+upload row limit exists |
 | specs/features/dataset-file-upload-api.feature | "Detect CSV format from .csv extension" | KEEP | detectFileFormat in upload-utils.ts:21; unit test "detects CSV format" exists |
@@ -226,7 +224,7 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/dataset-file-upload-api.feature | "Upload to existing without API key returns 401" | KEEP | apiKeyAuth on /:slug/upload; integration test "returns 401 for upload to existing" exists |
 | specs/features/dataset-cli.feature | "Add records rejects non-array JSON" | KEEP | parseRecordsJson in records-add.ts:28; unit tests "throws for a JSON object/string/number" in records-add.unit.test.ts exist |
 | specs/features/dataset-cli.feature | "Add records rejects invalid JSON" | KEEP | parseRecordsJson try/catch; unit tests "throws for malformed JSON" and "throws for empty string" exist |
-| specs/features/customer-io-nurturing-integration.feature | "Identify call authenticates with Basic Auth using the configured API key" | KEEP | NurturingService.identifyUser tested at langwatch/ee/billing/nurturing/nurturing.service.unit.test.ts; not @scenario-bound |
+| specs/features/customer-io-nurturing-integration.feature | "Identify call authenticates with Basic Auth using the configured API key" | KEEP | NurturingService.identifyUser tested at platform/app/ee/billing/nurturing/nurturing.service.unit.test.ts; not @scenario-bound |
 | specs/features/customer-io-nurturing-integration.feature | "Identify call routes to EU endpoint when region is eu" | KEEP | EU endpoint test exists in nurturing.service.unit.test.ts; no JSDoc binding |
 | specs/features/customer-io-nurturing-integration.feature | "Track call sends event payload to Customer.io" | KEEP | trackEvent tested in nurturing.service.unit.test.ts; not bound |
 | specs/features/customer-io-nurturing-integration.feature | "Group call sends organization traits to Customer.io" | KEEP | groupUser tested in nurturing.service.unit.test.ts; not bound |
@@ -256,8 +254,6 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/customer-io-nurturing-integration.feature | "Subsequent evaluations fire evaluation_ran event" | KEEP | evaluation_ran event tested in eval sync reactor tests |
 | specs/features/customer-io-nurturing-integration.feature | "Subsequent evaluation updates are debounced per project" | KEEP | Per-project debounce confirmed in reactor implementation |
 | specs/features/customer-io-nurturing-integration.feature | "Evaluation sync reactor uses project-scoped job ID for debouncing" | UPDATE | Actual makeJobId returns cio-eval-sync-{projectId}-{evaluationId}; scenario says project only |
-| specs/features/customer-io-nurturing-integration.feature | "Daily usage fold pushes aggregated metrics to Customer.io" | KEEP | customerIoDailyUsageSync.reactor.unit.test.ts covers identify with trace_count fields |
-| specs/features/customer-io-nurturing-integration.feature | "Daily usage sync sends cumulative totals not reset counters" | KEEP | Cumulative total + ISO timestamp tests exist in daily usage reactor |
 | specs/features/customer-io-nurturing-integration.feature | "Team member invite updates member count and fires event" | KEEP | fireTeamMemberInvitedNurturing tested in featureAdoption.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Workflow creation updates workflow count and fires event" | KEEP | fireWorkflowCreatedNurturing tested in featureAdoption.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Scenario creation updates scenario count and fires event" | KEEP | fireScenarioCreatedNurturing tested in featureAdoption.unit.test.ts |
@@ -290,7 +286,7 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/customer-io-nurturing-integration.feature | "Signup with ref in URL sends lead_source trait and event property to Customer.io" | KEEP | leadSource->lead_source mapping tested in signupIdentification.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Signup forwards utm tuple to Customer.io" | KEEP | utm tuple snake_case mapping tested in signupIdentification.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Signup without attribution omits those fields from Customer.io traits" | KEEP | Empty-attribution branch tested in signupIdentification.unit.test.ts |
-| specs/features/beta-pill.feature | "Beta pill badge renders with default message" | KEEP | BetaPill component + integration tests at langwatch/src/components/ui/__tests__/BetaPill.integration.test.tsx |
+| specs/features/beta-pill.feature | "Beta pill badge renders with default message" | KEEP | BetaPill component + integration tests at platform/app/src/components/ui/__tests__/BetaPill.integration.test.tsx |
 | specs/features/beta-pill.feature | "Beta pill badge renders with custom message" | KEEP | Custom-message hover popover tested in BetaPill.integration.test.tsx |
 | specs/features/beta-pill.feature | "Popover renders styled text" | KEEP | Styled-text rendering tested in BetaPill.integration.test.tsx |
 | specs/features/beta-pill.feature | "Popover renders clickable links" | KEEP | Clickable link inside popover tested in BetaPill.integration.test.tsx |
@@ -309,7 +305,7 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/onboarding/welcome-screens.feature | "Proceed from welcome screen to scenario creation" | KEEP | Proceed-from-welcome path tested in useNewScenarioFlow.unit.test.ts |
 | specs/features/onboarding/welcome-screens.feature | "Skip welcome screen when scenarios already exist" | KEEP | Welcome-already-seen branch tested in useNewScenarioFlow.unit.test.ts |
 | specs/features/onboarding/welcome-screens.feature | "Scenario welcome screen content" | KEEP | ScenarioWelcomeScreen.integration.test.tsx covers title, description, capabilities, CTA |
-| specs/features/tag-management.feature | "Tags display as pills" | KEEP | TagPill component + TagList integration tests at langwatch/src/components/ui/__tests__/ |
+| specs/features/tag-management.feature | "Tags display as pills" | KEEP | TagPill component + TagList integration tests at platform/app/src/components/ui/__tests__/ |
 | specs/features/tag-management.feature | "Tags can be removed" | KEEP | TagList onRemove tested in TagList.integration.test.tsx |
 | specs/features/tag-management.feature | "Suite sidebar shows tags" | KEEP | SuiteSidebar.integration.test.tsx renders labels; no @scenario binding |
 | specs/features/tag-management.feature | "Suite detail panel shows tags" | UPDATE | SuiteDetailPanel test asserts labels NOT displayed; behavior diverged from scenario |
@@ -463,16 +459,16 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/remove-dead-cost-checker-code.feature | "UsageStatsService still reports current month cost on the dashboard" | KEEP | usage-stats.service still calls getCurrentMonthCost; no test asserts dashboard reports it
 | specs/features/remove-dead-cost-checker-code.feature | "EvaluationExecutionService unit tests remove cost-limit scenarios" | DELETE | Cleanup-of-tests assertion already satisfied by PR #2661
 | specs/features/remove-dead-cost-checker-code.feature | "topicClustering unit tests remove createCostChecker mock" | DELETE | Cleanup-of-tests assertion already satisfied by PR #2661
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "List all evaluators for a project" | KEEP | mcp-server/src/tools/list-evaluators.ts exists; integration test exists for tool but coverage of digest format unclear
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "Get evaluator details by ID or slug" | KEEP | mcp-server/src/tools/get-evaluator.ts exists; covered partially in evaluator-tools.unit.test.ts
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "Create a built-in evaluator" | KEEP | mcp-server/src/tools/create-evaluator.ts exists; behavior of generated ID/slug not explicitly asserted
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "Update an existing evaluator" | KEEP | mcp-server/src/tools/update-evaluator.ts exists; evaluatorType immutability assertion unclear
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "Discover evaluator types overview" | KEEP | mcp-server/src/tools/discover-evaluator-schema.ts exists; behavior partially in discover-evaluator-schema.unit.test.ts
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "List all evaluators for a project" | KEEP | mcp/typescript/src/tools/list-evaluators.ts exists; integration test exists for tool but coverage of digest format unclear
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "Get evaluator details by ID or slug" | KEEP | mcp/typescript/src/tools/get-evaluator.ts exists; covered partially in evaluator-tools.unit.test.ts
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "Create a built-in evaluator" | KEEP | mcp/typescript/src/tools/create-evaluator.ts exists; behavior of generated ID/slug not explicitly asserted
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "Update an existing evaluator" | KEEP | mcp/typescript/src/tools/update-evaluator.ts exists; evaluatorType immutability assertion unclear
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "Discover evaluator types overview" | KEEP | mcp/typescript/src/tools/discover-evaluator-schema.ts exists; behavior partially in discover-evaluator-schema.unit.test.ts
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "Discover specific evaluator type details" | KEEP | discover-schema tool supports evaluatorType param; specific type detail flow not explicitly tested
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "PUT /api/evaluators/:id updates an evaluator" | DUPLICATE | Covered by evaluators-api.integration.test.ts (PUT /:id route exists in app.v1.ts)
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "DELETE /api/evaluators/:id archives an evaluator" | DUPLICATE | Covered by evaluators-api.integration.test.ts (DELETE /:id route in app.v1.ts archives via archivedAt)
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "List all model providers for a project" | KEEP | mcp-server/src/tools/list-model-providers.ts exists; masked-keys assertion not explicit in unit tests
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "Set or update a model provider" | KEEP | mcp-server/src/tools/set-model-provider.ts exists; key-never-returned assertion not in model-provider-tools.unit.test.ts
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "List all model providers for a project" | KEEP | mcp/typescript/src/tools/list-model-providers.ts exists; masked-keys assertion not explicit in unit tests
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "Set or update a model provider" | KEEP | mcp/typescript/src/tools/set-model-provider.ts exists; key-never-returned assertion not in model-provider-tools.unit.test.ts
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "Update model provider without changing keys" | KEEP | set-model-provider supports partial updates; preserve-existing-keys behavior not asserted
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "GET /api/model-providers lists providers with masked keys" | DUPLICATE | Covered by model-providers-api.integration.test.ts (GET / route in app.v1.ts)
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "PUT /api/model-providers/:provider upserts provider config" | DUPLICATE | Covered by model-providers-api.integration.test.ts (PUT /:provider upsert route in app.v1.ts)
@@ -533,8 +529,8 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/suites/rename-suites-to-runs.feature | "Sidebar displays \"Run Plans\" instead of \"Suites\"" | KEEP | featureIcons.ts has label "Run Plans"; no @e2e test bound yet |
 | specs/features/suites/rename-suites-to-runs.feature | "Sidebar displays \"Run History\" instead of \"Runs\"" | KEEP | routes.ts/featureIcons.ts use the new wording but no @e2e covers the sidebar item |
 | specs/features/suites/rename-suites-to-runs.feature | "Page header displays \"Run Plans\"" | KEEP | SimulationsPage uses Run Plans; no integration test asserts the heading |
-| specs/features/suites/rename-suites-to-runs.feature | "Route title is \"Run Plans\"" | DUPLICATE | bound by langwatch/src/utils/__tests__/routes.unit.test.ts (@scenario JSDoc) |
-| specs/features/suites/rename-suites-to-runs.feature | "Feature icon label for suites is \"Run Plans\"" | DUPLICATE | bound by langwatch/src/utils/__tests__/featureIcons.unit.test.ts (@scenario JSDoc) |
+| specs/features/suites/rename-suites-to-runs.feature | "Route title is \"Run Plans\"" | DUPLICATE | bound by platform/app/src/utils/__tests__/routes.unit.test.ts (@scenario JSDoc) |
+| specs/features/suites/rename-suites-to-runs.feature | "Feature icon label for suites is \"Run Plans\"" | DUPLICATE | bound by platform/app/src/utils/__tests__/featureIcons.unit.test.ts (@scenario JSDoc) |
 | specs/features/suites/rename-suites-to-runs.feature | "Route title for simulation runs is \"Run History\"" | KEEP | routes.ts has Run Plan/Run History titles but unit test only covers suites entry |
 | specs/features/suites/rename-suites-to-runs.feature | "Feature icon label for simulation runs is \"Run History\"" | KEEP | featureIcons.ts label updated; no unit test for simulation-runs entry yet |
 | specs/features/suites/rename-suites-to-runs.feature | "Form drawer title reads \"New Run Plan\" for creation" | DUPLICATE | covered by SuiteFormDrawer.integration.test.tsx "displays the 'New Run Plan' title" |
@@ -790,24 +786,24 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/prompts/custom-prompt-tags.feature | "Validation accepts well-formed custom tag names" | DUPLICATE | prompt-tag.repository.unit.test.ts "when name is a valid custom tag" suite covers canary/ab-test/my_tag/v2 |
 | specs/features/prompts/custom-prompt-tags.feature | "Full lifecycle of a custom tag" | DUPLICATE | Full CRUD + assign/cascade lifecycle covered across api/prompts/prompt-tags.integration.test.ts and server/prompt-config/prompt-tags.integration.test.ts |
 | specs/features/prompts/custom-prompt-tags.feature | "Delete and recreate a seeded tag" | DUPLICATE | DELETE + POST + reassign flow covered by api/prompts/prompt-tags.integration.test.ts and prompt-tags.integration.test.ts assignment suites |
-| specs/features/devtools/worktree-creation.feature | "Derives slug from issue title" | KEEP | scripts/worktree.sh generate_slug() implemented, covered by worktree.unit.bats but no @scenario binding |
+| specs/features/devtools/worktree-creation.feature | "Derives slug from issue title" | KEEP | dev/scripts/worktree.sh generate_slug() implemented, covered by worktree.unit.bats but no @scenario binding |
 | specs/features/devtools/worktree-creation.feature | "Truncates slug to 40 characters at word boundary" | UPDATE | Implementation truncates at 50 chars (max_len=50), spec says 40 — feature/code disagree |
-| specs/features/devtools/worktree-creation.feature | "Strips special characters from slug" | KEEP | scripts/worktree.sh strips non-alphanumeric, covered by worktree.unit.bats |
-| specs/features/devtools/worktree-creation.feature | "Builds branch name from issue number" | KEEP | scripts/worktree.sh build_branch_name() implemented, covered by worktree.unit.bats |
-| specs/features/devtools/worktree-creation.feature | "Builds branch name from feature name" | KEEP | scripts/worktree.sh build_branch_name() handles feat/ prefix, covered by worktree.unit.bats |
-| specs/features/devtools/worktree-creation.feature | "Derives directory name from issue branch" | KEEP | scripts/worktree.sh derive_directory() implemented, covered by worktree.unit.bats |
-| specs/features/devtools/worktree-creation.feature | "Derives directory name from feature branch" | KEEP | scripts/worktree.sh derive_directory() implemented, covered by worktree.unit.bats |
-| specs/features/devtools/worktree-creation.feature | "Creates worktree from issue number" | KEEP | scripts/worktree.sh main() implemented, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Creates worktree from feature name" | KEEP | scripts/worktree.sh implemented, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Checks out existing remote branch" | KEEP | scripts/worktree.sh git ls-remote check, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Copies all .env files to new worktree" | KEEP | scripts/worktree.sh copies subdirectory .env*, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Warns when .env files are missing from main checkout" | KEEP | scripts/worktree.sh prints warnings, no integration test asserts warning text |
-| specs/features/devtools/worktree-creation.feature | "Exits when worktree directory already exists" | KEEP | scripts/worktree.sh exits non-zero, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Installs dependencies and prints summary with issue URL" | KEEP | scripts/worktree.sh runs pnpm install + prints URL, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Prints summary without issue URL for feature worktrees" | KEEP | scripts/worktree.sh skips issue URL for feat/, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Fails gracefully when gh CLI is not available for issue input" | KEEP | scripts/worktree.sh checks command -v gh, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Fails when no argument is provided" | KEEP | scripts/worktree.sh exits with usage message, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Fetches from origin before creating worktree" | KEEP | scripts/worktree.sh runs git fetch origin, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Strips special characters from slug" | KEEP | dev/scripts/worktree.sh strips non-alphanumeric, covered by worktree.unit.bats |
+| specs/features/devtools/worktree-creation.feature | "Builds branch name from issue number" | KEEP | dev/scripts/worktree.sh build_branch_name() implemented, covered by worktree.unit.bats |
+| specs/features/devtools/worktree-creation.feature | "Builds branch name from feature name" | KEEP | dev/scripts/worktree.sh build_branch_name() handles feat/ prefix, covered by worktree.unit.bats |
+| specs/features/devtools/worktree-creation.feature | "Derives directory name from issue branch" | KEEP | dev/scripts/worktree.sh derive_directory() implemented, covered by worktree.unit.bats |
+| specs/features/devtools/worktree-creation.feature | "Derives directory name from feature branch" | KEEP | dev/scripts/worktree.sh derive_directory() implemented, covered by worktree.unit.bats |
+| specs/features/devtools/worktree-creation.feature | "Creates worktree from issue number" | KEEP | dev/scripts/worktree.sh main() implemented, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Creates worktree from feature name" | KEEP | dev/scripts/worktree.sh implemented, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Checks out existing remote branch" | KEEP | dev/scripts/worktree.sh git ls-remote check, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Copies all .env files to new worktree" | KEEP | dev/scripts/worktree.sh copies subdirectory .env*, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Warns when .env files are missing from main checkout" | KEEP | dev/scripts/worktree.sh prints warnings, no integration test asserts warning text |
+| specs/features/devtools/worktree-creation.feature | "Exits when worktree directory already exists" | KEEP | dev/scripts/worktree.sh exits non-zero, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Installs dependencies and prints summary with issue URL" | KEEP | dev/scripts/worktree.sh runs pnpm install + prints URL, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Prints summary without issue URL for feature worktrees" | KEEP | dev/scripts/worktree.sh skips issue URL for feat/, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Fails gracefully when gh CLI is not available for issue input" | KEEP | dev/scripts/worktree.sh checks command -v gh, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Fails when no argument is provided" | KEEP | dev/scripts/worktree.sh exits with usage message, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Fetches from origin before creating worktree" | KEEP | dev/scripts/worktree.sh runs git fetch origin, covered by worktree.integration.bats |
 | specs/features/devtools/orchestrator-bug-fix-workflow.feature | "Detects bug by GitHub label" | KEEP | orchestrate skill SKILL.md classifies by label first, no automated test |
 | specs/features/devtools/orchestrator-bug-fix-workflow.feature | "Detects bug by title keyword \"fix\"" | KEEP | orchestrate skill SKILL.md classifies by title keywords (fix/bug/broken/crash) |
 | specs/features/devtools/orchestrator-bug-fix-workflow.feature | "Detects bug by title keyword \"bug\"" | KEEP | orchestrate skill SKILL.md classifies by bug keyword |
@@ -839,11 +835,6 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/devtools/issue-creation-skill.feature | "Shows usage instructions when invoked with no arguments" | KEEP | /create-issue Phase 0 asks user for repo if no slug, no automated test |
 | specs/features/devtools/issue-creation-skill.feature | "Shows authentication error when not logged in" | KEEP | gh CLI auth failure surfaces naturally, no skill-specific test |
 | specs/features/devtools/issue-creation-skill.feature | "Shows access error when project is unreachable" | KEEP | Phase 1 verification step catches project item-add failure |
-| specs/features/devtools/bullboard-queue-dashboard.feature | "bullboard server starts and connects to Redis" | KEEP | bullboard/src/server.ts implements Redis connect + PORT 6380, no automated test |
-| specs/features/devtools/bullboard-queue-dashboard.feature | "bullboard server fails gracefully without Redis" | KEEP | bullboard/src/server.ts checks REDIS_URL and exits 1, no automated test |
-| specs/features/devtools/bullboard-queue-dashboard.feature | "bullboard service is included in scenarios profile" | DUPLICATE | Covered by langwatch/src/server/__tests__/bullboard-compose.unit.test.ts (profile/mount/port assertions) |
-| specs/features/devtools/bullboard-queue-dashboard.feature | "Bull Board UI loads via dev-scenarios" | KEEP | compose.dev.yml has bullboard in scenarios profile, no E2E test |
-| specs/features/devtools/bullboard-queue-dashboard.feature | "Bull Board displays configured BullMQ queues" | KEEP | bullboard/src/redisQueues.ts discovers queue names dynamically, no E2E test |
 | specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature | "Trace-level mapping UI includes both trace and thread available sources" | KEEP | getTraceAvailableSources() returns Current Trace + Current Thread groups, tested in thread-variables-in-trace-evaluator.unit.test.ts (no @scenario binding) |
 | specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature | "Thread-level mapping UI still shows only thread sources" | KEEP | getThreadAvailableSources() omits Trace group, tested in thread-variables-in-trace-evaluator.unit.test.ts |
 | specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature | "Thread source fields include thread_id, traces, and formatted_traces" | KEEP | tracesMapping.ts SERVER_ONLY_THREAD_SOURCES + tests assert all three fields |

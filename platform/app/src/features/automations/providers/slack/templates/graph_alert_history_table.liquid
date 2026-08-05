@@ -1,0 +1,54 @@
+{%- capture _emoji -%}{% if trigger.alertType == 'INFO' %}ℹ️{% elsif trigger.alertType == 'CRITICAL' %}🔴{% else %}🚨{% endif %}{%- endcapture -%}
+{%- capture _metric_field -%}
+*Metric*
+{{ metric.label | mrkdwn_escape }}
+{%- endcapture -%}
+{%- capture _condition_field -%}
+*Condition*
+{{ condition.operatorLabel }} {{ condition.threshold }} over the {{ condition.timePeriodLabel }}
+{%- endcapture -%}
+{%- capture _value_field -%}
+*Current value*
+{{ currentValue }}{% if previousValue != nil %} (was {{ previousValue }}){% endif %}
+{%- endcapture -%}
+{%- comment -%}
+`history` runs oldest-first and can hold far more points than a message should
+carry, so reverse it FIRST and take from the newest end. `limit` applies before
+`reversed` in a Liquid for-tag, so `for point in history reversed limit: 20`
+would take the OLDEST 20 and show them under a "Recent values" caption — the
+breach that fired the alert would not appear in its own message.
+{%- endcomment -%}
+{%- assign _newest_first = history | reverse -%}
+{%- capture _rows -%}
+{%- for point in _newest_first limit: 20 -%}
+,[
+  { "type": "raw_text", "text": {{ point.timestamp | date: "%H:%M" | json }} },
+  { "type": "raw_number", "value": {{ point.value }}, "text": {{ point.value | append: "" | json }} }
+]
+{%- endfor -%}
+{%- endcapture -%}
+{%- capture _recent -%}
+Recent: {% for point in _newest_first limit: 8 %}`{{ point.timestamp | date: "%H:%M" }}` {{ point.value }}{% unless forloop.last %} · {% endunless %}{% endfor %}
+{%- endcapture -%}
+{%- capture _links -%}
+<{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>
+{%- endcapture -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | truncate: 140 | prepend: " " | prepend: _emoji | json }}, "emoji": true } },
+  { "type": "section", "fields": [
+    { "type": "mrkdwn", "text": {{ _metric_field | json }} },
+    { "type": "mrkdwn", "text": {{ _condition_field | json }} },
+    { "type": "mrkdwn", "text": {{ _value_field | json }} }
+  ] }
+  {%- if history != empty -%}
+  ,{ "type": "data_table", "caption": {{ metric.label | truncate: 60 | prepend: "Recent values — " | json }}, "rows": [
+    [
+      { "type": "raw_text", "text": "Time" },
+      { "type": "raw_text", "text": "Value" }
+    ]
+    {{ _rows }}
+  ] }
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _recent | json }} }] }
+  {%- endif -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _links | json }} }] }
+]

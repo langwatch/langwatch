@@ -8,7 +8,11 @@ on:
   push:
     branches:
       - main
+  # ready_for_review is NOT a default pull_request activity type. Without it,
+  # taking a PR out of draft fires no event, so the heavy jobs gated on
+  # `draft == false` below would never get their first run.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
 
@@ -17,7 +21,10 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -25,6 +32,57 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
       feature-parity: ${{ steps.detect.outputs.feature-parity }}
+      # Draft PRs get the fast, cheap signal only: lint, ast-grep, typecheck,
+      # feature-parity. The 10 test shards and the build are the runner budget,
+      # and on a draft they mostly re-run against work in progress.
+      #
+      # Everything heavy comes back on ready_for_review, and `merge_group`
+      # is never a draft — so nothing reaches main without the full suite
+      # having run on it.
+      heavy: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+      # One shard each on a draft, because the draft run is affected-tests-only
+      # and a subset does not need splitting.
+      #
+      # Integration is back to six shards, each running its files serially.
+      #
+      # The four-shard split traded wall-clock for runner-minutes (35 -> 26) on
+      # the strength of running two files at once inside a shard. It did not
+      # hold. Measured here: shards ran 7.4-9.2 min against the ~6 min the
+      # six-way serial split used to take, so the claim that no shard got
+      # longer was wrong -- and two groupQueue suites started failing
+      # non-deterministically, both with Redis state disappearing underneath
+      # them (a staged job never dispatched; `j1` gone from a group set).
+      #
+      # The two kinds of parallelism are not interchangeable. A shard is its
+      # own runner with its own Redis service container, so shards cannot
+      # reach each other. Files inside a shard share one Redis server and are
+      # kept apart only by logical-database juggling, which is exactly what
+      # stopped holding. Buy the parallelism where it is free.
+      #
+      # The counts below are the `--shard=N/COUNT` denominators, and they MUST
+      # track the arrays. They were a literal `/4` in both run steps, which is
+      # how raising integration to six produced `--shard=5/4` and a startup
+      # error. Emitting the count next to the array is what keeps the two from
+      # drifting apart again.
+      #
+      # It also fixes the draft case, which was silently wrong: a draft got
+      # `shards: [1]` and still ran `--shard=1/4`, so it executed a quarter of
+      # its files while reporting a pass over all of them.
+      unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
+      unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
+      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5,6]' || '[1]' }}
+      integration-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '6' || '1' }}
+      # Coverage instrumentation costs ~45% of the run (measured: a unit subset
+      # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
+      # codecov.yml, no codecov status check, and both uploads are
+      # fail_ci_if_error: false — so it is a trend line, not a gate.
+      #
+      # A trend line does not need recomputing on every merge to main. It now
+      # runs on the weekly schedule and on demand, which keeps the graph while
+      # taking the instrumentation off the path between a merge and a green
+      # main. The provider is already the fast one (vitest 4 defaults to v8,
+      # not istanbul), so frequency was the only lever left.
+      coverage: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
       - uses: ./.github/actions/detect-changes
@@ -32,29 +90,47 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'langwatch/**'
+              - 'platform/app/**'
+              # Root workspace members the app's `...` closure installs from
+              # source — a change there is a change to the app.
+              - 'packages/**'
+              # The single lockfile, workspace definition, root manifest and
+              # hoist config all live at the repo root since ADR-076. A PR that
+              # bumps a dependency or adds a security override touches ONLY
+              # these — without them here, such a PR runs zero app CI while
+              # langwatch-app-complete reports success via allowed-skips.
+              # Dependabot targets the root weekly, so that is the common case,
+              # not the odd one.
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
             # The parity scanner binds @scenario annotations from test files
-            # across many roots, not just specs/ and langwatch/. This list MUST
+            # across many roots, not just specs/ and platform/app/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
             # DEFAULT_GO_TEST_ROOTS, DEFAULT_PYTHON_TEST_ROOTS,
-            # DEFAULT_BATS_TEST_ROOTS in langwatch/scripts/check-feature-parity.ts),
+            # DEFAULT_BATS_TEST_ROOTS in platform/app/scripts/check-feature-parity.ts),
             # otherwise a binding change in an unlisted root merges without the
             # gate ever running and silently breaks parity on main (e.g. #5143
-            # edited only scripts/__tests__/*.bats and slipped through).
+            # edited only dev/scripts/__tests__/*.bats and slipped through).
             feature-parity:
               - 'specs/**'
-              - 'langwatch/**'
-              - 'mcp-server/**'
-              - 'typescript-sdk/**'
-              - 'python-sdk/**'
+              - 'charts/langwatch/tests/**'
+              - 'platform/app/**'
+              - 'packages/**'
+              - 'skills/**'
+              - 'tools/**'
+              - 'mcp/typescript/**'
+              - 'sdks/typescript/**'
+              - 'sdks/python/**'
               - 'services/**'
               - 'pkg/**'
-              - 'langevals/**'
+              - 'services/langevals/**'
               - 'langwatch_server/**'
-              - 'scripts/**'
+              - 'dev/scripts/**'
               - '.github/workflows/langwatch-app-ci.yml'
 
   typecheck:
@@ -67,16 +143,35 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
+      # tsgo (and tsc) write incremental .tsbuildinfo caches to explicit paths
+      # under node_modules/.cache/tsbuildinfo (see tsconfig.tsgo*.json). A warm
+      # cache turns the full ~13-19s cold check into a ~1.5s revalidation of
+      # only the files whose content changed. Restored after install so pnpm
+      # can't clobber it; keyed rolling per-SHA with a prefix fallback so every
+      # run refreshes the cache off the most recent match (mirrors the Turbo
+      # cache pattern used by the build job).
+      - name: Cache TypeScript incremental build info
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: platform/app/node_modules/.cache/tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-
+            ${{ runner.os }}-tsbuildinfo-
+
       - name: Run typecheck
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm typecheck
+
+      - name: Run typecheck (tests)
+        working-directory: platform/app
+        run: pnpm run typecheck:tests
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -91,7 +186,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: ${{ fromJSON(needs.changes.outputs.unit-shards) }}
     env:
       VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
@@ -113,40 +208,58 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
-      - name: Run unit tests with coverage (shard ${{ matrix.shard }}/4)
+      - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
-        working-directory: langwatch
+        working-directory: platform/app
         run: |
-          pnpm test:unit --run --shard=${{ matrix.shard }}/4 \
-            --coverage --coverage.reporter=lcov --coverage.reporter=text \
-            --reporter=default \
-            --dangerouslyIgnoreUnhandledErrors
+          # shardFailureReporter feeds the globalSetup hard-floor so a wedged
+          # shard that already printed failures exits 1, not a masked 0.
+          #
+          # On a draft we run only the tests whose module graph reaches the
+          # diff (`--changed`), unsharded, on one runner. Real signal for a
+          # tenth of the budget. The full sharded suite returns on
+          # ready_for_review and in the merge queue, so nothing reaches main
+          # having only had the subset.
+          COV=""
+          if [ "${{ needs.changes.outputs.coverage }}" = "true" ]; then
+            COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
+          fi
+          if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            pnpm test:unit --run --changed origin/main --passWithNoTests \
+              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
+              --dangerouslyIgnoreUnhandledErrors
+          else
+            # shellcheck disable=SC2086
+            pnpm test:unit --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.unit-shard-count }} $COV \
+              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
+              --dangerouslyIgnoreUnhandledErrors
+          fi
 
       - name: Extract test failures
         if: failure()
-        working-directory: langwatch
-        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+        working-directory: platform/app
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        working-directory: langwatch
-        run: bash ../.github/scripts/notify-slack-test-failure.sh test-unit
+        working-directory: platform/app
+        run: bash ../../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
-        if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
+        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
-          files: langwatch/coverage/lcov.info
+          files: platform/app/coverage/lcov.info
           flags: unit
           name: unit-tests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
@@ -157,16 +270,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: ${{ fromJSON(needs.changes.outputs.integration-shards) }}
     env:
-      # Several integration suites (groupQueue, scripts, loopPrevention,
-      # traceparent) call redis.flushall() directly in afterEach against the
-      # shared Redis — the shared cleanup helper is tenant-scoped to avoid this
-      # race, but these suites aren't. vitest.integration.config.ts sets
-      # fileParallelism: false but does NOT cap the worker pool, so on CI
-      # multiple workers raced on those FLUSHALLs and wiped each other's
-      # in-flight queue state. Force a single worker to serialize them.
-      VITEST_MAX_WORKERS: "1"
+      # VITEST_INTEGRATION_PARALLEL is deliberately NOT set, so a shard runs
+      # its files one at a time.
+      #
+      # It was set here on the theory that the only obstacle to concurrent
+      # files was five suites calling redis.flushall() in afterEach, and that
+      # switching them to flushdb() plus a per-worker Redis logical database
+      # closed the gap. It did not: with it on, groupQueue.decodeDrop and
+      # scripts began failing non-deterministically, and both failures are
+      # state vanishing rather than a wrong assertion — a staged job that is
+      # never dispatched, and a group set that has lost `j1`. That is the
+      # shape a flushdb crossing a worker boundary makes.
+      #
+      # The isolation is also subtler than it reads: setupEnv runs as a
+      # config-time import in the main process, where VITEST_POOL_ID does not
+      # exist and the worker id falls back to 1, and again per worker as a
+      # setup file. Nothing in the suite asserts that two concurrent workers
+      # cannot see each other's keys. Turn this back on behind a test that
+      # does.
+      #
+      # The parallelism instead comes from six shards, each its own runner
+      # with its own Redis service container, where isolation is a property of
+      # the topology rather than of a database index.
+      #
+      # The two below stay set. The Redis isolation is free when files are
+      # serial and means the wiring is already in place if the flag above
+      # returns; the worker cap keeps vitest from taking all four vCPUs on a
+      # runner that is also hosting ClickHouse, Postgres and Redis — handing
+      # it the whole box starved the datastores and three suites failed on
+      # vi.waitFor timeouts rather than on anything they assert.
+      VITEST_ISOLATE_WORKER_REDIS: "1"
+      VITEST_MAX_WORKERS: "2"
       # Required environment variables for integration tests
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
@@ -218,15 +354,32 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
+      # traceparent-roundtrip.integration.test.ts runs the REAL nlpgo service,
+      # so it compiles it: `go build ./cmd/service` into platform/app/.vitest-tmp/.
+      # That build is the single most expensive thing in the whole integration
+      # suite — 140.9s for a file containing one test, measured on shard 2,
+      # where the entire shard's tests came to 10.6 minutes. One Go compile was
+      # over a fifth of it.
+      #
+      # The test already skips the build when the cached binary is newer than
+      # every .go file under services/nlpgo, so it only needs the artifact to
+      # survive between runs. Keyed on the Go sources and go.sum, so a real
+      # change to the service still rebuilds; the OS is in the key because the
+      # cached artifact is a native binary.
+      - name: Cache the compiled nlpgo test binary
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: platform/app/.vitest-tmp
+          key: ${{ runner.os }}-nlpgo-testbin-${{ hashFiles('services/nlpgo/**/*.go', 'go.sum') }}
+
       - name: Setup database
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Install Goose migration tool
@@ -238,7 +391,7 @@ jobs:
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
       - name: Run ClickHouse migrations
-        working-directory: langwatch
+        working-directory: platform/app
         # ClickHouse's HTTP probe can answer SELECT 1 via curl while the
         # Node @clickhouse/client still sees ECONNREFUSED on its first
         # connect (IPv6/IPv4 dual-stack bind race under --network host).
@@ -256,9 +409,9 @@ jobs:
           done
           exit 1
 
-      - name: Run integration tests with coverage (shard ${{ matrix.shard }}/6)
+      - name: Run integration tests (shard ${{ matrix.shard }}/4)
         id: integration-tests
-        working-directory: langwatch
+        working-directory: platform/app
         # Integration files run sequentially in a single long-lived fork worker
         # (fileParallelism:false, for Redis contention), so v8 coverage data
         # accumulates across every file in the shard. Two levers keep that
@@ -269,28 +422,45 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=8192
         run: |
-          pnpm test:integration --shard=${{ matrix.shard }}/6 \
-            --coverage --coverage.reporter=lcov --coverage.reporter=text \
-            --reporter=default --reporter=json --outputFile=test-results.json
+          # shardFailureReporter feeds the globalSetup hard-floor so a wedged
+          # shard that already printed failures exits 1, not a masked 0.
+          #
+          # Draft: affected integration tests only, one runner (see test-unit).
+          # The services are already up by this point either way.
+          COV=""
+          if [ "${{ needs.changes.outputs.coverage }}" = "true" ]; then
+            COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
+          fi
+          if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            pnpm test:integration --changed origin/main --passWithNoTests \
+              --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
+              --outputFile=test-results.json
+          else
+            # shellcheck disable=SC2086
+            pnpm test:integration --shard=${{ matrix.shard }}/${{ needs.changes.outputs.integration-shard-count }} $COV \
+              --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
+              --outputFile=test-results.json
+          fi
 
       - name: Extract test failures
         if: failure()
-        working-directory: langwatch
-        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+        working-directory: platform/app
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        working-directory: langwatch
-        run: bash ../.github/scripts/notify-slack-test-failure.sh test-integration
+        working-directory: platform/app
+        run: bash ../../.github/scripts/notify-slack-test-failure.sh test-integration
 
       - name: Upload integration test coverage to Codecov
-        if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
+        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
-          files: langwatch/coverage/lcov.info
+          files: platform/app/coverage/lcov.info
           flags: integration
           name: integration-tests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
@@ -299,20 +469,191 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
+    # Scoped to this job rather than the workflow, so nothing else gains write
+    # access. `reporter: github-pr-review` posts inline review comments, which
+    # needs `pull-requests: write`; without it reviewdog gets a 403 from the
+    # Review API and silently degrades to logging commands. The gate itself
+    # still bites either way — the exit code does not depend on posting — but
+    # the findings stop landing on the diff, which is the whole point of
+    # annotating rather than just failing.
+    #
+    # A pull_request from a fork gets a read-only token no matter what is
+    # declared here, so reviewdog falls back to logging for those. That is
+    # GitHub's rule, not something this block can opt out of.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
+          fetch-depth: 0
           persist-credentials: false
 
-      - uses: mongolyy/reviewdog-action-biome@c49bee54c1f87e4be32446ae3deca3a186b88a3a # v2
+      - uses: ./.github/actions/setup-pnpm-node
         with:
-          reporter: github-pr-review
-          fail_level: error
-          # The action resolves the Biome version (from the lockfile) and runs
-          # Biome inside workdir, so biome_flags paths are relative to it.
-          workdir: langwatch
-          biome_flags: "./src"
+          install: "@langwatch/web..."
+
+      # The ADR-076 workspace invariants: one lockfile, one workspace
+      # definition, no member carrying overrides pnpm would ignore, the app and
+      # the SDK on different names. They previously ran only in
+      # npx-server-smoke, which is deliberately NOT a required check and whose
+      # path filter misses most of the manifests these assert about — so the
+      # exact drift they exist to catch (a second lockfile reappearing, a
+      # member overrides block) merged with no job running at all. This job is
+      # required via langwatch-app-complete and now triggers on the root
+      # manifests. Takes ~200ms.
+      - name: Check the workspace invariants (ADR-076)
+        run: |
+          pnpm install --frozen-lockfile --filter "@langwatch/server-cli..."
+          pnpm --filter @langwatch/server-cli run test:invariants
+
+      # THE GATE. Everything below this step is annotation, not enforcement.
+      #
+      # reviewdog-action-biome runs with fail_on_error: false and pipes Biome's
+      # stdout into reviewdog, so it reports success whenever Biome produces no
+      # parseable diagnostics — including when Biome refuses to start. That is
+      # not hypothetical: three `nursery` rules graduated out of nursery in
+      # Biome 2.5.x, the unknown keys were a fatal config error, and `pnpm lint`
+      # exited 1 having checked zero files while this job stayed green.
+      #
+      # So run Biome ourselves and let a non-zero exit fail the job. A config
+      # error and a lint violation both surface here.
+      - name: Biome (blocking — config errors included)
+        working-directory: platform/app
+        run: pnpm lint
+
+      - name: Set up reviewdog
+        if: github.event_name == 'pull_request'
+        uses: reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f # v1.5.0
+        with:
+          reviewdog_version: v0.21.0
+
+      # The house rules that still carry a baseline are `warn` in biome.jsonc,
+      # so the step above lets them through. This step makes them BLOCKING for
+      # new violations, and annotates the diff with the rest.
+      #
+      # TWO JOBS, TWO MECHANISMS, because one tool cannot do both well:
+      #
+      #   ANNOTATE — reviewdog maps each diagnostic onto the diff and drops
+      #     anything outside the added lines, which is line-level filtering
+      #     Biome cannot do itself. This pass cannot fail the job.
+      #
+      #   GATE — .github/scripts/biome-new-violations.sh counts violations per
+      #     (file, rule) on both sides of the merge base and fails only on an
+      #     increase. Its header explains why the added-lines filter is the
+      #     wrong thing to GATE on: these rules anchor at a function's
+      #     declaration line, so a formatter rewrapping a signature re-adds
+      #     that line and hands the PR the function's entire pre-existing
+      #     backlog. Measured on this branch: 61 such findings, none of them
+      #     authored here.
+      #
+      # `biome lint --changed` is not a substitute for either: it is
+      # file-granular, so a one-line typo fix in a legacy file would inherit
+      # every long-function violation already in it (measured at 902 on this
+      # branch alone). A gate that fires on work you did not do is a gate
+      # people switch off.
+      #
+      # reviewdog comes from its own first-party setup action, pinned to the
+      # same v0.21.0 the previous wrapper resolved. Biome comes from this
+      # repo's lockfile rather than a second copy bundled by a wrapper action.
+      #
+      # That split replaces mongolyy/reviewdog-action-biome, for four measured
+      # reasons:
+      #
+      #  1. VERSION DRIFT. That action bundles its own Biome (renovate moved it
+      #     to ^2.5.5) while this repo pins 2.5.1 in package.json. Rule
+      #     behaviour is version-sensitive, so CI would enforce rules the
+      #     developer's `pnpm lint` never runs. `pnpm exec` uses the lockfile's
+      #     Biome, so the gate and the local command are the same program.
+      #  2. It shells out to `biome check --write`, which MUTATES files during
+      #     what is supposed to be a check.
+      #  3. It reconstructs diagnostics by scraping Biome's human-readable
+      #     console output through a stack of errorformat regexes. Biome 2.x
+      #     emits `--reporter=rdjson` — reviewdog's own schema — so the parsing
+      #     step disappears along with its failure mode.
+      #  4. It passes `--max-diagnostics=30`, silently capping what is reported.
+      #
+      # Biome's own CI recipe is `biome ci`, which annotates via GitHub
+      # directly. That is not enough on its own here: `biome ci` has no notion
+      # of a diff, and the `warn`-tier rules have a baseline in the thousands.
+      # reviewdog is what narrows them to the lines this PR actually adds.
+      #
+      # rdjson carries no severity (verified — Biome omits it even for errors),
+      # so `-level=warning` supplies it for the annotating pass. Errors are
+      # already caught full-tree by the blocking step above.
+      - name: Biome house rules — annotate the diff, gate on new violations
+        if: github.event_name == 'pull_request'
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # One list, used by the head run, the annotator and the gate's base
+          # run. They must agree: a path linted on one side and not the other
+          # reads as that file's whole backlog appearing or vanishing.
+          # `./packages` is GONE from this list, and deliberately not replaced
+          # with `../../packages`. The nine workspace packages now live in one
+          # repo-root tree, which is outside biome's project root here (the app
+          # directory, where biome.jsonc lives). Biome reports out-of-root files
+          # by ABSOLUTE path, and the gate keys counts on the reported path, so
+          # the base tree's temp-dir prefix can never match the head's: all 268
+          # of their diagnostics read as brand new every run. Restoring coverage
+          # means giving packages/ its own biome root and its own gate run, which
+          # is a change to the lint setup rather than to this move -- tracked as
+          # a follow-up. The app tree, which is what this job is named for, is
+          # still fully covered.
+          BIOME_PATHS=(./src ./ee ./scripts ./e2e ./prisma ./vite)
+
+          # Biome exits non-zero whenever it reports anything; the gate is the
+          # script's decision, not this line's, so don't abort here.
+          pnpm --dir platform/app exec biome check --reporter=rdjson \
+            "${BIOME_PATHS[@]}" > biome.raw.json || true
+          echo "diagnostics: $(jq '.diagnostics | length' biome.raw.json)"
+
+          # --- ANNOTATE (cannot fail the job) ---
+          #
+          # Biome ran with platform/app as its cwd, so its paths are relative to
+          # that; reviewdog matches against a repo-root diff. Rewriting the
+          # paths here rather than running reviewdog from platform/app keeps the
+          # mapping explicit — a path that silently fails to match the diff
+          # would filter every finding away and read as a clean pass.
+          #
+          # The gate below reads biome.raw.json, NOT this file: it compares
+          # against a base tree whose paths are app-relative too.
+          jq '.diagnostics |= map(.location.path = "platform/app/" + .location.path)' \
+            biome.raw.json > biome.rdjson
+
+          # A single un-capped `github-pr-review` pass died on `422 Body is too
+          # long (maximum is 65536 characters)`: GitHub caps a review body, and
+          # a PR that reformats files has a lot of added lines to annotate.
+          # Capping is safe now that posting and deciding are separate — the
+          # cap costs annotations, never enforcement.
+          POSTED=200
+          jq --argjson n "$POSTED" \
+            '.diagnostics |= (sort_by(.location.path, .location.range.start.line) | .[:$n])' \
+            biome.rdjson > biome.posted.json
+          total=$(jq '.diagnostics | length' biome.rdjson)
+          if [ "$total" -gt "$POSTED" ]; then
+            echo "::notice::annotating the first $POSTED of $total diagnostics; the gate reads all $total"
+          fi
+
+          reviewdog -f=rdjson -name=Biome \
+            -reporter=github-pr-review \
+            -filter-mode=added \
+            -level=warning \
+            -fail-level=none \
+            < biome.posted.json || true
+
+          # --- GATE (the only thing that can fail this step) ---
+          #
+          # Fetch the base explicitly: the script needs a real merge base, and
+          # a missing ref must fail the fetch rather than quietly leave the
+          # comparison with nothing to compare against.
+          BASE="${{ github.base_ref }}"
+          git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          bash .github/scripts/biome-new-violations.sh \
+            biome.raw.json "origin/$BASE" "${BIOME_PATHS[@]}"
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -320,6 +661,58 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh lint
+
+  # The ast-grep ruleset at dev/lint/ast-grep/ encodes deterministic house rules.
+  # coderabbit-config-check.yml only proves each rule still matches its own
+  # fixture; until this job existed, nothing ran them against actual code
+  # except CodeRabbit, once per PR, as a comment.
+  #
+  # Scans changed files only. The rules are severity: warning during rollout,
+  # so this reports without failing; promote a rule to severity: error in its
+  # .yml once its baseline is clean and this job starts gating on it.
+  ast-grep:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
+        with:
+          python-version: "3.12"
+
+      # Pinned to the same version coderabbit-config-check.yml uses —
+      # rule-matching behaviour is version-sensitive. Bump both together.
+      - name: Install pinned ast-grep
+        run: pip install "ast-grep-cli==0.42.3"
+
+      - name: Rule fixtures must still pass
+        working-directory: dev/lint/ast-grep
+        run: ast-grep test -c sgconfig.yml -t rule-tests
+
+      - name: Scan changed files
+        run: |
+          BASE="${{ github.base_ref || 'main' }}"
+          git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          files=$(git diff --name-only --diff-filter=ACMR "origin/$BASE...HEAD" -- '*.ts' '*.tsx')
+          if [ -z "$files" ]; then
+            echo "No changed TS/TSX files."
+            exit 0
+          fi
+          echo "$files" | sed 's/^/  /'
+          # shellcheck disable=SC2086
+          ast-grep scan -c dev/lint/ast-grep/sgconfig.yml $files
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh ast-grep
 
   feature-parity:
     needs: changes
@@ -331,11 +724,10 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       - name: Check feature-file parity
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm check:feature-parity
 
       - name: Notify Slack on failure
@@ -345,9 +737,39 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
 
-  build:
+  # The generated OpenAPI document is what external integrators compile
+  # clients from, and an operation missing its body, parameters or success
+  # response still appears in it. This turns each omission into a failure.
+  openapi-completeness:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/web..."
+
+      - name: Prepare files
+        working-directory: platform/app
+        run: pnpm start:prepare:files
+
+      - name: Check OpenAPI completeness
+        working-directory: platform/app
+        run: pnpm check:openapi-completeness
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh openapi-completeness
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     env:
       # Disable telemetry and optimize build for CI
@@ -377,7 +799,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
@@ -385,28 +807,19 @@ jobs:
       - name: Cache Prisma client
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: langwatch/node_modules/.prisma
-          key: ${{ runner.os }}-prisma-${{ hashFiles('langwatch/prisma/schema.prisma') }}
+          path: platform/app/node_modules/.prisma
+          key: ${{ runner.os }}-prisma-${{ hashFiles('platform/app/prisma/schema.prisma') }}
 
       # Cache Vite build artifacts
       - name: Cache Vite
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            langwatch/node_modules/.vite
-          key: ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'langwatch/vite.config.ts') }}
+            platform/app/node_modules/.vite
+          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('platform/app/src/**/*', 'platform/app/vite.config.ts') }}
           restore-keys: |
-            ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-vite-
-
-      # Cache Turbo build outputs
-      - name: Cache Turbo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: langwatch/.turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With
@@ -416,16 +829,17 @@ jobs:
       - name: Install node-gyp (for node-pty postinstall)
         run: npm install -g node-gyp@12.3.0
 
-      - name: Build mcp-server
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile && pnpm run build
-
+      # One install. mcp-server is a workspace dependency of the app, so the
+      # trailing `...` pulls it in — it used to be installed separately here
+      # from its own lockfile, i.e. twice per run. See ADR-076.
       - name: Install dependencies
-        working-directory: langwatch
-        run: CI=true pnpm install --frozen-lockfile
+        run: CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..."
+
+      - name: Build mcp-server
+        run: pnpm --filter @langwatch/mcp-server run build
 
       - name: Build
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm build
 
       # A successful `vite build` only proves the bundle compiles, not that it
@@ -433,7 +847,7 @@ jobs:
       # catch runtime boot failures (white screens from chunk-init errors).
       # Uses the runner's preinstalled Google Chrome (no browser download).
       - name: Boot smoke test
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           SMOKE_BROWSER_CHANNEL: chrome
         run: |
@@ -479,25 +893,24 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          install: "@langwatch/web..."
 
       - name: Stage canary fixture inside vitest root
-        working-directory: langwatch
-        run: cp ../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
+        working-directory: platform/app
+        run: cp ../../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
 
       - name: Run intentional failure
         id: canary
         continue-on-error: true
-        working-directory: langwatch
+        working-directory: platform/app
         run: |
           pnpm vitest run _ci_canary.test.ts \
             --reporter=default --reporter=json --outputFile=test-results.json
 
       - name: Extract failures
         if: always()
-        working-directory: langwatch
-        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+        working-directory: platform/app
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Assert detection worked
         if: always()
@@ -506,19 +919,19 @@ jobs:
             echo "FAIL: canary step should have failed (vitest should exit non-zero for a failing test), got outcome=${{ steps.canary.outcome }}"
             exit 1
           fi
-          if [ ! -s langwatch/test-failures.txt ]; then
+          if [ ! -s platform/app/test-failures.txt ]; then
             echo "FAIL: test-failures.txt is missing or empty — failure extraction did not work"
             exit 1
           fi
           echo "PASS: canary failed as expected and failures were extracted"
-          cat langwatch/test-failures.txt
+          cat platform/app/test-failures.txt
 
   langwatch-app-complete:
-    needs: [changes, typecheck, test-unit, test-integration, lint, feature-parity, build, ci-scripts-test, ci-self-test]
+    needs: [changes, typecheck, test-unit, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: typecheck, test-unit, test-integration, lint, feature-parity, build, ci-scripts-test, ci-self-test
+          allowed-skips: typecheck, test-unit, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test

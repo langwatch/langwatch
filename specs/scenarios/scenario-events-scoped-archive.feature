@@ -11,17 +11,17 @@ Feature: Archiving scenario runs requires an explicit scenario set
   unscoped request is refused, and the archive reports how much work it did.
 
   @integration
-  Scenario: DELETE without scenarioSetId returns 400
+  Scenario: DELETE without scenarioSetId is refused
     Given an authenticated request to DELETE /api/scenario-events
     When the request carries no scenarioSetId
-    Then the response status is 400
+    Then the request is refused as not matching the expected shape
     And no simulation run is archived
 
   @integration
-  Scenario: DELETE with empty scenarioSetId returns 400
+  Scenario: DELETE with empty scenarioSetId is refused
     Given an authenticated request to DELETE /api/scenario-events
     When the request carries an empty scenarioSetId
-    Then the response status is 400
+    Then the request is refused as not matching the expected shape
     And no simulation run is archived
 
   @integration
@@ -58,10 +58,10 @@ Feature: Archiving scenario runs requires an explicit scenario set
     And the 200 response documents archived, failed, scenarioSetId, and hasMore
 
   # --- AC coverage map (issue #3635) ---
-  # AC1 required scenarioSetId / 400: "DELETE without scenarioSetId returns 400" + "DELETE with empty scenarioSetId returns 400"
+  # AC1 required scenarioSetId: "DELETE without scenarioSetId is refused" + "DELETE with empty scenarioSetId is refused"
   # AC2 getRunIdsForSet + expandSetIdFilter + 10k cap: "Archiving the default set matches both default and empty set ids" + "Reaching the 10k cap reports hasMore true"
   # AC3 bounded-concurrency replaces Promise.all: "One run failing to archive does not stop the others"
   # AC4 failure collection + { archived, failed, scenarioSetId, hasMore }: "Archiving one set leaves runs in other sets untouched" + "One run failing to archive does not stop the others" + "Reaching the 10k cap reports hasMore true"
-  # AC5 unfiltered path removed: "DELETE without scenarioSetId returns 400"
+  # AC5 unfiltered path removed: "DELETE without scenarioSetId is refused"
   # AC6 integration two sets + default coalesce: "Archiving one set leaves runs in other sets untouched" + "Archiving the default set matches both default and empty set ids"
   # AC7 OpenAPI doc: "OpenAPI documents scenarioSetId as required and the archive response shape" (@unimplemented — verified by describeRoute + archiveResponseSchema in code)

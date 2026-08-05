@@ -528,6 +528,93 @@ func TestCredentialToBifrostKey_DeepSeekDefaultsBaseURL(t *testing.T) {
 	}
 }
 
+// Azure's resource endpoint must reach Bifrost's AzureKeyConfig.Endpoint.
+// The /go/proxy path (gatewayproxy.ParseCredentialFromHeaders) carries the
+// customer's Azure endpoint under Extra["api_base"] — the litellm-era name
+// that TestParseCredentialFromHeaders_Azure_PicksUpAllKnobs pins — while the
+// control-plane VK path (config.materialiser.ts / config_wire.go) uses
+// "endpoint". This branch reads only "endpoint" today, so every Azure
+// scenario/playground call dispatched via /go/proxy hands Bifrost an empty
+// endpoint and Bifrost returns provider_timeout "endpoint not set" (#5760).
+// The Azure branch must accept BOTH names, mirroring credBaseURL for vLLM.
+//
+// Spec: specs/ai-gateway/azure-endpoint-from-api-base.feature
+func TestCredentialToBifrostKey_Azure_EndpointFromApiBase(t *testing.T) {
+	cred := domain.Credential{
+		ID:            "mp-azure",
+		ProviderID:    domain.ProviderAzure,
+		APIKey:        "az-key",
+		Extra:         map[string]string{"api_base": "https://acme.openai.azure.com"},
+		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
+	}
+	key := credentialToBifrostKey(cred, bfschemas.Azure)
+
+	if key.AzureKeyConfig == nil {
+		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
+	}
+	if got := key.AzureKeyConfig.Endpoint.Val; got != "https://acme.openai.azure.com" {
+		t.Fatalf("AzureKeyConfig.Endpoint = %q, want the api_base endpoint "+
+			"(#5760: /go/proxy Azure sends the endpoint as api_base, not endpoint)", got)
+	}
+}
+
+// A provider with no AZURE_OPENAI_API_VERSION configured sends no
+// x-litellm-api_version, so gatewayproxy never writes Extra["api_version"].
+// APIVersion must then stay NIL, because nil is precisely what makes Bifrost
+// apply its own AzureAPIVersionDefault ("2024-10-21",
+// bifrost/core/providers/azure/types.go) at azure.go's
+// `if apiVersion == nil` fallback. validateKeyConfig never checks APIVersion,
+// so nil is safe — an unset version is not a misconfiguration.
+//
+// The ok-guard in credentialToBifrostKey is what preserves that. Assigning
+// unconditionally would store a non-nil EnvVar wrapping "", Bifrost's nil check
+// would not fire, and the request URL would carry `?api-version=` — the same
+// empty-value shape as the endpoint bug this PR exists to fix, but failing at
+// Azure instead of at the config check. Pinned here so a refactor that drops the
+// guard fails loudly rather than silently emitting an empty api-version.
+func TestCredentialToBifrostKey_Azure_NoAPIVersion_StaysNilSoBifrostDefaults(t *testing.T) {
+	cred := domain.Credential{
+		ID:            "mp-azure",
+		ProviderID:    domain.ProviderAzure,
+		APIKey:        "az-key",
+		Extra:         map[string]string{"api_base": "https://acme.openai.azure.com"},
+		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
+	}
+	key := credentialToBifrostKey(cred, bfschemas.Azure)
+
+	if key.AzureKeyConfig == nil {
+		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
+	}
+	if key.AzureKeyConfig.APIVersion != nil {
+		t.Fatalf("AzureKeyConfig.APIVersion = %q, want nil so Bifrost applies its "+
+			"own AzureAPIVersionDefault; a non-nil empty version skips that default "+
+			"and sends `?api-version=` (#5760)", key.AzureKeyConfig.APIVersion.Val)
+	}
+}
+
+// The counterpart: an explicitly configured api_version must still win, so the
+// nil-means-default rule above cannot be satisfied by simply never setting it.
+func TestCredentialToBifrostKey_Azure_ExplicitAPIVersionWins(t *testing.T) {
+	cred := domain.Credential{
+		ID:         "mp-azure",
+		ProviderID: domain.ProviderAzure,
+		APIKey:     "az-key",
+		Extra: map[string]string{
+			"api_base":    "https://acme.openai.azure.com",
+			"api_version": "2025-04-01-preview",
+		},
+		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
+	}
+	key := credentialToBifrostKey(cred, bfschemas.Azure)
+
+	if key.AzureKeyConfig.APIVersion == nil {
+		t.Fatal("AzureKeyConfig.APIVersion is nil, want the configured api_version")
+	}
+	if got := key.AzureKeyConfig.APIVersion.Val; got != "2025-04-01-preview" {
+		t.Fatalf("AzureKeyConfig.APIVersion = %q, want %q", got, "2025-04-01-preview")
+	}
+}
+
 func TestNormalizeOpenAICompatBaseURL(t *testing.T) {
 	cases := map[string]string{
 		"http://h:8000/v1":  "http://h:8000",
