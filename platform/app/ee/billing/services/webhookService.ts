@@ -16,8 +16,8 @@ import {
 } from "../../../src/server/data-retention/retentionPolicy.schema";
 import { SubscriptionRecordNotFoundError } from "../errors";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
-import { applyAnnualEventsBillingThreshold } from "../stripe/annualEventsBillingThreshold";
 import { SubscriptionStatus } from "../planTypes";
+import { applyAnnualEventsBillingThreshold } from "../stripe/annualEventsBillingThreshold";
 import {
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,

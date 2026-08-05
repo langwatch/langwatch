@@ -46,7 +46,10 @@ const makeStripe = (subscription: unknown) =>
       update: vi.fn().mockResolvedValue({}),
     },
   }) as unknown as Stripe & {
-    subscriptions: { retrieve: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
+    subscriptions: {
+      retrieve: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+    };
   };
 
 describe("applyAnnualEventsBillingThreshold", () => {

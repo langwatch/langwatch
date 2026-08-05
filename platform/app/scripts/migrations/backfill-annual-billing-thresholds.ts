@@ -18,14 +18,17 @@
  *   pnpm tsx scripts/migrations/backfill-annual-billing-thresholds.ts
  *   DRY_RUN=1 pnpm tsx scripts/migrations/backfill-annual-billing-thresholds.ts
  */
+
+import { prisma } from "~/server/db";
 import { applyAnnualEventsBillingThreshold } from "../../ee/billing/stripe/annualEventsBillingThreshold";
 import { createStripeClient } from "../../ee/billing/stripe/stripeClient";
-import { prisma } from "~/server/db";
 
 const DRY_RUN = process.env.DRY_RUN === "1";
 
 async function main() {
-  console.log(`Annual billing threshold backfill ${DRY_RUN ? "[DRY-RUN]" : ""}`);
+  console.log(
+    `Annual billing threshold backfill ${DRY_RUN ? "[DRY-RUN]" : ""}`,
+  );
   const stripe = createStripeClient();
 
   // Candidates: active Growth annual subscriptions linked to Stripe. The
