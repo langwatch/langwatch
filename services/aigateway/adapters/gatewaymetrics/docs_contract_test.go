@@ -78,7 +78,12 @@ var notMetrics = map[string]string{
 	// `error.code` values on the REST error envelope. They share the
 	// `gateway_` prefix with the metrics because they name the same
 	// subsystem, but they are values inside a JSON body, not series.
-	"gateway_scope_org_mismatch": "REST error code",
+	"gateway_scope_org_mismatch":          "REST error code",
+	"gateway_budget_cycle_anchor_invalid": "REST error code",
+
+	// SDK accessors. The API pages show the Python and TypeScript spellings
+	// side by side, so the snake_case half reads as metric-shaped.
+	"gateway_budgets": "Python SDK accessor (`langwatch.gateway_budgets`)",
 }
 
 // plannedMetrics are names the docs explicitly describe as not yet
