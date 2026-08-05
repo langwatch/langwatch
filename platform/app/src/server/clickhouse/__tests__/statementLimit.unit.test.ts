@@ -1,7 +1,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { AcquireAbortedError } from "@langwatch/clickhouse-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClickHouseOverloadedError } from "~/server/app-layer/traces/errors";
-import { withStatementLimit } from "../statementLimit";
+import { MIN_QUEUE_DEPTH, withStatementLimit } from "../statementLimit";
 
 /**
  * A stand-in for the driver that lets a test decide when each statement
@@ -184,7 +185,7 @@ describe("withStatementLimit", () => {
         });
 
         const admitted = limited.query({ query: "SELECT 1" });
-        const queued = Array.from({ length: 64 }, (_, index) =>
+        const queued = Array.from({ length: MIN_QUEUE_DEPTH }, (_, index) =>
           limited.query({ query: `SELECT q${index}` }),
         );
         await settleMicrotasks();
@@ -194,7 +195,7 @@ describe("withStatementLimit", () => {
         );
 
         driver.releaseAll();
-        for (let round = 0; round < 65; round += 1) {
+        for (let round = 0; round <= MIN_QUEUE_DEPTH; round += 1) {
           await settleMicrotasks();
           driver.releaseAll();
         }
@@ -210,7 +211,7 @@ describe("withStatementLimit", () => {
         });
 
         const admitted = limited.query({ query: "SELECT 1" });
-        const queued = Array.from({ length: 64 }, () =>
+        const queued = Array.from({ length: MIN_QUEUE_DEPTH }, () =>
           limited.query({ query: "SELECT queued" }),
         );
         await settleMicrotasks();
@@ -223,7 +224,7 @@ describe("withStatementLimit", () => {
         expect(driver.started).toBe(startedBeforeShed);
 
         driver.releaseAll();
-        for (let round = 0; round < 65; round += 1) {
+        for (let round = 0; round <= MIN_QUEUE_DEPTH; round += 1) {
           await settleMicrotasks();
           driver.releaseAll();
         }
@@ -253,7 +254,7 @@ describe("withStatementLimit", () => {
 
         controller.abort();
 
-        await expect(abandoned).rejects.toThrow();
+        await expect(abandoned).rejects.toBeInstanceOf(AcquireAbortedError);
         expect(driver.started).toBe(1);
 
         driver.releaseAll();

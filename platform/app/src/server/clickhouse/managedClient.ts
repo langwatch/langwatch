@@ -48,9 +48,14 @@ export function createManagedClickHouseClient({
   let parsedUrl: URL | string = url;
   try {
     parsedUrl = new URL(url);
-  } catch (error) {
+  } catch {
+    // Deliberately without the error. A ClickHouse URL carries credentials,
+    // and Node attaches the offending string to an ERR_INVALID_URL as `input`
+    // - which a structured logger serialises straight into the log line. The
+    // instance label says which client failed, and that is the whole of what
+    // an operator needs here.
     logger.warn(
-      { error, instance },
+      { instance },
       "ClickHouse URL was not a valid URL, it will still be set, but may not work as expected.",
     );
   }

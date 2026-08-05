@@ -29,10 +29,10 @@ const logger = createLogger("langwatch:clickhouse:statement-limit");
  * that used to succeed. Tighten it once `clickhouse_statement_wait_seconds`
  * says what the real waits look like.
  */
-const QUEUE_DEPTH_PER_SLOT = 8;
+export const QUEUE_DEPTH_PER_SLOT = 8;
 
 /** Never so shallow that a small pool sheds on ordinary burstiness. */
-const MIN_QUEUE_DEPTH = 64;
+export const MIN_QUEUE_DEPTH = 64;
 
 type LimitedOperation = "query" | "insert" | "command" | "exec";
 

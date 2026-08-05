@@ -38,7 +38,9 @@ const ROOTS = ["src", "ee"];
  * build anything, so matching the module alone would flag all of them.
  */
 const CONSTRUCTS_CLIENT = /\bcreateClient\s*\(/;
-const DRIVER_MODULE = /from\s+["']@clickhouse\/client["']/;
+// Any entrypoint of the driver package, not just the root: a
+// `@clickhouse/client/web` import constructs exactly the same client.
+const DRIVER_MODULE = /from\s+["']@clickhouse\/client(?:\/[^"']+)?["']/;
 
 /**
  * The functions that hand out a live client.
@@ -75,7 +77,8 @@ const MAY_RESOLVE_VIA_APP = new Set([
  *
  * `managedClient.ts` is the one construction site. The other three are
  * infrastructure rather than the tenant data path, and each needs a client the
- * managed one deliberately is not:
+ * managed one deliberately is not (`test-utils` makes five: it stands up and
+ * tears down throwaway endpoints, and never touches tenant data at all):
  *
  *  - `goose.ts` runs migrations on a client it opens and closes per call, from
  *    a URL that is not the application's.
