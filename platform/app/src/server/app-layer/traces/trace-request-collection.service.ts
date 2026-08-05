@@ -273,7 +273,7 @@ export class TraceRequestCollectionService {
         span.setAttribute("spans.ingestion.drops", droppedSpanCount);
         span.setAttribute("spans.ingestion.deduped", dedupedSpanCount);
         span.setAttribute("spans.ingestion.filtered", filteredSpanCount);
-        // Rejected-span breakdown by parser reason. Emitted as separate
+        // Rejected-span breakdown by rejection reason. Emitted as separate
         // attributes so dashboards can sum any slice without parsing a JSON
         // blob, and so the existing `spans.ingestion.drops`/`failures`
         // attributes stay back-compatible.
