@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readHandledError } from "~/features/errors";
 
 /**
  * Client for POST /api/scenario/fan-out/generate.
@@ -36,11 +37,13 @@ const responseSchema = z.object({
 export type GeneratedFanOutVariant = z.infer<typeof generatedVariantSchema>;
 export type FanOutGenerationResult = z.infer<typeof responseSchema>;
 
-const serializedHandledErrorSchema = z.object({
-  code: z.string(),
-  meta: z.record(z.string(), z.unknown()).optional(),
-});
-
+/**
+ * A named failure the generate endpoint reported.
+ *
+ * `kind` is the handled `code`, which is what picks both the recovery and the
+ * copy: `classifyGenerationError` keys off it and the words come from the
+ * code-keyed registry, so nothing user-facing is authored here.
+ */
 export class FanOutGenerationError extends Error {
   constructor(
     message: string,
@@ -59,12 +62,6 @@ export type FanOutTarget = {
 
 export type FanOutSeed =
   | { type: "SCENARIO_RUN"; scenarioId: string; scenarioRunId: string }
-  | {
-      type: "ANNOTATED_TRACE";
-      traceId: string;
-      annotationId: string;
-      annotationComment: string;
-    }
   | { type: "FREE_TEXT"; description: string };
 
 export async function generateAdjacentScenarios({
@@ -84,13 +81,7 @@ export async function generateAdjacentScenarios({
     body: JSON.stringify({ projectId, seed, target, count }),
   });
 
-  let payload: {
-    error?: string;
-    domainError?: unknown;
-    batchId?: unknown;
-    status?: unknown;
-    variants?: unknown;
-  };
+  let payload: unknown;
   try {
     payload = await response.json();
   } catch {
@@ -101,15 +92,14 @@ export async function generateAdjacentScenarios({
   }
 
   if (!response.ok) {
-    const handled = serializedHandledErrorSchema.safeParse(payload.domainError);
-    if (handled.success) {
-      throw new FanOutGenerationError(
-        payload.error ?? "Could not generate adjacent scenarios",
-        handled.data.code,
-        handled.data.meta,
-      );
+    // The endpoint throws its handled errors, so a failure arrives as the flat
+    // REST envelope the secured app serializes: the code in `error`, the meta
+    // spread alongside it.
+    const handled = readHandledError(payload);
+    if (handled) {
+      throw new FanOutGenerationError(handled.code, handled.code, handled.meta);
     }
-    throw new Error(payload.error ?? "Could not generate adjacent scenarios");
+    throw new Error("Could not generate adjacent scenarios");
   }
 
   const parsed = responseSchema.safeParse(payload);

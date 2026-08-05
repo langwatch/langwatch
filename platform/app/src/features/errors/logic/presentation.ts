@@ -813,6 +813,44 @@ const presentations = {
     describe: () => "Edit the plan to remove them.",
   },
 
+  // ---- related failures (fan-out batches) ----
+  fan_out_batch_not_found: {
+    title: "Batch of related failures not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  fan_out_variant_not_in_batch: {
+    title: "Those scenarios are no longer part of this batch",
+    describe: () =>
+      "Nothing was changed. Reload the batch to see the current list, then decide again.",
+  },
+  fan_out_no_approved_variants: {
+    title: "Nothing approved to run",
+    describe: () => "Approve at least one scenario, then start the run.",
+  },
+  fan_out_batch_not_run: {
+    title: "This batch has not been run yet",
+    describe: () =>
+      "Approve the scenarios you want to keep and run them to see how far the failure reaches.",
+  },
+  fan_out_batch_target_invalid: {
+    title: "This batch has no valid target",
+    describe: () =>
+      "We could not tell what these scenarios should run against. Generate a new batch and pick a target.",
+  },
+  fan_out_seed_scenario_not_found: {
+    title: "The original scenario no longer exists",
+    describe: () =>
+      "It was archived or deleted, so there is nothing left to base related failures on.",
+  },
+  fan_out_generation_timed_out: {
+    title: "Finding related failures took too long",
+    describe: () => "This is usually temporary. Try again in a moment.",
+  },
+  fan_out_unauthenticated: {
+    title: "You are signed out",
+    describe: () => "Sign in again to find related failures.",
+  },
+
   // ---- automations & notifications ----
   template_not_found: {
     title: "Template not found",

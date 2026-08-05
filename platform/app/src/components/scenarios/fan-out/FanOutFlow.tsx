@@ -1,14 +1,14 @@
 import { useState } from "react";
+import type { FanOutSeed, FanOutTarget } from "../services/fanOutGeneration";
 import { AdjacentScenariosGenerateModal } from "./AdjacentScenariosGenerateModal";
 import { FanOutTargetDialog } from "./FanOutTargetDialog";
-import type { FanOutSeed, FanOutTarget } from "../services/fanOutGeneration";
 
 /**
  * The fan-out entry flow: pick a target if we don't already know one, then
  * describe (or carry) the seed failure and generate.
  *
- * A seed that came from a failed run already knows its target, so that path
- * skips straight to generation.
+ * A seed that came from a failed run that recorded its target skips straight
+ * to generation; anything else asks first rather than guessing.
  */
 export function FanOutFlow({
   open,
@@ -23,7 +23,9 @@ export function FanOutFlow({
   /** Known when starting from a failed run; otherwise the user picks one. */
   knownTarget?: FanOutTarget;
 }) {
-  const [target, setTarget] = useState<FanOutTarget | null>(knownTarget ?? null);
+  const [target, setTarget] = useState<FanOutTarget | null>(
+    knownTarget ?? null,
+  );
 
   const handleClose = () => {
     setTarget(knownTarget ?? null);
@@ -34,7 +36,11 @@ export function FanOutFlow({
 
   if (!target) {
     return (
-      <FanOutTargetDialog open={open} onClose={handleClose} onConfirm={setTarget} />
+      <FanOutTargetDialog
+        open={open}
+        onClose={handleClose}
+        onConfirm={setTarget}
+      />
     );
   }
 

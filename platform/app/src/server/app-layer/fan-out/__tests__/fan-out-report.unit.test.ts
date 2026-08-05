@@ -2,11 +2,6 @@
  * @vitest-environment node
  *
  * Unit tests for FanOutReportService's blast-radius aggregation.
- *
- * Covers @unit scenarios from adjacent-scenario-blast-radius.feature:
- * - Blast radius is the ratio of failed to total variants
- * - Report shows a per-lens breakdown
- * - Report updates while runs are still in progress
  */
 import type { FanOutVariant } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
@@ -48,14 +43,21 @@ function run({
   };
 }
 
-function serviceReturning(runs: ReturnType<typeof run>[]) {
+function serviceReturning(
+  runs: ReturnType<typeof run>[],
+  batch: unknown = null,
+) {
   const simulationRuns = {
     getRunDataForBatchRun: vi
       .fn()
       .mockResolvedValue({ changed: true, lastUpdatedAt: 1, runs }),
   };
+  const fanOutRepository = {
+    findBatchById: vi.fn().mockResolvedValue(batch),
+  };
   return FanOutReportService.create({
     simulationRuns: simulationRuns as never,
+    fanOutRepository: fanOutRepository as never,
   });
 }
 
@@ -69,6 +71,7 @@ const baseParams = {
 describe("FanOutReportService", () => {
   describe("given every variant run has finished", () => {
     describe("when 3 of 7 failed", () => {
+      /** @scenario "Blast radius is the ratio of failed to total variants" */
       it("reports a blast radius of 3/7", async () => {
         const variants = Array.from({ length: 7 }, (_, i) =>
           variant({ id: `variant_${i}`, scenarioRunId: `run_${i}` }),
@@ -93,6 +96,7 @@ describe("FanOutReportService", () => {
     });
 
     describe("when variants span multiple lenses", () => {
+      /** @scenario "Report shows a per-lens breakdown" */
       it("breaks failures down by lens", async () => {
         const variants = [
           variant({ id: "v1", scenarioRunId: "run_1", lens: "paraphrase" }),
@@ -141,6 +145,7 @@ describe("FanOutReportService", () => {
   });
 
   describe("given some variant runs are still in progress", () => {
+    /** @scenario "Report updates while runs are still in progress" */
     it("reports a verdict only for the finished ones", async () => {
       const variants = [
         variant({ id: "v1", scenarioRunId: "run_1" }),
@@ -181,6 +186,7 @@ describe("FanOutReportService", () => {
   });
 
   describe("given the seed itself was run as a baseline", () => {
+    /** @scenario "The report shows the seed's own result for comparison" */
     it("surfaces the seed's own result alongside the variants", async () => {
       const variants = [variant({ id: "v1", scenarioRunId: "run_1" })];
       const runs = [
@@ -197,6 +203,56 @@ describe("FanOutReportService", () => {
       expect(report.seedRun?.scenarioRunId).toBe("seed_run");
       // The seed is context, never part of the ratio.
       expect(report.totalVariants).toBe(1);
+    });
+  });
+
+  describe("given a report is asked for by batch id", () => {
+    /** @scenario "Reporting on a batch from another project is refused" */
+    it("refuses a batch the project cannot see", async () => {
+      await expect(
+        serviceReturning([], null).getReportForBatch({
+          projectId: "project_1",
+          batchId: "batch_from_elsewhere",
+        }),
+      ).rejects.toMatchObject({ code: "fan_out_batch_not_found" });
+    });
+
+    /** @scenario "Reporting on a batch that has not run is refused" */
+    it("refuses a batch that has not been dispatched", async () => {
+      const batch = {
+        id: "batch_1",
+        scenarioSetId: "__internal__batch_1__fanout",
+        batchRunId: null,
+        seedScenarioRunId: null,
+        variants: [],
+      };
+
+      await expect(
+        serviceReturning([], batch).getReportForBatch({
+          projectId: "project_1",
+          batchId: "batch_1",
+        }),
+      ).rejects.toMatchObject({ code: "fan_out_batch_not_run" });
+    });
+
+    it("reports on the batch's own run once it has one", async () => {
+      const batch = {
+        id: "batch_1",
+        scenarioSetId: "__internal__batch_1__fanout",
+        batchRunId: "batchrun_1",
+        seedScenarioRunId: null,
+        variants: [variant({ id: "v1", scenarioRunId: "run_1" })],
+      };
+      const runs = [
+        run({ scenarioRunId: "run_1", status: ScenarioRunStatus.FAILED }),
+      ];
+
+      const report = await serviceReturning(runs, batch).getReportForBatch({
+        projectId: "project_1",
+        batchId: "batch_1",
+      });
+
+      expect(report.failedVariants).toBe(1);
     });
   });
 });

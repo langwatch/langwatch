@@ -3,12 +3,6 @@
  *
  * Integration tests for FanOutGenerationService.
  *
- * Covers @integration scenarios from adjacent-scenario-generation.feature:
- * - Generated variants inherit the seed's target
- * - Free-text generation drafts a seed situation and criteria first
- * - Default generation covers the six adjacency lenses
- * - Batch size stays within 5 to 8 variants
- *
  * The LLM call is mocked: what matters here is the persistence contract
  * around it (a real Scenario row per variant, the target carried through,
  * the batch only ready once its variants exist), not the model's prose.
@@ -45,7 +39,9 @@ function variantFixture(lens: string, index: number) {
 function sixVariants() {
   return {
     object: {
-      variants: ADJACENT_SCENARIO_LENSES.map((lens, i) => variantFixture(lens, i)),
+      variants: ADJACENT_SCENARIO_LENSES.map((lens, i) =>
+        variantFixture(lens, i),
+      ),
     },
   };
 }
@@ -67,6 +63,7 @@ describe("FanOutGenerationService", () => {
 
   describe("given a free-text incident description", () => {
     describe("when generating adjacent scenarios", () => {
+      /** @scenario "Free-text generation drafts a seed situation and criteria first" */
       it("drafts a seed situation and criteria before fanning out", async () => {
         generateObjectMock
           .mockResolvedValueOnce({
@@ -93,6 +90,7 @@ describe("FanOutGenerationService", () => {
         expect(generateObjectMock).toHaveBeenCalledTimes(2);
       });
 
+      /** @scenario "Generated variants inherit the seed's target" */
       it("records the caller's target on the batch", async () => {
         generateObjectMock
           .mockResolvedValueOnce({
@@ -114,6 +112,7 @@ describe("FanOutGenerationService", () => {
 
   describe("given a failed scenario run as the seed", () => {
     describe("when generating adjacent scenarios", () => {
+      /** @scenario "A run seed reuses its own scenario text" */
       it("reuses the seed scenario's own situation and criteria", async () => {
         const seedScenario = await prisma.scenario.create({
           data: {
@@ -153,6 +152,7 @@ describe("FanOutGenerationService", () => {
         .mockResolvedValueOnce(sixVariants());
     });
 
+    /** @scenario "Every generated variant is a real, persisted scenario" */
     it("persists one real scenario row per variant", async () => {
       const result = await service.generate({
         projectId,
@@ -172,6 +172,7 @@ describe("FanOutGenerationService", () => {
       }
     });
 
+    /** @scenario "Default generation covers the six adjacency lenses" */
     it("covers the six adjacency lenses", async () => {
       const result = await service.generate({
         projectId,
@@ -185,6 +186,7 @@ describe("FanOutGenerationService", () => {
       );
     });
 
+    /** @scenario "Failing variants stay visible in the scenario library" */
     it("labels each variant scenario so it is filterable in the library", async () => {
       const result = await service.generate({
         projectId,
@@ -200,6 +202,7 @@ describe("FanOutGenerationService", () => {
       expect(scenario!.labels).toContain(`fan-out:${result.variants[0]!.lens}`);
     });
 
+    /** @scenario "Nothing reaches the scenario library unreviewed" */
     it("leaves every variant pending review", async () => {
       const result = await service.generate({
         projectId,
@@ -222,6 +225,7 @@ describe("FanOutGenerationService", () => {
       expect(result.batch.scenarioSetId).toBe(getFanOutSetId(result.batch.id));
     });
 
+    /** @scenario "Batch moves to ready-for-review once generation completes" */
     it("only reports ready for review once the variants exist", async () => {
       const result = await service.generate({
         projectId,
@@ -239,6 +243,7 @@ describe("FanOutGenerationService", () => {
   });
 
   describe("given the seed scenario does not exist", () => {
+    /** @scenario "Show a clear error when the seed scenario is gone" */
     it("fails instead of generating against a missing seed", async () => {
       generateObjectMock.mockResolvedValue(sixVariants());
 
@@ -253,7 +258,7 @@ describe("FanOutGenerationService", () => {
             scenarioRunId: "scenariorun_1",
           },
         }),
-      ).rejects.toThrow(/not found/);
+      ).rejects.toMatchObject({ code: "fan_out_seed_scenario_not_found" });
     });
   });
 });

@@ -1,7 +1,10 @@
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { AICreateModal, type ExampleTemplate } from "../../shared/AICreateModal";
+import {
+  AICreateModal,
+  type ExampleTemplate,
+} from "../../shared/AICreateModal";
 import {
   type FanOutSeed,
   type FanOutTarget,

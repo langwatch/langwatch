@@ -1,8 +1,8 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { Dialog } from "../../ui/dialog";
-import { TargetSelector, type TargetValue } from "../TargetSelector";
 import type { FanOutTarget } from "../services/fanOutGeneration";
+import { TargetSelector, type TargetValue } from "../TargetSelector";
 
 /**
  * Asks which agent or prompt the generated scenarios should run against.

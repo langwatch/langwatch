@@ -3,20 +3,20 @@ import {
   Box,
   Button,
   Checkbox,
-  HStack,
   Heading,
+  HStack,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Check, MoreVertical, Play, X } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { Drawer } from "../../ui/drawer";
 import { Menu } from "../../ui/menu";
-import { toaster } from "../../ui/toaster";
 import { FAN_OUT_LENS_LABELS } from "../services/fanOutGeneration";
 
 interface Props {
@@ -36,7 +36,10 @@ interface Props {
 export function AdjacentScenariosReviewDrawerFromUrl(props: Props) {
   const params = useDrawerParams();
   return (
-    <AdjacentScenariosReviewDrawer {...props} batchId={props.batchId ?? params.batchId} />
+    <AdjacentScenariosReviewDrawer
+      {...props}
+      batchId={props.batchId ?? params.batchId}
+    />
   );
 }
 
@@ -57,11 +60,7 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
       await utils.fanOut.getBatch.invalidate();
     },
     onError: (error) => {
-      toaster.create({
-        title: "Could not save your decision",
-        description: error.message,
-        type: "error",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't save your decision" });
     },
   });
 
@@ -71,11 +70,7 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
       if (batchId) openDrawer("adjacentScenariosReport", { batchId });
     },
     onError: (error) => {
-      toaster.create({
-        title: "Could not start the run",
-        description: error.message,
-        type: "error",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't start the run" });
     },
   });
 
@@ -108,7 +103,12 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
   }, []);
 
   return (
-    <Drawer.Root open={true} placement="end" size="xl" onOpenChange={closeDrawer}>
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size="xl"
+      onOpenChange={closeDrawer}
+    >
       <Drawer.Content>
         <Drawer.Header borderBottomWidth="1px">
           <VStack align="start" gap={1}>
@@ -122,7 +122,14 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
         </Drawer.Header>
 
         <Drawer.Body padding={0}>
-          {batchQuery.isLoading ? (
+          {batchQuery.error ? (
+            <Box padding={6}>
+              <HandledErrorAlert
+                error={batchQuery.error}
+                fallbackTitle="Couldn't load these scenarios"
+              />
+            </Box>
+          ) : batchQuery.isLoading ? (
             <HStack justify="center" padding={10}>
               <Spinner size="sm" />
               <Text textStyle="sm" color="fg.muted">
@@ -183,7 +190,11 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
               >
                 <X size={14} /> Reject selected
               </Button>
-              <Button size="xs" variant="ghost" onClick={() => setSelected(new Set())}>
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => setSelected(new Set())}
+              >
                 Clear
               </Button>
             </HStack>
@@ -226,6 +237,11 @@ function VariantRow({
     lens: string;
     rationale: string | null;
     status: string;
+    scenario: {
+      name: string;
+      situation: string;
+      criteria: string[];
+    } | null;
   };
   selected: boolean;
   onToggle: () => void;
@@ -257,7 +273,7 @@ function VariantRow({
         </Checkbox.Root>
       </Box>
 
-      <VStack align="start" gap={1} flex={1} minWidth={0}>
+      <VStack align="start" gap={2} flex={1} minWidth={0}>
         <HStack gap={2} flexWrap="wrap">
           <Badge size="sm" variant="subtle">
             {FAN_OUT_LENS_LABELS[variant.lens] ?? variant.lens}
@@ -273,10 +289,34 @@ function VariantRow({
             </Badge>
           )}
         </HStack>
+
+        {variant.scenario && (
+          <Text textStyle="sm" fontWeight="medium">
+            {variant.scenario.name}
+          </Text>
+        )}
+
         {variant.rationale && (
           <Text textStyle="sm" color="fg.muted">
             {variant.rationale}
           </Text>
+        )}
+
+        {variant.scenario && (
+          <VStack align="start" gap={1} width="full">
+            <Text textStyle="xs" color="fg.muted" whiteSpace="pre-wrap">
+              {variant.scenario.situation}
+            </Text>
+            {variant.scenario.criteria.length > 0 && (
+              <VStack align="start" gap={0.5} width="full">
+                {variant.scenario.criteria.map((criterion) => (
+                  <Text key={criterion} textStyle="xs" color="fg.muted">
+                    {"•"} {criterion}
+                  </Text>
+                ))}
+              </VStack>
+            )}
+          </VStack>
         )}
       </VStack>
 

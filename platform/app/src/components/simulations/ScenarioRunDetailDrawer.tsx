@@ -35,6 +35,7 @@ import { FanOutFlow } from "../scenarios/fan-out/FanOutFlow";
 import { TraceDetails } from "../traces/TraceDetails";
 import { Drawer } from "../ui/drawer";
 import { CopyIdChip } from "./CopyIdChip";
+import { fanOutTargetFromRunMetadata } from "./fan-out-target.utils";
 import { RunCriteriaChip } from "./RunCriteriaChip";
 import { RunDetailSection } from "./RunDetailSection";
 import { getRunStatePollInterval } from "./run-state-polling";
@@ -137,16 +138,12 @@ export function ScenarioRunDetailDrawer({
     });
   }, [scenarioState?.name, scenarioState?.metadata, targetNameMap]);
 
-  // The failed run already knows what it ran against, so a fan-out seeded
-  // from it can skip asking for a target.
-  const fanOutTarget = useMemo(() => {
-    const langwatch = scenarioState?.metadata?.langwatch;
-    if (!langwatch?.targetReferenceId || !langwatch?.targetType) return null;
-    return {
-      type: langwatch.targetType,
-      referenceId: langwatch.targetReferenceId,
-    };
-  }, [scenarioState?.metadata]);
+  // A run that recorded what it ran against lets a fan-out seeded from it skip
+  // asking for a target; anything else falls through to the target picker.
+  const fanOutTarget = useMemo(
+    () => fanOutTargetFromRunMetadata(scenarioState?.metadata),
+    [scenarioState?.metadata],
+  );
 
   const { onRunComplete, onRunFailed } = useDrawerRunCallbacks();
 
@@ -380,7 +377,6 @@ export function ScenarioRunDetailDrawer({
                         // there is no blast radius to chase for a pass.
                         scenarioId &&
                         scenarioRunId &&
-                        fanOutTarget &&
                         (scenarioState.status === "FAILED" ||
                           scenarioState.status === "ERROR")
                           ? () => setFanOutOpen(true)
@@ -556,7 +552,7 @@ export function ScenarioRunDetailDrawer({
         isLoading={isRunning}
       />
 
-      {scenarioId && scenarioRunId && fanOutTarget && (
+      {scenarioId && scenarioRunId && (
         <FanOutFlow
           open={fanOutOpen}
           onClose={() => setFanOutOpen(false)}

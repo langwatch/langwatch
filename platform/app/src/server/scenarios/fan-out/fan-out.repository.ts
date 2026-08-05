@@ -1,5 +1,4 @@
 import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type {
   FanOutBatch,
@@ -13,7 +12,6 @@ import { getLangWatchTracer } from "langwatch";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.fan-out.repository");
-const logger = createLogger("langwatch:scenarios:fan-out:repository");
 
 export type CreateFanOutBatchInput = Omit<
   Prisma.FanOutBatchUncheckedCreateInput,
@@ -109,7 +107,6 @@ export class FanOutRepository {
     projectId: string;
     status: FanOutBatchStatus;
     batchRunId?: string;
-    promotedSuiteId?: string;
   }): Promise<FanOutBatch> {
     return tracer.withActiveSpan(
       "FanOutRepository.updateBatchStatus",
@@ -129,72 +126,106 @@ export class FanOutRepository {
           data: {
             status: input.status,
             ...(input.batchRunId ? { batchRunId: input.batchRunId } : {}),
-            ...(input.promotedSuiteId
-              ? { promotedSuiteId: input.promotedSuiteId }
-              : {}),
           },
         });
       },
     );
   }
 
-  async findVariantsByIds(input: {
-    ids: string[];
+  /**
+   * Applies a whole review decision set atomically: every variant flips status
+   * together, and the scenarios behind rejected variants are archived in the
+   * same transaction so a reject can never leave its scenario in the library.
+   *
+   * FanOutVariant has no projectId of its own (RELATIONAL_PARENT_SCOPED), so
+   * every read and write here is scoped through the parent batch, which does.
+   * Returns null when any requested id is not part of that batch, so the caller
+   * can reject the whole set rather than silently applying part of it.
+   */
+  async applyDecisions(input: {
     batchId: string;
-  }): Promise<FanOutVariant[]> {
-    return tracer.withActiveSpan(
-      "FanOutRepository.findVariantsByIds",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "postgresql",
-          "db.operation": "SELECT",
-          "db.table": "FanOutVariant",
-        },
-      },
-      async () => {
-        return this.prisma.fanOutVariant.findMany({
-          where: { id: { in: input.ids }, batchId: input.batchId },
-        });
-      },
-    );
-  }
-
-  async updateVariantStatus(input: {
-    id: string;
-    status: FanOutVariantStatus;
+    projectId: string;
+    decisions: Array<{ variantId: string; status: FanOutVariantStatus }>;
     decidedById: string | null;
-  }): Promise<FanOutVariant> {
+  }): Promise<FanOutVariant[] | null> {
     return tracer.withActiveSpan(
-      "FanOutRepository.updateVariantStatus",
+      "FanOutRepository.applyDecisions",
       {
         kind: SpanKind.CLIENT,
         attributes: {
           "db.system": "postgresql",
           "db.operation": "UPDATE",
           "db.table": "FanOutVariant",
-          "fan_out_variant.id": input.id,
+          "tenant.id": input.projectId,
+          "fan_out_batch.id": input.batchId,
+          "result.count": input.decisions.length,
         },
       },
-      async () => {
-        return this.prisma.fanOutVariant.update({
-          where: { id: input.id },
-          data: {
-            status: input.status,
-            decidedById: input.decidedById,
-            decidedAt: new Date(),
-          },
+      async (span) => {
+        return this.prisma.$transaction(async (tx) => {
+          const ids = input.decisions.map((decision) => decision.variantId);
+          const found = await tx.fanOutVariant.findMany({
+            where: {
+              id: { in: ids },
+              batchId: input.batchId,
+              batch: { projectId: input.projectId },
+            },
+            select: { id: true },
+          });
+
+          if (found.length !== new Set(ids).size) {
+            span.setAttribute("result.found", false);
+            return null;
+          }
+
+          const decidedAt = new Date();
+          const updated: FanOutVariant[] = [];
+          const rejectedScenarioIds: string[] = [];
+
+          for (const { variantId, status } of input.decisions) {
+            const variant = await tx.fanOutVariant.update({
+              where: { id: variantId, batchId: input.batchId },
+              data: {
+                status,
+                decidedById: input.decidedById,
+                decidedAt,
+              },
+            });
+            updated.push(variant);
+            if (status === "REJECTED") {
+              rejectedScenarioIds.push(variant.scenarioId);
+            }
+          }
+
+          if (rejectedScenarioIds.length > 0) {
+            await tx.scenario.updateMany({
+              where: {
+                id: { in: rejectedScenarioIds },
+                projectId: input.projectId,
+                archivedAt: null,
+              },
+              data: { archivedAt: decidedAt },
+            });
+          }
+
+          span.setAttribute("result.found", true);
+          return updated;
         });
       },
     );
   }
 
+  /**
+   * Records the run id a variant was dispatched under, so the blast-radius
+   * report can join the variant to its ClickHouse verdict.
+   */
   async setVariantScenarioRunId(input: {
     id: string;
+    projectId: string;
     scenarioRunId: string;
   }): Promise<void> {
-    await this.prisma.fanOutVariant.update({
-      where: { id: input.id },
+    await this.prisma.fanOutVariant.updateMany({
+      where: { id: input.id, batch: { projectId: input.projectId } },
       data: { scenarioRunId: input.scenarioRunId },
     });
   }

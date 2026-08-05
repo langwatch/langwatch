@@ -2011,7 +2011,6 @@ model Scenario {
 
 enum FanOutSeedType {
   SCENARIO_RUN
-  ANNOTATED_TRACE
   FREE_TEXT
 }
 
@@ -2030,29 +2029,26 @@ enum FanOutVariantStatus {
 }
 
 // A batch of LLM-generated "adjacent" test scenarios fanned out from a single
-// real failure (a failed scenario run, an annotated trace, or a pasted
-// incident description), so the team can see how far a bug class extends
-// before a customer finds the rest. See specs/scenarios/adjacent-scenario-*.feature.
+// real failure (a failed scenario run or a pasted incident description), so the
+// team can see how far a bug class extends before a customer finds the rest.
+// See specs/scenarios/adjacent-scenario-*.feature.
 model FanOutBatch {
-  id                String             @id @default(nanoid())
+  id                String            @id @default(nanoid())
   projectId         String
-  project           Project            @relation(fields: [projectId], references: [id])
+  project           Project           @relation(fields: [projectId], references: [id])
   seedType          FanOutSeedType
   seedScenarioId    String? // originating Scenario, when seedType = SCENARIO_RUN
   seedScenarioRunId String? // ClickHouse ScenarioRunId of the failed run, when seedType = SCENARIO_RUN
-  seedTraceId       String? // when seedType = ANNOTATED_TRACE
-  seedAnnotationId  String? // when seedType = ANNOTATED_TRACE
   seedDescription   String? // free text, or the LLM-drafted seed situation for other seed types
   seedCriteria      String[]
   seedTarget        Json // { type: "prompt" | "http" | "code" | "workflow", referenceId }
-  status            FanOutBatchStatus  @default(GENERATING)
+  status            FanOutBatchStatus @default(GENERATING)
   batchRunId        String? // ClickHouse BatchRunId, set once approved variants are dispatched
   scenarioSetId     String // ClickHouse ScenarioSetId (fan-out namespace), see fanout-set-id.ts
-  promotedSuiteId   String? // SimulationSuite passing/approved variants were promoted into, if any
   createdById       String?
-  createdBy         User?              @relation(fields: [createdById], references: [id])
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @default(now()) @updatedAt
+  createdBy         User?             @relation(fields: [createdById], references: [id])
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @default(now()) @updatedAt
 
   variants FanOutVariant[]
 
@@ -2060,20 +2056,20 @@ model FanOutBatch {
 }
 
 model FanOutVariant {
-  id            String               @id @default(nanoid())
+  id            String              @id @default(nanoid())
   batchId       String
-  batch         FanOutBatch          @relation(fields: [batchId], references: [id])
+  batch         FanOutBatch         @relation(fields: [batchId], references: [id])
   scenarioId    String
-  scenario      Scenario             @relation(fields: [scenarioId], references: [id])
+  scenario      Scenario            @relation(fields: [scenarioId], references: [id])
   lens          String // paraphrase | entity_substitution | tone_shift | adjacent_intent | boundary_value | multi_turn_context_variation
   rationale     String?
-  status        FanOutVariantStatus  @default(PENDING)
+  status        FanOutVariantStatus @default(PENDING)
   scenarioRunId String? // ClickHouse ScenarioRunId, set once dispatched
   decidedById   String?
-  decidedBy     User?                @relation(fields: [decidedById], references: [id])
+  decidedBy     User?               @relation(fields: [decidedById], references: [id])
   decidedAt     DateTime?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @default(now()) @updatedAt
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @default(now()) @updatedAt
 
   @@unique([batchId, scenarioId])
   @@index([batchId])

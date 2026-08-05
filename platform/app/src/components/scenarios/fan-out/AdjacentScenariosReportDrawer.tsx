@@ -2,14 +2,15 @@ import {
   Badge,
   Box,
   Button,
-  HStack,
   Heading,
+  HStack,
   Progress,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { useMemo } from "react";
+import { HandledErrorAlert } from "~/features/errors";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -29,7 +30,10 @@ interface Props {
 export function AdjacentScenariosReportDrawerFromUrl(props: Props) {
   const params = useDrawerParams();
   return (
-    <AdjacentScenariosReportDrawer {...props} batchId={props.batchId ?? params.batchId} />
+    <AdjacentScenariosReportDrawer
+      {...props}
+      batchId={props.batchId ?? params.batchId}
+    />
   );
 }
 
@@ -58,7 +62,12 @@ export function AdjacentScenariosReportDrawer({ batchId }: Props) {
   );
 
   return (
-    <Drawer.Root open={true} placement="end" size="xl" onOpenChange={closeDrawer}>
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size="xl"
+      onOpenChange={closeDrawer}
+    >
       <Drawer.Content>
         <Drawer.Header borderBottomWidth="1px">
           <VStack align="start" gap={1}>
@@ -71,7 +80,12 @@ export function AdjacentScenariosReportDrawer({ batchId }: Props) {
         </Drawer.Header>
 
         <Drawer.Body>
-          {reportQuery.isLoading ? (
+          {reportQuery.error ? (
+            <HandledErrorAlert
+              error={reportQuery.error}
+              fallbackTitle="Couldn't load the blast radius"
+            />
+          ) : reportQuery.isLoading ? (
             <HStack justify="center" padding={10}>
               <Spinner size="sm" />
               <Text textStyle="sm" color="fg.muted">

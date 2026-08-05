@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "FanOutSeedType" AS ENUM ('SCENARIO_RUN', 'ANNOTATED_TRACE', 'FREE_TEXT');
+CREATE TYPE "FanOutSeedType" AS ENUM ('SCENARIO_RUN', 'FREE_TEXT');
 
 -- CreateEnum
 CREATE TYPE "FanOutBatchStatus" AS ENUM ('GENERATING', 'READY_FOR_REVIEW', 'DISPATCHING', 'COMPLETED', 'FAILED');
@@ -14,15 +14,12 @@ CREATE TABLE "FanOutBatch" (
     "seedType" "FanOutSeedType" NOT NULL,
     "seedScenarioId" TEXT,
     "seedScenarioRunId" TEXT,
-    "seedTraceId" TEXT,
-    "seedAnnotationId" TEXT,
     "seedDescription" TEXT,
     "seedCriteria" TEXT[],
     "seedTarget" JSONB NOT NULL,
     "status" "FanOutBatchStatus" NOT NULL DEFAULT 'GENERATING',
     "batchRunId" TEXT,
     "scenarioSetId" TEXT NOT NULL,
-    "promotedSuiteId" TEXT,
     "createdById" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

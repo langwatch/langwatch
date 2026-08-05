@@ -1,7 +1,7 @@
 /**
- * Fan-out generation service: turns a real failure (a failed scenario run, an
- * annotated production trace, or a pasted incident description) into a small,
- * bounded batch of LLM-generated "adjacent" variant scenarios.
+ * Fan-out generation service: turns a real failure (a failed scenario run or a
+ * pasted incident description) into a small, bounded batch of LLM-generated
+ * "adjacent" variant scenarios.
  *
  * App-layer for v1 — calls the LLM directly via the Vercel AI SDK, the same
  * tool a Scenario SDK implementation would use internally. Not a Scenario SDK
@@ -14,14 +14,19 @@
 
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { FanOutBatch, FanOutSeedType, FanOutVariant } from "@prisma/client";
+import type {
+  FanOutBatch,
+  FanOutSeedType,
+  FanOutVariant,
+  PrismaClient,
+} from "@prisma/client";
 import { generateObject } from "ai";
-import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { getFanOutSetId } from "../fanout-set-id";
 import { ScenarioRepository } from "../scenario.repository";
+import { FanOutSeedScenarioNotFoundError } from "./errors";
 import { FanOutRepository } from "./fan-out.repository";
 
 /** Generates a fan-out batch id. */
@@ -111,12 +116,6 @@ export type GenerateFanOutBatchInput = {
         scenarioRunId: string;
       }
     | {
-        type: "ANNOTATED_TRACE";
-        traceId: string;
-        annotationId: string;
-        annotationComment: string;
-      }
-    | {
         type: "FREE_TEXT";
         description: string;
       };
@@ -176,12 +175,10 @@ export class FanOutGenerationService {
       id: batchId,
       projectId: input.projectId,
       seedType,
-      seedScenarioId: input.seed.type === "SCENARIO_RUN" ? input.seed.scenarioId : null,
+      seedScenarioId:
+        input.seed.type === "SCENARIO_RUN" ? input.seed.scenarioId : null,
       seedScenarioRunId:
         input.seed.type === "SCENARIO_RUN" ? input.seed.scenarioRunId : null,
-      seedTraceId: input.seed.type === "ANNOTATED_TRACE" ? input.seed.traceId : null,
-      seedAnnotationId:
-        input.seed.type === "ANNOTATED_TRACE" ? input.seed.annotationId : null,
       seedDescription: resolved.situation,
       seedCriteria: resolved.criteria,
       seedTarget: input.target,
@@ -236,23 +233,20 @@ export class FanOutGenerationService {
         projectId: input.projectId,
       });
       if (!scenario) {
-        throw new Error(`Seed scenario ${input.seed.scenarioId} not found`);
+        throw new FanOutSeedScenarioNotFoundError({
+          meta: { scenarioId: input.seed.scenarioId },
+        });
       }
       return { situation: scenario.situation, criteria: scenario.criteria };
     }
 
-    // A trace annotation or a pasted incident is prose, not a scenario, so it
-    // gets drafted into one first.
-    const prompt =
-      input.seed.type === "ANNOTATED_TRACE"
-        ? `Customer-reported issue (from a trace annotation): ${input.seed.annotationComment}`
-        : input.seed.description;
-
+    // A pasted incident is prose, not a scenario, so it gets drafted into one
+    // first.
     const draft = await generateObject({
       model,
       schema: seedDraftSchema,
       system: SEED_DRAFT_SYSTEM_PROMPT,
-      prompt,
+      prompt: input.seed.description,
       maxRetries: 1,
       abortSignal: AbortSignal.timeout(30_000),
     });
