@@ -121,8 +121,13 @@ Two things this counter deliberately excludes, because both would make a per-key
 To find a client stuck in a rejection loop, rank by key, then drill into the one that stands out:
 
 ```promql
-topk(5, sum by (vk_id, code) (rate(gateway_client_rejects_total{code!=""}[15m])))
-sum by (code) (rate(gateway_client_rejects_total{vk_id="vk_Hkj6EJ..."}[15m]))
+topk(5, sum by (vk_id) (rate(gateway_client_rejects_total{code!=""}[15m])))
+```
+
+Copy the complete `vk_id` from that result, then replace `<full-vk-id>` for the code breakdown:
+
+```promql
+sum by (code) (rate(gateway_client_rejects_total{vk_id="<full-vk-id>"}[15m]))
 ```
 
 ### Streaming
