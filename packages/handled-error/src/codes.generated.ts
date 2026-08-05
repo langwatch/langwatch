@@ -230,6 +230,13 @@ export const goErrorCodes = {
    */
   max_workers_reached: { service: "langyagent", httpStatus: 503 },
   /**
+   * ErrMissingModel — is a request-shape error with its own stable identity so
+   * clients and rejection metrics do not have to infer it from prose.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  missing_model: { service: "aigateway", httpStatus: 400 },
+  /**
    * ErrModelNotAllowed
    *
    * @source services/aigateway/domain/errors.go

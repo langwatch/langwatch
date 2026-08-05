@@ -60,7 +60,7 @@ func faultForCode(code herr.Code) Fault {
 	switch code {
 	case domain.ErrInvalidAPIKey, domain.ErrBudgetExceeded, domain.ErrRateLimited,
 		domain.ErrGuardrailBlocked, domain.ErrPolicyViolation, domain.ErrModelNotAllowed,
-		domain.ErrPayloadTooLarge, domain.ErrBadRequest, domain.ErrNotFound,
+		domain.ErrPayloadTooLarge, domain.ErrBadRequest, domain.ErrMissingModel, domain.ErrNotFound,
 		domain.ErrKeyRevoked, domain.ErrKeyDisabled, domain.ErrNoProviderConfigured,
 		domain.ErrEndUserRequired:
 		return FaultCustomer

@@ -240,7 +240,7 @@ func TestLLMTargetURL(t *testing.T) {
 // The proxy's error capture is the wire that lets a turn's terminal frame name
 // the REAL cause instead of opencode's laundered prose. Contract: EVERY >=400
 // answer leaves a capture for LastLLMError — a herr envelope losslessly, a
-// provider-native body best-effort with its message; a later success — or a
+// provider-native body as a safe handled upstream error; a later success — or a
 // new turn — clears it; the body always reaches the worker's SDK
 // byte-for-byte, even past the 64KB capture cap.
 func TestLLMProxy_ErrorCapture(t *testing.T) {
@@ -248,9 +248,12 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 	// carry the same value, `message` is always present.
 	herrBody := `{"error":{"type":"no_provider_configured","code":"no_provider_configured","message":"no model provider configured","reasons":[{"type":"unknown","message":"unknown"}]}}`
 
-	newGateway := func(status *int, body *string) *httptest.Server {
+	newGateway := func(status *int, body *string, handledCode ...string) *httptest.Server {
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
+			if len(handledCode) > 0 {
+				w.Header().Set(herr.HandledErrorHeader, handledCode[0])
+			}
 			w.WriteHeader(*status)
 			_, _ = io.WriteString(w, *body)
 		}))
@@ -258,7 +261,7 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 
 	t.Run("when the gateway answers with a herr envelope", func(t *testing.T) {
 		status, body := http.StatusBadRequest, herrBody
-		gateway := newGateway(&status, &body)
+		gateway := newGateway(&status, &body, "no_provider_configured")
 		defer gateway.Close()
 
 		relay := startRelay(t)
@@ -304,7 +307,7 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 
 	t.Run("when a new turn starts", func(t *testing.T) {
 		status, body := http.StatusBadRequest, herrBody
-		gateway := newGateway(&status, &body)
+		gateway := newGateway(&status, &body, "no_provider_configured")
 		defer gateway.Close()
 
 		relay := startRelay(t)
@@ -333,7 +336,7 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 	t.Run("when the gateway answers the codex session-expired envelope", func(t *testing.T) {
 		status := http.StatusUnauthorized
 		body := `{"error":{"type":"codex_session_expired","code":"codex_session_expired","message":"Your OpenAI session expired. Sign in to Codex again to keep using it."}}`
-		gateway := newGateway(&status, &body)
+		gateway := newGateway(&status, &body, "codex_session_expired")
 		defer gateway.Close()
 
 		relay := startRelay(t)
@@ -397,19 +400,16 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 
 	// Provider-native error bodies the gateway forwards byte-for-byte are NOT
 	// herr envelopes, even when they reuse `error.type` (Anthropic) or carry an
-	// unmatched `error.code` (OpenAI), but they hold the only actionable prose
-	// there is: the provider's own message. Every one of them must land as an
-	// `llm_upstream_error` with that prose in meta, so the turn's error frame
-	// (and the turn span) name the real failure. A body that names its own
-	// error type keeps that discriminant as a typed reason, so exact-code
-	// consumers (the codex plan-limit promotion) still classify it.
+	// unmatched `error.code` (OpenAI). Every one lands as a safe handled
+	// `llm_upstream_error`: a provider discriminant when present, otherwise a
+	// stable status-derived reason. Provider prose never enters the frame.
 	t.Run("when the gateway forwards a provider-native error body", func(t *testing.T) {
 		cases := []struct {
 			name string
 			body string
 			want string
-			// The provider's own error discriminant, expected as the captured
-			// cause's single typed reason. Empty means no reason is captured.
+			// The provider discriminant, or the status-derived fallback,
+			// expected as the captured cause's single typed reason.
 			wantCauseType string
 		}{
 			{
@@ -428,22 +428,25 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 				name:          "openai unmatched type and code pair",
 				body:          `{"error":{"type":"invalid_request_error","code":"invalid_api_key","message":"Incorrect API key provided."}}`,
 				want:          "Incorrect API key provided.",
-				wantCauseType: "invalid_request_error",
+				wantCauseType: "invalid_api_key",
 			},
 			{
-				name: "codex backend detail",
-				body: `{"detail":"The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account."}`,
-				want: "The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account.",
+				name:          "codex backend detail",
+				body:          `{"detail":"The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account."}`,
+				want:          "The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account.",
+				wantCauseType: "upstream_bad_request",
 			},
 			{
-				name: "bare message field",
-				body: `{"message":"model overloaded"}`,
-				want: "model overloaded",
+				name:          "bare message field",
+				body:          `{"message":"model overloaded"}`,
+				want:          "model overloaded",
+				wantCauseType: "upstream_bad_request",
 			},
 			{
-				name: "plain text body",
-				body: `upstream exploded`,
-				want: "upstream exploded",
+				name:          "plain text body",
+				body:          `upstream exploded`,
+				want:          "upstream exploded",
+				wantCauseType: "upstream_bad_request",
 			},
 		}
 		for _, tc := range cases {
@@ -483,14 +486,8 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 				if e.Meta["http_status"] != http.StatusBadRequest {
 					t.Errorf("captured http_status = %v, want 400", e.Meta["http_status"])
 				}
-				if tc.wantCauseType == "" {
-					if len(e.Reasons) != 0 {
-						t.Errorf("captured reasons = %v, want none for a body without an error type", e.Reasons)
-					}
-					return
-				}
 				if len(e.Reasons) != 1 {
-					t.Fatalf("captured reasons = %d, want exactly the provider's discriminant", len(e.Reasons))
+					t.Fatalf("captured reasons = %d, want exactly one handled reason", len(e.Reasons))
 				}
 				var cause herr.E
 				if !errors.As(e.Reasons[0], &cause) || string(cause.Code) != tc.wantCauseType {

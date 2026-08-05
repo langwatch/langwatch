@@ -55,6 +55,12 @@ type ErrorBody struct {
 	Fault   string      `json:"fault,omitempty"`
 }
 
+// HandledErrorHeader marks an HTTP response body as a LangWatch-authored herr
+// envelope. Its value is the top-level error code. Consumers must verify that
+// it matches the body before trusting message/meta fields; provider payloads
+// can coincidentally use the same JSON shape.
+const HandledErrorHeader = "X-LangWatch-Handled-Error"
+
 // ErrorRecorder can store an error for later inspection (e.g. request logging).
 type ErrorRecorder interface {
 	RecordError(err error)
@@ -83,6 +89,7 @@ func WriteHTTP(w http.ResponseWriter, err error) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(HandledErrorHeader, string(e.Code))
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(ErrorResponse{Error: toErrorBody(e)})
 }

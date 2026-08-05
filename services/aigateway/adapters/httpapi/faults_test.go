@@ -145,7 +145,7 @@ func TestWriteErrorCountsCustomerRejectionsPerVirtualKey(t *testing.T) {
 		err  error
 		code string
 	}{
-		{"a body the gateway cannot read", herr.New(context.Background(), domain.ErrBadRequest, herr.M{"message": "no model"}), "bad_request"},
+		{"a request with no model", herr.New(context.Background(), domain.ErrMissingModel, herr.M{"message": "choose a model"}), "missing_model"},
 		{"a model the key may not use", herr.New(context.Background(), domain.ErrModelNotAllowed, herr.M{"message": "nope"}), "model_not_allowed"},
 		{"a payload past the ceiling", herr.New(context.Background(), domain.ErrPayloadTooLarge, herr.M{"message": "too big"}), "payload_too_large"},
 	}
@@ -160,9 +160,9 @@ func TestWriteErrorCountsCustomerRejectionsPerVirtualKey(t *testing.T) {
 	// The flood this metric exists for is one key repeating one code, which
 	// has to accumulate on a single series rather than mint one per request.
 	for range 5 {
-		observedWriteError(t, ctx, herr.New(context.Background(), domain.ErrBadRequest, herr.M{"message": "no model"}))
+		observedWriteError(t, ctx, herr.New(context.Background(), domain.ErrMissingModel, herr.M{"message": "choose a model"}))
 	}
-	assert.Equal(t, 6, clientRejects(t, rec, "bad_request", "vk_flooder"))
+	assert.Equal(t, 6, clientRejects(t, rec, "missing_model", "vk_flooder"))
 	assert.Equal(t, 3, clientRejectSeries(t, rec), "one series per code, not per request")
 }
 

@@ -85,64 +85,42 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And the customer reads copy written by LangWatch for that case
     And the provider's own sentence still appears nowhere
 
-  # Keeping the prose out of the customer's card put all of it on the operator
-  # log line, which makes what the log keeps load-bearing. It kept less than it
-  # looked: the probe read three known dialects and, failing those, discarded
-  # any body that started with a brace, so an unrecognised JSON shape left the
-  # line holding a byte count and nothing else. Five turns failed with no
-  # recoverable cause at all.
+  # Provider bodies are untrusted on every surface, including logs: an invalid
+  # credential response can quote the credential. The relay therefore extracts
+  # only bounded identifier-shaped discriminants from known JSON paths. When
+  # there is no code, the HTTP status supplies a stable handled reason and the
+  # body contributes only its kind (json, html, text, binary, or empty).
   #
   # Bindings: services/langyagent/adapters/otelrelay/llmproxy_body_test.go
 
   @unit
-  Scenario: A failure in a shape nobody parsed still leaves the operator something to read
-    Given a relayed model call is rejected with an error body in no dialect the relay knows
-    When the relay records the failure for operators
-    Then the body itself is recorded, bounded, under a field that says nobody parsed it
-    And it is never confused with a provider message the relay did recognise
-    And it is bounded tighter than a provider's own sentence, because a snippet
-      only has to say what kind of body arrived
-
-  # A body that is not text at all reaches here too: a rejected call can answer
-  # with raw gzip, because Go only decompresses transparently when it set the
-  # request's encoding header itself. Those bytes must not enter a log line -
-  # the tooling that reads these logs back cannot handle them - but the fact
-  # that the body was binary is itself worth recording.
-  @unit
-  Scenario: A body that is not text is named rather than pasted
-    Given a relayed model call is rejected with a body that is not valid text
-    When the relay records the failure for operators
-    Then the line says the body was binary
-    And none of its bytes are recorded
-
-  # A proxied call answered by a Cloudflare Access login page was 41 kilobytes
-  # of HTML. Bounding that to the usual couple of thousand characters records
-  # two thousand characters of stylesheet, so an interstitial contributes its
-  # title: with the status, that is the whole diagnosis.
-  @unit
-  Scenario: A login page standing in for the API is recorded as a login page
-    Given a relayed model call is answered with an HTML page instead of an API response
-    When the relay records the failure for operators
-    Then the page's title and the status are recorded
-    And none of the page's markup or styling is
-
-  # The content type is trusted before the body is examined, on purpose: an
-  # edge substituting a login page is careless about its headers. That cuts
-  # both ways, though - an edge can equally label a plain sentence as HTML, and
-  # a title-or-nothing rule would answer that with a byte count, which is the
-  # very failure this change exists to remove.
-  @unit
-  Scenario: An HTML answer with no title still yields its visible text
-    Given a relayed model call is answered with HTML carrying no title
-    When the relay records the failure for operators
-    Then the page's visible text is recorded with the markup stripped
-    And the line is never left holding only a byte count
+  Scenario: Provider JSON discriminants become handled error reasons
+    Given a relayed model call is rejected with provider JSON
+    When the JSON names a code or type in a known provider dialect
+    Then that bounded identifier becomes the reason under "llm_upstream_error"
+    And a specific code wins over a broad type
+    And no message field enters the handled error or logs
 
   @unit
-  Scenario: A provider message the relay knows is still recorded as one
-    Given a relayed model call is rejected in a dialect the relay knows
-    When the relay records the failure for operators
-    Then the provider's own sentence is recorded as the upstream message, as before
+  Scenario: Observed upstream response shapes become safe handled errors
+    Given the relay receives usage-limit JSON, message-only invalid-model JSON,
+      a plain proxy 502, a Cloudflare HTML interstitial, or a binary body
+    When it captures the failed model call
+    Then each failure has a stable provider or HTTP-derived handled reason
+    And its metadata contains only the HTTP status and body kind
+    And operators can distinguish the shapes without recording their contents
+
+  # A provider can coincidentally emit the same type/code/message triplet as
+  # herr. Shape is not provenance. herr.WriteHTTP marks LangWatch-authored
+  # envelopes with a response header whose value must match the body code; the
+  # gateway strips that header from every forwarded provider response.
+  @unit
+  Scenario: Only a marked LangWatch envelope is trusted as a handled error
+    Given a provider body looks exactly like a LangWatch handled-error envelope
+    When it has no matching LangWatch handled-error response marker
+    Then the relay treats it as untrusted provider JSON
+    And its message and metadata are discarded
+    But a marked LangWatch envelope round-trips losslessly
 
   # The flicker had a second cause independent of the worker-stopped loop: for the
   # kinds that DO auto-retry, the red card rendered for a single frame before the

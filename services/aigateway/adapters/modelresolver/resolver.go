@@ -79,9 +79,10 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 		// Fault is stated rather than inferred, the same way
 		// errProviderNotAllowed states it: a malformed body is the caller's
 		// to fix, and an unannotated rejection reads as a platform problem.
-		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
-			"message": missingModelMessage(requestType),
-			"fault":   "customer",
+		return nil, herr.New(ctx, domain.ErrMissingModel, herr.M{
+			"message":      missingModelMessage(requestType),
+			"fault":        "customer",
+			"request_type": string(requestType),
 		})
 	}
 

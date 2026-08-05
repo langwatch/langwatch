@@ -225,8 +225,11 @@ Feature: Gateway service — public HTTP surface and operational basics
     # clock, retrying against a rejection that read, in full, "missing model
     # field". That names no field, no body and no endpoint, so the operator on
     # the other end had nothing to correct and the loop never stopped. The
-    # message is the only place the detail can go: resolution runs before the
-    # request is labeled with a model, so the counter records model="unknown".
+    # The handled error therefore carries a stable `missing_model` code plus
+    # the request surface in metadata; operators and clients need not infer
+    # this high-volume rejection from prose. Resolution still runs before the
+    # request is labeled with a model, so the request counter records
+    # model="unknown".
     #
     # Model resolution is unconditional, so every surface reaches this
     # rejection - and the surfaces disagree about where a model comes from.
@@ -241,7 +244,9 @@ Feature: Gateway service — public HTTP surface and operational basics
     Scenario: a request with no model is rejected with a message the client can act on
       Given a valid VK
       When a request arrives naming no model
-      Then the rejection names the endpoint the caller actually used
+      Then the rejection has handled error code "missing_model"
+      And its metadata names the request surface
+      And the rejection names the endpoint the caller actually used
       And it says where that endpoint takes its model from
       And it shows what a correct request looks like
       And it never names a request shape the caller is not using

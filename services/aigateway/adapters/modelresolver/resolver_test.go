@@ -125,7 +125,7 @@ func TestResolve_EmptyModel(t *testing.T) {
 
 	_, err := r.Resolve(context.Background(), chatRequest(""), cfg)
 	require.Error(t, err)
-	assert.True(t, herr.IsCode(err, domain.ErrBadRequest))
+	assert.True(t, herr.IsCode(err, domain.ErrMissingModel))
 }
 
 // @scenario "a request with no model is rejected with a message the client can act on"
@@ -209,6 +209,7 @@ func TestResolve_EmptyModelNamesTheCallersOwnSurface(t *testing.T) {
 
 			var e herr.E
 			require.ErrorAs(t, err, &e)
+			assert.Equal(t, domain.ErrMissingModel, e.Code)
 			message, _ := e.Meta["message"].(string)
 
 			for _, want := range tt.mustSay {
@@ -220,6 +221,7 @@ func TestResolve_EmptyModelNamesTheCallersOwnSurface(t *testing.T) {
 			}
 			assert.Equal(t, "customer", e.Meta["fault"],
 				"a malformed request is the caller's to fix; an unannotated rejection reads as a platform problem")
+			assert.Equal(t, string(tt.requestType), e.Meta["request_type"])
 		})
 	}
 }
@@ -230,7 +232,7 @@ func TestResolve_EmptyModelSurvivesANilRequest(t *testing.T) {
 	// though the pipeline never passes one. It must reject, not panic.
 	_, err := New().Resolve(context.Background(), nil, domain.BundleConfig{})
 	require.Error(t, err)
-	assert.True(t, herr.IsCode(err, domain.ErrBadRequest))
+	assert.True(t, herr.IsCode(err, domain.ErrMissingModel))
 }
 
 // chatRequest is the ordinary case the resolution tests exercise: a model

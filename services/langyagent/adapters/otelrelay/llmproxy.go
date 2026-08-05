@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"html"
 	"io"
 	"net/http"
 	"net/http/httputil"
@@ -189,31 +188,26 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				return nil // capture is best-effort; the proxied response stands.
 			}
-			e, typed := decodeLLMErrorBody(peeked)
+			contentType := resp.Header.Get("Content-Type")
+			e, typed := decodeLLMErrorBody(peeked, resp.Header.Get(herr.HandledErrorHeader), resp.StatusCode, contentType)
 			if !typed {
-				// The provider's own sentence goes HERE and nowhere else. It is
-				// the most useful thing there is when diagnosing a wedged
-				// conversation, and a log line is read by operators rather than
-				// shipped to a customer — which is the whole distinction, since
-				// the same sentence may be quoting the API key we sent.
-				//
-				// Which field it lands in says how much the relay understood:
-				// upstream_message is a recognized dialect, raw_body_snippet is a
-				// shape nobody parsed, html_title is an interstitial standing in
-				// for the API. See describeUpstreamErrorBody.
-				contentType := resp.Header.Get("Content-Type")
-				clog.Get(r.baseCtx).Info("otelrelay llm error body not a typed envelope; captured best-effort",
+				// Provider responses are untrusted. Record only the bounded
+				// classification carried by the handled error; authentication
+				// failures can echo the API key in their prose.
+				clog.Get(r.baseCtx).Info("otelrelay llm error normalized as handled upstream error",
 					zap.String("conversation", entry.info.ConversationID),
 					zap.Int("status", resp.StatusCode),
 					zap.Int("body_bytes", len(peeked)),
-					zap.String("content_type", contentType),
-					describeUpstreamErrorBody(peeked, contentType))
+					zap.String("body_kind", e.Meta["body_kind"].(string)),
+					zap.String("upstream_code", string(firstHandledReasonCode(e))))
 			}
-			if e.Meta == nil {
-				e.Meta = herr.M{}
+			if typed {
+				if e.Meta == nil {
+					e.Meta = herr.M{}
+				}
+				// Gateway envelopes deliberately carry no HTTP status.
+				e.Meta["http_status"] = resp.StatusCode
 			}
-			// The envelope deliberately carries no HTTP status; keep it in meta.
-			e.Meta["http_status"] = resp.StatusCode
 			entry.setLLMError(e)
 			// A 429 is retryable by the worker SDK's book, which is right for a
 			// burst and an endless silent spinner for a hard plan limit. Cut the
@@ -327,14 +321,28 @@ func cutRateLimitRetry(resp *http.Response) {
 	resp.Header.Del("retry-after-ms")
 }
 
-// maxUpstreamMessageBytes bounds the provider message carried on a best-effort
-// capture, so a pathological body never bloats the error frame.
-const maxUpstreamMessageBytes = 2048
+// maxProviderCodeBytes bounds a provider discriminant carried as a typed
+// reason. Longer strings are prose, not codes anyone should dispatch on.
+const maxProviderCodeBytes = 128
 
-// maxProviderTypeBytes bounds the provider error type carried as a typed
-// reason on a best-effort capture; a longer string is not a discriminant
-// anyone classifies on.
-const maxProviderTypeBytes = 128
+// providerCodePattern deliberately admits identifiers rather than arbitrary
+// strings. Provider prose can contain credentials and belongs neither in the
+// handled-error wire contract nor in logs.
+var providerCodePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.:-]{0,127}$`)
+
+// providerCodePaths cover the provider JSON dialects observed in production
+// and the common OpenAI/Anthropic/JSON:API variants. Prefer a semantic `code`
+// over a broad `type` whenever both exist.
+var providerCodePaths = []string{
+	"error.code",
+	"error.error.code",
+	"errors.0.code",
+	"code",
+	"error.type",
+	"error.error.type",
+	"errors.0.type",
+	"type",
+}
 
 // decodeLLMErrorBody turns a failed LLM response body into the herr.E the turn's
 // terminal error frame carries as its cause. Typed gateway envelopes (see
@@ -363,14 +371,14 @@ const maxProviderTypeBytes = 128
 // upstream. A discriminant is a value from a set the provider enumerates, so it
 // cannot smuggle a key the way free text can.
 //
-// The prose is not lost, only redirected: the caller logs it server-side, where
-// it is an operator's diagnostic rather than a customer's copy.
-func decodeLLMErrorBody(peeked []byte) (e herr.E, typed bool) {
+// Unknown prose is intentionally not retained. The caller logs the safe
+// handled classification (status, body kind, and discriminant) instead.
+func decodeLLMErrorBody(peeked []byte, handledCode string, status int, contentType string) (e herr.E, typed bool) {
 	var envelope herr.ErrorResponse
-	if json.Unmarshal(peeked, &envelope) == nil && isGatewayEnvelope(envelope.Error) {
+	if json.Unmarshal(peeked, &envelope) == nil && isGatewayEnvelope(envelope.Error, handledCode) {
 		return herr.FromBody(envelope.Error), true
 	}
-	return decodeProviderErrorBody(peeked), false
+	return decodeProviderErrorBody(peeked, status, contentType), false
 }
 
 // decodeProviderErrorBody captures a body KNOWN to be provider-native, skipping
@@ -386,180 +394,103 @@ func decodeLLMErrorBody(peeked []byte) (e herr.E, typed bool) {
 // shape isGatewayEnvelope reads as ours; routing it through here keeps its
 // prose out of the frame on the strength of where it came from rather than
 // what it looks like.
-func decodeProviderErrorBody(peeked []byte) herr.E {
-	e := herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{}}
-	if t := gjson.GetBytes(peeked, "error.type"); t.Type == gjson.String &&
-		t.Str != "" && len(t.Str) <= maxProviderTypeBytes {
-		// herrgen:external — the provider's own discriminant, relayed as a
-		// reason so the client can branch on it. Not ours to enumerate, so
-		// it never belongs in the generated code list.
-		e.Reasons = []error{herr.E{Code: herr.Code(t.Str)}}
+func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr.E {
+	e := herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{
+		"body_kind": providerBodyKind(peeked, contentType),
+	}}
+	if status > 0 {
+		e.Meta["http_status"] = status
+	}
+
+	code := providerErrorCode(peeked)
+	if code == "" && status > 0 {
+		code = upstreamHTTPReasonCode(status)
+	}
+	if code != "" {
+		// herrgen:external — provider and upstream-HTTP discriminants are
+		// relayed as reasons so clients can branch on them. They are not our
+		// top-level error codes and do not belong in the generated code list.
+		e.Reasons = []error{herr.E{Code: code}}
 	}
 	return e
 }
 
-// isGatewayEnvelope reports whether a failed response body is the gateway's
-// own herr envelope rather than provider-native error JSON. The gateway
-// always emits `error.type` and `error.code` with the SAME value plus a
-// non-empty `error.message` (pkg/herr's toErrorBody dual emission); provider
-// dialects reuse the field names but not the matched pair: Anthropic sends
-// `type` without `code`, the codex backend sends `type` only or a bare
-// `detail`, and OpenAI's `code` (when present) rarely matches its `type`.
-// This gate decides whether prose survives, so it is worth stating plainly: a
-// body that emits the full matched shape decodes typed and keeps its message
-// (herr.FromBody), because that shape is the gateway's own and the message is
-// therefore ours. Everything else keeps only its discriminant. A provider
-// dialect that happens to emit the matched shape is indistinguishable from the
-// gateway by construction — the reason the gate demands all three fields, not
-// one.
-func isGatewayEnvelope(body herr.ErrorBody) bool {
-	return body.Code != "" && body.Type == body.Code && body.Message != ""
-}
-
-// htmlTitlePattern picks the <title> out of an HTML document. Non-greedy and
-// case-insensitive across newlines, because the interstitials that land here
-// are machine-generated and pretty-printed.
-var htmlTitlePattern = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
-
-// htmlNoisePattern drops the elements whose CONTENT is not prose. Stripping
-// tags without this leaves a stylesheet's rules behind as text, which is the
-// same 2 KB of CSS the title exists to avoid.
-var htmlNoisePattern = regexp.MustCompile(`(?is)<(script|style|head)[^>]*>.*?</(script|style|head)>`)
-
-// htmlTagPattern strips the remaining markup, including comments.
-var htmlTagPattern = regexp.MustCompile(`(?s)<!--.*?-->|<[^>]*>`)
-
-// maxRawSnippetBytes bounds a body nobody parsed. Smaller than the bound on a
-// provider's own sentence: a snippet only has to identify what kind of body
-// arrived, and every extra byte of an unparsed third-party response is a byte
-// we did not choose to record.
-const maxRawSnippetBytes = 512
-
-// describeUpstreamErrorBody returns the one log field that says most about a
-// failed LLM response body, or zap.Skip() when the body says nothing at all.
-//
-// It replaces a probe that returned "" for every JSON shape it did not
-// recognize, which threw the body away and left the log line holding a byte
-// count. The shapes it missed are ordinary: {"errors":[{"detail":…}]}, a
-// nested error.error.message, a bare {"code":…}. Rather than chase dialects,
-// anything unrecognized now travels as the raw body under its own field name,
-// bounded by boundMessage — a distinct field because a snippet nobody has
-// parsed must not be read as the provider's own sentence.
-//
-// HTML is the exception, and it is the reason the bound alone is not enough.
-// A proxied LLM call answered by a Cloudflare Access login page comes back as
-// tens of kilobytes of interstitial; capping that at two thousand characters
-// yields two thousand characters of CSS. The <title> and the status are the
-// whole diagnosis ("Sign in - example.cloudflareaccess.com" plus a 403), so
-// that is all an HTML body contributes.
-func describeUpstreamErrorBody(body []byte, contentType string) zap.Field {
-	// Nothing else here may run on bytes that are not text. Go decompresses
-	// transparently only when it added Accept-Encoding itself, so a 4xx body
-	// can arrive as raw gzip; without this gate that lands in the log line as
-	// binary, and our own log tooling dies reading invalid UTF-8. Saying the
-	// body was binary is itself the diagnosis, so it is not a silent drop.
-	if !utf8.Valid(body) {
-		return zap.Bool("raw_body_binary", true)
+func providerErrorCode(body []byte) herr.Code {
+	if !json.Valid(body) {
+		return ""
 	}
-	if isHTMLBody(body, contentType) {
-		return describeHTMLBody(body)
-	}
-	if message := extractUpstreamErrorMessage(body); message != "" {
-		return zap.String("upstream_message", message)
-	}
-	if raw := strings.TrimSpace(string(body)); raw != "" {
-		return zap.String("raw_body_snippet", bound(raw, maxRawSnippetBytes))
-	}
-	return zap.Skip()
-}
-
-// describeHTMLBody reduces an HTML answer to the part worth logging: its
-// title, or failing that its visible text with the markup stripped.
-//
-// The fallback matters more than it looks. isHTMLBody trusts the declared
-// content type before it looks at the body, precisely because an edge
-// substituting a login page is careless about its headers - but that cuts both
-// ways. An edge answering `Content-Type: text/html` with the plain sentence
-// "upstream connect error or disconnect before headers" would, with a
-// title-or-nothing rule, leave the operator a byte count: the exact
-// empty-log failure this whole change exists to remove.
-func describeHTMLBody(body []byte) zap.Field {
-	if title := htmlTitle(body); title != "" {
-		return zap.String("html_title", title)
-	}
-	if text := htmlText(body); text != "" {
-		return zap.String("html_excerpt", text)
-	}
-	return zap.Skip()
-}
-
-// extractUpstreamErrorMessage pulls the human-readable message out of the known
-// provider error dialects: OpenAI/Anthropic `error.message`, the codex
-// backend's `detail`, a bare `message`. Returns "" when none of them matched,
-// which is the caller's cue to fall back to the raw body rather than to drop
-// it.
-func extractUpstreamErrorMessage(body []byte) string {
-	for _, path := range []string{"error.message", "detail", "message"} {
-		if v := gjson.GetBytes(body, path); v.Type == gjson.String && v.Str != "" {
-			return boundMessage(v.Str)
+	for _, path := range providerCodePaths {
+		value := gjson.GetBytes(body, path)
+		if value.Type == gjson.String && len(value.Str) <= maxProviderCodeBytes &&
+			providerCodePattern.MatchString(value.Str) {
+			// herrgen:external — this is the provider's identifier, not ours.
+			return herr.Code(value.Str)
 		}
 	}
 	return ""
 }
 
-// isHTMLBody reports whether a body is an HTML document. The declared content
-// type is the primary signal; the leading markup is checked as well because an
-// edge that returns a login page in place of an API response is not reliably
-// careful about its headers.
-func isHTMLBody(body []byte, contentType string) bool {
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "text/html") {
-		return true
+func upstreamHTTPReasonCode(status int) herr.Code {
+	switch status {
+	case http.StatusBadRequest:
+		return "upstream_bad_request"
+	case http.StatusUnauthorized:
+		return "upstream_unauthorized"
+	case http.StatusForbidden:
+		return "upstream_forbidden"
+	case http.StatusNotFound:
+		return "upstream_not_found"
+	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
+		return "upstream_timeout"
+	case http.StatusConflict:
+		return "upstream_conflict"
+	case http.StatusUnprocessableEntity:
+		return "upstream_unprocessable_entity"
+	case http.StatusTooManyRequests:
+		return "upstream_rate_limited"
+	default:
+		if status >= 500 {
+			return "upstream_unavailable"
+		}
+		return "upstream_http_error"
 	}
-	leading := strings.ToLower(strings.TrimSpace(string(body)))
-	return strings.HasPrefix(leading, "<!doctype html") || strings.HasPrefix(leading, "<html")
 }
 
-// htmlTitle returns an HTML document's title, entity-decoded and collapsed
-// onto one line. Bounded like everything else here: a title is short by
-// convention, never by guarantee.
-func htmlTitle(body []byte) string {
-	match := htmlTitlePattern.FindSubmatch(body)
-	if match == nil {
-		return ""
+func providerBodyKind(body []byte, contentType string) string {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return "empty"
 	}
-	return bound(collapse(string(match[1])), maxRawSnippetBytes)
-}
-
-// htmlText is the visible text of an HTML document with the markup removed:
-// the stylesheet, script and head blocks dropped whole (their content is not
-// prose), then the remaining tags and comments stripped.
-func htmlText(body []byte) string {
-	stripped := htmlTagPattern.ReplaceAll(htmlNoisePattern.ReplaceAll(body, []byte(" ")), []byte(" "))
-	return bound(collapse(string(stripped)), maxRawSnippetBytes)
-}
-
-// collapse entity-decodes a fragment of markup and puts it on one line.
-func collapse(fragment string) string {
-	return strings.Join(strings.Fields(html.UnescapeString(fragment)), " ")
-}
-
-// boundMessage caps a provider message at maxUpstreamMessageBytes, backing off
-// to a rune boundary.
-func boundMessage(message string) string {
-	return bound(message, maxUpstreamMessageBytes)
-}
-
-// bound caps text at limit bytes, backing off to a rune boundary so a cut
-// never lands mid-character.
-func bound(text string, limit int) string {
-	if len(text) <= limit {
-		return text
+	if json.Valid(trimmed) {
+		return "json"
 	}
-	cut := text[:limit]
-	for len(cut) > 0 && !utf8.ValidString(cut) {
-		cut = cut[:len(cut)-1]
+	if !utf8.Valid(trimmed) {
+		return "binary"
 	}
-	return cut + "…"
+	lower := strings.ToLower(string(trimmed))
+	declaredHTML := strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "text/html")
+	if declaredHTML || strings.HasPrefix(lower, "<!doctype html") || strings.HasPrefix(lower, "<html") {
+		return "html"
+	}
+	return "text"
+}
+
+func firstHandledReasonCode(e herr.E) herr.Code {
+	for _, reason := range e.Reasons {
+		if nested, ok := reason.(herr.E); ok {
+			return nested.Code
+		}
+	}
+	return e.Code
+}
+
+// isGatewayEnvelope reports whether a failed response body is the gateway's
+// own herr envelope rather than provider-native error JSON. Shape alone is not
+// provenance: a provider can emit the same type/code/message triplet. The
+// explicit herr response marker must match the body's code before its message
+// and metadata are trusted.
+func isGatewayEnvelope(body herr.ErrorBody, handledCode string) bool {
+	return handledCode != "" && body.Code == handledCode && body.Type == body.Code && body.Message != ""
 }
 
 // remapWorkerParent translates the worker's outbound trace context into the

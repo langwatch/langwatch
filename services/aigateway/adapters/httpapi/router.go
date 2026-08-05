@@ -1147,6 +1147,9 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	for k, v := range ue.Headers {
 		w.Header().Set(k, v)
 	}
+	// A provider must not be able to make its body look LangWatch-authored.
+	// herr.WriteHTTP sets this marker only for our handled envelopes.
+	w.Header().Del(herr.HandledErrorHeader)
 	if ue.Provider != "" {
 		w.Header().Set("X-LangWatch-Provider", ue.Provider)
 	}
@@ -1203,6 +1206,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrMissingModel, http.StatusBadRequest)
 	// Fail-closed attribution: the request is missing a required field
 	// (the end-user id) while a per-end-user template is active. A
 	// request-shape error like the two around it, so 400 per the house

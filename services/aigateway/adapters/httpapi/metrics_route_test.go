@@ -210,6 +210,6 @@ func TestRouter_ClientRejectsCannotBeMintedByAnUnauthenticatedCaller(t *testing.
 		require.Equal(t, http.StatusBadRequest, rec.Code)
 
 		assert.Contains(t, gatewaySeries(t, router),
-			`gateway_client_rejects_total{code="bad_request",vk_id="vk-test"} 1`)
+			`gateway_client_rejects_total{code="missing_model",vk_id="vk-test"} 1`)
 	})
 }

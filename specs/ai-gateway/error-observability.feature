@@ -60,6 +60,7 @@ Feature: Gateway errors are logged with fault attribution
     Given an authenticated request is rejected as the caller's fault
     When the error response is written
     Then the rejection is counted against its error code and virtual key
+    And a missing-model rejection is counted as "missing_model", not generic "bad_request"
     And the count carries no project or model label, because those are
       redundant with the key and caller-controlled respectively
 
