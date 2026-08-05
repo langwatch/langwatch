@@ -30,7 +30,7 @@ Feature: Judge-vs-annotation confusion matrix
   Scenario: Confusion matrix mounts only once enough rows are annotated
     Given fewer than 5 of the 20 rows have an annotation
     When I view the results page Metrics
-    Then the "Exact Match vs reviewers — support-agent" chart is not offered
+    Then the "Exact Match vs reviewers on support-agent" chart is not offered
     # Below a small floor, a 2x2 table is not a matrix, it's two anecdotes —
     # mirrors the BT leaderboard's low-sample-size framing rather than
     # inventing a new threshold philosophy.
@@ -39,7 +39,7 @@ Feature: Judge-vs-annotation confusion matrix
   Scenario: Confusion matrix mounts once the annotation floor is met
     Given 12 of the 20 rows have an annotation
     When I view the results page Metrics
-    Then the "Exact Match vs reviewers — support-agent" chart is offered
+    Then the "Exact Match vs reviewers on support-agent" chart is offered
     And enabling it shows a compact 2x2 matrix card next to the other evaluator charts
 
   @unit
@@ -63,6 +63,37 @@ Feature: Judge-vs-annotation confusion matrix
     When I open the expanded confusion matrix
     Then that row is excluded from every matrix cell
     And the coverage note counts it separately as "1 row has conflicting reviewer annotations"
+
+  @integration
+  Scenario: Excluding reviewer disagreements is admitted to, not just done
+    Given at least one row was excluded for conflicting reviewer annotations
+    When I open the expanded confusion matrix
+    Then I am told those rows are left out of every figure
+    And I am told agreement may read higher than it would if they could be scored
+    # Dropping a row two reviewers could not agree on is the honest move, but
+    # those are the rows most likely to be genuinely hard, so removing them
+    # flatters accuracy and kappa alike. A reader who is not told that reads a
+    # number that quietly excludes the hardest evidence against the judge.
+
+  @integration
+  Scenario: A run with no reviewer disagreements says nothing about them
+    Given no row was excluded for conflicting reviewer annotations
+    When I open the expanded confusion matrix
+    Then no note about reviewer disagreement is shown
+    # A caveat about a bias that did not occur is noise, and teaches the
+    # reader to skip the line on the runs where it does matter.
+
+  @unit
+  Scenario: The capped lookup scores only rows it fetched every target for
+    Given the run has more rows times targets than the annotation lookup cap
+    And the cap falls partway through a row rather than on a row boundary
+    When the matrix is built
+    Then that partly-fetched row is excluded along with every row after it
+    And only rows whose every target was fetched are scored
+    # Scoring the rest of a partly-fetched row would count targets whose
+    # annotations were never requested as "not annotated", which is the one
+    # thing this chart must never do: invent coverage out of a request that
+    # was never made.
 
   @unit
   Scenario: Derived metrics accompany the raw matrix
@@ -164,7 +195,7 @@ Feature: Judge-vs-annotation confusion matrix
   Scenario: Each pass/fail evaluator with enough annotation coverage gets its own matrix
     Given the experiment also has a second pass/fail evaluator "LLM Answer Match" with its own runs and annotations meeting the floor
     When I view the results page Metrics
-    Then I see both "Exact Match vs reviewers — support-agent" and "LLM Answer Match vs reviewers — support-agent" as separate chart options
+    Then I see both "Exact Match vs reviewers on support-agent" and "LLM Answer Match vs reviewers on support-agent" as separate chart options
 
   @integration
   Scenario: No confusion matrix is offered when comparing multiple runs

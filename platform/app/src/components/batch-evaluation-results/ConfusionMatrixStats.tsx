@@ -1,5 +1,5 @@
 /**
- * The statistics that sit beside the matrix — the chance-agreement plot and
+ * The statistics that sit beside the matrix: the chance-agreement plot and
  * the single-figure metrics. Split out of ConfusionMatrixDrawer so the drawer
  * stays a layout, not a layout plus three presentational widgets.
  */
@@ -23,7 +23,7 @@ export function CoverageNote({
   coverage: JudgeAnnotationCoverage;
 }) {
   // When the lookup was capped, `totalRows` is the slice that was checked
-  // rather than the whole run — say "of the rows checked" so the numerator
+  // rather than the whole run, so say "of the rows checked" and the numerator
   // keeps meaning "annotated".
   const denominator = coverage.truncated
     ? `the ${coverage.totalRows} rows checked are annotated`
@@ -43,10 +43,24 @@ export function CoverageNote({
             } excluded for conflicting reviewer annotations`
           : ""}
       </Text>
+      {/* A row two reviewers disagreed on is a row nobody can say the judge
+          got right or wrong, so it is dropped rather than resolved by picking
+          one reviewer. Dropping it is the honest move, but it also removes the
+          rows most likely to be genuinely hard, which flatters every figure
+          below. The reader is told, because a silently favourable sample is
+          exactly what this chart exists to prevent. */}
+      {conflicts > 0 ? (
+        <Text fontSize="xs" color="fg.muted" marginTop={1}>
+          The {conflicts} row{conflicts === 1 ? "" : "s"} where reviewers
+          disagreed with each other {conflicts === 1 ? "is" : "are"} left out of
+          every figure below, so agreement may read higher here than it would if
+          those rows could be scored.
+        </Text>
+      ) : null}
       {/* The sharpest limitation of this chart, and the one no confidence
           interval can fix. Reviewers annotate what catches their eye, so the
           annotated set skews toward rows that already looked wrong. Every
-          figure below describes THAT set, not the run — say so rather than
+          figure below describes THAT set, not the run, so say so rather than
           letting the statistics imply a rigour the sample doesn't have. */}
       <Text fontSize="xs" color="fg.muted" marginTop={1}>
         Figures describe the annotated rows only. If those were picked by
@@ -96,7 +110,7 @@ export function HeadlineMetrics({
         </Text>
         <Text fontSize="2xs" color="fg.muted">
           {cohensKappa === null
-            ? "undefined — one label used throughout"
+            ? "undefined, one label used throughout"
             : `${kappaAgreementLabel(cohensKappa)} agreement`}
         </Text>
       </VStack>
@@ -109,7 +123,7 @@ export function HeadlineMetrics({
  *
  * This is the visual form of the kappa argument. A judge scoring 90% on a
  * set that is 90% passes has done nothing, and a bare "90%" hides that
- * completely — here the shaded floor swallows the marker and the point is
+ * completely. Here the shaded floor swallows the marker and the point is
  * immediate. The confidence band is drawn at the same scale so a thin
  * sample reads as a wide, hesitant smear rather than a crisp number.
  */
@@ -166,7 +180,7 @@ export function AgreementBar({
         borderColor="border"
         overflow="hidden"
       >
-        {/* Everything left of this line is free — a judge gets it for
+        {/* Everything left of this line is free: a judge gets it for
             nothing by matching the base rate. */}
         {chance !== null ? (
           <Box
@@ -230,7 +244,7 @@ export function AgreementBar({
 
 /**
  * The rates that read straight off the matrix. Secondary to accuracy and
- * kappa on purpose — each answers a narrower question than "can I trust
+ * kappa on purpose: each answers a narrower question than "can I trust
  * this judge", and a wall of equally-sized figures buries the two that do.
  */
 export function SecondaryMetrics({

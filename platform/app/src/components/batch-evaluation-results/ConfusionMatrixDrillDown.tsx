@@ -3,7 +3,7 @@
  *
  * This is the payoff of the whole chart: a False Positive count says the
  * judge was wrong six times, and only this list says what it got wrong and
- * — when the reviewer wrote one — why.
+ * and, when the reviewer wrote one, why.
  */
 import { Box, Text, VStack } from "@chakra-ui/react";
 
@@ -64,7 +64,7 @@ function DrillDownRow({
   targetId: string;
 }) {
   // Same formatter the results table uses, so a row reads identically here
-  // and there — it unwraps the common single-"output"-key envelope instead
+  // and there: it unwraps the common single-"output"-key envelope instead
   // of dumping raw JSON with escaped newlines at the reader.
   const outputText =
     formatTargetOutput(row?.targets[targetId]?.output) || "(no output)";
@@ -77,7 +77,7 @@ function DrillDownRow({
       <Text fontSize="sm" lineClamp={3}>
         {outputText}
       </Text>
-      {/* On a disagreement cell this is the whole point of drilling in — the
+      {/* On a disagreement cell this is the whole point of drilling in: the
           reviewer already wrote down why the judge was wrong. */}
       {pair.comment ? (
         <Text

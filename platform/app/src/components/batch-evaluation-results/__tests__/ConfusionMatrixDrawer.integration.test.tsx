@@ -139,10 +139,17 @@ describe("ConfusionMatrixDrawer", () => {
 
       expect(screen.getByText("Is this better than chance?")).toBeDefined();
       // 1 TP / 1 FP / 1 FN / 1 TN: both raters split 50/50, so chance
-      // agreement is exactly 50% — and observed accuracy happens to sit on
+      // agreement is exactly 50%, and observed accuracy happens to sit on
       // it, which the bar's caption must state rather than hide.
       expect(screen.getByText(/chance 50% · observed 50%/)).toBeDefined();
       expect(screen.getByText("at or below chance")).toBeDefined();
+    });
+
+    /** @scenario A run with no reviewer disagreements says nothing about them */
+    it("says nothing about reviewer disagreement when there was none", () => {
+      renderDrawer(fullMatrix);
+
+      expect(screen.queryByText(/where reviewers disagreed/)).toBeNull();
     });
 
     describe("when a matrix cell is clicked", () => {
@@ -160,7 +167,7 @@ describe("ConfusionMatrixDrawer", () => {
         // drill-down must show it and nothing else.
         expect(
           screen.getByText(
-            /False Positive — judge said Pass, reviewer said 👎 \(1 row\)/,
+            /False Positive: judge said Pass, reviewer said 👎 \(1 row\)/,
           ),
         ).toBeDefined();
         expect(screen.getByText("Row 2")).toBeDefined();
@@ -168,6 +175,47 @@ describe("ConfusionMatrixDrawer", () => {
         expect(screen.getByText(/Reviewer: Wrong refund/)).toBeDefined();
         expect(screen.queryByText("Row 1")).toBeNull();
       });
+    });
+  });
+
+  describe("given rows were excluded for conflicting reviewer annotations", () => {
+    const withConflicts = (conflictingRows: number) => ({
+      coverage: {
+        ...coverageWith([
+          { rowIndex: 0, predicted: true, actual: true },
+          { rowIndex: 1, predicted: true, actual: false },
+          { rowIndex: 2, predicted: false, actual: true },
+          { rowIndex: 3, predicted: false, actual: false },
+        ]),
+        annotatedRows: 4 + conflictingRows,
+        conflictingRows,
+      },
+      rows: [makeRow(0), makeRow(1), makeRow(2), makeRow(3)],
+    });
+
+    /** @scenario Excluding reviewer disagreements is admitted to, not just done */
+    it("says the excluded rows may be flattering the agreement figures", () => {
+      renderDrawer(withConflicts(3));
+
+      expect(
+        screen.getByText(
+          /The 3 rows where reviewers disagreed with each other are left out of every figure below/,
+        ),
+      ).toBeDefined();
+      expect(
+        screen.getByText(/agreement may read higher here than it would/),
+      ).toBeDefined();
+    });
+
+    /** @scenario Excluding reviewer disagreements is admitted to, not just done */
+    it("says it in the singular for a lone excluded row", () => {
+      renderDrawer(withConflicts(1));
+
+      expect(
+        screen.getByText(
+          /The 1 row where reviewers disagreed with each other is left out of every figure below/,
+        ),
+      ).toBeDefined();
     });
   });
 

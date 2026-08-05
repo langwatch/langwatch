@@ -16,10 +16,22 @@ import { ERROR_CELL_BG, formatCellShare } from "./confusionMatrixDisplay";
 export type Quadrant = keyof ConfusionMatrixCounts;
 
 export const QUADRANT_LABELS: Record<Quadrant, string> = {
-  truePositive: "True Positive — judge said Pass, reviewer said 👍",
-  falsePositive: "False Positive — judge said Pass, reviewer said 👎",
-  falseNegative: "False Negative — judge said Fail, reviewer said 👍",
-  trueNegative: "True Negative — judge said Fail, reviewer said 👎",
+  truePositive: "True Positive: judge said Pass, reviewer said 👍",
+  falsePositive: "False Positive: judge said Pass, reviewer said 👎",
+  falseNegative: "False Negative: judge said Fail, reviewer said 👍",
+  trueNegative: "True Negative: judge said Fail, reviewer said 👎",
+};
+
+/**
+ * What each quadrant means in the reader's own terms, short enough to sit
+ * under a count in the compact card, where there are no axis labels to read
+ * the meaning off. The full label above still travels as the tooltip.
+ */
+export const QUADRANT_SHORT_LABELS: Record<Quadrant, string> = {
+  truePositive: "Both passed",
+  falsePositive: "Judge passed, reviewer failed",
+  falseNegative: "Judge failed, reviewer passed",
+  trueNegative: "Both failed",
 };
 
 const CELLS: { quadrant: Quadrant; label: string; isError: boolean }[] = [

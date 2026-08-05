@@ -5,7 +5,7 @@
  * "Predicted" is the pass/fail evaluator's own verdict; "actual" is the
  * independent ground truth (a human reviewer's annotation on the same
  * target output). Undefined precision/recall/F1/false-positive-rate mean
- * the denominator is zero (e.g. the judge never predicted a positive) —
+ * the denominator is zero (e.g. the judge never predicted a positive), so
  * callers render "—" rather than a misleading 0%.
  */
 
@@ -58,7 +58,7 @@ export type ConfusionMatrixMetrics = ConfusionMatrixCounts & {
    */
   chanceAgreement: number | null;
   /**
-   * Cohen's kappa — agreement after subtracting the agreement two raters
+   * Cohen's kappa: agreement after subtracting the agreement two raters
    * would reach by chance alone. Negative means worse than guessing. Null
    * when chance agreement is already total, which leaves kappa undefined.
    */
@@ -74,7 +74,7 @@ const Z_95 = 1.959964;
  * Preferred over the textbook Wald interval (p ± z·√(p(1-p)/n)) because
  * this chart's whole job is small samples: Wald under-covers badly below
  * ~n=40, spills outside [0, 1], and degenerates to zero width at p=0 or
- * p=1 — reporting perfect certainty from a handful of rows, which is the
+ * p=1, reporting perfect certainty from a handful of rows, which is the
  * exact misreading the interval is here to prevent. Wilson keeps sane
  * coverage down to single-digit n.
  */
@@ -108,7 +108,7 @@ export const wilsonInterval = ({
 
 /**
  * Conventional Landis & Koch (1977) descriptors for a kappa value. These
- * bands are a shared reading convention, not a statistical result — they
+ * bands are a shared reading convention, not a statistical result: they
  * exist so the number is legible to someone who does not work with kappa
  * daily.
  */
@@ -123,7 +123,7 @@ export const kappaAgreementLabel = (kappa: number): string => {
 
 /**
  * Which cell of the 2x2 a single judge/reviewer pair lands in. Exported so
- * the drill-down filters by the same rule the tally counts by — two copies
+ * the drill-down filters by the same rule the tally counts by. Two copies
  * of this mapping is exactly how a cell's count and its row list drift apart.
  */
 export const quadrantOf = ({
@@ -149,7 +149,7 @@ const tallyQuadrants = (
 
 /**
  * The rates that read off the matrix directly. Each is null when its own
- * denominator is zero — an undefined rate, never a zero one.
+ * denominator is zero: an undefined rate, never a zero one.
  */
 const deriveRates = ({
   truePositive,
@@ -200,7 +200,7 @@ const deriveAgreement = ({
 
   // Agreement two raters would reach by chance alone, given how often each
   // of them says "pass". This is the bar accuracy has to clear to mean
-  // anything — a judge scoring at this level has matched the base rate and
+  // anything: a judge scoring at this level has matched the base rate and
   // demonstrated nothing.
   const judgePassRate = total > 0 ? predictedPositive / total : 0;
   const reviewerPassRate = total > 0 ? actualPositive / total : 0;
@@ -212,7 +212,7 @@ const deriveAgreement = ({
 
   // chanceAgreement === 1 means both raters used a single category
   // throughout, so the correction divides by zero. Kappa is genuinely
-  // undefined there — reporting 1.0 would dress a degenerate case up as a
+  // undefined there, and reporting 1.0 would dress a degenerate case up as a
   // perfect one.
   const cohensKappa =
     chanceAgreement !== null && chanceAgreement < 1

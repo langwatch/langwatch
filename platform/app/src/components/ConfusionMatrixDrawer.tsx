@@ -3,15 +3,15 @@
  *
  * Design choices are backed by competitive + academic research (see
  * specs/experiments/judge-annotation-confusion-matrix.feature and
- * project memory): raw counts + percentage together (not normalized-only —
- * a dominant cell can inflate accuracy and hide real error rates), domain
- * labels instead of ML jargon, semantic agree/disagree color rather than a
- * magnitude heatmap, and every cell clickable through to its rows. The
+ * project memory): raw counts + percentage together (not normalized-only,
+ * since a dominant cell can inflate accuracy and hide real error rates),
+ * domain labels instead of ML jargon, semantic agree/disagree color rather
+ * than a magnitude heatmap, and every cell clickable through to its rows. The
  * matrix itself and the statistics beside it live in ConfusionMatrixGrid
  * and ConfusionMatrixStats; this file is the layout that arranges them.
  *
  * Opened from ConfusionMatrixChart's expand affordance. Data (pairs, rows,
- * coverage) is passed via drawer complexProps rather than refetched — same
+ * coverage) is passed via drawer complexProps rather than refetched, the same
  * pattern as ComparisonLeaderboardDrawer.
  */
 import { Box, Text, VStack } from "@chakra-ui/react";
@@ -47,8 +47,8 @@ export type ConfusionMatrixDrawerProps = {
   targetName?: string;
   /**
    * Optional because this drawer is URL-routed: `?drawer.open=confusionMatrix`
-   * survives a reload or a pasted link, while complexProps — a module-level
-   * store — does not. On that path these arrive undefined, so the type has to
+   * survives a reload or a pasted link, while complexProps (a module-level
+   * store) does not. On that path these arrive undefined, so the type has to
    * say so rather than letting consumers assume data is present.
    */
   coverage?: JudgeAnnotationCoverage;
@@ -60,17 +60,16 @@ export type ConfusionMatrixDrawerProps = {
  * separate a good judge from a bad one.
  *
  * Deliberately a property of the interval rather than a row count. A raw
- * "fewer than N rows" floor is both arbitrary and unreachable here — the
- * chart already refuses to mount below its own minimum — whereas the
- * interval answers the question actually being asked: is this enough
- * evidence to act on? Thirty points is roughly the span at which the
- * plausible range still covers both "clearly working" and "barely better
- * than chance".
+ * "fewer than N rows" floor is both arbitrary and unreachable here, since the
+ * chart already refuses to mount below its own minimum, whereas the interval
+ * answers the question actually being asked: is this enough evidence to act
+ * on? Thirty points is roughly the span at which the plausible range still
+ * covers both "clearly working" and "barely better than chance".
  */
 const UNINFORMATIVE_INTERVAL_WIDTH = 0.3;
 
 // Module-level so the "no data" path hands the same array identity to every
-// useMemo on every render — a fresh `[]` here cascades through the memo chain
+// useMemo on every render. A fresh `[]` here cascades through the memo chain
 // and re-renders the subtree for nothing.
 const EMPTY_PAIRS: JudgeAnnotationPair[] = [];
 const EMPTY_ROWS: BatchResultRow[] = [];
@@ -117,8 +116,8 @@ function UninformativeSampleWarning({
   return (
     <Box bg="orange.subtle" borderRadius="md" padding={3}>
       <Text fontSize="xs" color="orange.fg">
-        Not enough annotated rows to judge this yet — accuracy could plausibly
-        be anywhere from {formatPercent(interval.lower)} to{" "}
+        Not enough annotated rows to judge this yet. Accuracy could plausibly be
+        anywhere from {formatPercent(interval.lower)} to{" "}
         {formatPercent(interval.upper)}. Annotate more rows to narrow that
         range.
       </Text>
@@ -219,7 +218,7 @@ export function ConfusionMatrixDrawer({
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
             {evaluatorName ?? "Judge"} vs reviewers
-            {targetName ? ` — ${targetName}` : ""}
+            {targetName ? ` on ${targetName}` : ""}
           </Text>
           <Drawer.CloseTrigger />
         </Drawer.Header>

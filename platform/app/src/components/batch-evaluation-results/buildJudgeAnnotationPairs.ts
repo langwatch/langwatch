@@ -2,11 +2,11 @@
  * buildJudgeAnnotationPairs - joins a pass/fail evaluator's per-row verdict
  * against human reviewer annotations on the SAME target output, keyed by the
  * target's trace id (every experiments-v3 target execution gets a real,
- * dereferenceable trace id — see orchestrator.ts's generateOtelTraceId()).
+ * dereferenceable trace id, see orchestrator.ts's generateOtelTraceId()).
  *
  * A row only becomes a matrix data point when it has BOTH a resolved judge
  * verdict AND at least one reviewer annotation. Unannotated rows are not a
- * "no opinion" vote — they carry no ground truth and must not silently
+ * "no opinion" vote: they carry no ground truth and must not silently
  * become a trueNegative/falseNegative. A trace annotated by more than one
  * reviewer who disagree (isThumbsUp true vs false) has no single ground
  * truth either, so it is excluded and reported separately rather than
@@ -22,7 +22,7 @@ export type JudgeAnnotationCoverage = {
   totalRows: number;
   /** Rows with at least one reviewer annotation, resolved or conflicting. */
   annotatedRows: number;
-  /** Subset of annotatedRows where reviewers disagreed — excluded from pairs. */
+  /** Subset of annotatedRows where reviewers disagreed, excluded from pairs. */
   conflictingRows: number;
   /**
    * True when annotation lookup was capped, so `totalRows` is the slice that
@@ -71,7 +71,7 @@ type ReviewerGroundTruth =
 const reviewerGroundTruthFor = (
   annotations: AnnotationByTrace[],
 ): ReviewerGroundTruth => {
-  // Only annotations that carry a verdict count as ground truth — and only
+  // Only annotations that carry a verdict count as ground truth, and only
   // they may explain it. A comment-only annotation ("checking this later")
   // is not the reviewer's rationale for the thumbs up/down being scored,
   // so it must not become the drill-down's stated reason.

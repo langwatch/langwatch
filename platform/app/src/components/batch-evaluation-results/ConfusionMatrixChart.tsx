@@ -3,12 +3,12 @@
  *
  * Sibling of WinRateChart in the same metrics row. Unlike WinRateChart
  * (which compares candidates against each other), this compares a single
- * pass/fail evaluator's own verdict against an independent ground truth —
- * a human reviewer's annotation on the same target output — so the card
- * answers "is this judge trustworthy", not "which variant is best".
+ * pass/fail evaluator's own verdict against an independent ground truth (a
+ * human reviewer's annotation on the same target output), so the card answers
+ * "is this judge trustworthy", not "which variant is best".
  *
  * The compact card can't show the full matrix + derived metrics + row
- * drill-down — the expand button opens the full view in a drawer
+ * drill-down, so the expand button opens the full view in a drawer
  * (specs/experiments/judge-annotation-confusion-matrix.feature).
  */
 import { Box, Grid, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
@@ -16,6 +16,11 @@ import { LuMaximize2 } from "react-icons/lu";
 
 import { useDrawer } from "~/hooks/useDrawer";
 import type { JudgeAnnotationCoverage } from "./buildJudgeAnnotationPairs";
+import {
+  QUADRANT_LABELS,
+  QUADRANT_SHORT_LABELS,
+  type Quadrant,
+} from "./ConfusionMatrixGrid";
 import {
   type ConfusionMatrixMetrics,
   computeConfusionMatrix,
@@ -70,10 +75,8 @@ function AccuracyHeadline({
           color={isNearChance ? "orange.fg" : "fg.muted"}
           title={
             cohensKappa === null
-              ? "Cohen's kappa is undefined here — one label was used throughout"
-              : `Cohen's kappa ${cohensKappa.toFixed(
-                  2,
-                )} — ${kappaAgreementLabel(
+              ? "Cohen's kappa is undefined here: one label was used throughout"
+              : `Cohen's kappa ${cohensKappa.toFixed(2)}, ${kappaAgreementLabel(
                   cohensKappa,
                 )} agreement once chance is subtracted`
           }
@@ -83,7 +86,7 @@ function AccuracyHeadline({
       </HStack>
       <Text fontSize="2xs" color="fg.muted">
         {/* When the lookup was capped, `totalRows` is the slice that was
-            checked, not the whole run — same phrasing rule as the drawer's
+            checked, not the whole run. Same phrasing rule as the drawer's
             coverage line, so the card never implies fuller coverage than
             the drawer would admit to. */}
         accuracy · {annotatedRows} of {totalRows} rows
@@ -93,7 +96,16 @@ function AccuracyHeadline({
   );
 }
 
-/** The four counts, abbreviated — the full labels live in the drawer. */
+/**
+ * The four counts, each named in the reader's own terms.
+ *
+ * The compact card has no axis labels to read a quadrant's meaning off, so
+ * every cell says what it is. Spelled out rather than initialled: "FP" saves a
+ * few pixels and costs a guess, and the guess is usually wrong for anyone who
+ * does not already think in confusion matrices. The share sits on its own line
+ * so the name has the full cell width, and the tooltip carries the formal name
+ * for readers who do want it.
+ */
 function MiniMatrix({
   metrics,
   height,
@@ -101,34 +113,42 @@ function MiniMatrix({
   metrics: ConfusionMatrixMetrics;
   height: number;
 }) {
-  const cells = [
-    { key: "tp", label: "TP", value: metrics.truePositive, isError: false },
-    { key: "fp", label: "FP", value: metrics.falsePositive, isError: true },
-    { key: "fn", label: "FN", value: metrics.falseNegative, isError: true },
-    { key: "tn", label: "TN", value: metrics.trueNegative, isError: false },
+  const cells: { quadrant: Quadrant; isError: boolean }[] = [
+    { quadrant: "truePositive", isError: false },
+    { quadrant: "falsePositive", isError: true },
+    { quadrant: "falseNegative", isError: true },
+    { quadrant: "trueNegative", isError: false },
   ];
 
   return (
     <Grid templateColumns="1fr 1fr" gap={1} height={`${height}px`}>
-      {cells.map((cell) => (
-        <Box
-          key={cell.key}
-          borderRadius="sm"
-          display="flex"
-          flexDirection="column"
-          justifyContent="center"
-          alignItems="center"
-          bg={cell.isError ? ERROR_CELL_BG : "bg.muted"}
-        >
-          <Text fontSize="md" fontWeight="bold">
-            {cell.value}
-          </Text>
-          <Text fontSize="2xs" color="fg.muted">
-            {cell.label} ·{" "}
-            {formatCellShare({ value: cell.value, total: metrics.total })}
-          </Text>
-        </Box>
-      ))}
+      {cells.map((cell) => {
+        const value = metrics[cell.quadrant];
+        return (
+          <Box
+            key={cell.quadrant}
+            borderRadius="sm"
+            display="flex"
+            flexDirection="column"
+            justifyContent="center"
+            alignItems="center"
+            textAlign="center"
+            paddingX={1}
+            bg={cell.isError ? ERROR_CELL_BG : "bg.muted"}
+            title={QUADRANT_LABELS[cell.quadrant]}
+          >
+            <Text fontSize="md" fontWeight="bold" lineHeight="1.1">
+              {value}
+            </Text>
+            <Text fontSize="2xs" color="fg.muted" lineHeight="1.2">
+              {QUADRANT_SHORT_LABELS[cell.quadrant]}
+            </Text>
+            <Text fontSize="2xs" color="fg.muted" lineHeight="1.2">
+              {formatCellShare({ value, total: metrics.total })}
+            </Text>
+          </Box>
+        );
+      })}
     </Grid>
   );
 }
@@ -147,9 +167,9 @@ export function ConfusionMatrixChart({
 
   const onExpand = () => {
     // Passed straight through openDrawer's own props (not a preceding
-    // setComplexProps call) — see feedback_drawer_complexprops_ordering:
-    // openDrawer's updateDrawerUrl recomputes complexProps from whatever
-    // props it receives and would clobber a prior setComplexProps call.
+    // setComplexProps call): openDrawer's updateDrawerUrl recomputes
+    // complexProps from whatever props it receives and would clobber a
+    // prior setComplexProps call.
     openDrawer("confusionMatrix", {
       evaluatorId,
       evaluatorName,
@@ -183,13 +203,13 @@ export function ConfusionMatrixChart({
           fontSize="xs"
           fontWeight="medium"
           lineClamp={1}
-          title={`${evaluatorName} vs reviewers — ${targetName}`}
+          title={`${evaluatorName} vs reviewers on ${targetName}`}
         >
-          {evaluatorName} vs reviewers — {targetName}
+          {evaluatorName} vs reviewers on {targetName}
         </Text>
         {/* Always visible, just quiet. Revealing this only on hover made the
             one route into the full matrix invisible until you happened to
-            mouse over the card — and unreachable altogether by keyboard or on
+            mouse over the card, and unreachable altogether by keyboard or on
             a touch screen, where there is no hover at all. Subdued by default,
             full strength on hover or keyboard focus. */}
         <IconButton

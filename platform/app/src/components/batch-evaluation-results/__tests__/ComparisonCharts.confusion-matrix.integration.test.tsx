@@ -220,10 +220,10 @@ describe("ComparisonCharts confusion matrix availability", () => {
         // the sibling cards tellable apart — the regression here was two
         // identically-keyed, identically-titled cards.
         expect(
-          screen.getByText("Exact Match vs reviewers — support-agent"),
+          screen.getByText("Exact Match vs reviewers on support-agent"),
         ).toBeDefined();
         expect(
-          screen.getByText("Exact Match vs reviewers — billing-agent"),
+          screen.getByText("Exact Match vs reviewers on billing-agent"),
         ).toBeDefined();
       });
 
@@ -244,10 +244,10 @@ describe("ComparisonCharts confusion matrix availability", () => {
         });
 
         expect(
-          screen.getByText("Exact Match vs reviewers — support-agent"),
+          screen.getByText("Exact Match vs reviewers on support-agent"),
         ).toBeDefined();
         expect(
-          screen.getByText("LLM Answer Match vs reviewers — support-agent"),
+          screen.getByText("LLM Answer Match vs reviewers on support-agent"),
         ).toBeDefined();
       });
     });
@@ -282,7 +282,7 @@ describe("ComparisonCharts confusion matrix availability", () => {
 
         expect(screen.queryByText(/^Comparison vs reviewers/)).toBeNull();
         expect(
-          screen.getByText("Exact Match vs reviewers — support-agent"),
+          screen.getByText("Exact Match vs reviewers on support-agent"),
         ).toBeDefined();
       });
     });
