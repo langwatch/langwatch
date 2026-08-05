@@ -55,7 +55,7 @@ Each has a `deny` list and an optional `allow` list.
 OpenAI Chat Completions: matched against `tools[].function.name`.
 Anthropic Messages: matched against `tools[].name`.
 
-Blocked → `403 tool_not_allowed` with the offending name in `error.message`. (In v1, block attribution flows via the `X-LangWatch-Request-Id` response header → trace correlation; a dedicated `langwatch.policy.violation` span attribute is a v1.1 observability follow-up.)
+Blocked → `403 tool_not_allowed` with the offending name in `error.message`. (In v1, block attribution flows via the `X-LangWatch-Gateway-Request-Id` response header → trace correlation; a dedicated `langwatch.policy.violation` span attribute is a v1.1 observability follow-up.)
 
 ### MCP servers
 
@@ -163,7 +163,7 @@ Fix the policy via `langwatch virtual-keys update <id>` (or the UI) and subseque
 ```http
 HTTP/1.1 403 Forbidden
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNO...
+X-LangWatch-Gateway-Request-Id: req_9d24b8e07f1a3c65d8b2e40f7a1c93
 
 {
   "error": {
@@ -188,6 +188,6 @@ Use patterns for deterministic rules (tool names, URL allowlists) and guardrails
 Every block emits:
 
 - `AuditLog` row (gateway shape) with actor (user or service principal, service-account VKs use `actor=svc_<projectId>`), VK id, policy kind, matched pattern, offending value (truncated to 64 chars), request id.
-- `X-LangWatch-Request-Id` response header for joining the 403 back to the trace stream.
+- `X-LangWatch-Gateway-Request-Id` response header for joining the 403 back to the trace stream.
 
 (A dedicated `langwatch.policy.violation=<kind>:<pattern>` span attribute is tracked as a v1.1 observability follow-up. In v1, use the audit log + request-id correlation to identify repeat offenders and tune patterns.)

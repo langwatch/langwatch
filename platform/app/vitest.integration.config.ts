@@ -6,7 +6,10 @@ import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
-import { applyWorkerCap } from "./src/test-utils/workerCap";
+import {
+  integrationFilesRunInParallel,
+  withdrawWorkerCountOverride,
+} from "./src/test-utils/integrationFileConcurrency";
 import WeightBalancedSequencer from "./vitest.sequencer";
 
 config();
@@ -14,17 +17,11 @@ config();
 // One switch for the CI-vs-laptop trade-offs below.
 const isCI = !!process.env.CI;
 
-// Whether a shard may run more than one file at a time. See the note on
-// `fileParallelism` below for why nothing turns this on.
-const fileParallelism = process.env.VITEST_INTEGRATION_PARALLEL === "1";
-
-// The workflow sets VITEST_MAX_WORKERS to keep vitest off all four of a
-// runner's vCPUs, and vitest assigns it AFTER resolving `fileParallelism:
-// false` down to one worker. The cap therefore raised the floor: the
-// integration shards ran two files concurrently, and the two gateway budget
-// suites that replay a rollup migration collided on schema neither of them
-// owns. Strip it while files are serial.
-applyWorkerCap({ env: process.env, fileParallelism });
+// `fileParallelism` below is the only place that decides whether files run
+// concurrently, so a worker count exported by the runner is withdrawn before
+// vitest can apply it over the top of that decision. See
+// src/test-utils/integrationFileConcurrency.ts for why the two interact.
+withdrawWorkerCountOverride(process.env);
 
 export default defineConfig({
   test: {
@@ -48,11 +45,13 @@ export default defineConfig({
     // Run test files sequentially to avoid BullMQ/Redis resource contention
     // when multiple pipelines are created and destroyed in parallel.
     //
-    // That contention is Redis-specific: BullMQ keys a queue by name alone, so
-    // two files building the same pipeline share it. The ClickHouse and
-    // Postgres fixtures do not have the same problem -- of the 111 integration
-    // files that touch ClickHouse there are five hardcoded tenant ids between
-    // them, and one appears in more than one file.
+    // Redis is the loudest contention: BullMQ keys a queue by name alone, so
+    // two files building the same pipeline share it. ClickHouse is not exempt
+    // either. Tenant ids are per suite -- of the 111 integration files that
+    // touch ClickHouse there are five hardcoded ids between them, and one
+    // appears in more than one file -- but the schema is shared, and the
+    // suites that replay goose migrations rebuild rollup tables in place. A
+    // file reading such a table while another replays sees it mid-swap.
     //
     // So parallelism is opt-in rather than impossible: set both
     // VITEST_INTEGRATION_PARALLEL and VITEST_ISOLATE_WORKER_REDIS (see
@@ -69,7 +68,7 @@ export default defineConfig({
     // again per worker as a setup file. Nothing asserts that two concurrent
     // workers cannot see each other's keys; write that test before setting
     // this again. CI parallelises across shards instead.
-    fileParallelism,
+    fileParallelism: integrationFilesRunInParallel(process.env),
     // Use forked child processes. We briefly tried pool: "threads" to
     // sidestep the post-test shard 4 wedge, but threads exposes a panic
     // in @prisma/client/query-engine-node-api when the client gets
@@ -81,9 +80,12 @@ export default defineConfig({
     // above is the reason: threads panic inside @prisma/client's query engine,
     // and that is true wherever it runs.
     //
-    // Only reached when fileParallelism is on: vitest clamps maxWorkers to 1
-    // while files are serial, and `applyWorkerCap` above keeps the workflow's
-    // VITEST_MAX_WORKERS from undoing that clamp. Two rather than every core
+    // This only takes effect when fileParallelism is on: vitest implements
+    // `fileParallelism: false` by clamping maxWorkers to 1, so with the flag
+    // off, which is the current state everywhere, the value here is inert, and
+    // an earlier `isCI ? "100%" : 1` read as if CI were running four
+    // workers when it was running one. Keep it honest: ask for two, and let
+    // vitest clamp it to one while files are serial. Two rather than every core
     // because the runner has 4 vCPUs and is also hosting ClickHouse, Postgres
     // and Redis; handing vitest the whole box starved the datastores and
     // suites failed on vi.waitFor timeouts rather than on their assertions.

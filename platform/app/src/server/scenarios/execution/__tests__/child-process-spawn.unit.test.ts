@@ -62,7 +62,12 @@ describe("resolveChildProcessSpawn", () => {
 
         expect(result.command).toBe("node");
         expect(result.args).toEqual([
-          path.join(PACKAGE_ROOT, "dist", "scenario-child-process.js"),
+          path.join(
+            PACKAGE_ROOT,
+            "dist",
+            "server",
+            "scenario-child-process.cjs",
+          ),
         ]);
       });
 
@@ -85,7 +90,7 @@ describe("resolveChildProcessSpawn", () => {
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.objectContaining({
             bundlePath: expect.stringContaining(
-              "dist/scenario-child-process.js",
+              "dist/server/scenario-child-process.cjs",
             ),
           }),
           expect.stringContaining("pre-compiled bundle"),
@@ -118,7 +123,12 @@ describe("resolveChildProcessSpawn", () => {
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.objectContaining({
             bundlePath: expect.stringContaining(
-              path.join(PACKAGE_ROOT, "dist", "scenario-child-process.js"),
+              path.join(
+                PACKAGE_ROOT,
+                "dist",
+                "server",
+                "scenario-child-process.cjs",
+              ),
             ),
           }),
           expect.stringContaining("NOT FOUND"),
@@ -133,7 +143,7 @@ describe("resolveChildProcessSpawn", () => {
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.any(Object),
-          expect.stringContaining("build:scenario-child-process"),
+          expect.stringContaining("build:server"),
         );
       });
     });

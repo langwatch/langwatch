@@ -9,37 +9,34 @@ import { execSync, spawn, spawnSync } from "child_process";
 import fs from "fs";
 import { isBuiltin } from "module";
 import path from "path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "../../../../..");
 const BUNDLE_PATH = path.join(
   PACKAGE_ROOT,
   "dist",
-  "scenario-child-process.js",
+  "server",
+  "scenario-child-process.cjs",
 );
 
 describe("Pre-compiled Scenario Child Process", () => {
   describe("when the child process build step runs", () => {
     beforeAll(() => {
-      // Build the bundle fresh for testing
-      execSync("pnpm run build:scenario-child-process", {
+      // Build the bundle fresh for testing (build:server emits all server
+      // bundles, the scenario child process among them)
+      execSync("pnpm run build:server", {
         cwd: PACKAGE_ROOT,
         stdio: "pipe",
       });
-    }, 30000);
+    }, 60000);
 
-    afterAll(() => {
-      // Clean up built artifacts
-      if (fs.existsSync(BUNDLE_PATH)) {
-        fs.unlinkSync(BUNDLE_PATH);
-        const mapPath = `${BUNDLE_PATH}.map`;
-        if (fs.existsSync(mapPath)) {
-          fs.unlinkSync(mapPath);
-        }
-      }
-    });
+    // No teardown on purpose. build:server wipes and rewrites the whole of
+    // dist/server on every run, so nothing accumulates. Deleting just this one
+    // bundle afterwards left the directory PARTIAL — the other three entry
+    // points rebuilt, the scenario bundle gone — which is the state that sends
+    // production scenario spawns down the tsx fallback.
 
-    it("produces a single JavaScript file at dist/scenario-child-process.js", () => {
+    it("produces a single JavaScript file at dist/server/scenario-child-process.cjs", () => {
       expect(fs.existsSync(BUNDLE_PATH)).toBe(true);
 
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
@@ -119,8 +116,8 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(result.exitCode).toBe(1);
     }, 8000);
 
-    // Regression guard for #5855: the bundle keeps some deps external (see the
-    // `external` list in scripts/build-scenario-child-process.mjs), so it emits
+    // Regression guard for #5855: the bundle keeps every dependency external
+    // (scripts/build-server.mjs bundles first-party code only), so it emits
     // runtime require("x") calls that MUST resolve from the bundle's own
     // directory — the exact resolution root prod uses. An external that is only
     // a transitive dep of a workspace package (e.g. pino via

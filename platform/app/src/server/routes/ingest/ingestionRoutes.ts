@@ -63,6 +63,7 @@ import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/t
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
+import { usdToNanoUsd } from "~/server/gateway/wireMoney";
 import {
   parseOtlpLogs,
   parseOtlpMetrics,
@@ -794,6 +795,10 @@ secured
                 ).filter((b) => b.scopeType !== "ATTRIBUTED_USER");
                 if (budgets.length === 0) continue;
 
+                // The reported cost is a float the caller sent, so it is
+                // pinned to an integer once, here, and every total downstream
+                // adds those integers rather than re-deriving from decimals.
+                const nano = usdToNanoUsd(event.costUsd.toFixed(10));
                 const rows = budgets.map((b) => ({
                   tenantId: govProject.id,
                   budgetId: b.id,
@@ -802,7 +807,7 @@ secured
                   window: b.window,
                   virtualKeyId: sentinelVK,
                   gatewayRequestId: event.requestId,
-                  amountUsd: event.costUsd.toFixed(10),
+                  amountNanoUsd: Number(nano),
                   tokensInput: event.inputTokens,
                   tokensOutput: event.outputTokens,
                   tokensCacheRead: event.cacheReadTokens,

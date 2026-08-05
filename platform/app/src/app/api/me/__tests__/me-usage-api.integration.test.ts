@@ -10,7 +10,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/migrationReplay";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
 import {
   cleanupTestData,

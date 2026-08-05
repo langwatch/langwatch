@@ -56,7 +56,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   };
 });
 
-import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/migrationReplay";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { app } from "../[[...route]]/app";
 
 const ns = `billing-api-${nanoid(8)}`;
@@ -911,7 +911,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         virtualKeyId: templateAnchor,
         providerKey: null,
         gatewayRequestId: `${ns}-caps-req`,
-        amountUsd: "12.500000",
+        amountNanoUsd: 12_500_000_000,
         tokensInput: 10,
         tokensOutput: 5,
         tokensCacheRead: 0,

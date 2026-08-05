@@ -25,7 +25,7 @@ import {
 } from "@ee/governance/process-manager/gatewayDebits.process";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/migrationReplay";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
@@ -48,6 +48,19 @@ const TRIO_VK = `vk_sib_trio_${suffix}`;
 const WINDOWS_VK = `vk_sib_win_${suffix}`;
 const MANUAL_VK = `vk_sib_man_${suffix}`;
 const SEATS_VK = `vk_sib_seat_${suffix}`;
+const ANCHOR_VK = `vk_sib_anch_${suffix}`;
+
+/**
+ * A month cycle anchored to the 17th, and the two instants that tell the
+ * anchored budget apart from the calendar one: the first sits inside the
+ * anchored period that opened on 17 June, the second after it rolled on
+ * 17 July. A debit on 20 June is in neither July calendar month.
+ */
+const CYCLE_ANCHOR = new Date("2026-06-17T09:00:00.000Z");
+const BACKDATED_DEBIT_AT = new Date("2026-06-20T00:00:00.000Z");
+const FRESH_DEBIT_AT = new Date("2026-07-15T12:00:00.000Z");
+const INSIDE_ANCHORED_PERIOD = new Date("2026-07-15T18:00:00.000Z");
+const AFTER_ANCHORED_ROLLOVER = new Date("2026-07-20T00:00:00.000Z");
 
 const COST_USD = 0.001;
 /** Above one request, at or below two. One request must not breach it. */
@@ -62,6 +75,8 @@ let writeDebits: (payload: WriteGatewayDebitsPayload) => Promise<void>;
 function servedRequest(options: {
   virtualKeyId: string;
   endUserId?: string;
+  /** When the request was served. Defaults to now. */
+  occurredAt?: Date;
 }): WriteGatewayDebitsPayload {
   return {
     gateway_request_id: `grq_${nanoid()}`,
@@ -85,7 +100,7 @@ function servedRequest(options: {
     status: "confirmed",
     error_type: "",
     duration_ms: 120,
-    occurred_at: Date.now(),
+    occurred_at: (options.occurredAt ?? new Date()).getTime(),
   };
 }
 
@@ -111,6 +126,7 @@ async function createBudget(input: {
   limitUsd: string;
   onBreach?: "BLOCK" | "WARN";
   scopeType?: "VIRTUAL_KEY" | "ATTRIBUTED_USER";
+  cycleAnchorAt?: Date;
 }): Promise<void> {
   await prisma.gatewayBudget.create({
     data: {
@@ -123,19 +139,32 @@ async function createBudget(input: {
       limitUsd: input.limitUsd,
       onBreach: input.onBreach ?? "BLOCK",
       createdById: USER_ID,
+      cycleAnchorAt: input.cycleAnchorAt ?? null,
       resetsAt: new Date(Date.now() + 86_400_000),
     },
   });
 }
 
-/** What each of these budgets reports as spent, in the order asked for. */
-async function spentUsdFor(budgetIds: string[]): Promise<string[]> {
+/**
+ * What each of these budgets reports as spent, in the order asked for, as
+ * of `now`. The clock is an argument because an anchored budget's period
+ * moves with it, and the whole point of one is which side of its own
+ * boundary a debit falls on.
+ */
+async function spentUsdFor({
+  budgetIds,
+  now,
+}: {
+  budgetIds: string[];
+  now?: Date;
+}): Promise<string[]> {
   const budgets = await prisma.gatewayBudget.findMany({
     where: { id: { in: budgetIds } },
   });
   const spends = await chRepo.getSpendForBudgetsAcrossTenants(
     [PROJECT_ID],
     budgetIds.map((id) => budgets.find((b) => b.id === id)!),
+    now,
   );
   return budgetIds.map(
     (id) => spends.find((s) => s.budgetId === id)?.spentUsd ?? "missing",
@@ -184,7 +213,14 @@ beforeAll(async () => {
     data: { id: USER_ID, email: `${suffix}@acme.test`, name: "ACME Admin" },
   });
 
-  for (const vk of [PAIR_VK, TRIO_VK, WINDOWS_VK, MANUAL_VK, SEATS_VK]) {
+  for (const vk of [
+    PAIR_VK,
+    TRIO_VK,
+    WINDOWS_VK,
+    MANUAL_VK,
+    SEATS_VK,
+    ANCHOR_VK,
+  ]) {
     await createVirtualKey(vk);
   }
 
@@ -243,6 +279,23 @@ beforeAll(async () => {
     onBreach: "WARN",
   });
 
+  // An anchored month and a calendar month on one key. Their periods
+  // overlap but do not coincide, which is what makes each one's own
+  // boundary observable.
+  await createBudget({
+    id: `bdg-anch-month-${suffix}`,
+    virtualKeyId: ANCHOR_VK,
+    window: "MONTH",
+    limitUsd: LOOSE_LIMIT_USD,
+    cycleAnchorAt: CYCLE_ANCHOR,
+  });
+  await createBudget({
+    id: `bdg-anch-cal-${suffix}`,
+    virtualKeyId: ANCHOR_VK,
+    window: "MONTH",
+    limitUsd: LOOSE_LIMIT_USD,
+  });
+
   await createBudget({
     id: `bdg-seat-a-${suffix}`,
     virtualKeyId: SEATS_VK,
@@ -285,9 +338,9 @@ describe("given a hard cap and a soft cap on the same virtual key", () => {
   it("reports each budget's spend as one request, not two", async () => {
     await writeDebits(servedRequest({ virtualKeyId: PAIR_VK }));
 
-    expect(await spentUsdFor([hardId, softId])).toEqual([
-      "0.001000",
-      "0.001000",
+    expect(await spentUsdFor({ budgetIds: [hardId, softId] })).toEqual([
+      "0.001",
+      "0.001",
     ]);
   });
 
@@ -314,6 +367,8 @@ describe("given a hard cap and a soft cap on the same virtual key", () => {
 
     expect(decision.decision).toBe("allow");
     expect(decision.blockedBy).toHaveLength(0);
+    // The decision payload is the gateway's own reconciliation contract and
+    // keeps its fixed six decimals; only the published figures changed unit.
     expect(decision.scopes.find((s) => s.scopeId === PAIR_VK)?.spentUsd).toBe(
       "0.001000",
     );
@@ -327,10 +382,10 @@ describe("given three budgets on the same virtual key", () => {
   it("reports one request's cost against each of the three", async () => {
     await writeDebits(servedRequest({ virtualKeyId: TRIO_VK }));
 
-    expect(await spentUsdFor(ids)).toEqual([
-      "0.001000",
-      "0.001000",
-      "0.001000",
+    expect(await spentUsdFor({ budgetIds: ids })).toEqual([
+      "0.001",
+      "0.001",
+      "0.001",
     ]);
   });
 });
@@ -346,9 +401,9 @@ describe("given sibling budgets on the same key with different windows", () => {
 
     // Both windows contain both requests today, and each must see exactly
     // the two, not the four rows the pair of budgets wrote between them.
-    expect(await spentUsdFor([dayId, monthId])).toEqual([
-      "0.002000",
-      "0.002000",
+    expect(await spentUsdFor({ budgetIds: [dayId, monthId] })).toEqual([
+      "0.002",
+      "0.002",
     ]);
   });
 });
@@ -361,10 +416,53 @@ describe("given two manual-window budgets on the same virtual key", () => {
   it("reports one request's cost against each, off the raw ledger", async () => {
     await writeDebits(servedRequest({ virtualKeyId: MANUAL_VK }));
 
-    expect(await spentUsdFor([hardId, softId])).toEqual([
-      "0.001000",
-      "0.001000",
+    expect(await spentUsdFor({ budgetIds: [hardId, softId] })).toEqual([
+      "0.001",
+      "0.001",
     ]);
+  });
+});
+
+describe("given an anchored month and a calendar month on the same key", () => {
+  const anchoredId = `bdg-anch-month-${suffix}`;
+  const calendarId = `bdg-anch-cal-${suffix}`;
+
+  /** @scenario "An anchored budget counts spend across a calendar boundary until its own period rolls" */
+  /** @scenario "Anchored and calendar siblings on one key total their own periods" */
+  it("counts a debit from the previous calendar month, until the anchored period rolls", async () => {
+    // 20 June: inside the anchored period that opened on 17 June, and in
+    // neither July calendar month.
+    await writeDebits(
+      servedRequest({
+        virtualKeyId: ANCHOR_VK,
+        occurredAt: BACKDATED_DEBIT_AT,
+      }),
+    );
+    // 15 July: inside both the anchored period and the July calendar one.
+    await writeDebits(
+      servedRequest({ virtualKeyId: ANCHOR_VK, occurredAt: FRESH_DEBIT_AT }),
+    );
+
+    // On 15 July the anchored budget still holds both debits, because its
+    // period runs 17 June to 17 July. The calendar sibling sees only the
+    // July one. This is the case the whole feature exists for: a customer
+    // billed from the 17th gets a figure that spans the calendar boundary.
+    expect(
+      await spentUsdFor({
+        budgetIds: [anchoredId, calendarId],
+        now: INSIDE_ANCHORED_PERIOD,
+      }),
+    ).toEqual(["0.002", "0.001"]);
+
+    // On 20 July the anchored period has rolled: its floor moved to 17
+    // July, so both debits are behind it and the new period reads zero.
+    // The calendar sibling is untouched, still inside July.
+    expect(
+      await spentUsdFor({
+        budgetIds: [anchoredId, calendarId],
+        now: AFTER_ANCHORED_ROLLOVER,
+      }),
+    ).toEqual(["0", "0.001"]);
   });
 });
 
@@ -396,7 +494,11 @@ describe("given two per-seat templates anchored on the same virtual key", () => 
 
     for (const buckets of breakdowns) {
       expect(buckets).toEqual([
-        { scopeId: `${SEATS_VK}:${END_USER}`, spentUsd: "0.001000" },
+        {
+          scopeId: `${SEATS_VK}:${END_USER}`,
+          spentNanoUsd: 1_000_000,
+          spentUsd: "0.001",
+        },
       ]);
     }
   });

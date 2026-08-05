@@ -158,9 +158,10 @@ Feature: Payload cost governs the scheduling plane
 
   # --- Phases 2-4: the remaining ADR-069 invariants ---
 
-  @planned
-  # Not yet implemented as of 2026-07-28 — ADR-069 phase 2: offloaded payloads
-  # stage as small stubs, and byte budgets count the stub, not the payload.
+  @integration
+  # ADR-069 phase 2, shipped: the encoder records the pre-compression,
+  # pre-offload payload size on the envelope header, and the coalescing drain
+  # spends its byte budget against that rather than the stored value's length.
   Scenario: an offloaded payload's reference advertises its true cost
     Given a job whose payload is offloaded to blob storage
     When the job is staged
