@@ -47,6 +47,7 @@ import { SimulationModelSelect } from "../scenarios/SimulationModelSelect";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { ScenarioPicker } from "./ScenarioPicker";
+import { PromptTargetMappingSection } from "./PromptTargetMappingSection";
 import { TargetPicker } from "./TargetPicker";
 import { useArchivedItemsResolution } from "./useArchivedItemsResolution";
 import { type SuiteFormData, useSuiteForm } from "./useSuiteForm";
@@ -406,6 +407,13 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                     </Text>
                   )}
                 </VStack>
+
+                {/* Scenario mappings for prompt targets */}
+                <PromptTargetMappingSection
+                  selectedTargets={suiteForm.selectedTargets}
+                  prompts={prompts}
+                  onMappingChange={suiteForm.setTargetMapping}
+                />
 
                 {/* Models */}
                 <VStack align="start" gap={2}>

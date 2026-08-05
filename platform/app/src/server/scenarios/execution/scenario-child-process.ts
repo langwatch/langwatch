@@ -95,6 +95,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     modelParams,
     simulatorModelParams,
     judgeModelParams,
+    judgeModelSupportsReasoningEffort,
     nlpServiceUrl,
     target,
   } = jobData;
@@ -122,9 +123,17 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     simulatorModelParams ?? modelParams,
     nlpServiceUrl,
   );
+  // The judge forces a finish_test / continue_test function-tool call, which
+  // chat-completions refuses on a reasoning model unless reasoning is
+  // explicitly off (#6369). The parent resolved whether this model accepts the
+  // parameter; the factory only acts on it when a request actually carries
+  // tools.
   const judgeModel = createModelFromParams(
     judgeModelParams ?? modelParams,
     nlpServiceUrl,
+    {
+      modelSupportsReasoningEffort: judgeModelSupportsReasoningEffort ?? false,
+    },
   );
 
   // For HTTP targets, use a remote span judge that queries spans from

@@ -43,6 +43,25 @@ export const PromptConfigDataSchema = z.object({
       content: z.string(),
     }),
   ),
+  /**
+   * The prompt's declared input variables. Without these the adapter cannot
+   * know a template's `{{question}}` was meant to be bound to anything, and it
+   * rendered as an empty string instead (#6590). Defaulted so a job queued by
+   * an older worker still parses.
+   */
+  inputs: z
+    .array(
+      z.object({
+        identifier: z.string(),
+        type: z.string(),
+      }),
+    )
+    .default([]),
+  /**
+   * Explicit bindings from the suite target for this prompt. Declared inputs
+   * these leave out are matched to a scenario source by name.
+   */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /** Model configured on prompt (if any). Used for model selection logic. */
   model: z.string().optional(),
   temperature: z.number().optional(),
@@ -305,6 +324,15 @@ export const ChildProcessJobDataSchema = z.object({
   /** Model params for the judge agent — same resolution + fallback as the
    *  simulator, from the scenarios.judge default. */
   judgeModelParams: LiteLLMParamsSchema.optional(),
+  /**
+   * Whether the judge's model accepts `reasoning_effort`. The judge is the one
+   * role that forces a function-tool call, and `/v1/chat/completions` rejects
+   * tools on a reasoning model unless reasoning is explicitly off (#6369). The
+   * capability lives in the model registry and the project's custom-model
+   * overrides, neither of which the child process can reach, so the parent
+   * resolves it and sends the answer. Absent means unknown — send nothing.
+   */
+  judgeModelSupportsReasoningEffort: z.boolean().optional(),
   nlpServiceUrl: z.string(),
   target: TargetConfigSchema,
 });

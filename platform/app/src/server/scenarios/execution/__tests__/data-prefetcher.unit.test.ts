@@ -20,7 +20,7 @@ import {
   type PromptFetcher,
   prefetchScenarioData,
   type ScenarioFetcher,
-  type SuiteModelFetcher,
+  type SuiteConfigFetcher,
   type WorkflowVersionFetcher,
 } from "../data-prefetcher";
 import type { ExecutionContext, LiteLLMParams, TargetConfig } from "../types";
@@ -71,7 +71,7 @@ describe("prefetchScenarioData", () => {
       getById: vi.fn().mockResolvedValue(defaultScenario),
     };
 
-    const suiteModelFetcher: SuiteModelFetcher = {
+    const suiteConfigFetcher: SuiteConfigFetcher = {
       getBySetId: vi.fn().mockResolvedValue(null),
     };
 
@@ -112,7 +112,7 @@ describe("prefetchScenarioData", () => {
 
     return {
       scenarioFetcher,
-      suiteModelFetcher,
+      suiteConfigFetcher,
       promptFetcher,
       agentFetcher,
       workflowVersionFetcher,
@@ -392,7 +392,7 @@ describe("prefetchScenarioData", () => {
         /** @scenario "A run plan simulator model overrides the scenario default at run time" */
         it("uses the run plan's simulator model over the scenario default", async () => {
           const deps = createMockDeps({
-            suiteModelFetcher: {
+            suiteConfigFetcher: {
               getBySetId: vi.fn().mockResolvedValue({
                 simulatorModel: "groq/plan-sim",
                 judgeModel: null,
@@ -427,7 +427,7 @@ describe("prefetchScenarioData", () => {
         /** @scenario "A run plan with no model override falls back to the scenario or project default" */
         it("falls back to the default simulator and judge models", async () => {
           const deps = createMockDeps({
-            suiteModelFetcher: {
+            suiteConfigFetcher: {
               getBySetId: vi.fn().mockResolvedValue({
                 simulatorModel: null,
                 judgeModel: null,
@@ -451,6 +451,39 @@ describe("prefetchScenarioData", () => {
             expect(result.data.judgeModelParams?.model).toBe(
               "openai/judge-default",
             );
+          }
+        });
+      });
+    });
+
+    describe("given a judge model that accepts reasoning_effort", () => {
+      describe("when prefetching the run data", () => {
+        /** @scenario "The judge's reasoning support travels from the parent to the worker" */
+        it("records the judge's reasoning support on the child job data", async () => {
+          const deps = createMockDeps({
+            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+            modelParamsProvider: {
+              prepare: vi
+                .fn()
+                .mockImplementation(
+                  async (_projectId: string, model: string) => ({
+                    success: true as const,
+                    params: { api_key: "k", model },
+                    supportsReasoningEffort: model === "openai/judge-default",
+                  }),
+                ),
+            },
+          });
+
+          const result = await prefetchScenarioData(
+            defaultContext,
+            httpTarget,
+            deps,
+          );
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.judgeModelSupportsReasoningEffort).toBe(true);
           }
         });
       });

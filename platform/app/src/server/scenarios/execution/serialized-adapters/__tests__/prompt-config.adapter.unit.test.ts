@@ -2,6 +2,7 @@
  * @vitest-environment node
  */
 
+import type { Logger } from "@langwatch/observability";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiteLLMParams, PromptConfigData } from "../../types";
@@ -26,6 +27,7 @@ describe("SerializedPromptConfigAdapter", () => {
     promptId: "prompt_123",
     systemPrompt: "You are a helpful assistant.",
     messages: [{ role: "user", content: "Hello" }],
+    inputs: [],
     model: "openai/gpt-4",
     temperature: 0.7,
     maxTokens: 1000,
@@ -51,26 +53,6 @@ describe("SerializedPromptConfigAdapter", () => {
     mockGenerateText.mockResolvedValue({
       text: "I am doing well!",
     } as Awaited<ReturnType<typeof generateText>>);
-  });
-
-  /**
-   * Intentional design: the prompt adapter uses Liquid template interpolation
-   * for its inputs ({{input}}, {{messages}}) rather than fieldMappings.
-   * fieldMappings are only applicable to code and HTTP adapters where input
-   * fields are explicitly declared. Verify the constructor does not accept them.
-   */
-  /** @scenario Prompt adapter does not accept fieldMappings */
-  it("does not accept fieldMappings in its constructor", () => {
-    // SerializedPromptConfigAdapter constructor: (config, litellmParams, nlpServiceUrl)
-    // Verify it constructs successfully with the expected constructor params only.
-    const adapter = new SerializedPromptConfigAdapter(
-      defaultConfig,
-      defaultLitellmParams,
-      "http://localhost:8080",
-    );
-
-    // The adapter exposes no fieldMappings property
-    expect("fieldMappings" in adapter).toBe(false);
   });
 
   it("has AGENT role", () => {
@@ -232,6 +214,105 @@ describe("SerializedPromptConfigAdapter", () => {
       expect(messages[1]).toEqual({
         role: "user",
         content: "User asked: How are you?",
+      });
+    });
+
+    describe("when the template mentions messages only in prose", () => {
+      /** @scenario "The word 'messages' in prose does not suppress the conversation" */
+      it("still sends the conversation to the model", async () => {
+        const config: PromptConfigData = {
+          ...defaultConfig,
+          systemPrompt: "Summarise the customer's messages politely.",
+          messages: [],
+        };
+        const adapter = new SerializedPromptConfigAdapter(
+          config,
+          defaultLitellmParams,
+          "http://localhost:8080",
+        );
+
+        await adapter.call(defaultInput);
+
+        const callArgs = mockGenerateText.mock.calls[0]![0];
+        const messages = callArgs.messages as Array<{
+          role: string;
+          content: string;
+        }>;
+
+        // System + the conversation. Before the fix the bare word "messages"
+        // matched the history-suppression check and the model was told to
+        // summarise a conversation it was never shown.
+        expect(messages).toHaveLength(2);
+        expect(messages[1]).toMatchObject({
+          role: "user",
+          content: "How are you?",
+        });
+      });
+    });
+
+    describe("when the prompt declares its own inputs", () => {
+      /** @scenario "A declared input is bound by name to a scenario source" */
+      it("binds them in the rendered system prompt", async () => {
+        const config: PromptConfigData = {
+          ...defaultConfig,
+          systemPrompt: "question: {{question}}\nthread: {{thread_id}}",
+          messages: [],
+          inputs: [
+            { identifier: "question", type: "str" },
+            { identifier: "thread_id", type: "str" },
+          ],
+        };
+        const adapter = new SerializedPromptConfigAdapter(
+          config,
+          defaultLitellmParams,
+          "http://localhost:8080",
+        );
+
+        await adapter.call({ ...defaultInput, threadId: "thread_abc" });
+
+        const callArgs = mockGenerateText.mock.calls[0]![0];
+        const messages = callArgs.messages as Array<{
+          role: string;
+          content: string;
+        }>;
+
+        expect(messages[0]!.content).toBe(
+          "question: How are you?\nthread: thread_abc",
+        );
+      });
+
+      /** @scenario "An input nothing can be bound to renders as a visible placeholder" */
+      it("renders a placeholder for one it cannot bind", async () => {
+        const config: PromptConfigData = {
+          ...defaultConfig,
+          systemPrompt: "tier: {{customer_tier}}",
+          messages: [],
+          // Two inputs on purpose: a lone declared input falls back to the
+          // scenario message (computeBestMatchMappings), which is right for a
+          // single-input agent and would hide the unbound case here.
+          inputs: [
+            { identifier: "question", type: "str" },
+            { identifier: "customer_tier", type: "str" },
+          ],
+        };
+        const adapter = new SerializedPromptConfigAdapter(
+          config,
+          defaultLitellmParams,
+          "http://localhost:8080",
+          { warn: vi.fn() } as unknown as Logger,
+        );
+
+        await adapter.call(defaultInput);
+
+        const callArgs = mockGenerateText.mock.calls[0]![0];
+        const messages = callArgs.messages as Array<{
+          role: string;
+          content: string;
+        }>;
+
+        expect(messages[0]!.content).toBe(
+          "tier: [unbound input: customer_tier]",
+        );
       });
     });
 

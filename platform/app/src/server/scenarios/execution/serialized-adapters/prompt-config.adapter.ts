@@ -5,15 +5,25 @@
  * database access. Designed to run in isolated worker threads.
  */
 
+import type { Logger } from "@langwatch/observability";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { trace } from "@opentelemetry/api";
 import { generateText } from "ai";
 import { Liquid } from "liquidjs";
+import { createChildProcessLogger } from "../child-logger";
 import { createModelFromParams } from "../model.factory";
+import {
+  buildPromptTemplateContext,
+  templateReferencesVariable,
+} from "../prompt-template-context";
 import type { LiteLLMParams, PromptConfigData } from "../types";
 
 // Shared Liquid engine instance for template interpolation
 const liquid = new Liquid();
+
+/** The context name a template reads to place conversation history itself. */
+const MESSAGES_VARIABLE = "messages";
 
 /**
  * Serialized prompt config adapter that uses pre-fetched configuration.
@@ -22,29 +32,35 @@ const liquid = new Liquid();
 export class SerializedPromptConfigAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
+  private readonly logger: Logger;
+
   constructor(
     private readonly config: PromptConfigData,
     private readonly litellmParams: LiteLLMParams,
     private readonly nlpServiceUrl: string,
+    logger?: Logger,
   ) {
     super();
     this.name = "SerializedPromptConfigAdapter";
+    this.logger =
+      logger ?? createChildProcessLogger("langwatch:scenarios:prompt-adapter");
   }
 
   async call(input: AgentInput): Promise<string> {
-    // Build template context for Liquid
-    // Note: messages is serialized to JSON string for template interpolation
-    const lastUserMessage = input.messages.findLast((m) => m.role === "user");
-    const templateContext = {
-      input:
-        typeof lastUserMessage?.content === "string"
-          ? lastUserMessage.content
-          : JSON.stringify(lastUserMessage?.content ?? ""),
-      messages: JSON.stringify(input.messages),
-    };
+    const { context: templateContext, unboundInputs } =
+      buildPromptTemplateContext({
+        input,
+        inputs: this.config.inputs,
+        scenarioMappings: this.config.scenarioMappings,
+      });
 
-    // Check if template uses {{messages}} - if so, template handles conversation history
-    const templateUsesMessages = this.templateContainsMessages();
+    if (unboundInputs.length > 0) {
+      this.reportUnboundInputs(unboundInputs);
+    }
+
+    // A template that reads `messages` places the conversation history itself,
+    // so appending it again would show the model the same turns twice.
+    const templateUsesMessages = this.templateReadsMessages();
 
     // Interpolate template variables using Liquid
     const systemPrompt = await liquid.parseAndRender(
@@ -63,7 +79,7 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
     const messages = [
       { role: "system" as const, content: systemPrompt },
       ...promptMessages,
-      // Only append input.messages if template doesn't use {{messages}}
+      // Only append input.messages if the template doesn't place them itself
       ...(templateUsesMessages ? [] : input.messages),
     ];
 
@@ -80,14 +96,37 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
   }
 
   /**
-   * Check if the template (system prompt or any message) uses the messages variable.
-   * If so, the template handles conversation history placement.
+   * Whether the template (system prompt or any message) reads the conversation
+   * history itself.
+   *
+   * ⚠ This used to test `/\bmessages\b/` against the raw template text, so a
+   * system prompt containing the ordinary word "messages" in prose dropped the
+   * conversation history from the request entirely.
    */
-  private templateContainsMessages(): boolean {
-    const messagesPattern = /\bmessages\b/;
-    if (messagesPattern.test(this.config.systemPrompt)) {
+  private templateReadsMessages(): boolean {
+    if (templateReferencesVariable(this.config.systemPrompt, MESSAGES_VARIABLE))
       return true;
-    }
-    return this.config.messages.some((m) => messagesPattern.test(m.content));
+    return this.config.messages.some((m) =>
+      templateReferencesVariable(m.content, MESSAGES_VARIABLE),
+    );
+  }
+
+  /**
+   * Record the declared inputs a simulation has nothing to bind to.
+   *
+   * The rendered prompt already shows a placeholder where each one would have
+   * gone; this puts the same list on the run's trace and in the worker log, so
+   * the cause is findable from the run rather than only from reading the
+   * prompt. The values themselves are never recorded — only the names.
+   */
+  private reportUnboundInputs(unboundInputs: string[]): void {
+    trace.getActiveSpan()?.addEvent("langwatch.prompt.unbound_inputs", {
+      "langwatch.prompt.id": this.config.promptId,
+      "langwatch.prompt.unbound_inputs": unboundInputs.join(", "),
+    });
+    this.logger.warn(
+      { promptId: this.config.promptId, unboundInputs },
+      "Prompt declares input variables a simulation cannot bind",
+    );
   }
 }

@@ -120,13 +120,26 @@ Feature: Scenario Input Mapping
     And "messages" is resolved to the messages array
 
   # --- Prompt Adapter ---
+  #
+  # Prompt targets used to be the exception: they took no mappings at all, so a
+  # prompt's declared inputs were never bound under simulation (#6590). They now
+  # use the same machinery, with one difference in where the mappings live — an
+  # agent is configured, so its mappings sit on the agent record; a prompt is
+  # authored elsewhere and pointed at, so the binding sits on the suite target
+  # that made the pairing. See specs/scenarios/prompt-agent-input-binding.feature.
 
   @unit
-  Scenario: Prompt adapter does not accept fieldMappings
-    Given a prompt target adapter
-    When its constructor shape is inspected
-    Then the adapter has no "fieldMappings" parameter
-    And conversation messages flow through without any mapping step
+  Scenario: Prompt targets carry their mappings on the suite target
+    Given a suite target of type "prompt" with scenarioMappings
+    When the suite target schema validates
+    Then the scenarioMappings are preserved in the parsed output
+
+  @unit
+  Scenario: A prompt's declared inputs are bound through the shared resolver
+    Given a prompt declaring inputs "query" and "context"
+    And fieldMappings maps "query" to source "scenario" path ["input"]
+    When the prompt template context is built from an agent input
+    Then "query" receives the scenario message content
 
   # --- Default Mappings ---
 
