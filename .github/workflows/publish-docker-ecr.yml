@@ -12,6 +12,15 @@ name: publish-docker-ecr
 #   - Different tag policy. This workflow NEVER pushes `:latest`. The SaaS
 #     pipeline still owns that tag on these repositories, and racing it would
 #     silently repoint production.
+#   - Different architecture set. arm64 only. Every consumer of these images is
+#     Graviton: the EKS node groups are AL2023_ARM_64_STANDARD on m8g, and every
+#     Lambda is `architectures = ["arm64"]`. Building amd64 here doubled the
+#     matrix to produce a manifest nothing ever pulled. Docker Hub still ships
+#     both arches for the community — that flow is untouched.
+#
+# If a consumer of these ECR images is ever added on x86, restore the amd64 rows
+# in the build table and add `-amd64` back to SOURCES in create-manifest. Both
+# carry a pointer to this note.
 #
 # The tags written here, and only these:
 #   - `git-<short-sha>`   always
@@ -221,18 +230,17 @@ jobs:
           # The full build table. `image` doubles as the ECR repository name and
           # as the key of the path filter above, so the two cannot drift.
           #
-          # Runner labels mirror publish-docker-app.yml: the app's arm64 build
-          # needs the 32GB larger runner for the pnpm/vite bundle, everything
-          # else fits on the standard hosted arm runner.
+          # arm64 only — see the header. Docker Hub still ships both arches for
+          # the community; this registry serves one all-Graviton consumer.
+          #
+          # Runner labels mirror publish-docker-app.yml: the app's build needs
+          # the 32GB larger runner for the pnpm/vite bundle, everything else
+          # fits on the standard hosted arm runner.
           ALL=$(cat <<'JSON'
           [
-            {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"amd64","platform":"linux/amd64",   "runner":"ubuntu-latest"},
             {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"arm64","platform":"linux/arm64/v8","runner":"arm64-runner-32gb"},
-            {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.langwatch_nlp","arch":"amd64","platform":"linux/amd64",   "runner":"ubuntu-latest"},
             {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.langwatch_nlp","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
-            {"image":"langwatch-langevals",   "dockerfile":"infra/docker/Dockerfile.langevals",    "arch":"amd64","platform":"linux/amd64",   "runner":"ubuntu-latest"},
             {"image":"langwatch-langevals",   "dockerfile":"infra/docker/Dockerfile.langevals",    "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
-            {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"amd64","platform":"linux/amd64",   "runner":"ubuntu-latest"},
             {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}
           ]
           JSON
@@ -396,18 +404,21 @@ jobs:
           set -euo pipefail
 
           if printf '%s' "${BUILT}" | jq -e --arg i "${IMAGE}" 'index($i)' >/dev/null; then
-            # Rebuilt this run: assemble the index from the per-arch tags.
-            SOURCES=("${REPO}:${IMAGE_TAG}-amd64" "${REPO}:${IMAGE_TAG}-arm64")
+            # Rebuilt this run: wrap the per-arch tag in an index. Single-source
+            # `imagetools create` still writes a proper image index, so the
+            # consumer-facing tag has the same shape whether the image was
+            # rebuilt this run or re-tagged below.
+            SOURCES=("${REPO}:${IMAGE_TAG}-arm64")
           else
             # Not rebuilt: point this commit's tag at the index already published
             # for the last commit that did change this image. `imagetools create`
             # from a single index copies it, so this writes a manifest and moves
             # no layers.
             #
-            # Newest first, bare `git-<sha>` only — the per-arch `-amd64` /
-            # `-arm64` tags are pushed just before their index and are not
-            # multi-arch, so matching one here would publish a single-arch image
-            # under a tag consumers expect to be multi-arch.
+            # Newest first, bare `git-<sha>` only. The `-arm64` tag is pushed
+            # just before its index and is a bare manifest rather than an index;
+            # matching one here would hand consumers a different media type than
+            # the tag normally carries.
             # The lookup and the match are separate statements on purpose. With
             # both in one pipeline, the `|| true` that keeps a no-match from
             # tripping `set -e` also swallows a failed `describe-images` — and
