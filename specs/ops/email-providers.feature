@@ -155,9 +155,24 @@ Feature: Email gateway providers
   Scenario: Settings supplied out of band are accepted
     Given a gateway is named
     And it has no settings in the chart
-    But additional environment variables are supplied to the containers
+    But additional environment variables are supplied to every sender
     When the deployment is rendered
     Then rendering succeeds, because the chart cannot see what those variables carry
+
+  @unit
+  Scenario: Settings supplied to only one of the two Deployments are refused
+    Given a gateway is named
+    And it has no settings in the chart
+    But additional environment variables are supplied to only one of the senders
+    When the deployment is rendered
+    Then rendering fails naming the sender still left without the gateway
+
+  @unit
+  Scenario: A secret reference missing its key is caught before install
+    Given a gateway is named
+    And its credential names a secret but no key within it
+    When the deployment is rendered
+    Then rendering fails naming the reference that resolves to nothing
 
   @unit
   Scenario: Forcing an unencrypted starting connection is not silently dropped

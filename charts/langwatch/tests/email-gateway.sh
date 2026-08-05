@@ -75,10 +75,15 @@ render_status() {
   if helm template lw . $flags >/dev/null 2>&1; then echo "ok"; else echo "failed"; fi
 }
 
+# The whole failure on one line. helm splits its errors across lines, putting
+# the template location on the "Error:" line and the reason underneath, so
+# taking only the first line would drop what the assertion is about.
 # shellcheck disable=SC2086
 render_error() {
   local flags="$1"
-  helm template lw . $flags 2>&1 | grep -m1 "Error:" || true
+  # The trailing `|| true` is what keeps a refused render, which is the only
+  # kind this is called for, from ending the run under `set -e -o pipefail`.
+  helm template lw . $flags 2>&1 | sed -n '/^Error:/,$p' | grep -v '^Use --debug' | tr '\n' ' ' || true
 }
 
 # @scenario "Background jobs can send email as well as the web application"
@@ -137,10 +142,11 @@ test_an_unconfigured_gateway_stops_the_render() {
 # @scenario "Settings supplied out of band are accepted"
 test_extra_environment_variables_are_an_accepted_source() {
   local entry label flags
+  local both="--set app.extraEnvs[0].name=SMTP_URL --set app.extraEnvs[0].value=smtp://relay.internal:587 --set workers.extraEnvs[0].name=SMTP_URL --set workers.extraEnvs[0].value=smtp://relay.internal:587"
   local cases=(
-    "app-extra-envs|--set app.email.provider=smtp --set app.extraEnvs[0].name=SMTP_URL --set app.extraEnvs[0].value=smtp://relay.internal:587"
-    "app-extra-env-from|--set app.email.provider=ses --set app.extraEnvFrom[0].secretRef.name=aws-mailer"
-    "workers-extra-envs|--set app.email.provider=smtp --set workers.extraEnvs[0].name=SMTP_HOST --set workers.extraEnvs[0].value=relay.internal"
+    "extra-envs-on-both|--set app.email.provider=smtp $both"
+    "extra-env-from-on-both|--set app.email.provider=ses --set app.extraEnvFrom[0].secretRef.name=aws-mailer --set workers.extraEnvFrom[0].secretRef.name=aws-mailer"
+    "app-only-with-workers-off|--set app.email.provider=smtp --set workers.enabled=false --set app.extraEnvs[0].name=SMTP_URL --set app.extraEnvs[0].value=smtp://relay.internal:587"
   )
   for entry in "${cases[@]}"; do
     label="${entry%%|*}"
@@ -151,6 +157,68 @@ test_extra_environment_variables_are_an_accepted_source() {
       fail "$label" "render refused even though the settings can arrive out of band: $(render_error "$BASE $flags")"
     fi
   done
+}
+
+# Supplying the settings to one Deployment says nothing about the other, since
+# each reads only its own extra environment. Accepting one side would leave the
+# other believing email is configured and unable to send.
+#
+# @scenario "Settings supplied to only one of the two Deployments are refused"
+test_out_of_band_settings_must_reach_every_sender() {
+  local entry label flags want err
+  local cases=(
+    "app-only|workers.extraEnvs|--set app.email.provider=smtp --set app.extraEnvs[0].name=SMTP_URL --set app.extraEnvs[0].value=smtp://relay.internal:587"
+    "workers-only|app.extraEnvs|--set app.email.provider=smtp --set workers.extraEnvs[0].name=SMTP_HOST --set workers.extraEnvs[0].value=relay.internal"
+  )
+  for entry in "${cases[@]}"; do
+    label="${entry%%|*}"
+    want="${entry#*|}"; want="${want%%|*}"
+    flags="${entry##*|}"
+    if [ "$(render_status "$BASE $flags")" = "ok" ]; then
+      fail "$label" "rendered successfully, so the other Deployment would install with no gateway"
+      continue
+    fi
+    err=$(render_error "$BASE $flags")
+    case "$err" in
+      *"$want"*) echo "ok   [$label] render refused, pointing at $want" ;;
+      *) fail "$label" "render failed without naming $want: ${err:-<no Error: line>}" ;;
+    esac
+  done
+}
+
+# A secretKeyRef naming a Secret but no key inside it reads as configured to the
+# provider guard and resolves to nothing in the container.
+#
+# @scenario "A secret reference missing its key is caught before install"
+test_a_half_written_secret_reference_stops_the_render() {
+  local entry label flags err
+  local cases=(
+    "sendgrid-api-key|--set app.email.provider=sendgrid --set app.email.providers.sendgrid.apiKey.secretKeyRef.name=mail"
+    "resend-api-key|--set app.email.provider=resend --set app.email.providers.resend.apiKey.secretKeyRef.name=mail"
+    "smtp-url|--set app.email.provider=smtp --set app.email.providers.smtp.url.secretKeyRef.name=mail"
+    "smtp-password|--set app.email.provider=smtp --set app.email.providers.smtp.host=relay.internal --set app.email.providers.smtp.password.secretKeyRef.name=mail"
+  )
+  for entry in "${cases[@]}"; do
+    label="${entry%%|*}"
+    flags="${entry#*|}"
+    if [ "$(render_status "$BASE $flags")" = "ok" ]; then
+      fail "$label" "rendered successfully; the container would receive a Secret reference with no key"
+      continue
+    fi
+    err=$(render_error "$BASE $flags")
+    case "$err" in
+      *"is set but key is empty"*) echo "ok   [$label] render refused" ;;
+      *) fail "$label" "render failed without naming the empty key: ${err:-<no Error: line>}" ;;
+    esac
+  done
+
+  # A complete reference is the normal case and must still render.
+  flags="--set app.email.provider=smtp --set app.email.providers.smtp.url.secretKeyRef.name=mail --set app.email.providers.smtp.url.secretKeyRef.key=smtpUrl"
+  if [ "$(render_status "$BASE $flags")" = "ok" ]; then
+    echo "ok   [complete-secret-ref] render allowed"
+  else
+    fail "complete-secret-ref" "render refused for a complete secret reference: $(render_error "$BASE $flags")"
+  fi
 }
 
 # @scenario "Forcing an unencrypted starting connection is not silently dropped"
@@ -205,6 +273,8 @@ test_the_retired_enabled_toggle_is_refused() {
 test_workers_receive_the_same_gateway_as_the_app
 test_an_unconfigured_gateway_stops_the_render
 test_extra_environment_variables_are_an_accepted_source
+test_out_of_band_settings_must_reach_every_sender
+test_a_half_written_secret_reference_stops_the_render
 test_an_explicit_false_reaches_the_containers
 test_no_provider_emits_nothing
 test_the_retired_enabled_toggle_is_refused

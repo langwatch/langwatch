@@ -151,7 +151,9 @@ The `smtp` gateway ignores these variables deliberately, because a relay is norm
 
 ## Troubleshooting
 
-The chart refuses to render when `app.email.provider` names a gateway nothing configures, so a missing setting stops `helm install` rather than surfacing at the first alert. It allows the render when `app.extraEnvs` or `app.extraEnvFrom` are in play, since those can carry the settings and the chart cannot see inside them.
+The chart refuses to render when `app.email.provider` names a gateway nothing configures, so a missing setting stops `helm install` rather than surfacing at the first alert. It also refuses a credential that names a Secret without naming a key inside it, which otherwise installs cleanly and resolves to nothing.
+
+Settings can instead arrive through `extraEnvs` or `extraEnvFrom`, which the chart cannot see inside and therefore accepts. Supply them to both `app` and `workers`: each Deployment reads only its own extra environment, and both send mail.
 
 A gateway that is configured but unusable fails at send time with a message naming the setting to fill in. When another gateway is fully configured, the message names it too, which is the usual case for an install that set SES up through `app.extraEnvs` while leaving `app.email.provider` at its default:
 
