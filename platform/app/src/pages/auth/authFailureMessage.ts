@@ -24,6 +24,31 @@ const normalize = (value: string | undefined): string =>
     .toLowerCase()
     .replace(/[\s-]+/g, "_");
 
+/**
+ * The auth layer's way of saying "those are not the credentials for this
+ * account", as opposed to a rate limit, an address mismatch, or our side
+ * falling over, each of which needs its own wording.
+ *
+ * The sign-up screen branches on this: it retries the sign-in with whatever the
+ * customer typed, and a credential rejection is the one outcome that means the
+ * address belongs to an account they cannot open. Lives beside the mapping
+ * above so the set of identifiers meaning this has exactly one definition.
+ */
+export const isCredentialRejection = ({
+  code,
+  message,
+}: {
+  code?: string;
+  message?: string;
+}): boolean => {
+  const key = normalize(code) || normalize(message);
+  return (
+    key === "invalid_email_or_password" ||
+    key === "credentialssignin" ||
+    key === "user_not_found"
+  );
+};
+
 export const authFailureMessage = ({
   code,
   message,

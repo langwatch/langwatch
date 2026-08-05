@@ -271,6 +271,17 @@ const presentations = {
     describe: () =>
       "It may have been removed along with its run. Reload to see the current steps.",
   },
+  email_already_registered: {
+    // Reached from the sign-up screen, and the reader there is usually looking
+    // at their own account: either a previous sign-up created it and could not
+    // sign them in, or they were a member before and an invite asked them to
+    // create an account they already have. The screen retries the sign-in for
+    // them first, so by the time this copy renders the password they typed was
+    // not the account's, which leaves exactly two moves worth naming.
+    title: "That email already has an account",
+    describe: () =>
+      "Sign in with it, or reset the password if you don't have it.",
+  },
   prompt_not_found: {
     title: "Prompt not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
