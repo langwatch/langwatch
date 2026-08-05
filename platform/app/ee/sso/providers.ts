@@ -2,7 +2,8 @@
 /**
  * Identity-provider wiring for enterprise SSO: the BetterAuth
  * `socialProviders` map (Google, GitHub, GitLab, Azure AD) and the
- * genericOAuth configs (Auth0, Okta). `src/server/better-auth/index.ts` is
+ * genericOAuth configs (Auth0, Okta, AWS Cognito, OneLogin).
+ * `src/server/better-auth/index.ts` is
  * the assembly point that feeds these into `betterAuth()`; the federation
  * capability itself lives here, under the Enterprise license, alongside the
  * gate (`sso-gate.ts`) that decides whether a deployment may use it.
@@ -331,8 +332,9 @@ export const buildGenericOAuthConfigs = (
       // Auth0 applications have only the legacy path registered as an
       // allowed callback. Sending a different `redirect_uri` would cause
       // Auth0 to reject the authorization request.
-      // The legacy path is wired back to BetterAuth's plugin handler via
-      // a Next.js rewrite in `next.config.mjs`.
+      // BetterAuth serves that path because the genericOAuth plugin registers
+      // each config in `ctx.socialProviders`, which is what the core callback
+      // route resolves against.
       redirectURI: `${e.NEXTAUTH_URL}/api/auth/callback/auth0`,
       mapProfileToUser: (profile) => ({
         name: fallbackName(profile),
