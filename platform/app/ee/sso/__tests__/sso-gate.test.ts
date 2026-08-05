@@ -21,6 +21,9 @@ vi.mock("~/env.mjs", () => ({
     ONELOGIN_CLIENT_ID: "onelogin-client",
     ONELOGIN_CLIENT_SECRET: "onelogin-secret",
     ONELOGIN_ISSUER: "https://acme.onelogin.com/oidc/2",
+    OIDC_CLIENT_ID: "oidc-client",
+    OIDC_CLIENT_SECRET: "oidc-secret",
+    OIDC_ISSUER: "https://idp.acme.test",
     NEXTAUTH_URL: "https://acme.test",
   },
 }));
@@ -49,6 +52,7 @@ import {
   parseLicenseKey,
   verifySignature,
 } from "../../licensing/validation";
+import { PLAIN_OIDC_PROVIDERS } from "../providers";
 import {
   __resetSsoGateForTests,
   __setSsoLicenseRepositoryForTests,
@@ -56,6 +60,14 @@ import {
   resolveAuthProvider,
 } from "../sso-gate";
 import type { ISsoLicenseRepository } from "../sso-license.repository";
+
+/**
+ * Taken from the provider table rather than listed here, so a provider added
+ * there is gated by these tests without anyone remembering to come back. The
+ * gate is provider-agnostic today, and this is what would notice if that ever
+ * stopped being true for one of them.
+ */
+const PLAIN_OIDC_PROVIDER_IDS = PLAIN_OIDC_PROVIDERS.map((p) => p.providerId);
 
 const envMock = env as unknown as {
   IS_SAAS: boolean;
@@ -417,10 +429,9 @@ describe("resolveAuthProvider", () => {
     });
 
     /** @scenario Without a license the provider is not offered */
-    it.each([
-      "cognito",
-      "onelogin",
-    ])("coerces %s to email as well, credentials notwithstanding", async (configured) => {
+    it.each(
+      PLAIN_OIDC_PROVIDER_IDS,
+    )("coerces %s to email as well, credentials notwithstanding", async (configured) => {
       envMock.NEXTAUTH_PROVIDER = configured;
       __setSsoLicenseRepositoryForTests(repoWithOrgs([]));
 
@@ -431,10 +442,9 @@ describe("resolveAuthProvider", () => {
   });
 
   describe("when the gate allows an OIDC provider", () => {
-    it.each([
-      "cognito",
-      "onelogin",
-    ])("reports %s, so the sign-in page federates to it", async (configured) => {
+    it.each(
+      PLAIN_OIDC_PROVIDER_IDS,
+    )("reports %s, so the sign-in page federates to it", async (configured) => {
       allowTheGate();
       envMock.NEXTAUTH_PROVIDER = configured;
 
