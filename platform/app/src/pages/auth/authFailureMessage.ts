@@ -25,14 +25,26 @@ const normalize = (value: string | undefined): string =>
     .replace(/[\s-]+/g, "_");
 
 /**
+ * Every identifier the auth layer uses for "those are not the credentials for
+ * this account". `user_not_found` belongs in here on purpose: telling a
+ * stranger which addresses have accounts is an enumeration oracle, so it must
+ * be indistinguishable from a wrong password everywhere this set is read.
+ */
+const CREDENTIAL_REJECTION_KEYS = new Set([
+  "invalid_email_or_password",
+  "credentialssignin",
+  "user_not_found",
+]);
+
+/**
  * The auth layer's way of saying "those are not the credentials for this
  * account", as opposed to a rate limit, an address mismatch, or our side
  * falling over, each of which needs its own wording.
  *
  * The sign-up screen branches on this: it retries the sign-in with whatever the
  * customer typed, and a credential rejection is the one outcome that means the
- * address belongs to an account they cannot open. Lives beside the mapping
- * above so the set of identifiers meaning this has exactly one definition.
+ * address belongs to an account they cannot open. Reads the same set the
+ * wording below does, so the two answers cannot drift.
  */
 export const isCredentialRejection = ({
   code,
@@ -40,14 +52,8 @@ export const isCredentialRejection = ({
 }: {
   code?: string;
   message?: string;
-}): boolean => {
-  const key = normalize(code) || normalize(message);
-  return (
-    key === "invalid_email_or_password" ||
-    key === "credentialssignin" ||
-    key === "user_not_found"
-  );
-};
+}): boolean =>
+  CREDENTIAL_REJECTION_KEYS.has(normalize(code) || normalize(message));
 
 export const authFailureMessage = ({
   code,
@@ -63,13 +69,11 @@ export const authFailureMessage = ({
 }): string => {
   const key = normalize(code) || normalize(message);
 
+  if (CREDENTIAL_REJECTION_KEYS.has(key)) {
+    return "Invalid email or password.";
+  }
+
   switch (key) {
-    // `user_not_found` gets the same wording on purpose: telling a stranger
-    // which addresses have accounts is an enumeration oracle.
-    case "invalid_email_or_password":
-    case "credentialssignin":
-    case "user_not_found":
-      return "Invalid email or password.";
     case "invalid_origin":
       // Naming the concept ("origin", "trusted origins") would only help
       // someone who already knows the answer. The address bar is the thing

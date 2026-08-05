@@ -438,13 +438,21 @@ test_auth_base_url() {
 
   # One key per container: a duplicate would leave which value wins up to
   # manifest order rather than to this chart.
-  local app_render app_count
+  local app_render app_count workers_render workers_count
   app_render=$(tmpl_only "templates/app/deployment.yaml" --set autogen.enabled=true)
   app_count=$(count_matches "$app_render" "name: NEXTAUTH_URL$")
   if [ "$app_count" = "1" ]; then
     pass "app declares NEXTAUTH_URL exactly once"
   else
     fail "app declares NEXTAUTH_URL exactly once: found $app_count"
+  fi
+
+  workers_render=$(tmpl_only "templates/workers/deployment.yaml" --set autogen.enabled=true)
+  workers_count=$(count_matches "$workers_render" "name: NEXTAUTH_URL$")
+  if [ "$workers_count" = "1" ]; then
+    pass "workers declare NEXTAUTH_URL exactly once"
+  else
+    fail "workers declare NEXTAUTH_URL exactly once: found $workers_count"
   fi
 
   # Falls back to baseHost when only that is set, so an install that never
@@ -457,6 +465,17 @@ test_auth_base_url() {
     | grep -A1 "name: NEXTAUTH_URL$")
   assert_contains "NEXTAUTH_URL falls back to baseHost" \
     "$fallback" "https://internal.example.com"
+
+  # And with both values blanked, the template's own literal default answers,
+  # so a bare install still boots with a coherent (if local) address.
+  local default_fallback
+  default_fallback=$(tmpl_only "templates/workers/deployment.yaml" \
+    --set autogen.enabled=true \
+    --set "app.http.publicUrl=" \
+    --set "app.http.baseHost=" \
+    | grep -A1 "name: NEXTAUTH_URL$")
+  assert_contains "NEXTAUTH_URL falls back to the localhost default" \
+    "$default_fallback" "http://localhost:5560"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -279,8 +279,9 @@ function SignUpForm() {
               {/* Shown only once the sign-in this screen ran on the customer's
                   behalf came back with the wrong password for an account that
                   does exist. The copy above names the situation; these are the
-                  two ways out of it, and they carry the callback so the invite
-                  they were following survives the detour. */}
+                  two ways out of it. The sign-in link carries the callback so
+                  the invite they were following survives the detour; the reset
+                  flow returns through the emailed link instead. */}
               {showRecoveryLinks ? (
                 <HStack width="full" gap={4}>
                   <Link href={signInHref} textDecoration="underline">
