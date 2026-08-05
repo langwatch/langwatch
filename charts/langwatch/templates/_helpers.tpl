@@ -1288,7 +1288,6 @@ here, once, by name, so both consuming templates agree.
   {{- end -}}
   {{- $normalised | uniq | toJson -}}
 {{- end -}}
-||||||| parent of a5ec8a5b6 (feat(stored-objects): Azure Blob sign-in without a shared account key)
 
 {{/*
 ServiceAccount name for the first-party workloads (app, workers, cronjobs).
