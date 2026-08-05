@@ -169,17 +169,6 @@ spec:
                   key: cronApiKey
             {{- end }}
 
-            # Email configuration
-            {{- if .Values.app.email.enabled }}
-            - name: EMAIL_DEFAULT_FROM
-              value: {{ .Values.app.email.defaultFrom | quote }}
-            - name: EMAIL_PROVIDER
-              value: {{ .Values.app.email.provider | quote }}
-            {{- if eq .Values.app.email.provider "sendgrid" }}
-            {{- include "langwatch.secretOrValue" (dict "envName" "SENDGRID_API_KEY" "fieldValues" .Values.app.email.providers.sendgrid.apiKey) | nindent 12 }}
-            {{- end }}
-            {{- end }}
-
             # AI Gateway virtual-key pepper (control-plane only).
             # The gateway pod must NEVER receive this value — it is used here
             # in src/server/gateway/virtualKey.crypto.ts to hash incoming VK
