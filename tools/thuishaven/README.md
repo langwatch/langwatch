@@ -269,8 +269,8 @@ registry, and dashboard stay the same.
   any non-TTY) get the read-only report and delete nothing.
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
   tsgo runs across worktrees don't exhaust RAM (bounded by memory / CPU). The
-  `typecheck` script slots itself too (`dev/scripts/typecheck-queue.mjs`,
-  `TYPECHECK_SLOTS`), so this command passes `TYPECHECK_SLOTS=0` to the run it
+  `typecheck` script slots itself too (`dev/scripts/check-queue.mjs`,
+  `CHECK_SLOTS`), so this command passes `CHECK_SLOTS=0` to the run it
   spawns and stays the only thing counting it.
 - **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an
   agent edits, then fires one catch-up reload — a human's browser isn't thrashed

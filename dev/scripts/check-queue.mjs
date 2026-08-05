@@ -1,33 +1,35 @@
 #!/usr/bin/env node
 /**
- * Machine-wide queue for typecheck runs.
+ * Machine-wide queue for the whole-repo checks: typecheck and lint.
  *
- * A tsgo run on this codebase peaks around 3 to 4 GiB and saturates every core.
- * One is fine. The three or four that a laptop driving several worktrees and
- * agents produces are what makes the machine unusable, and nothing about
- * `pnpm typecheck` knew that another one was already running.
+ * Both saturate the machine on purpose. A tsgo run peaks around 3 to 4 GiB and
+ * uses every core; a biome run over 6,800 files spends 38 CPU-seconds in 4
+ * seconds of wall clock. That is the right trade for one run. The three or four
+ * that a laptop driving several worktrees and agents produces are what make the
+ * machine unusable, and neither command knew another was already running.
  *
  * This wrapper takes a slot from a counter shared by every worktree, terminal
- * and agent on the machine, runs the real command, and releases the slot. On
- * the happy path it prints nothing and is transparent: stdio is inherited, the
- * exit code is passed through, and signals are forwarded. It speaks only when a
- * run has to wait, which is exactly when the caller needs to know that the
- * extra minutes were queueing rather than a hung typechecker.
+ * and agent on the machine, runs the real command, and releases the slot. One
+ * counter covers typecheck and lint together, because they compete for the same
+ * cores. On the happy path it prints nothing and is transparent: stdio is
+ * inherited, the exit code is passed through, and signals are forwarded. It
+ * speaks only when a run has to wait, which is exactly when the caller needs to
+ * know that the extra minutes were queueing rather than a hung tool.
  *
- *   node dev/scripts/typecheck-queue.mjs <command> [args...]
- *   node dev/scripts/typecheck-queue.mjs --explain
+ *   node dev/scripts/check-queue.mjs <command> [args...]
+ *   node dev/scripts/check-queue.mjs --explain
  *
  * Environment:
- *   TYPECHECK_SLOTS=N            How many runs may proceed at once. 0 (or
- *                                "off") disables the queue entirely. Unset
- *                                derives a limit from the machine, and is off
- *                                under CI, where one job runs one typecheck.
- *   TYPECHECK_QUEUE_DIR=<path>   Where the shared state lives.
- *   TYPECHECK_QUEUE_POLL_MS=N    How often a waiter re-checks (default 500).
- *   TYPECHECK_QUEUE_HEARTBEAT_MS How often a waiting run repeats itself so it
- *                                never looks hung (default 30s).
- *   TYPECHECK_QUEUE_MAX_WAIT_MS  Give up waiting and run anyway (default 30m),
- *                                so a wedged queue can never block a typecheck.
+ *   CHECK_SLOTS=N            How many checks may proceed at once. 0 (or "off")
+ *                            disables the queue entirely. Unset derives a limit
+ *                            from the machine, and is off under CI, where one
+ *                            job runs one check.
+ *   CHECK_QUEUE_DIR=<path>   Where the shared state lives.
+ *   CHECK_QUEUE_POLL_MS=N    How often a waiter re-checks (default 500).
+ *   CHECK_QUEUE_HEARTBEAT_MS How often a waiting run repeats itself so it never
+ *                            looks hung (default 30s).
+ *   CHECK_QUEUE_MAX_WAIT_MS  Give up waiting and run anyway (default 30m), so a
+ *                            wedged queue can never block a check.
  *
  * The state is a directory of one small JSON file per run, holding its pid,
  * arrival sequence, label and state. Occupancy is counted from the files whose
@@ -36,7 +38,7 @@
  * the read-decide-write step between processes.
  *
  * `haven typecheck` (ADR-064) holds one of its own RAM slots and passes
- * TYPECHECK_SLOTS=0 to the run it spawns, so a run is never counted twice.
+ * CHECK_SLOTS=0 to the run it spawns, so a run is never counted twice.
  */
 
 import { spawn } from "node:child_process";
@@ -46,9 +48,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Memory budget per concurrent run when deriving the default limit. */
+/** Memory budget per concurrent check when deriving the default limit. */
 const RAM_BUDGET_BYTES = 6 * 1024 * 1024 * 1024;
-/** Cores a single run wants before a second one is worth starting. */
+/** Cores a single check wants before a second one is worth starting. */
 const CPUS_PER_RUN = 4;
 /** A lock directory older than this belongs to a process that died holding it. */
 const LOCK_STALE_MS = 5_000;
@@ -61,34 +63,34 @@ const HEARTBEAT_MS = 30_000;
 const DEFAULT_POLL_MS = 500;
 const DEFAULT_MAX_WAIT_MS = 30 * 60 * 1000;
 
-const PREFIX = "typecheck:";
+const PREFIX = "checks:";
 
 const stderr = (line) => process.stderr.write(line);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Resolves how many runs may proceed at once.
+ * Resolves how many checks may proceed at once.
  *
- * An explicit TYPECHECK_SLOTS always wins, including under CI, which is what
- * lets the tests exercise the queue on a CI runner. Unset, CI gets no queue at
- * all (one job runs one typecheck, so a gate could only add risk) and a
- * developer machine gets a limit bounded by both memory and cores: tsgo is
- * memory-hungry AND parallel, so the tighter of the two bounds is the honest
- * one. Never below 1, or the queue would deadlock every run.
+ * An explicit CHECK_SLOTS always wins, including under CI, which is what lets
+ * the tests exercise the queue on a CI runner. Unset, CI gets no queue at all
+ * (one job runs one check, so a gate could only add risk) and a developer
+ * machine gets a limit bounded by both memory and cores: tsgo is memory-hungry
+ * AND parallel, so the tighter of the two bounds is the honest one. Never below
+ * 1, or the queue would deadlock every run.
  */
 function resolveSlots(env) {
-  const raw = (env.TYPECHECK_SLOTS ?? "").trim();
+  const raw = (env.CHECK_SLOTS ?? "").trim();
   if (raw !== "") {
     if (/^(off|none|unlimited|false)$/i.test(raw)) {
-      return { slots: 0, source: "TYPECHECK_SLOTS" };
+      return { slots: 0, source: "CHECK_SLOTS" };
     }
     const parsed = Number.parseInt(raw, 10);
     if (Number.isNaN(parsed) || parsed < 0) {
       stderr(
-        `${PREFIX} ignoring TYPECHECK_SLOTS=${raw}, expected a non-negative integer\n`,
+        `${PREFIX} ignoring CHECK_SLOTS=${raw}, expected a non-negative integer\n`,
       );
     } else {
-      return { slots: parsed, source: "TYPECHECK_SLOTS" };
+      return { slots: parsed, source: "CHECK_SLOTS" };
     }
   }
 
@@ -112,9 +114,9 @@ function resolveSlots(env) {
  * cannot mix two users' queues.
  */
 function resolveQueueDir(env) {
-  if (env.TYPECHECK_QUEUE_DIR) return env.TYPECHECK_QUEUE_DIR;
+  if (env.CHECK_QUEUE_DIR) return env.CHECK_QUEUE_DIR;
   const uid = typeof process.getuid === "function" ? process.getuid() : "user";
-  return path.join(os.tmpdir(), `langwatch-typecheck-slots-${uid}`);
+  return path.join(os.tmpdir(), `langwatch-check-slots-${uid}`);
 }
 
 /**
@@ -127,7 +129,7 @@ function resolveLabel(env, commandArgv) {
   const named = script ? [pkg, script].filter(Boolean).join(" ") : null;
   const repoRoot = path.resolve(fileURLToPath(import.meta.url), "../../..");
   const worktree = path.basename(repoRoot);
-  const fallback = path.basename(commandArgv[0] ?? "typecheck");
+  const fallback = path.basename(commandArgv[0] ?? "check");
   return `${named ?? fallback} (${worktree})`;
 }
 
@@ -154,7 +156,7 @@ function statMtimeMs(target) {
  * Runs `body` with the queue lock held. Whoever creates the lock directory
  * wins, and a lock left behind by a process that died mid-decision is broken
  * once it goes stale. Failing to ever get the lock runs the body anyway: a
- * miscounted slot is a far better outcome than a typecheck that never starts.
+ * miscounted slot is a far better outcome than a check that never starts.
  */
 async function withQueueLock(dir, body) {
   fs.mkdirSync(dir, { recursive: true });
@@ -301,7 +303,7 @@ async function waitForTurn({
       });
       stderr(
         `${PREFIX} no slot after ${formatDuration(waited)}, starting anyway. ` +
-          `Another run may be stuck holding one of the ${slots} slots.\n`,
+          `Another check may be stuck holding one of the ${slots} slots.\n`,
       );
       return { waited, announced, forced: true };
     }
@@ -310,10 +312,12 @@ async function waitForTurn({
     if (!announced) {
       announced = true;
       lastBeat = Date.now();
+      const holders = describeActive(outcome.running, Date.now());
       stderr(
-        `${PREFIX} ${active} typecheck ${active === 1 ? "run is" : "runs are"} ` +
-          `already active on this machine (limit ${slots}, set TYPECHECK_SLOTS to change). ` +
-          `Queued at position ${outcome.position}, waiting for a free slot.\n`,
+        `${PREFIX} ${active} ${active === 1 ? "check is" : "checks are"} ` +
+          `already active on this machine (limit ${slots}, set CHECK_SLOTS to change). ` +
+          `Queued at position ${outcome.position}, waiting for a free slot` +
+          `${holders ? `. Active: ${holders}` : ""}\n`,
       );
     } else if (Date.now() - lastBeat >= heartbeatMs) {
       lastBeat = Date.now();
@@ -391,8 +395,8 @@ async function main(argv, env) {
   const commandArgv = argv[0] === "--" ? argv.slice(1) : argv;
   if (commandArgv.length === 0) {
     stderr(
-      `${PREFIX} usage: typecheck-queue.mjs <command> [args...]\n` +
-        `${PREFIX} runs the command under a machine-wide slot, see TYPECHECK_SLOTS\n`,
+      `${PREFIX} usage: check-queue.mjs <command> [args...]\n` +
+        `${PREFIX} runs the command under a machine-wide slot, see CHECK_SLOTS\n`,
     );
     return 2;
   }
@@ -426,12 +430,9 @@ async function main(argv, env) {
       dir,
       ticket,
       slots,
-      pollMs: positiveInt(env.TYPECHECK_QUEUE_POLL_MS, DEFAULT_POLL_MS),
-      maxWaitMs: positiveInt(
-        env.TYPECHECK_QUEUE_MAX_WAIT_MS,
-        DEFAULT_MAX_WAIT_MS,
-      ),
-      heartbeatMs: positiveInt(env.TYPECHECK_QUEUE_HEARTBEAT_MS, HEARTBEAT_MS),
+      pollMs: positiveInt(env.CHECK_QUEUE_POLL_MS, DEFAULT_POLL_MS),
+      maxWaitMs: positiveInt(env.CHECK_QUEUE_MAX_WAIT_MS, DEFAULT_MAX_WAIT_MS),
+      heartbeatMs: positiveInt(env.CHECK_QUEUE_HEARTBEAT_MS, HEARTBEAT_MS),
     });
     if (announced && !forced) {
       stderr(

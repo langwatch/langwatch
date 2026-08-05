@@ -1,18 +1,21 @@
-Feature: Machine-wide slots for typecheck runs
+Feature: Machine-wide slots for whole-repo checks
   As a developer whose laptop runs several worktrees and agents at once
-  I want `pnpm typecheck` to queue instead of piling up
-  So that N parallel tsgo runs never take the machine down, and a slow run
+  I want `pnpm typecheck` and `pnpm lint` to queue instead of piling up
+  So that N parallel checks never take the machine down, and a slow one
   explains itself instead of looking hung
 
-  # A tsgo run on this codebase peaks around 3 to 4 GiB and saturates every
-  # core. One is fine. Three or four at once, which is the normal state of a
-  # laptop driving several worktrees or agents, is what makes the machine
-  # unusable. Nothing about `pnpm typecheck` knew that another one was already
-  # running.
+  # Both checks saturate the machine on purpose. A tsgo run peaks around 3 to 4
+  # GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds
+  # in 4 seconds of wall clock. That is the right trade for one run, and capping
+  # either tool's threads only stretches the same CPU cost over 5x the wall
+  # clock. Three or four at once, which is the normal state of a laptop driving
+  # several worktrees or agents, is what makes the machine unusable, and neither
+  # command knew another was already running.
   #
-  # `platform/app`'s typecheck scripts now run through
-  # dev/scripts/typecheck-queue.mjs, a thin wrapper that takes a machine-wide
-  # slot, runs the real command, and releases. The state is a directory of
+  # `platform/app`'s typecheck, lint and format scripts now run through
+  # dev/scripts/check-queue.mjs, a thin wrapper that takes a machine-wide
+  # slot, runs the real command, and releases. ONE counter covers all of them,
+  # because they compete for the same cores. The state is a directory of
   # per-run JSON entries (pid, arrival sequence, label, state) under the
   # system temp dir, so every worktree, terminal and agent on the machine
   # counts against the same total. Waiters are served in arrival order.
@@ -21,14 +24,14 @@ Feature: Machine-wide slots for typecheck runs
   # prints nothing at all and passes stdio, exit code and signals straight
   # through. It only speaks when a run has to wait, which is exactly when an
   # agent needs to know that the extra minutes were queueing rather than a
-  # hung typechecker.
+  # hung tool.
   #
   # Knobs, all optional:
-  #   TYPECHECK_SLOTS=N            how many may run at once (0 disables the gate)
-  #   TYPECHECK_QUEUE_DIR=<path>   where the shared state lives
-  #   TYPECHECK_QUEUE_POLL_MS=N    how often a waiter re-checks
-  #   TYPECHECK_QUEUE_HEARTBEAT_MS how often a waiting run repeats itself
-  #   TYPECHECK_QUEUE_MAX_WAIT_MS  after this, run anyway rather than hang
+  #   CHECK_SLOTS=N            how many may run at once (0 disables the gate)
+  #   CHECK_QUEUE_DIR=<path>   where the shared state lives
+  #   CHECK_QUEUE_POLL_MS=N    how often a waiter re-checks
+  #   CHECK_QUEUE_HEARTBEAT_MS how often a waiting run repeats itself
+  #   CHECK_QUEUE_MAX_WAIT_MS  after this, run anyway rather than hang
   #
   # `haven typecheck` keeps its own RAM slot (ADR-064) and turns this gate off
   # for the run it spawns, so a run is never counted by both.
@@ -37,8 +40,8 @@ Feature: Machine-wide slots for typecheck runs
 
   @unit
   Scenario: A run that finds a free slot is silent
-    Given no other typecheck run holds a slot
-    When I run a typecheck through the queue
+    Given no other check holds a slot
+    When I run a check through the queue
     Then the command runs immediately
     And the wrapper prints nothing of its own
 
@@ -53,11 +56,18 @@ Feature: Machine-wide slots for typecheck runs
 
   @unit
   Scenario: A run past the limit waits and names what it is waiting for
-    Given the limit is 1 and a typecheck is already running
-    When a second typecheck starts
+    Given the limit is 1 and a check is already running
+    When a second check starts
     Then it does not run the command yet
-    And it reports that 1 typecheck run is already active and that it is queued
+    And it reports that 1 check is already active and that it is queued
     And the report names the limit and the environment variable that changes it
+
+  @unit
+  Scenario: Lint and typecheck queue against the same counter
+    Given the limit is 1 and a typecheck is already running
+    When a lint starts
+    Then the lint waits for the typecheck to finish
+    And the two never run at the same time, because they compete for the same cores
 
   @unit
   Scenario: A run that waited says how long it waited
@@ -98,27 +108,27 @@ Feature: Machine-wide slots for typecheck runs
 
   @unit
   Scenario: The limit can be turned off
-    Given TYPECHECK_SLOTS is 0
-    When several typechecks run at once
+    Given CHECK_SLOTS is 0
+    When several checks run at once
     Then none of them queue
 
   @unit
   Scenario: An explicit limit is honored
-    Given TYPECHECK_SLOTS is 1
-    When three typechecks are started at once
+    Given CHECK_SLOTS is 1
+    When three checks are started at once
     Then only one of them runs at a time
 
   @unit
   Scenario: The default limit is derived from the machine
-    Given TYPECHECK_SLOTS is not set
+    Given CHECK_SLOTS is not set
     When the limit is resolved on a developer machine
     Then it is one slot per 6 GiB of RAM, capped at one per 4 CPUs, and never below 1
 
   @unit
   Scenario: CI does not queue by default
-    Given CI is set and TYPECHECK_SLOTS is not
-    When a typecheck runs
-    Then the gate is off, because a CI runner runs one typecheck at a time anyway
+    Given CI is set and CHECK_SLOTS is not
+    When a check runs
+    Then the gate is off, because a CI runner runs one check at a time anyway
 
   # --- Interaction with haven ---
 
@@ -126,5 +136,5 @@ Feature: Machine-wide slots for typecheck runs
   Scenario: haven typecheck is not gated twice
     Given "haven typecheck" already holds one of its own RAM slots
     When it runs "pnpm typecheck"
-    Then it passes TYPECHECK_SLOTS=0 to that run
+    Then it passes CHECK_SLOTS=0 to that run
     And the run is counted once, by haven's slot

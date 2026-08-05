@@ -1,16 +1,16 @@
 /**
  * @vitest-environment node
  *
- * Tests for dev/scripts/typecheck-queue.mjs, the machine-wide slot the
- * `typecheck` scripts run under so parallel tsgo runs across worktrees and
- * agents cannot take the machine down.
+ * Tests for dev/scripts/check-queue.mjs, the machine-wide slot the whole-repo
+ * checks (typecheck, lint, format) run under so parallel tsgo and biome runs
+ * across worktrees and agents cannot take the machine down.
  *
  * The wrapper is a concurrency mechanism, so it is driven as a real process:
  * every test spawns the actual script against a scratch queue directory and a
  * fake command that timestamps its own start and end into a shared log. Max
  * observed overlap in that log is what "the limit is honored" means.
  *
- * Corresponds to specs/setup/typecheck-slots.feature.
+ * Corresponds to specs/setup/check-slots.feature.
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
@@ -26,7 +26,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
-const QUEUE_SCRIPT = path.join(REPO_ROOT, "dev/scripts/typecheck-queue.mjs");
+const QUEUE_SCRIPT = path.join(REPO_ROOT, "dev/scripts/check-queue.mjs");
 
 /**
  * The command the wrapper runs. Appends `start` on boot and `end` after
@@ -51,7 +51,7 @@ let fakeCommand: string;
 const running = new Set<ChildProcess>();
 
 beforeEach(() => {
-  scratch = mkdtempSync(path.join(os.tmpdir(), "typecheck-queue-test-"));
+  scratch = mkdtempSync(path.join(os.tmpdir(), "check-queue-test-"));
   queueDir = path.join(scratch, "queue");
   logFile = path.join(scratch, "runs.log");
   fakeCommand = path.join(scratch, "fake-command.cjs");
@@ -91,10 +91,10 @@ function startRun(tag: string, options: RunOptions = {}): Run {
     ...process.env,
     // The queue is machine-wide by design, so every test pins it to a scratch
     // directory. Without this the suite would contend with the developer's own
-    // typechecks (and with itself, across shards).
-    TYPECHECK_QUEUE_DIR: queueDir,
-    TYPECHECK_SLOTS: "1",
-    TYPECHECK_QUEUE_POLL_MS: "25",
+    // checks (and with itself, across shards).
+    CHECK_QUEUE_DIR: queueDir,
+    CHECK_SLOTS: "1",
+    CHECK_QUEUE_POLL_MS: "25",
     ...options.env,
   })) {
     if (value !== undefined) env[key] = value;
@@ -170,11 +170,11 @@ function queueEntries(): string[] {
   }
 }
 
-describe("typecheck queue", () => {
+describe("check queue", () => {
   describe("given a free slot", () => {
     /** @scenario "A run that finds a free slot is silent" */
     it("runs immediately and says nothing of its own", async () => {
-      const run = startRun("solo", { env: { TYPECHECK_SLOTS: "2" } });
+      const run = startRun("solo", { env: { CHECK_SLOTS: "2" } });
       const result = await run.done;
 
       expect(result.code).toBe(0);
@@ -209,13 +209,56 @@ describe("typecheck queue", () => {
 
       const [, second] = await Promise.all([holder.done, queued.done]);
 
-      expect(second.stderr).toContain("1 typecheck run is already active");
+      expect(second.stderr).toContain("1 check is already active");
       expect(second.stderr).toContain("limit 1");
-      expect(second.stderr).toContain("TYPECHECK_SLOTS");
+      expect(second.stderr).toContain("CHECK_SLOTS");
       expect(second.stderr).toContain("Queued at position 1");
       expect(second.stderr).toContain("in the queue, starting now");
       expect(startOrder(readEvents())).toEqual(["holder", "queued"]);
       expect(maxOverlap(readEvents())).toBe(1);
+    });
+
+    /** @scenario "Lint and typecheck queue against the same counter" */
+    it("makes a lint wait for a typecheck, and wires every check through the queue", async () => {
+      const scriptEnv = (script: string) => ({
+        npm_package_name: "@langwatch/web",
+        npm_lifecycle_event: script,
+      });
+      const typecheck = startRun("typecheck", {
+        holdMs: 700,
+        env: scriptEnv("typecheck"),
+      });
+      await waitForHolder();
+      const lint = startRun("lint", { env: scriptEnv("lint") });
+
+      const [, second] = await Promise.all([typecheck.done, lint.done]);
+
+      expect(second.stderr).toContain("1 check is already active");
+      expect(startOrder(readEvents())).toEqual(["typecheck", "lint"]);
+      expect(maxOverlap(readEvents())).toBe(1);
+
+      // One counter only covers both if both scripts actually route through it.
+      const scripts = (
+        JSON.parse(
+          readFileSync(
+            path.join(REPO_ROOT, "platform/app/package.json"),
+            "utf8",
+          ),
+        ) as { scripts: Record<string, string> }
+      ).scripts;
+      for (const name of [
+        "typecheck",
+        "typecheck:tests",
+        "typecheck:legacy",
+        "lint",
+        "lint:fix",
+        "lint:plugins",
+        "format",
+      ]) {
+        expect(scripts[name], `${name} bypasses the check queue`).toContain(
+          "check-queue.mjs",
+        );
+      }
     });
 
     /** @scenario "A long wait repeats itself so it never looks hung" */
@@ -231,7 +274,7 @@ describe("typecheck queue", () => {
       });
       await waitForHolder();
       const queued = startRun("queued", {
-        env: { TYPECHECK_QUEUE_HEARTBEAT_MS: "150" },
+        env: { CHECK_QUEUE_HEARTBEAT_MS: "150" },
       });
 
       const [, second] = await Promise.all([holder.done, queued.done]);
@@ -290,7 +333,7 @@ describe("typecheck queue", () => {
       const holder = startRun("holder", { holdMs: 3000 });
       await waitForHolder();
       const impatient = startRun("impatient", {
-        env: { TYPECHECK_QUEUE_MAX_WAIT_MS: "200" },
+        env: { CHECK_QUEUE_MAX_WAIT_MS: "200" },
       });
 
       const result = await impatient.done;
@@ -308,7 +351,7 @@ describe("typecheck queue", () => {
     /** @scenario "The limit can be turned off" */
     it("runs everything at once and keeps no state", async () => {
       const runs = ["a", "b", "c"].map((tag) =>
-        startRun(tag, { holdMs: 300, env: { TYPECHECK_SLOTS: "0" } }),
+        startRun(tag, { holdMs: 300, env: { CHECK_SLOTS: "0" } }),
       );
       const results = await Promise.all(runs.map((run) => run.done));
 
@@ -323,7 +366,7 @@ describe("typecheck queue", () => {
     it("bounds the default by both memory and cores, never below one", async () => {
       const run = startRun("explain", {
         argv: ["--explain"],
-        env: { TYPECHECK_SLOTS: undefined, CI: undefined },
+        env: { CHECK_SLOTS: undefined, CI: undefined },
       });
       const result = await run.done;
 
@@ -339,7 +382,7 @@ describe("typecheck queue", () => {
     it("does not queue under CI", async () => {
       const explained = await startRun("explain", {
         argv: ["--explain"],
-        env: { TYPECHECK_SLOTS: undefined, CI: "true" },
+        env: { CHECK_SLOTS: undefined, CI: "true" },
       }).done;
       expect(explained.stderr).toContain("slots=0 source=CI");
       expect(explained.stderr).toContain("queue=off");
@@ -347,7 +390,7 @@ describe("typecheck queue", () => {
       const runs = ["a", "b"].map((tag) =>
         startRun(tag, {
           holdMs: 300,
-          env: { TYPECHECK_SLOTS: undefined, CI: "true" },
+          env: { CHECK_SLOTS: undefined, CI: "true" },
         }),
       );
       await Promise.all(runs.map((run) => run.done));

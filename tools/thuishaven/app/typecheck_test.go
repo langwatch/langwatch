@@ -42,7 +42,7 @@ func TestTypecheckDisablesTheScriptsOwnQueue(t *testing.T) {
 	if sem.lastSlots != 3 {
 		t.Fatalf("expected the override to pick the slot count, got %d", sem.lastSlots)
 	}
-	if len(sup.envs) != 1 || !slices.Contains(sup.envs[0], "TYPECHECK_SLOTS=0") {
+	if len(sup.envs) != 1 || !slices.Contains(sup.envs[0], "CHECK_SLOTS=0") {
 		t.Fatalf("expected the spawned run to have its own queue disabled, got env %v", sup.envs)
 	}
 }
