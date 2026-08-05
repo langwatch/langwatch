@@ -59,3 +59,12 @@ Feature: Signing up never strands an account
     When the server refuses a sign-up because the email is already registered
     Then it answers with the "email_already_registered" code
     And the code carries the wording a customer reads
+
+  # Sign-in lowercases the address on every lookup, so an account stored as
+  # typed, capitals and all, is one that sign-in can never find, no matter the
+  # password. Autocapitalised addresses locked people out this way.
+  @unit
+  Scenario: A capitalised email creates an account sign-in can find
+    When I sign up with "Joel.During@example.com"
+    Then the account is stored with the lowercased address
+    And a later sign-up for any casing of that address says it is already registered
