@@ -92,9 +92,9 @@ describe("trace", () => {
   });
 
   describe("given a statement that fails", () => {
-    it("records the error and rethrows it", async () => {
+    it("records the failure class and rethrows the original", async () => {
       const { tracer, errors } = recordingTracer();
-      const failure = new Error("boom");
+      const failure = Object.assign(new Error("boom"), { code: "ECONNRESET" });
 
       await expect(
         trace({ tracer })(async () => {
@@ -102,7 +102,26 @@ describe("trace", () => {
         })(request),
       ).rejects.toThrow("boom");
 
-      expect(errors).toEqual([failure]);
+      expect(errors).toEqual([{ name: "Error", code: "ECONNRESET" }]);
+    });
+
+    it("never lets the failing statement reach the span", async () => {
+      // ClickHouse embeds the statement in its own error message, so recording
+      // the raw error would re-open the no-SQL rule on the failure path - the
+      // path nobody inspects until an incident.
+      const { tracer, errors } = recordingTracer();
+
+      await expect(
+        trace({ tracer })(async () => {
+          throw new Error(
+            "Code: 62. DB::Exception: Syntax error (in query: SELECT Email FROM t WHERE Email = 'ops@example.com')",
+          );
+        })(request),
+      ).rejects.toThrow();
+
+      const recorded = JSON.stringify(errors);
+      expect(recorded).not.toContain("SELECT");
+      expect(recorded).not.toContain("ops@example.com");
     });
 
     it("still ends the span", async () => {

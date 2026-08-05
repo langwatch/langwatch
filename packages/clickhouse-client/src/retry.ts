@@ -97,6 +97,13 @@ export async function runWithRetry<T>(
     isAborted,
   }: RunWithRetryOptions = {},
 ): Promise<T> {
+  // Without this, `maxAttempts: 0` never enters the loop and throws the
+  // uninitialised `lastError` - an `undefined` with no message and no stack,
+  // which every instanceof-based handler upstream misses.
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+    throw new RangeError("maxAttempts must be a positive integer");
+  }
+
   let lastError: unknown;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {

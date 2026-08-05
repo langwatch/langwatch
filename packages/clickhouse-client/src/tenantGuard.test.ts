@@ -98,6 +98,45 @@ describe("checkTenantScope", () => {
     });
   });
 
+  describe("given a commented-out predicate", () => {
+    it.each([
+      ["a line comment", "SELECT 1 FROM t -- WHERE TenantId = {t:String}"],
+      ["a block comment", "/* TenantId = {t:String} */ SELECT 1 FROM t"],
+    ])("refuses %s, which is the case the guard exists for", (_label, sql) => {
+      expect(
+        checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT }),
+      ).toEqual({ kind: "missing-predicate" });
+    });
+  });
+
+  describe("given a statement the text check cannot see through", () => {
+    // Accepted limits, kept executable so they stay documented rather than
+    // becoming folklore. One match anywhere satisfies the whole statement, and
+    // closing these needs a parser. See the module docblock.
+    it.each([
+      [
+        "a disjunction that returns every tenant",
+        "SELECT 1 FROM t WHERE TenantId = {t:String} OR Status = 'x'",
+      ],
+      [
+        "a UNION whose second arm is unscoped",
+        "SELECT 1 FROM t WHERE TenantId = {t:String} UNION ALL SELECT 1 FROM t",
+      ],
+      [
+        "a JOIN with only one side scoped",
+        "SELECT 1 FROM a JOIN b ON a.Id = b.Id WHERE a.TenantId = {t:String}",
+      ],
+      [
+        "a scoped subquery beneath an unscoped outer query",
+        "SELECT * FROM (SELECT Id FROM t WHERE TenantId = {t:String}) UNION ALL SELECT Id FROM t",
+      ],
+    ])("still accepts %s", (_label, sql) => {
+      expect(
+        checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT }),
+      ).toBeNull();
+    });
+  });
+
   describe("given a multi-tenant IN predicate", () => {
     it("does not accept it as scoping", () => {
       // `IN` spans tenants by construction. If that is genuinely wanted it has

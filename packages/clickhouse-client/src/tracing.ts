@@ -17,10 +17,44 @@
 
 import type { QueryMiddleware, QueryRequest, QueryResult } from "./pipeline";
 
+/**
+ * A failure, reduced to what is safe to ship.
+ *
+ * Deliberately not the error itself. A ClickHouse server error embeds the
+ * failing statement in its message ("...(in query: SELECT ...)"), so handing
+ * the raw error to a span backend re-opens the very hole the no-SQL rule above
+ * closes - and does it on the failure path, where nobody looks until later.
+ * The class and the server's error code are enough to group and alert on.
+ */
+export interface QueryErrorDescriptor {
+  name: string;
+  code?: string | undefined;
+  status?: number | undefined;
+}
+
 export interface SpanPort {
   setAttribute(key: string, value: string | number | boolean): void;
-  recordError(error: unknown): void;
+  recordError(error: QueryErrorDescriptor): void;
   end(): void;
+}
+
+/** Strips a failure down to {@link QueryErrorDescriptor}. Never the message. */
+export function describeQueryError(error: unknown): QueryErrorDescriptor {
+  if (typeof error !== "object" || error === null) {
+    return { name: typeof error };
+  }
+  const candidate = error as {
+    name?: unknown;
+    code?: unknown;
+    statusCode?: unknown;
+    status?: unknown;
+  };
+  const status = candidate.statusCode ?? candidate.status;
+  return {
+    name: typeof candidate.name === "string" ? candidate.name : "Error",
+    ...(typeof candidate.code === "string" ? { code: candidate.code } : {}),
+    ...(typeof status === "number" ? { status } : {}),
+  };
 }
 
 export interface TracerPort {
@@ -93,7 +127,7 @@ export function trace({
         });
         return result;
       } catch (error) {
-        span.recordError(error);
+        span.recordError(describeQueryError(error));
         onComplete?.({ request, durationMs: now() - startedAt, error });
         throw error;
       } finally {

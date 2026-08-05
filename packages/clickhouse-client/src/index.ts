@@ -84,9 +84,10 @@ export {
 export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard";
 export { checkTenantScope, TenantScopeError, tenantGuard } from "./tenantGuard";
 export type {
+  QueryErrorDescriptor,
   QueryOutcome,
   SpanPort,
   TraceOptions,
   TracerPort,
 } from "./tracing";
-export { SPAN_ATTRIBUTES, trace } from "./tracing";
+export { describeQueryError, SPAN_ATTRIBUTES, trace } from "./tracing";

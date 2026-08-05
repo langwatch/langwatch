@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { QueryRequest } from "./pipeline";
-import { retry } from "./retry";
+import { retry, runWithRetry } from "./retry";
 
 const request: QueryRequest = {
   tenantId: "project_1",
@@ -22,6 +22,21 @@ const fakeSleep = () => {
     },
   };
 };
+
+describe("runWithRetry", () => {
+  describe("given a degenerate attempt budget", () => {
+    it.each([
+      0, -1, 2.5,
+    ])("refuses %s rather than throwing an undefined", async (maxAttempts) => {
+      // The loop would never run and `throw lastError` would throw
+      // `undefined` - no message, no stack, and every instanceof handler
+      // upstream misses it.
+      await expect(
+        runWithRetry(async () => "ok", { maxAttempts }),
+      ).rejects.toBeInstanceOf(RangeError);
+    });
+  });
+});
 
 describe("retry", () => {
   describe("given a transient failure that then succeeds", () => {

@@ -58,6 +58,9 @@ export function decideVendorLog({
   if (level === "error") return null;
 
   const fields: Record<string, unknown> = { ...(record.args ?? {}) };
+  // The vendor owns `args`, so it could carry an `error` key of its own and
+  // silently defeat the rule this module exists for.
+  delete fields.error;
   if (record.module !== undefined) fields.module = record.module;
   if (record.err !== undefined) fields[VENDOR_CAUSE_FIELD] = record.err;
 

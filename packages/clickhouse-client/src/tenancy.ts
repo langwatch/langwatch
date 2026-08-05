@@ -54,6 +54,14 @@ export interface RoutingTable {
   readonly routes: ReadonlyMap<string, string>;
   /** Env vars that were present but unusable, for the caller to report. */
   readonly skipped: readonly { envVar: string; reason: string }[];
+  /**
+   * Env vars whose `<label>__<organizationId>` split was a guess, because the
+   * part before the last separator contains one too. The route was still
+   * created from the guess, but the caller should surface these loudly: if the
+   * guess is wrong the intended organisation has no route at all and its
+   * tenants fall through to the shared instance.
+   */
+  readonly ambiguous: readonly { envVar: string; organizationId: string }[];
 }
 
 /**
@@ -70,6 +78,7 @@ export function parseRoutingTable(
   const routes = new Map<string, string>();
   const source = new Map<string, string>();
   const skipped: { envVar: string; reason: string }[] = [];
+  const ambiguous: { envVar: string; organizationId: string }[] = [];
 
   for (const [envVar, value] of Object.entries(env)) {
     if (!envVar.startsWith(PRIVATE_ROUTE_ENV_PREFIX)) continue;
@@ -89,6 +98,18 @@ export function parseRoutingTable(
       continue;
     }
 
+    // `<label>__<organizationId>` cannot be split unambiguously when either
+    // half may itself contain the separator, and taking the last one is a
+    // guess. Guessing wrong is not a parse error, it is a silent fail-open:
+    // the intended organisation gets no route, so every one of its tenants
+    // falls through to the shared instance and reads and writes there.
+    //
+    // Nothing here can tell which split was meant, so say so and let the
+    // operator disambiguate rather than discovering it as misplaced data.
+    if (suffix.slice(0, Math.max(separator, 0)).includes("__")) {
+      ambiguous.push({ envVar, organizationId });
+    }
+
     const existing = source.get(organizationId);
     if (existing !== undefined) {
       throw new DuplicateRouteError(organizationId, existing, envVar);
@@ -98,7 +119,7 @@ export function parseRoutingTable(
     source.set(organizationId, envVar);
   }
 
-  return { routes, skipped };
+  return { routes, skipped, ambiguous };
 }
 
 /** Resolves a tenant to its organisation. Backed by the control-plane database. */

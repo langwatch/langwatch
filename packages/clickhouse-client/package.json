@@ -2,7 +2,7 @@
   "name": "@langwatch/clickhouse-client",
   "version": "0.1.0",
   "private": true,
-  "description": "The shared ClickHouse client contract: fleet-aware connection-pool sizing, the vendor logging policy, transient-failure classification and backoff. Pure and dependency-light so every construction site agrees on the same rules.",
+  "description": "The shared ClickHouse client contract: fail-closed tenant routing and scope guarding, bounded concurrency with shedding, retries and backoff, tracing and vendor logging policy, and fleet-aware connection-pool sizing - composed as middleware over one query function type.",
   "license": "MIT",
   "type": "module",
   "exports": {

@@ -9,11 +9,23 @@
  * not theirs.
  *
  * This is a guard against omission, not a security boundary. It matches on the
- * statement text, so a determined caller can defeat it (a predicate hidden in a
- * string literal, an unusual alias). That is fine: the thing it has to stop is
- * a normal engineer writing a normal query and forgetting a WHERE clause, and
- * for that a text check is exactly enough. Real isolation is enforced by the
+ * statement text, so the thing it has to stop is a normal engineer writing a
+ * normal query and forgetting a WHERE clause. Real isolation is enforced by the
  * routing in ./tenancy.ts and by the credentials the server was given.
+ *
+ * Known and accepted limits, each pinned by a test in ./tenantGuard.test.ts so
+ * they stay documented rather than becoming folklore. One match anywhere in the
+ * statement satisfies the whole statement, so all of these pass:
+ *
+ *   - a disjunction: `WHERE TenantId = {t:String} OR Status = 'x'` matches, and
+ *     returns every tenant's rows. This is the one a regex cannot see, and the
+ *     reason this check is a backstop rather than the isolation mechanism.
+ *   - a UNION whose second arm is unscoped.
+ *   - a JOIN where only one side is scoped.
+ *   - a scoped subquery or CTE beneath an unscoped outer query.
+ *
+ * Closing these needs a parser. If that day comes, the shape of this function
+ * does not have to change - only `checkTenantScope`'s internals.
  *
  * The predicate must bind a parameter rather than inline a literal. An inlined
  * tenant is a string built by concatenation somewhere, which is the shape that
@@ -48,6 +60,17 @@ const LITERAL_TENANT_PREDICATE =
  * Pure, so the rule can be exercised over a table of statements without a
  * driver, a server, or a pipeline.
  */
+/**
+ * Removes `--` line comments and block comments before matching.
+ *
+ * Without this the guard misses the case it most exists for: someone debugging
+ * comments the WHERE clause out, and the statement then reads every tenant's
+ * rows while still visibly "containing" the predicate.
+ */
+function withoutComments(sql: string): string {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
+}
+
 export function checkTenantScope({
   sql,
   params,
@@ -57,10 +80,11 @@ export function checkTenantScope({
   params?: Record<string, unknown> | undefined;
   tenantId: string;
 }): TenantScopeViolation | null {
-  const bound = BOUND_TENANT_PREDICATE.exec(sql);
+  const statement = withoutComments(sql);
+  const bound = BOUND_TENANT_PREDICATE.exec(statement);
 
   if (bound === null) {
-    return LITERAL_TENANT_PREDICATE.test(sql)
+    return LITERAL_TENANT_PREDICATE.test(statement)
       ? { kind: "literal-predicate" }
       : { kind: "missing-predicate" };
   }

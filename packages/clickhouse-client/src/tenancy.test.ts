@@ -59,6 +59,29 @@ describe("parseRoutingTable", () => {
     });
   });
 
+  describe("given an organisation id that contains the separator", () => {
+    it("reports the split as a guess rather than making it silently", () => {
+      // Guessing wrong is a fail-open: the intended organisation gets no route,
+      // so every one of its tenants falls through to the shared instance.
+      const table = parseRoutingTable({
+        CLICKHOUSE_URL__acme__organization__x1: "http://acme:8123",
+      });
+
+      expect(table.ambiguous).toEqual([
+        {
+          envVar: "CLICKHOUSE_URL__acme__organization__x1",
+          organizationId: "x1",
+        },
+      ]);
+    });
+
+    it("does not flag an unambiguous single-separator name", () => {
+      expect(
+        parseRoutingTable({ CLICKHOUSE_URL__org_1: "http://x:8123" }).ambiguous,
+      ).toEqual([]);
+    });
+  });
+
   describe("given two routes for one organisation", () => {
     it("refuses to guess which instance holds their data", () => {
       expect(() =>
