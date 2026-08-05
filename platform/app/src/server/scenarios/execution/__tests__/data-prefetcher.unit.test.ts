@@ -456,38 +456,6 @@ describe("prefetchScenarioData", () => {
       });
     });
 
-    describe("given a judge model that accepts reasoning_effort", () => {
-      describe("when prefetching the run data", () => {
-        /** @scenario "The judge's reasoning support travels from the parent to the worker" */
-        it("records the judge's reasoning support on the child job data", async () => {
-          const deps = createMockDeps({
-            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
-            modelParamsProvider: {
-              prepare: vi
-                .fn()
-                .mockImplementation(
-                  async (_projectId: string, model: string) => ({
-                    success: true as const,
-                    params: { api_key: "k", model },
-                    supportsReasoningEffort: model === "openai/judge-default",
-                  }),
-                ),
-            },
-          });
-
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
-            deps,
-          );
-
-          expect(result.success).toBe(true);
-          if (result.success) {
-            expect(result.data.judgeModelSupportsReasoningEffort).toBe(true);
-          }
-        });
-      });
-    });
   });
 
   describe("error handling", () => {

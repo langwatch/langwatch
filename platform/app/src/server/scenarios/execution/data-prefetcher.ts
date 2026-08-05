@@ -34,7 +34,6 @@ import {
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
 import { prisma } from "../../db";
-import { modelAcceptsReasoningEffort } from "../../modelProviders/resolveSupportedParameters";
 import {
   PromptService,
   type VersionedPrompt,
@@ -168,13 +167,6 @@ export type ModelParamsResult =
   | {
       success: true;
       params: LiteLLMParams;
-      /**
-       * Whether this model accepts `reasoning_effort`. Resolved here because
-       * this is where the provider row — and so the project's custom-model
-       * overrides — is in hand; the spawned worker has neither. Absent means
-       * unknown, which the worker treats as "do not send it".
-       */
-      supportsReasoningEffort?: boolean;
     }
   | { success: false; reason: ModelParamsFailureReason; message: string };
 
@@ -424,8 +416,6 @@ export async function prefetchScenarioData(
       modelParams: modelParamsResult.params,
       simulatorModelParams: simulatorParamsResult.params,
       judgeModelParams: judgeParamsResult.params,
-      judgeModelSupportsReasoningEffort:
-        judgeParamsResult.supportsReasoningEffort ?? false,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       target,
     },
@@ -1123,10 +1113,6 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
           return {
             success: true,
             params: params as LiteLLMParams,
-            supportsReasoningEffort: modelAcceptsReasoningEffort(
-              model,
-              provider,
-            ),
           };
         } catch (error) {
           const errorMessage =

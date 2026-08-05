@@ -9,13 +9,18 @@
  *   /v1/responses or set reasoning_effort to 'none'.
  *
  * The judge forces a finish_test / continue_test function-tool call on every
- * criteria-graded run, so on a reasoning model no run could reach a verdict.
+ * criteria-graded run, so on such a model no run could reach a verdict.
+ *
+ * Reasoning is disabled by RETRY, never preemptively: whether a model accepts
+ * reasoning off is not knowable up front (Gemini 2.5 Pro answers "Budget 0 is
+ * invalid. This model only works in thinking mode."), so the request goes out
+ * untouched and is re-sent with reasoning off only when the provider's
+ * rejection asks for exactly that.
  *
  * Drives the real model built by `createModelFromParams` against a local server
- * that enforces the endpoint's rule: a request carrying function tools is
- * rejected with that exact error unless it declares `reasoning_effort: "none"`.
- * Only the network is local — the provider, the request builder and the Vercel
- * AI SDK call are the ones production uses.
+ * standing in for the chat-completions endpoint. Only the network is local —
+ * the provider, the request builder and the Vercel AI SDK call are the ones
+ * production uses.
  *
  * Covers the @integration scenarios in
  * specs/scenarios/judge-transport-tool-reasoning.feature.
@@ -42,6 +47,11 @@ const finishTest = tool({
   }),
 });
 
+type EndpointRule =
+  | "accept"
+  | "reject-tools-without-reasoning-off"
+  | "reject-unrelated";
+
 interface StubEndpoint {
   url: string;
   bodies: () => Array<Record<string, unknown>>;
@@ -51,15 +61,14 @@ interface StubEndpoint {
 /**
  * Stands in for the chat-completions endpoint behind the gateway proxy.
  *
- * `enforceReasoningRule` reproduces the upstream 400 verbatim: function tools
- * are refused unless the caller explicitly declared reasoning off. With it off,
- * the server accepts anything and exists only to record the wire body.
+ * "reject-tools-without-reasoning-off" reproduces the upstream 400 verbatim,
+ * including the structured `param` field the retry keys on. "reject-unrelated"
+ * answers a 400 that has nothing to do with reasoning. "accept" takes anything
+ * and exists only to record the wire body.
  */
-async function startEndpoint({
-  enforceReasoningRule = false,
-}: {
-  enforceReasoningRule?: boolean;
-} = {}): Promise<StubEndpoint> {
+async function startEndpoint(
+  rule: EndpointRule = "accept",
+): Promise<StubEndpoint> {
   const bodies: Array<Record<string, unknown>> = [];
 
   const server: Server = createServer((req, res) => {
@@ -71,8 +80,23 @@ async function startEndpoint({
 
       const carriesTools =
         Array.isArray(body.tools) && (body.tools as unknown[]).length > 0;
+
+      if (rule === "reject-unrelated") {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: {
+              type: "invalid_request_error",
+              message: "Unsupported value for parameter 'temperature'.",
+              param: "temperature",
+            },
+          }),
+        );
+        return;
+      }
+
       if (
-        enforceReasoningRule &&
+        rule === "reject-tools-without-reasoning-off" &&
         carriesTools &&
         body.reasoning_effort !== "none"
       ) {
@@ -84,6 +108,7 @@ async function startEndpoint({
               message: `Function tools with reasoning_effort are not supported for ${String(
                 body.model,
               )} in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.`,
+              param: "reasoning_effort",
             },
           }),
         );
@@ -148,101 +173,33 @@ afterEach(async () => {
 });
 
 describe("judge transport: function tools and reasoning effort", () => {
-  describe("given a model whose target accepts reasoning_effort", () => {
+  describe("given an endpoint that rejects tools unless reasoning is off", () => {
     describe("when the request carries function tools", () => {
-      /** @scenario "A tool-carrying request to a reasoning model declares reasoning off" */
-      it("declares reasoning off on the wire", async () => {
-        endpoint = await startEndpoint();
-        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url, {
-          modelSupportsReasoningEffort: true,
-        });
+      /** @scenario "A rejected tool-carrying request is retried with reasoning off" */
+      it("retries with reasoning declared off and succeeds", async () => {
+        endpoint = await startEndpoint("reject-tools-without-reasoning-off");
+        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url);
 
-        await generateText({
+        const result = await generateText({
           model,
           messages: [{ role: "user", content: "grade this" }],
           tools: { finishTest },
           toolChoice: "required",
         });
 
-        expect(endpoint.bodies()[0]?.reasoning_effort).toBe("none");
+        const bodies = endpoint.bodies();
+        expect(bodies).toHaveLength(2);
+        expect(bodies[0]).not.toHaveProperty("reasoning_effort");
+        expect(bodies[1]?.reasoning_effort).toBe("none");
+        expect(result.toolCalls).toHaveLength(1);
       });
     });
 
-    describe("when the request carries no tools", () => {
-      /** @scenario "A request without tools is left alone" */
-      it("sends no reasoning_effort", async () => {
-        endpoint = await startEndpoint();
-        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url, {
-          modelSupportsReasoningEffort: true,
-        });
-
-        await generateText({
-          model,
-          messages: [{ role: "user", content: "just answer" }],
-        });
-
-        expect(endpoint.bodies()[0]).not.toHaveProperty("reasoning_effort");
-      });
-    });
-
-    describe("when the caller already asked for a specific effort", () => {
-      /** @scenario "An explicitly requested reasoning effort is preserved" */
-      it("preserves the caller's value rather than rewriting it", async () => {
-        endpoint = await startEndpoint();
-        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url, {
-          modelSupportsReasoningEffort: true,
-        });
-
-        await generateText({
-          model,
-          messages: [{ role: "user", content: "grade this" }],
-          tools: { finishTest },
-          toolChoice: "required",
-          providerOptions: {
-            // Namespaced under `createOpenAICompatible`'s provider name, which
-            // `createModelFromParams` derives from the model's prefix. The
-            // camelCase spelling is the provider's first-class option; a
-            // snake_case one is overwritten by it and never reaches the wire.
-            openai: { reasoningEffort: "high" },
-          },
-        });
-
-        expect(endpoint.bodies()[0]?.reasoning_effort).toBe("high");
-      });
-    });
-  });
-
-  describe("given a model whose target does not accept reasoning_effort", () => {
-    describe("when the request carries function tools", () => {
-      /** @scenario "A model that does not accept reasoning_effort is left alone" */
-      it("sends no reasoning_effort", async () => {
-        endpoint = await startEndpoint();
-        const model = createModelFromParams(
-          { api_key: "test-key", model: "openai/gpt-4o" },
-          endpoint.url,
-          { modelSupportsReasoningEffort: false },
-        );
-
-        await generateText({
-          model,
-          messages: [{ role: "user", content: "grade this" }],
-          tools: { finishTest },
-          toolChoice: "required",
-        });
-
-        expect(endpoint.bodies()[0]).not.toHaveProperty("reasoning_effort");
-      });
-    });
-  });
-
-  describe("given an endpoint that enforces the tools/reasoning rule", () => {
     describe("when the judge grades a conversation against its criteria", () => {
       /** @scenario "The judge reaches a verdict against an endpoint that enforces the rule" */
       it("reaches a verdict instead of an infrastructure error", async () => {
-        endpoint = await startEndpoint({ enforceReasoningRule: true });
-        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url, {
-          modelSupportsReasoningEffort: true,
-        });
+        endpoint = await startEndpoint("reject-tools-without-reasoning-off");
+        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url);
 
         const result = await generateText({
           model,
@@ -256,29 +213,103 @@ describe("judge transport: function tools and reasoning effort", () => {
           reasoning: "criteria met",
         });
       });
+    });
 
-      /**
-       * Falsifiability: without the fix the same endpoint answers 400 with the
-       * upstream message. Pinning it here means a regression that reverts the
-       * transport rule cannot pass this file by loosening one assertion.
-       */
-      /** @scenario "The judge reaches a verdict against an endpoint that enforces the rule" */
-      it("fails the way #6369 reported when reasoning is not declared off", async () => {
-        endpoint = await startEndpoint({ enforceReasoningRule: true });
-        const unfixed = createModelFromParams(JUDGE_PARAMS, endpoint.url, {
-          modelSupportsReasoningEffort: false,
-        });
+    describe("when the caller already asked for a specific effort", () => {
+      /** @scenario "An explicitly requested reasoning effort is preserved" */
+      it("surfaces the rejection rather than rewriting the caller's intent", async () => {
+        endpoint = await startEndpoint("reject-tools-without-reasoning-off");
+        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url);
 
         await expect(
           generateText({
-            model: unfixed,
+            model,
             messages: [{ role: "user", content: "grade this" }],
             tools: { finishTest },
             toolChoice: "required",
+            providerOptions: {
+              // Namespaced under `createOpenAICompatible`'s provider name,
+              // which `createModelFromParams` derives from the model's prefix.
+              // The camelCase spelling is the provider's first-class option; a
+              // snake_case one is overwritten by it and never reaches the wire.
+              openai: { reasoningEffort: "high" },
+            },
           }),
         ).rejects.toThrow(
           /Function tools with reasoning_effort are not supported/,
         );
+
+        const bodies = endpoint.bodies();
+        expect(bodies).toHaveLength(1);
+        expect(bodies[0]?.reasoning_effort).toBe("high");
+      });
+    });
+  });
+
+  describe("given an endpoint that accepts tool-carrying requests as they are", () => {
+    describe("when the request carries function tools", () => {
+      /** @scenario "A model that accepts the request is never sent anything new" */
+      it("sends exactly one request with no reasoning_effort", async () => {
+        endpoint = await startEndpoint("accept");
+        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url);
+
+        await generateText({
+          model,
+          messages: [{ role: "user", content: "grade this" }],
+          tools: { finishTest },
+          toolChoice: "required",
+        });
+
+        const bodies = endpoint.bodies();
+        expect(bodies).toHaveLength(1);
+        expect(bodies[0]).not.toHaveProperty("reasoning_effort");
+      });
+
+      /**
+       * The regression that forced the retry design: Gemini 2.5 Pro accepts
+       * tool-carrying requests but rejects reasoning off ("Budget 0 is
+       * invalid. This model only works in thinking mode."), so disabling
+       * reasoning preemptively broke a judge that worked.
+       */
+      /** @scenario "A model whose reasoning cannot be disabled is never asked to disable it" */
+      it("never asks a thinking-only model to disable reasoning", async () => {
+        endpoint = await startEndpoint("accept");
+        const model = createModelFromParams(
+          { api_key: "test-key", model: "gemini/gemini-2.5-pro" },
+          endpoint.url,
+        );
+
+        await generateText({
+          model,
+          messages: [{ role: "user", content: "grade this" }],
+          tools: { finishTest },
+          toolChoice: "required",
+        });
+
+        const bodies = endpoint.bodies();
+        expect(bodies).toHaveLength(1);
+        expect(bodies[0]).not.toHaveProperty("reasoning_effort");
+      });
+    });
+  });
+
+  describe("given an endpoint that rejects for an unrelated reason", () => {
+    describe("when the request carries function tools", () => {
+      /** @scenario "An unrelated rejection is surfaced, not retried" */
+      it("surfaces the rejection without retrying", async () => {
+        endpoint = await startEndpoint("reject-unrelated");
+        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url);
+
+        await expect(
+          generateText({
+            model,
+            messages: [{ role: "user", content: "grade this" }],
+            tools: { finishTest },
+            toolChoice: "required",
+          }),
+        ).rejects.toThrow(/temperature/);
+
+        expect(endpoint.bodies()).toHaveLength(1);
       });
     });
   });

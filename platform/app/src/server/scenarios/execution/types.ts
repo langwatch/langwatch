@@ -332,7 +332,6 @@ export const ChildProcessJobDataSchema = z.object({
    * overrides, neither of which the child process can reach, so the parent
    * resolves it and sends the answer. Absent means unknown — send nothing.
    */
-  judgeModelSupportsReasoningEffort: z.boolean().optional(),
   nlpServiceUrl: z.string(),
   target: TargetConfigSchema,
 });

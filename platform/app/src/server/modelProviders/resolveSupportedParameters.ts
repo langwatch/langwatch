@@ -48,38 +48,6 @@ export function resolveSupportedParameters(
 }
 
 /**
- * Every spelling under which a model can advertise reasoning support.
- * `llmModels.json` uses provider-specific names for UI clarity (`effort` on
- * Anthropic, `thinkingLevel` on Gemini) while the custom-model form stores the
- * unified `reasoning`; all of them mean the same capability at the wire.
- * @see reasoningBoundary.ts — the same aliases, mapped for dispatch.
- */
-const REASONING_PARAMETER_ALIASES = [
-  "reasoning",
-  "reasoning_effort",
-  "effort",
-  "thinkingLevel",
-];
-
-/**
- * Whether a model accepts a `reasoning_effort` on the wire.
- *
- * Callers use this to decide whether sending the parameter is meaningful at
- * all — a model that does not advertise it rejects the request outright. An
- * unknown model answers `false`: absent metadata is not permission.
- */
-export function modelAcceptsReasoningEffort(
-  modelId: string,
-  modelProvider: ProviderWithCustomModels | null | undefined,
-): boolean {
-  const allowed = resolveSupportedParameters(modelId, modelProvider);
-  if (allowed === null) return false;
-  return allowed.some((parameter) =>
-    REASONING_PARAMETER_ALIASES.includes(parameter),
-  );
-}
-
-/**
  * Drop every key in `params` that the model does not list as supported.
  * `max_tokens` is always preserved — it is a hard ceiling rather than a
  * sampling knob, and gateway-side dispatchers (anthropic, bedrock,
