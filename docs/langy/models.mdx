@@ -1,0 +1,70 @@
+---
+title: Langy Models and Bring Your Own Key
+description: Choose the model Langy runs on and connect your own provider API keys through the LangWatch AI Gateway.
+sidebarTitle: Models
+keywords: langy model, bring your own llm key, ai gateway
+---
+
+Open the model menu in the Langy panel's composer to see what is running and switch it. The menu shows a short shortlist first and hides the rest of your project's enabled models behind **More models**.
+
+<Frame caption="The Langy model menu. A short shortlist at the top (the gpt-5.6 family and claude-opus-4-8), then More models expands the full grouped catalog from your project's enabled providers.">
+  ![Langy model picker](/images/langy/models/model-picker.png)
+</Frame>
+
+## The model menu
+
+The menu has two parts:
+
+- **Shortlist.** A small derived list, not a fixed roster. It leads with Langy's current default, then your current selection, then one representative each from the quick, balanced, and reasoning groups. Named families you will see include `gpt-5.6-terra` (default), `gpt-5.6-luna` (fast), `gpt-5.6-sol`, and `claude-opus-4-8`.
+- **More models.** Expands the full catalog over every provider you have enabled on the project, grouped by capability. Toggle it back with **Fewer models**. Type a search query to collapse the split and search the whole catalog at once.
+
+The groups are:
+
+| Group | What it holds |
+|---|---|
+| Quick | Small, fast models for cheap turns. |
+| Balanced | General-purpose models. |
+| Reasoning | Models with extended reasoning, including Codex `gpt-5.6` over the Responses API. |
+
+<Note>
+The exact number of models under **More models** depends on which providers you have enabled and which models each exposes. There is no fixed count.
+</Note>
+
+## Langy's model role
+
+LangWatch resolves models by role. Langy has its own role, separate from the others, so changing Langy's model does not change what your playground, evaluations, or workflows use.
+
+| Role | Used by |
+|---|---|
+| Default | The general default across the platform. |
+| Fast | Cheaper, quicker assists. |
+| Langy | The model Langy chats and works with. |
+| Embeddings | Vector embeddings. |
+
+Setting a model in the Langy composer sets the Langy role for the project.
+
+## Bring your own key
+
+Langy uses your own provider accounts. Add a provider API key once in the model-provider settings, and Langy (and the rest of the platform) can use that provider's models.
+
+Supported providers include OpenAI, Anthropic, Gemini, Azure, Bedrock, Vertex, and more (around 14 in total). Every provider except Codex is configured with an **API key**. Codex is configured by signing in with your OpenAI account instead. See [Run Langy on your own OpenAI plan](/langy/codex).
+
+Provider keys are stored **encrypted at rest**. They are decrypted only when a call needs them, and they are never returned over the API.
+
+## How Langy's model calls are routed
+
+Langy never calls a provider directly. Every Langy LLM call rides a per-project **virtual key** through the LangWatch AI Gateway. That means the same controls apply to Langy that apply to any other traffic on your project:
+
+- **Tracing.** Every call is traced, with tokens and cost, in your own LangWatch project.
+- **Rate limits.** Your gateway rate limits and budgets apply.
+- **Model policy.** The gateway enforces which models are allowed, server-side, as a second check on top of the picker.
+
+<Info>
+**Also check:** [Token usage and cost](/langy/token-usage-and-cost), [Data flow and privacy](/langy/security/data-flow-and-privacy).
+</Info>
+
+## Reference
+
+- [Run Langy on your own OpenAI plan (Codex)](/langy/codex)
+- [Token usage and cost](/langy/token-usage-and-cost)
+- [How Langy works](/langy/how-langy-works)

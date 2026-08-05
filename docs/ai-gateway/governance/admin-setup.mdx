@@ -44,14 +44,9 @@ skip to §1 below.
   Google Workspace, Auth0).
 
 <Note>
-  **Governance is currently behind a preview flag.** The `/governance` UI surface (and the **Govern** main-menu entry) require the `release_ui_ai_governance_enabled` flag enabled for your org.
+  On SaaS, governance rollout is managed per organization: if you don't see the **Govern** menu, or AI-tools device login is refused with a governance error, contact your LangWatch account rep.
 
-  - **Self-hosted**: set `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_governance_enabled` in your LangWatch app environment, restart, and the menu + routes are visible to every admin.
-  - **SaaS**: contact your LangWatch account rep — we'll enable the flag for your org.
-
-  The CLI surface (`langwatch login`, `langwatch open`, `langwatch claude`, etc.) is always available once you install the CLI — no env flag needed. Server-side authorization handles per-account governance entitlement.
-
-  Once the flag is on, fresh admins can reach `/governance` even with no project created yet — governance is org-scoped, not project-scoped.
+  You can reach `/governance` with no project created yet: governance is org-scoped, not project-scoped.
 </Note>
 
 ## 1. Connect SSO
@@ -285,17 +280,6 @@ Want to see real spend land in `/me/usage` and the governance
 dashboard before rolling out to your team? The repo ships dogfood
 helpers that mint a personal virtual key and fire a real completion
 through your local Go gateway.
-
-Both feature flags must be force-enabled in `langwatch/.env`
-(`.env.example` ships them in the default block as of `e303ec709`):
-
-```env
-FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled,release_ui_ai_governance_enabled
-```
-
-Without `release_ui_ai_governance_enabled`, `/governance` and
-`/settings/governance/{ingestion-sources,anomaly-rules}` render
-`NotFoundScene` even for an ORG ADMIN.
 
 ```bash
 # 1. Bring up the stack (postgres + redis + app + gateway)

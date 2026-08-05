@@ -1,0 +1,114 @@
+---
+title: Register the Langy GitHub App
+description: Deployment-time guide for the GitHub App that lets Langy open bot-authored pull requests, covering registration, permissions, the GITHUB_LANGY env vars, install, verify, and disconnect.
+sidebarTitle: GitHub App
+keywords:
+  - langy github app
+  - github_langy_app_id
+  - bot-authored pull requests
+---
+
+Langy opens pull requests through a GitHub App you register and install. PRs are authored by the app and credit the requesting user via a `Co-authored-by` trailer and a `Requested by @<login> via LangWatch` note in the body.
+
+There is no per-user OAuth and no long-lived stored token: the app private key is the only credential, it lives only in the control-plane env, and installation tokens are minted on demand, cached in Redis a hair under their 1 hour lifetime, and never written to the database.
+
+To set it up: register a GitHub App, put its id, private key, webhook secret, and slug into the deployment env, and have org admins install it on the repos Langy may touch from **Settings > Integrations**.
+
+<Info>
+**Also check:** [What Langy can do in your GitHub](/langy/security/github-access), [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables).
+</Info>
+
+<Note>
+Registering the app is independent of the Langy runtime, which the umbrella chart deploys by default. See [Setup](/self-hosting/langy/setup) first if you have not enabled the pod yet. If the private key is unset, the GitHub feature is silently off and Langy returns findings without opening PRs.
+</Note>
+
+## Register the app
+
+Go to GitHub, then your **org settings > Developer settings > GitHub Apps > New GitHub App**. Self-hosted registration is manual for now; the App Manifest one-click flow is a deferred follow-up.
+
+Fill in these fields:
+
+| Field | Value |
+|---|---|
+| App name | `LangWatch Langy` (or per environment, e.g. `LangWatch Langy (dev)`) |
+| Homepage URL | `https://app.langwatch.ai` (or your control-plane URL) |
+| Setup URL | `<BASE_URL>/api/github-langy/setup` |
+| Redirect on update | ON (so re-configuring an install returns to the Setup URL) |
+| Request user authorization (OAuth) during installation | OFF. Langy is bot-authored, no user OAuth. |
+| Webhook > Active | ON |
+| Webhook URL | `<BASE_URL>/api/github-langy/webhook` |
+| Webhook secret | Generate one (`openssl rand -hex 32`). You set it as `GITHUB_LANGY_WEBHOOK_SECRET`. |
+| Where can this GitHub App be installed? | Any account (recommended) or only this org |
+
+Set the repository permissions to exactly these, nothing more. Tighter scope means a smaller blast radius.
+
+| Permission | Access |
+|---|---|
+| Contents | Read & write |
+| Pull requests | Read & write |
+| Metadata | Read |
+
+Subscribe to no events beyond the installation lifecycle, which GitHub sends automatically (`installation`, `installation_repositories`).
+
+Click **Create GitHub App**. On the resulting page:
+
+- copy the **App ID**
+- note the **app slug** (in the app's URL: `github.com/apps/<slug>`)
+- **Generate a private key** and download the `.pem`
+
+## Plumb the secrets
+
+Add these to the control-plane env (`.env`, `values.yaml`, or your secret manager). All are optional in the schema (`platform/app/src/env-create.mjs`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
+
+```bash title=".env"
+GITHUB_LANGY_APP_ID="<App ID from registration>"
+GITHUB_LANGY_APP_SLUG="<app slug from the app URL>"
+GITHUB_LANGY_WEBHOOK_SECRET="<the webhook secret you generated>"
+# The private key PEM. In a single-line env value, escape newlines as \n;
+# the token service normalises them back.
+GITHUB_LANGY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+```
+
+<Warning>
+`GITHUB_LANGY_PRIVATE_KEY` is the only credential for the whole GitHub integration and grants write access to installed repos. Keep it in a secrets manager, never in version control, and never expose it to a worker. It stays in the control plane.
+</Warning>
+
+There is no client id or secret; the bot-authored flow uses no user OAuth. `CREDENTIALS_SECRET` (already required for any production install) signs the install round-trip's state, so nothing new is needed there.
+
+For the full env-var reference, see [Environment variables](/self-hosting/langy/environment-variables#github).
+
+## Install the app
+
+An org admin installs the app from **Settings > Integrations > GitHub > Install the LangWatch GitHub App**, or from the in-chat card the first time Langy needs GitHub access. GitHub walks them through choosing the repositories, then redirects to the Setup URL, which records the installation against their LangWatch organization.
+
+The installation is the access boundary: Langy can only open PRs on repositories the app is installed on. A single LangWatch organization can install the app on several GitHub accounts; each installation is listed separately in settings.
+
+## Verify
+
+In a session, ask Langy something like "open a PR on `<a repo the app is installed on>`". You should see:
+
+<Steps>
+  <Step title="Install card (if not yet installed)">
+    The "Install the LangWatch GitHub App" card appears in chat if the org has not installed the app yet.
+  </Step>
+  <Step title="Chat continues">
+    After installing, the popup closes and the chat continues.
+  </Step>
+  <Step title="PR card">
+    Langy clones the repo into the per-session worker home, branches, commits, pushes, and posts the PR URL, rendered as a PR card. The PR is authored by the app, with the requester credited as co-author.
+  </Step>
+</Steps>
+
+If anything goes wrong, the audit log (`langy.github.install`, `langy.github.disconnect`) and Sentry capture the failure paths.
+
+## Disconnect
+
+Go to **Settings > Integrations > Disconnect**, which opens GitHub's uninstall page (GitHub cannot be uninstalled via the API). Once GitHub confirms, the `installation.deleted` webhook removes the local record.
+
+## Operational notes
+
+- **Token in worker, not on disk.** Workers receive a 1-hour installation token via `GH_TOKEN` env. The github skill wires `git config credential.helper '!gh auth git-credential'` so git pushes read it from env, with no `.gitconfig` and no `.git-credentials`. The clone directory lives inside the per-worker home that the idle reaper deletes (within 10 min).
+- **Nothing at rest.** No token or refresh token is stored control-plane side. The app private key is the only credential; it never leaves the control plane and never goes near a worker. Tokens are minted per turn, cached in Redis a hair under their 1h lifetime, and self-expire.
+- **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories (or a single repository when the turn targets one).
+- **Sticky worker tokens.** A worker spawned with token T keeps T until the idle reaper kills it. Removing the installation cuts off new turns immediately; a live worker may hold a token for up to the idle TTL (within 10 min) or until it self-expires (within 1h).
+- **Egress.** The control plane reaches `api.github.com` to mint installation tokens and read installation metadata. Workers need `github.com`, `api.github.com`, and `codeload.github.com` to clone and push, which requires outbound egress to be enabled. See [Networking and egress](/self-hosting/langy/networking-and-egress).

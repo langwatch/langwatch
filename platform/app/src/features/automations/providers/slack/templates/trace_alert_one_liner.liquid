@@ -1,0 +1,6 @@
+{%- capture _line -%}
+{% if trigger.alertType == 'INFO' %}ℹ️{% elsif trigger.alertType == 'CRITICAL' %}🔴{% elsif trigger.alertType == 'WARNING' %}⚠️{% else %}🔔{% endif %} *{{ trigger.name | mrkdwn_escape }}*{% if match.evaluation %} · {{ match.evaluation.evaluatorName | default: "eval" | mrkdwn_escape }} `{{ match.evaluation.score | default: "—" }}`{% endif %} · _{{ match.trace.input | truncate: 140 | mrkdwn_escape }}_ · <{{ match.trace.url }}|View ↗>
+{%- endcapture -%}
+[
+  { "type": "section", "text": { "type": "mrkdwn", "text": {{ _line | json }} } }
+]

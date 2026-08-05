@@ -3,22 +3,22 @@ Feature: Docker dev environment worktree isolation and startup speed
   I want each worktree to have isolated Docker containers and dependencies
   So that parallel development work doesn't interfere
 
-  # The dev-environment scripts live in `scripts/dev.sh` (bash) +
-  # `compose.dev.yml` and a TypeScript port allocator at
+  # The dev-environment scripts live in `dev/scripts/dev.sh` (bash) +
+  # `dev/compose.dev.yml` and a TypeScript port allocator at
   # `packages/server/src/shared/ports.ts`. Tests exist for the
   # TypeScript pieces (`packages/server/test/ports.test.ts`,
   # `env.test.ts`, `cli-doctor.test.ts`) and bash worktree helpers
-  # (`scripts/__tests__/worktree.unit.bats`,
+  # (`dev/scripts/__tests__/worktree.unit.bats`,
   # `worktree.integration.bats`). The parity check's
   # DEFAULT_TEST_ROOTS doesn't scan `packages/server/test/` or
-  # `scripts/__tests__/.bats` files, so JSDoc-bound scenarios there
+  # `dev/scripts/__tests__/.bats` files, so JSDoc-bound scenarios there
   # would not be discovered. Leaving `@unimplemented` — extending
   # DEFAULT_TEST_ROOTS to cover packages/server is the right
   # structural fix.
 
   Background:
-    Given the Docker dev environment is configured via compose.dev.yml
-    And scripts/dev.sh provides an interactive launcher
+    Given the Docker dev environment is configured via dev/compose.dev.yml
+    And dev/scripts/dev.sh provides an interactive launcher
 
   @integration @unimplemented
   Scenario: Two worktrees have isolated node_modules
@@ -46,19 +46,18 @@ Feature: Docker dev environment worktree isolation and startup speed
   Scenario: Rebuild command works correctly
     Given the rebuild option is selected in dev.sh
     When rebuild runs
-    Then it removes the correct named volumes (app-modules and bullboard-modules)
+    Then it removes the correct named volumes (app-modules)
     And uses the VOLUME_PREFIX for worktree-aware volume names
 
   @unit @unimplemented
   Scenario: Port scan starts at correct base ports
     Given dev.sh scans for free ports
     Then APP_PORT scanning starts at 5560
-    And BULLBOARD_PORT scanning starts at 6380
     And AI_SERVER_PORT scanning starts at 3456
 
   @unit @unimplemented
   Scenario: Environment variables are not duplicated across services
-    Given compose.dev.yml uses YAML anchors for shared env vars
+    Given dev/compose.dev.yml uses YAML anchors for shared env vars
     Then DATABASE_URL is defined once in x-common-env
     And REDIS_URL is defined once in x-common-env
     And services merge the anchor with service-specific overrides

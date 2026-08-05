@@ -89,7 +89,9 @@ Enrich the automations list, plus a per-automation detail panel, with an operati
 
 ### Querying the outbox by trigger
 
-`ReactorOutbox` rows are keyed by `(reactorName, dedupKey)` and grouped by `groupKey`, both `projectId`-prefixed and embedding the `triggerId` (`${projectId}/${reactorName}:${triggerId}...`). Counting per-trigger health via a `LIKE` on `dedupKey` is unindexed and slow. We will instead add an indexed **`subjectId`** column (the `triggerId`) to `ReactorOutbox` so per-trigger health is an indexed lookup — scoped by `(projectId, subjectId)`, never `subjectId` alone (it is not unique across tenants). This is a small extension to the ADR-030 schema.
+`ReactorOutbox` rows are keyed by `(reactorName, dedupKey)` and grouped by `groupKey`, both `projectId`-prefixed and embedding the `triggerId` (`${projectId}/${reactorName}:${triggerId}...`). Counting per-trigger health via a `LIKE` on `dedupKey` is unindexed and slow.
+
+**Implementation status (2026-07-11):** the `subjectId` column proposed here has NOT shipped, and neither has the per-trigger health read — nothing queries `ReactorOutbox` for trigger health today, by `LIKE` on `dedupKey` or otherwise. (An earlier note claimed a `LIKE`-scan fallback was in place; it never was.) Both the column and the read remain follow-up work, and the column should land before the read does, so the health list is never built on an unindexed scan.
 
 ### Layering
 
@@ -150,10 +152,11 @@ We do not block the management surface on the deferred dispatch wiring: the alwa
 - **Outbox-derived columns depend on outbox-backed notify dispatch.** Until ADR-030 + ADR-026 fully wire, they render as "—"/empty; only `TriggerSent`-derived columns are populated. This is an explicit, documented two-phase rollout, not a bug.
 - **Migration**: existing triggers open in the new drawer with every section pre-filled; no data migration is required (the drawer reads the same `Trigger` columns, including the ADR-036 template columns and the ADR-026 cadence/debounce columns).
 - **A new domain folder `src/automations/`** holds the provider model + `cadences.ts` (the shared cadence constants). The drawer + UI live under `src/features/automations/`. Keeps client-only UI separate from cross-cutting domain types.
+  - *Implementation note (PR #5911):* the provider model later split per side — pure definitions + `cadences.ts` in `src/shared/automations/`, client halves + registry in `src/features/automations/providers/`, server halves (persistence/secret hooks) + registry in `src/server/app-layer/automations/providers/`. `src/automations/` no longer exists.
 
 ## References
 
 - [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — `TriggerSent` + `ReactorOutbox` schemas the dispatch-health view reads; `subjectId` extension
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence + debounce columns the cadence secondary edits
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — Liquid templates + test-fire banner the Configuration secondary edits
-- Code touched: `src/components/AddAutomationDrawer.tsx`, `src/components/EditTriggerTemplatesDrawer.tsx`, `src/pages/[project]/automations.tsx`, `src/server/api/routers/automations.ts`, `src/server/app-layer/triggers/trigger-template.service.ts`, `src/automations/**`, `src/features/automations/**`
+- Code touched: `src/components/AddAutomationDrawer.tsx`, `src/components/EditTriggerTemplatesDrawer.tsx`, `src/pages/[project]/automations.tsx`, `src/server/api/routers/automations.ts`, `src/server/app-layer/automations/trigger-template.service.ts`, `src/automations/**`, `src/features/automations/**`

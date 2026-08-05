@@ -5,16 +5,17 @@ Feature: `langwatch copilot` defaults to direct OTLP so Copilot seat billing is 
   For claude/codex the base-URL swap bills the same key either way; for
   copilot it does not.
 
-  So copilot inverts the wrapper's usual gateway-leaning defaults. Every
-  place the path resolver would silently pick the gateway for other tools
-  picks direct OTLP (ingestion) for copilot instead, and every mid-run
-  fallback ONTO the gateway tells the user their Copilot seat is being
-  bypassed. Explicit choices (flag, env, prompt answer, pinned mode, org
-  policy) are honored unchanged.
+  The wrapper is ingestion-first for every tool (the gateway is reachable
+  only by explicit choice - see wrap-path-choice.feature), which already
+  keeps copilot billing-safe by default. What stays copilot-specific is the
+  WORDING: every route that puts copilot on the gateway - an explicit
+  choice, a pinned mode, or org policy - tells the user their Copilot seat
+  is being bypassed. Explicit choices (flag, env, prompt answer, pinned
+  mode, org policy) are honored unchanged.
 
   Pairs with:
     - specs/ai-governance/cli-wrappers/wrap-path-choice.feature (the generic
-      path-selection precedence this feature carves an exception into)
+      ingestion-first path-selection precedence)
     - dev/docs/adr/039-copilot-cli-as-tracked-coding-assistant.md
 
   Background:
@@ -22,7 +23,7 @@ Feature: `langwatch copilot` defaults to direct OTLP so Copilot seat billing is 
     And the cached policy for "copilot" allows both the gateway and direct OTLP paths
     And the user has a personal virtual key
 
-  Rule: every silent gateway default flips to ingestion for copilot
+  Rule: copilot rides the ingestion-first defaults
 
     @unit
     Scenario: Non-interactive copilot run with no pinned mode resolves to direct OTLP
@@ -40,21 +41,6 @@ Feature: `langwatch copilot` defaults to direct OTLP so Copilot seat billing is 
       Then the select prompt's pre-selected choice is "Direct OTLP"
       And the gateway choice explains that LLM usage is billed per token
 
-    @unit
-    Scenario: Aborting the copilot path prompt falls back to direct OTLP for this run
-      Given tool_mode.copilot is unset
-      And stdin and stdout are a TTY
-      When the user runs `langwatch copilot` and aborts the prompt with Ctrl-C
-      Then this run proceeds on direct OTLP without persisting a choice
-      And the next run prompts again
-
-    @unit
-    Scenario: Non-copilot tools keep the gateway default on non-interactive runs
-      Given tool_mode.claude is unset
-      And stdin is not a TTY
-      When the user runs `langwatch claude`
-      Then the resolved path is the gateway
-
   Rule: explicit choices win over the copilot exception
 
     @unit
@@ -71,7 +57,7 @@ Feature: `langwatch copilot` defaults to direct OTLP so Copilot seat billing is 
       Then the resolved path is the gateway
       And no prompt is shown
 
-  Rule: mid-run fallbacks onto the gateway explain the Copilot billing shift
+  Rule: gateway routing for copilot explains the billing shift
 
     @unit
     Scenario: Policy-forced gateway routing for copilot names the seat bypass
@@ -79,14 +65,6 @@ Feature: `langwatch copilot` defaults to direct OTLP so Copilot seat billing is 
       When the user runs `langwatch copilot`
       Then the wrapper routes through the gateway
       And the notice states that usage will bill the org's provider keys instead of the user's Copilot seat
-
-    @unit
-    Scenario: Ingestion setup failure falling back to the gateway names the seat bypass
-      Given tool_mode.copilot resolves to direct OTLP
-      And minting the ingestion key fails because the control plane is unreachable
-      When the user runs `langwatch copilot`
-      Then the wrapper falls back to the gateway path
-      And the fallback notice states that usage will bill the org's provider keys instead of the user's Copilot seat
 
   Rule: the platform policy knows copilot
 

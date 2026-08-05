@@ -1,0 +1,216 @@
+import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import {
+  fireIntegrationMethodNurturing,
+  mapProductSelectionToIntegrationMethod,
+} from "~/../ee/billing/nurturing/hooks/productInterest";
+import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
+import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { skipPermissionCheck } from "../../rbac";
+import { organizationRouter } from "../organization";
+import { projectRouter } from "../project";
+
+/**
+ * Router for handling onboarding-related operations.
+ */
+export const onboardingRouter = createTRPCRouter({
+  /**
+   * Initializes an organization and its associated project.
+   *
+   * This procedure handles the creation of a new organization and assigns it to a user.
+   * It also creates a project under the newly created organization.
+   *
+   * @throws {TRPCError} - Throws an error if organization or project creation fails.
+   */
+  initializeOrganization: protectedProcedure
+    .input(
+      z.object({
+        // Organization details
+        orgName: z.string().optional(),
+        phoneNumber: z.string().optional(),
+        signUpData: signUpDataSchema.optional(),
+        // ADR-038: declared signup intent. Optional for rolling-deploy
+        // tolerance; absent means NULL, the safe legacy default.
+        primaryIntent: z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]).optional(),
+
+        // Project details
+        projectName: z.string().optional(),
+        language: z.string().default("other"),
+        framework: z.string().default("other"),
+      }),
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // Create and assign organization
+        const orgRouter = organizationRouter.createCaller(ctx);
+        const orgResult = await orgRouter.createAndAssign({
+          orgName: input.orgName,
+          phoneNumber: input.phoneNumber,
+          signUpData: input.signUpData,
+          primaryIntent: input.primaryIntent,
+        });
+        if (!orgResult.success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create organization",
+          });
+        }
+
+        // Every new org gets the standard AI tool catalog at creation, for
+        // every intent: the /me portal must render tiles on its very first
+        // load instead of the "no tools yet" empty state.
+        //
+        // Non-fatal by design, same contract as the personal-workspace
+        // ensure below: a failure here must not cost the user the
+        // organization they just created, and the aiTools.list read path
+        // lazily provisions the same set on first portal load anyway.
+        try {
+          await AiToolEntryService.create(ctx.prisma).ensureDefaultCatalog({
+            organizationId: orgResult.organization.id,
+          });
+        } catch (error) {
+          captureException(toError(error), {
+            extra: {
+              origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
+              organizationId: orgResult.organization.id,
+            },
+          });
+        }
+
+        // Governance-intent signups get their personal workspace here rather
+        // than waiting for the first CLI login. That is where their usage
+        // lands, so provisioning it now is what makes /me show something the
+        // moment onboarding finishes instead of an empty shell whose contents
+        // depend on a command the user has not run yet.
+        //
+        // Non-fatal by design, matching organization.acceptInvite: a failure
+        // here must not cost the user the organization they just created, and
+        // `user.personalContext` backfills lazily on the next session.
+        if (input.primaryIntent === "AGENT_GOVERNANCE") {
+          try {
+            const personalWorkspaceService = new PersonalWorkspaceService(
+              ctx.prisma,
+            );
+            await personalWorkspaceService.ensure({
+              userId: ctx.session.user.id,
+              organizationId: orgResult.organization.id,
+              displayName: ctx.session.user.name,
+              displayEmail: ctx.session.user.email,
+            });
+          } catch (error) {
+            captureException(toError(error), {
+              extra: {
+                origin: "onboarding.initializeOrganization",
+                organizationId: orgResult.organization.id,
+              },
+            });
+          }
+        }
+
+        // Create project under the organization. Governance-intent signups
+        // skip it (ADR-038 v6): their users live on /me and a project is only
+        // created when the org later flips to LLMOps in settings.
+        let projectSlug: string | null = null;
+        if (input.primaryIntent !== "AGENT_GOVERNANCE") {
+          const projectName = input.projectName ?? orgResult.team.name;
+          const projectCaller = projectRouter.createCaller(ctx);
+          const projectResult = await projectCaller.create({
+            organizationId: orgResult.organization.id,
+            teamId: orgResult.team.id,
+            name: projectName,
+            language: input.language,
+            framework: input.framework,
+          });
+          if (!projectResult.success) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to create project",
+            });
+          }
+          projectSlug = projectResult.projectSlug;
+        }
+
+        try {
+          const signupPayload = {
+            userName: ctx.session.user.name,
+            userEmail: ctx.session.user.email,
+            organizationName: orgResult.organization.name,
+            phoneNumber: input.phoneNumber,
+            signUpData: input.signUpData,
+          };
+
+          await Promise.all([
+            getApp().notifications.sendSlackSignupEvent({
+              ...signupPayload,
+              utmCampaign: input.signUpData?.utmCampaign,
+            }),
+            getApp().notifications.sendHubspotSignupForm(signupPayload),
+          ]);
+        } catch (error) {
+          captureException(toError(error));
+        }
+
+        fireSignupNurturingCalls({
+          userId: ctx.session.user.id,
+          email: ctx.session.user.email,
+          name: ctx.session.user.name,
+          organizationId: orgResult.organization.id,
+          organizationName: orgResult.organization.name,
+          signUpData: input.signUpData,
+          primaryIntent: input.primaryIntent,
+        });
+
+        // Return success response with team and project slugs
+        // (projectSlug is null for governance-intent signups)
+        return {
+          success: true,
+          teamSlug: orgResult.team.slug,
+          teamName: orgResult.team.name,
+          teamId: orgResult.team.id,
+          organizationId: orgResult.organization.id,
+          projectSlug,
+        };
+      } catch (error) {
+        captureException(toError(error));
+        throw error;
+      }
+    }),
+
+  /**
+   * Sets the integration_method trait in Customer.io after the user
+   * picks their flavour on the onboarding screen.
+   *
+   * Separate from initializeOrganization because the org is created
+   * BEFORE the flavour selection screen.
+   */
+  setIntegrationMethod: protectedProcedure
+    .input(
+      z.object({
+        integrationMethod: z.enum([
+          "via-claude-code",
+          "via-platform",
+          "via-claude-desktop",
+          "manually",
+        ]),
+      }),
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      const traitValue = mapProductSelectionToIntegrationMethod(
+        input.integrationMethod,
+      );
+
+      fireIntegrationMethodNurturing({
+        userId: ctx.session.user.id,
+        integrationMethod: traitValue,
+      });
+
+      return { success: true };
+    }),
+});

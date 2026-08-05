@@ -65,7 +65,7 @@ No limit means a misbehaving container can starve the whole system. Too tight me
 ## Rationale
 
 **Why profiles over multiple compose files?**
-Profiles keep everything in one file, easier to maintain. `--profile scenarios` is clearer than `-f compose.yml -f compose.scenarios.yml`.
+Profiles keep everything in one file, easier to maintain. `--profile scenarios` is clearer than `-f infra/compose.yml -f infra/compose.scenarios.yml`.
 
 **Why init container over host install?**
 macOS binaries don't work in Linux containers. We tried `.npmrc` supportedArchitectures but it was unreliable. Init container guarantees correct platform binaries.
@@ -88,8 +88,8 @@ make down             # Stop all
 ```
 
 **Key files:**
-- `compose.dev.yml` - Docker Compose configuration
-- `scripts/dev.sh` - Interactive profile chooser
+- `dev/compose.dev.yml` - Docker Compose configuration
+- `dev/scripts/dev.sh` - Interactive profile chooser
 - `Makefile` - Convenience targets
 
 **Trade-offs accepted:**
@@ -104,7 +104,7 @@ The `pnpm_store` named volume persists downloaded packages across container rest
 
 ### Context
 
-The original design used `VOLUME_PREFIX` for volume naming but `scripts/dev.sh` did not set it when running from worktrees, causing container and volume collisions between parallel worktrees.
+The original design used `VOLUME_PREFIX` for volume naming but `dev/scripts/dev.sh` did not set it when running from worktrees, causing container and volume collisions between parallel worktrees.
 
 ### Changes
 
@@ -133,7 +133,7 @@ The 2026-03 worktree-isolation amendment treated **every** volume as per-worktre
 
 ### Decision
 
-**The contributor's `langwatch/.env` is the source of truth.** A new `langwatch/.env.dev-up` overlay is loaded as `env_file` AFTER `.env` and contains only the URLs whose services are starting locally for the chosen mode. `x-common-env` no longer sets infrastructure URLs.
+**The contributor's `platform/app/.env` is the source of truth.** A new `platform/app/.env.dev-up` overlay is loaded as `env_file` AFTER `.env` and contains only the URLs whose services are starting locally for the chosen mode. `x-common-env` no longer sets infrastructure URLs.
 
 **`make quickstart` is the single entry point** with five intent-based modes:
 
@@ -145,13 +145,13 @@ The 2026-03 worktree-isolation amendment treated **every** volume as per-worktre
 | `nlp` | + langwatch_nlp + langevals | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT` |
 | `full-local` | `--profile full` (workers, scenarios, bullboard, ai-server) | all five infrastructure URLs |
 
-Migration mode uses `compose.dev.migration.yml` to expose host ports so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
+Migration mode uses `dev/compose.dev.migration.yml` to expose host ports so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
 
-`make quickstart` accepts a positional mode arg (`make quickstart frontend-only`) for non-interactive runs. `make quickstart-help` (or `./scripts/dev.sh help`) prints the mode reference.
+`make quickstart` accepts a positional mode arg (`make quickstart frontend-only`) for non-interactive runs. `make quickstart-help` (or `./dev/scripts/dev.sh help`) prints the mode reference.
 
 **Stateful services share volumes across worktrees.** `db-data`, `clickhouse-data`, and `redis-data` use stable names (`langwatch-db-data`, `langwatch-clickhouse-data`, `langwatch-redis-data`) — they no longer interpolate `VOLUME_PREFIX`. Sign up once, persist forever.
 
-Trade-off: only one worktree can have the same stateful container `up` at a time (postgres locks `/var/lib/postgresql/data`). `scripts/dev.sh` detects this (`check_stateful_collision`) and fails fast with a clear message pointing at the other compose project.
+Trade-off: only one worktree can have the same stateful container `up` at a time (postgres locks `/var/lib/postgresql/data`). `dev/scripts/dev.sh` detects this (`check_stateful_collision`) and fails fast with a clear message pointing at the other compose project.
 
 **Redis is a singleton with a fixed host port.** `redis:alpine` exposes `:6379` on the host and uses the shared `langwatch-redis-data` volume. Parallel worktrees reuse the same redis instance.
 
@@ -159,7 +159,7 @@ Trade-off: only one worktree can have the same stateful container `up` at a time
 
 **Deprecated targets** (`make dev`, `dev-nlp`, `dev-scenarios`, `dev-test`, `dev-full`, and `dev-up` / `dev-down` / `dev-logs`) print a deprecation warning and forward to the corresponding `quickstart` mode for one release before being removed.
 
-**Fail-fast SSRF guard.** `scripts/dev.sh` errors if `langwatch/.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
+**Fail-fast SSRF guard.** `dev/scripts/dev.sh` errors if `platform/app/.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
 
 ### Migration
 
@@ -170,4 +170,64 @@ docker volume ls | grep -E '^local +lw-[0-9a-f]{8}-(db|redis|clickhouse)-data'
 docker volume rm <volume-name>   # one per worktree, after confirming you don't need the data
 ```
 
-If you previously relied on `x-common-env`'s implicit `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` overrides, those moved to `langwatch/.env.dev-up` written by `quickstart`. Running `make dev` (deprecated alias for `quickstart backend-shared`) keeps the same effective behavior.
+If you previously relied on `x-common-env`'s implicit `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` overrides, those moved to `platform/app/.env.dev-up` written by `quickstart`. Running `make dev` (deprecated alias for `quickstart backend-shared`) keeps the same effective behavior.
+
+## Amendment: In-process workers for local dev (2026-07)
+
+### Context
+
+Locally, the app and the background workers run as two Node processes,
+multiplexed by `concurrently` inside `scripts/start.sh` (the app plus a separate
+`pnpm run start:workers` lane, alongside Vite and the Go services). The second
+worker process has to be handed the exact matching env and Redis DB index, and
+if it silently fails to boot you get an app that looks healthy but never drains
+queues. Some contributors would rather run a single process locally.
+
+Production is different and stays that way: it runs web and worker as separate
+Deployments (`charts/langwatch/templates/{app,workers}`) so they scale
+independently. Collapsing them is a *dev-only* convenience, never a prod change.
+
+### Decision
+
+Make **single-process dev the default**. `pnpm dev` sets
+`WORKERS_IN_PROCESS=1` and hosts the worker stack inside the app process; the
+two-process topology is still available as `pnpm dev:concurrent`, and
+`pnpm dev:app` / `pnpm dev:worker` run one side on its own. Amended after the
+default was inverted: a laptop running several worktrees cannot afford a second
+Node process per stack, and haven had already defaulted this way, so plain
+`pnpm dev` disagreeing with it was the surprise rather than the safeguard.
+
+A new process role `"all"` runs the web server AND the worker-side wiring in one
+process. The three prior `processRole === "worker"` gates now go through
+`roleRunsWorkers(role)` (`src/server/app-layer/config.ts`), which is true for
+both `"worker"` and `"all"`:
+
+- the outbox runtime + consumer/drainer and the heartbeat scheduler
+  (`src/server/app-layer/presets.ts`),
+- the GroupQueue consumer (`src/server/event-sourcing/eventSourcing.ts`),
+- the heartbeat scheduler's `start()` no-op guard
+  (`.../outbox/heartbeat/heartbeat.scheduler.ts`).
+
+The imperative worker boot (topic clustering, scenario pool, anomaly / spend-spike
+/ usage-stats workers, ingestion pullers, storage stats) is extracted from the
+`src/workers.ts` entrypoint into a reusable `startWorkers()`
+(`src/server/workers/startWorkers.ts`). The standalone worker calls it with its
+own metrics HTTP server; `src/start.ts` calls it with `shouldStartMetricsServer: false`
+(the web server already serves the shared prom registry at `/metrics`) after the
+server is listening, and drains it before closing the shared App on shutdown.
+
+`scripts/start.sh` skips the standalone `workers` concurrently lane when
+`WORKERS_IN_PROCESS` is set in development; `scripts/check-ports.sh` stops
+reserving the worker-metrics port in that mode.
+
+### Consequences
+
+- One fewer local process, guaranteed to boot with the app on the same Redis DB.
+- **Prod is unaffected**: `WORKERS_IN_PROCESS` is gated on `NODE_ENV=development`
+  in both `start.sh` and `start.ts`, and prod never sets it.
+- Vite and the Go services (aigateway, nlpgo) remain separate processes — this
+  only folds in the *worker* Node process, not those.
+- Known limitation: the web entrypoint does not load `instrumentation.node`, so
+  in-process workers produce no-op OTel spans. Run the standalone worker
+  (`pnpm dev`, default) to get worker traces. Follow-up if in-process worker
+  tracing is wanted.

@@ -73,10 +73,8 @@ spec:
       # The app does not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
-      {{- with (coalesce .Values.app.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 8 }}
 
       # Node selection - https://kubespec.dev/v1/Pod#spec.nodeSelector
       {{- with (coalesce .Values.app.nodeSelector .Values.global.scheduling.nodeSelector)}}
@@ -102,34 +100,22 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # PriorityClass - https://kubespec.dev/v1/Pod#spec.priorityClassName
+      {{- with (coalesce .Values.app.priorityClassName .Values.global.scheduling.priorityClassName)}}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
+      {{- with .Values.app.extraInitContainers}}
       initContainers:
-        {{- with .Values.app.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
-        # Fix permissions for Next.js cache/static directories when running as non-root
-        - name: fix-nextjs-permissions
-          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
-          command: ['sh', '-c']
-          args:
-            - |
-              cp -r /app/langwatch/.next/* /next-tmp/ 2>/dev/null || true
-              echo "Copied .next contents to writable volume"
-          volumeMounts:
-            - name: next-dir
-              mountPath: /next-tmp
-          securityContext:
-            runAsUser: 1000
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
+      {{- end }}
       containers:
         {{- with .Values.app.extraContainers}}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: {{ .Release.Name }}-app
           securityContext:
-            {{- toYaml (coalesce .Values.app.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
           ports:
@@ -139,10 +125,28 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
-            - name: NEXTAUTH_URL
-              value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
+            # Names this process in telemetry. It becomes the OTel resource
+            # `service.name` and the `service` field on every stdout log line,
+            # which log shipping promotes to the Loki `service_name` label.
+            # Set per role so app / workers / cronjobs stay distinguishable —
+            # unset, all three collapse onto the same code default.
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.app.otel.serviceName | default "langwatch-app" | quote }}
+
+            {{/* NEXTAUTH_URL comes from langwatch.sharedEnv: every process
+                 needs the same answer for what this installation is called. */}}
             - name: NEXTAUTH_URL_INTERNAL
               value: "http://localhost:{{ .Values.app.service.port | default 5560 }}"
+
+            # Internal platform-API base URL that in-pod scenario/simulation
+            # runners call back to. Post-#3541 the app boot-validates it as a
+            # required URL. On the app pod the app IS local, so self-reference
+            # over localhost (like NEXTAUTH_URL_INTERNAL) — no Service/DNS hop.
+            # Workers/nlp are separate pods and use the app's service DNS
+            # instead. Override only if in-pod runners must reach the app
+            # through a different URL.
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.app.http.langwatchEndpoint | default (printf "http://localhost:%v" (.Values.app.service.port | default 5560)) | quote }}
 
             # Cron API key
             {{- if .Values.app.cronApiKey.secretKeyRef.name }}
@@ -163,17 +167,6 @@ spec:
                 secretKeyRef:
                   name: {{ include "langwatch.appSecretName" . }}
                   key: cronApiKey
-            {{- end }}
-
-            # Email configuration
-            {{- if .Values.app.email.enabled }}
-            - name: EMAIL_DEFAULT_FROM
-              value: {{ .Values.app.email.defaultFrom | quote }}
-            - name: EMAIL_PROVIDER
-              value: {{ .Values.app.email.provider | quote }}
-            {{- if eq .Values.app.email.provider "sendgrid" }}
-            {{- include "langwatch.secretOrValue" (dict "envName" "SENDGRID_API_KEY" "fieldValues" .Values.app.email.providers.sendgrid.apiKey) | nindent 12 }}
-            {{- end }}
             {{- end }}
 
             # AI Gateway virtual-key pepper (control-plane only).
@@ -218,17 +211,39 @@ spec:
                   key: LW_GATEWAY_JWT_SECRET
             {{- end }}
 
+            {{- if (index .Values "langyagent").chartManaged }}
             # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
             # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
-            # against the same Secret. Hyphenated values key → index, not dot.
-            {{- if (index .Values "langy-agent").chartManaged }}
+            # against the same Secret. Subchart values key read via index (aliased subchart).
             - name: OPENCODE_AGENT_URL
-              value: {{ (index .Values "langy-agent").controlPlane.agentUrl | default (printf "http://%s-langy-agent:80" .Release.Name) | quote }}
+              value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ (index .Values "langy-agent").secrets.existingSecretName | default "langwatch-langy-agent-auth" }}
-                  key: {{ (index .Values "langy-agent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+                  name: {{ (index .Values "langyagent").secrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
+                  key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+            {{- include "langwatch.langyCallbackUrlEnv" . | nindent 12 }}
+            {{- end }}
+            {{- /* Langy's rollout flag is SYSTEM-scoped and defaults off, because
+                   the hosted product opens it one cohort at a time. A self-hosted
+                   install has a single cohort — the people who installed it — so
+                   deploying the agent and then finding no assistant anywhere in
+                   the product is a dead end whose only lever is an internal ops
+                   screen. Deploying the pod IS the decision to enable it; the
+                   operator keeps the staged path by setting
+                   langyagent.enableForAllUsers=false, which hands authority back
+                   to the flag store (/ops/feature-flags). Operator-forced flags
+                   are joined with it, never clobbered by it. */}}
+            {{- $forcedFlags := list }}
+            {{- with .Values.app.featureFlagForceEnable }}
+            {{- $forcedFlags = append $forcedFlags . }}
+            {{- end }}
+            {{- if and (index .Values "langyagent").chartManaged (index .Values "langyagent").enableForAllUsers }}
+            {{- $forcedFlags = append $forcedFlags "release_langy_enabled" }}
+            {{- end }}
+            {{- if $forcedFlags }}
+            - name: FEATURE_FLAG_FORCE_ENABLE
+              value: {{ join "," $forcedFlags | quote }}
             {{- end }}
 
             # LW_GATEWAY_PUBLIC_URL — the externally-reachable AI Gateway URL
@@ -254,16 +269,27 @@ spec:
               value: {{ $gwPublic | quote }}
             {{- end }}
 
+            {{- /* LW_GATEWAY_BASE_URL — where the CONTROL PLANE itself reaches the
+                   gateway, over cluster DNS. Distinct from the public URL above,
+                   which is what browsers and laptops use: an install with no
+                   gateway ingress (the common self-hosted shape) has no public URL
+                   at all, and the control plane still has to reach the gateway.
+                   Langy needs it to mint the worker's virtual key, and without it
+                   the assistant refuses every turn with a credential-resolution
+                   error naming this variable. */}}
+            {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
+
             # NextAuth configuration (NEXTAUTH_SECRET lives in sharedEnv —
             # every app-image consumer needs it, see _helpers.tpl)
             - name: NEXTAUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}
 
-            # NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github, gitlab, google, okta)
+            # NextAuth - SSO OAuth providers (auth0, azureAd, github, gitlab, google, okta).
+            # These are this chart's values keys, which map to env prefixes; the
+            # provider id the app selects on is app.nextAuth.provider.
             {{- $oauthProviders := list
               (dict "key" "auth0"   "prefix" "AUTH0"    "fields" (list "clientId" "clientSecret" "issuer"))
               (dict "key" "azureAd" "prefix" "AZURE_AD" "fields" (list "clientId" "clientSecret" "tenantId"))
-              (dict "key" "cognito" "prefix" "COGNITO"  "fields" (list "clientId" "clientSecret" "issuer"))
               (dict "key" "github"  "prefix" "GITHUB"   "fields" (list "clientId" "clientSecret"))
               (dict "key" "gitlab"  "prefix" "GITLAB"   "fields" (list "clientId" "clientSecret"))
               (dict "key" "google"  "prefix" "GOOGLE"   "fields" (list "clientId" "clientSecret"))
@@ -281,6 +307,11 @@ spec:
             {{- with .Values.app.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+
+          {{- with .Values.app.extraEnvFrom}}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
           {{- if .Values.app.extraLifecycle}}
           lifecycle:
@@ -314,8 +345,6 @@ spec:
             {{- end }}
             - name: tmp-dir
               mountPath: /tmp
-            - name: next-dir
-              mountPath: /app/langwatch/.next
             {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
             # Stored-objects local-FS mount — renders ONLY when local-FS is
             # the active backend (dataplane disabled). Single-replica only
@@ -332,9 +361,8 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
-          emptyDir: {}
-        - name: next-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.app.scratchSizeLimit }}
         {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
         - name: stored-objects-data
           persistentVolumeClaim:

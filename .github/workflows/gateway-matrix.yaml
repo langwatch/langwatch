@@ -17,9 +17,9 @@ name: gateway-matrix
 # Touches needing this matrix:
 #   - services/aigateway/**          (gateway data plane)
 #   - pkg/**                         (shared HTTP/health helpers)
-#   - langwatch/src/server/gateway/  (control plane)
-#   - langwatch/src/server/event-sourcing/pipelines/trace-processing/
-#     reactors/gatewayBudgetSync.reactor.ts
+#   - platform/app/src/server/gateway/  (control plane)
+#   - platform/app/ee/governance/process-manager/gatewayDebits.process.ts
+#     (the sole writer of gateway budget debits)
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
 #     PRs don't pay the ~$0.07 cost)
@@ -34,7 +34,7 @@ on:
       providers:
         description: 'Build tags (space-separated). Default = all six.'
         type: string
-        default: 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings'
+        default: 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio'
       run_id_label:
         description: 'Optional label appended to trace tags for grep.'
         type: string
@@ -48,9 +48,9 @@ on:
       - 'cmd/**'
       - 'go.mod'
       - 'go.sum'
-      - 'langwatch/src/server/gateway/**'
-      - 'langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/gatewayBudgetSync.reactor.ts'
-      - 'langwatch/src/server/routes/gateway-internal.ts'
+      - 'platform/app/src/server/gateway/**'
+      - 'platform/app/ee/governance/process-manager/gatewayDebits.process.ts'
+      - 'platform/app/src/server/routes/gateway-internal.ts'
       - 'charts/gateway/**'
       - '.github/workflows/gateway-matrix.yaml'
   schedule:
@@ -115,6 +115,12 @@ jobs:
       # when VOYAGE_ENABLED is unset so this stays inert until then.
       TEST_VK_VOYAGE: ${{ secrets.MATRIX_TEST_VK_VOYAGE }}
       VOYAGE_API_KEY: ${{ secrets.MATRIX_VOYAGE_API_KEY }}
+      # Audio cells (live_audio): ElevenLabs VK + a voice id for TTS. The
+      # audio_test.go cells t.Skip when unset, so this stays inert until
+      # the secrets are provisioned (seed with
+      # scripts/dogfood/audio/seed-audio-vk.ts).
+      TEST_VK_ELEVENLABS: ${{ secrets.MATRIX_TEST_VK_ELEVENLABS }}
+      ELEVENLABS_VOICE_ID: ${{ secrets.MATRIX_ELEVENLABS_VOICE_ID }}
       LW_PROJECT_API_KEY: ${{ secrets.MATRIX_LW_PROJECT_API_KEY }}
 
     services:
@@ -157,20 +163,24 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-          cache-dependency-path: langwatch/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install langwatch deps
-        working-directory: langwatch
-        run: pnpm install --frozen-lockfile
+        # node-pty (in the app's closure via mcp-server) falls back to
+        # `node-gyp rebuild` on linux, and this job bypasses the shared setup
+        # action that puts node-gyp on PATH.
+        run: |
+          npm install -g node-gyp@12.3.0
+          pnpm install --frozen-lockfile --filter "@langwatch/web..."
 
       - name: Apply DB migrations
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
         run: pnpm prisma migrate deploy
 
       - name: Start control plane (background)
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
           REDIS_URL: redis://localhost:6379
@@ -201,7 +211,7 @@ jobs:
           # still produces useful coverage signal — a missing-cred
           # cell t.Skips with a clear reason instead of silently
           # being absent from the report.
-          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings' }}
+          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio' }}
         run: |
           go test -tags="$MATRIX_TAGS" -v -count=1 -timeout 1200s \
             ./tests/matrix/... 2>&1 | tee /tmp/matrix.log

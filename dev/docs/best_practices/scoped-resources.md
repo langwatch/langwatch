@@ -104,7 +104,7 @@ The grouped row's `id` is a stable hash of its non-scope keys (e.g. `${role}::${
 
 ## UI shape: ScopeChipPicker
 
-One shared primitive — `langwatch/src/components/settings/ScopeChipPicker.tsx` — renders the multi-select of scopes the caller can write at. Every settings page that touches scoped resources uses it. Don't roll a new picker.
+One shared primitive — `platform/app/src/components/settings/ScopeChipPicker.tsx` — renders the multi-select of scopes the caller can write at. Every settings page that touches scoped resources uses it. Don't roll a new picker.
 
 The drawer/form that authors a new rule:
 
@@ -135,7 +135,7 @@ The chip picker only offers scopes from `available`. The server still re-authz's
 
 ## The shared scope contract
 
-The `{ scopeType, scopeId }` shape has one definition for the wire format, the UI, and resolvers: `langwatch/src/server/scopes/scope.types.ts`.
+The `{ scopeType, scopeId }` shape has one definition for the wire format, the UI, and resolvers: `platform/app/src/server/scopes/scope.types.ts`.
 
 ```ts
 import { SCOPE_TIERS, scopeAssignmentSchema, type ScopeAssignment } from "~/server/scopes/scope.types";
@@ -148,11 +148,11 @@ Rules:
 
 - **camelCase end-to-end.** `scopeType` / `scopeId` everywhere, including the TypeScript SDK. Do not introduce snake_case `scope_type` / `scope_id`. The sync layer passes scope values through verbatim and never defaults or transforms them.
 - **The shared type is the three universal tiers only.** Budget-only tiers (`VIRTUAL_KEY`, `PRINCIPAL`) are NOT in `SCOPE_TIERS`; they live on `GatewayBudget`'s own storage enum. The shared value-type is the API/UI contract; the per-table enum is the storage invariant.
-- **The cascade walk has one home.** `langwatch/src/server/scopes/resolveScopeChain.ts` returns the `PROJECT → TEAM → ORGANIZATION` chain (most-specific-first) for a project context. Apply it as `scopes: { some: { OR: resolveScopeChain(ctx) } }` (junction) or `{ organizationId, OR: resolveScopeChain(ctx) }` (inline). The tie-break policy (which matched row wins) stays in the feature's own resolver.
+- **The cascade walk has one home.** `platform/app/src/server/scopes/resolveScopeChain.ts` returns the `PROJECT → TEAM → ORGANIZATION` chain (most-specific-first) for a project context. Apply it as `scopes: { some: { OR: resolveScopeChain(ctx) } }` (junction) or `{ organizationId, OR: resolveScopeChain(ctx) }` (inline). The tie-break policy (which matched row wins) stays in the feature's own resolver.
 
 ## organizationId anchor and tenancy regimes
 
-Every Prisma model sits in exactly one of three regimes (a partition test fails CI if a model falls through all three). See `langwatch/src/utils/dbMultiTenancyProtection.ts` and `dbOrganizationIdProtection.ts`.
+Every Prisma model sits in exactly one of three regimes (a partition test fails CI if a model falls through all three). See `platform/app/src/utils/dbMultiTenancyProtection.ts` and `dbOrganizationIdProtection.ts`.
 
 - **`ORG_SCOPED_MODELS`**: carries an explicit `organizationId` column. The org guard requires `organizationId` (or a tight unique key like the row id) in every WHERE and every create payload. Inline scoped tables and junction parents live here.
 - **`SCOPED_MODELS`**: accessed via `(scopeType, scopeId)` predicates (junction tables and their parents). Junction parents also carry `organizationId` so the org guard covers them.
@@ -191,10 +191,10 @@ Migrations are immutable once deployed (see `feedback_never_modify_deployed_migr
 ## Reference implementations
 
 - **Decision record:** `dev/docs/adr/021-multi-scope-targeting-and-tenancy.md`
-- **Shared contract:** `langwatch/src/server/scopes/scope.types.ts` (`ScopeAssignment`, `SCOPE_TIERS`) and `resolveScopeChain.ts`
-- **Storage + read grouping:** `langwatch/src/server/api/routers/modelProviders.ts` → `getDefaultModelsForProject`
-- **Write per-scope:** `langwatch/src/server/modelProviders/modelDefaults.service.ts`
-- **Multi-scope authz:** `langwatch/src/server/modelProviders/modelProvider.authz.ts` → `assertCanManageAllScopes`
-- **UI primitive:** `langwatch/src/components/settings/ScopeChipPicker.tsx`
+- **Shared contract:** `platform/app/src/server/scopes/scope.types.ts` (`ScopeAssignment`, `SCOPE_TIERS`) and `resolveScopeChain.ts`
+- **Storage + read grouping:** `platform/app/src/server/api/routers/modelProviders.ts` → `getDefaultModelsForProject`
+- **Write per-scope:** `platform/app/src/server/modelProviders/modelDefaults.service.ts`
+- **Multi-scope authz:** `platform/app/src/server/modelProviders/modelProvider.authz.ts` → `assertCanManageAllScopes`
+- **UI primitive:** `platform/app/src/components/settings/ScopeChipPicker.tsx`
 - **Cascade-FK variant:** `GatewayBudget` model in `prisma/schema.prisma`
 - **Spec:** `specs/model-providers/role-based-default-models.feature`

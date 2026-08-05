@@ -28,13 +28,48 @@ trap cleanup_cluster EXIT
 # ─── PostgreSQL helper ───────────────────────────────────────────────────────
 # Argv-embedded query — only safe for simple queries with no double quotes or
 # single-quoted literals (its only call site is `SELECT 1`). Suites needing
-# real SQL (double-quoted Prisma identifiers, string literals) use a local
-# stdin-based variant instead — see pg_exec in test_dataset_s3_migration_upgrade.
+# real SQL (double-quoted Prisma identifiers, string literals) should use a
+# local stdin-based `kc exec -i ... psql` variant instead.
 pg_query() {
   local pod="$1" query="$2"
   kc exec "$pod" -- \
     sh -c "PGPASSWORD=e2etest psql -U postgres -d langwatch -t -c \"$query\"" \
     | tr -d ' \n'
+}
+
+# ─── in-cluster HTTP probe ───────────────────────────────────────────────────
+# Asks a workload the same question a scraper (or the kubelet) would, from
+# inside its own pod, and echoes "<status> <samples|no-samples>".
+#
+# Reporting the status AND whether the body actually carried metric samples in
+# one value is deliberate: "can metrics be collected" is not answered by a 200
+# alone. A gate that let the caller through but returned an empty body would
+# pass a status-only assertion while collecting nothing.
+#
+# `node -e` rather than curl/wget — the app image is a Node image and is not
+# guaranteed to ship either. `process_cpu_user_seconds_total` is the sentinel
+# because prom-client's default-metrics collector always registers it, so its
+# presence means the registry was really serialized to the caller.
+#
+#   http_probe <target> <port> <path> [bearer-token]
+http_probe() {
+  local target="$1" port="$2" path="$3" token="${4:-}"
+  kc exec "$target" -- node -e '
+const [port, path, token] = process.argv.slice(1);
+const opts = { host: "127.0.0.1", port: Number(port), path, headers: {} };
+if (token) opts.headers.authorization = "Bearer " + token;
+require("http")
+  .get(opts, (r) => {
+    let body = "";
+    r.setEncoding("utf8");
+    r.on("data", (chunk) => { body += chunk; });
+    r.on("end", () => {
+      const hasSamples = /(^|\n)process_cpu_user_seconds_total/.test(body);
+      console.log(r.statusCode + " " + (hasSamples ? "samples" : "no-samples"));
+    });
+  })
+  .on("error", () => console.log("ERR ERR"));
+' "$port" "$path" "$token" 2>/dev/null | tr -d '\r' | tail -1
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -367,7 +402,9 @@ test_app() {
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Workers health check
 # Upgrades the release to enable workers and verifies the pod reaches Ready.
-# Workers have no HTTP endpoint — reaching Running state is the health signal.
+# The worker serves one HTTP listener (the metrics port, 2999): /metrics behind
+# the bearer gate, and the unauthenticated /healthz the kubelet probes. Reaching
+# Ready therefore proves the startupProbe passed, not merely that PID 1 exists.
 # ─────────────────────────────────────────────────────────────────────────────
 test_workers() {
   sep; info "Suite: workers health check"
@@ -380,71 +417,176 @@ test_workers() {
     --wait --timeout "${TIMEOUT}s"
   pass "helm upgrade (workers deployed)"
 
-  # Workers pod should be ready
+  # Workers pod should be ready. This is now a real assertion about the probe:
+  # the pod only goes Ready once the startupProbe's HTTP GET succeeds.
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
   pass "Workers pod ready"
+
+  # ── the liveness probe contract ─────────────────────────────────────────
+  # Regression guard for the CrashLoopBackOff class: probing /metrics instead
+  # of /healthz crash-loops BOTH a stock install (production + no
+  # METRICS_API_KEY ⇒ the endpoint fails closed with 500) and a secretKeyRef
+  # install (an httpGet probe cannot read a Secret ⇒ 401). Assert the live
+  # Deployment probes the unauthenticated liveness path and carries no
+  # credentials, then prove the endpoint really answers that way in-cluster.
+  local startup_path liveness_path
+  startup_path=$(kc get deploy "${RELEASE}-workers" \
+    -o jsonpath='{.spec.template.spec.containers[0].startupProbe.httpGet.path}')
+  liveness_path=$(kc get deploy "${RELEASE}-workers" \
+    -o jsonpath='{.spec.template.spec.containers[0].livenessProbe.httpGet.path}')
+  assert_eq "Workers startupProbe path is /healthz" "$startup_path" "/healthz"
+  assert_eq "Workers livenessProbe path is /healthz" "$liveness_path" "/healthz"
+
+  # No bearer token copied out of the Secret into the podspec, where anyone
+  # with `get deploy` could read it.
+  local probe_headers
+  probe_headers=$(kc get deploy "${RELEASE}-workers" \
+    -o jsonpath='{.spec.template.spec.containers[0].startupProbe.httpGet.httpHeaders}')
+  assert_eq "Workers startupProbe sends no auth header" "$probe_headers" ""
+
+  # Ask the worker the same question the kubelet asks: unauthenticated GET on
+  # the liveness path. Asserting "no-samples" alongside the status also pins
+  # that the liveness body carries no telemetry.
+  assert_eq "Worker /healthz answers 200 unauthenticated, with no telemetry" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /healthz)" "200 no-samples"
+
+  # …and confirm WHY the probe cannot use /metrics in this configuration: the
+  # e2e release sets no metrics API key, so the bearer gate fails closed. If
+  # this ever stops being 500, the constraint that forced /healthz has changed
+  # and the probe design should be revisited.
+  assert_eq "Worker /metrics fails closed without a key" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics)" "500 no-samples"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SUITE: dataset S3 migration — real upgrade across the ADR-032 boundary
+# SUITE: metrics collection
+# Everything above runs in the chart's DEFAULT metrics configuration, where no
+# key is configured — so every live assertion about /metrics so far describes
+# the fail-closed branch. The branch an operator actually runs in production
+# (a key IS set, and Prometheus scrapes with a bearer) had no live coverage.
+#
+# This suite installs the two configurations that were only ever template-
+# tested and asks, in a real cluster: do both tiers come up, and can metrics
+# actually be collected?
+#
+# See specs/server/metrics-collection.feature.
+# ─────────────────────────────────────────────────────────────────────────────
+METRICS_KEY="e2e-metrics-key"
+METRICS_SECRET="lw-metrics-key"
+
+test_metrics_collection() {
+  sep; info "Suite: metrics collection (key configured)"
+
+  # ── the key as a plain chart value ──────────────────────────────────────
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1 \
+    --set workers.enabled=true \
+    --set workers.replicaCount=1 \
+    --set app.telemetry.metrics.enabled=true \
+    --set-string "app.telemetry.metrics.apiKey.value=${METRICS_KEY}" \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade (metrics enabled, key as plain value)"
+
+  # Both tiers must still converge. Turning the gate on must not cost the
+  # workers their startupProbe — the whole point of a credential-free
+  # liveness path.
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
+  pass "App pod ready with metrics enabled"
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
+  pass "Workers pod ready with metrics enabled"
+
+  # Liveness must stay credential-free now that a key exists. If configuring a
+  # key ever started requiring one from the kubelet, every keyed install would
+  # crash-loop — the exact regression this PR exists to prevent.
+  assert_eq "Worker /healthz stays unauthenticated once a key is set" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /healthz)" "200 no-samples"
+
+  # The gate: no credential and a wrong credential are both refused, and
+  # neither leaks samples.
+  assert_eq "Worker /metrics rejects an unauthenticated scrape" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics)" "401 no-samples"
+  assert_eq "Worker /metrics rejects the wrong key" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics wrong-key)" \
+    "401 no-samples"
+
+  # …and the path Prometheus actually uses: an authenticated scrape really
+  # collects samples. This is the assertion the suite exists for.
+  assert_eq "Worker /metrics serves samples to an authenticated scrape" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics "$METRICS_KEY")" \
+    "200 samples"
+
+  # The app tier carries the same gate on its own registry.
+  assert_eq "App /metrics rejects an unauthenticated scrape" \
+    "$(http_probe "deploy/${RELEASE}-app" 5560 /metrics)" "401 no-samples"
+  assert_eq "App /metrics serves samples to an authenticated scrape" \
+    "$(http_probe "deploy/${RELEASE}-app" 5560 /metrics "$METRICS_KEY")" \
+    "200 samples"
+
+  # ── the same key delivered from a Secret ────────────────────────────────
+  # Rendering a secretKeyRef correctly is not the same as the value arriving
+  # in the process. e2e-overlays.sh proves the reference renders; only a live
+  # install proves the container can actually authenticate with it.
+  sep; info "Suite: metrics collection (key from a Secret)"
+
+  kc delete secret "$METRICS_SECRET" 2>/dev/null || true
+  kc create secret generic "$METRICS_SECRET" \
+    --from-literal="apiKey=${METRICS_KEY}"
+  pass "Metrics key Secret created"
+
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1 \
+    --set workers.enabled=true \
+    --set workers.replicaCount=1 \
+    --set app.telemetry.metrics.enabled=true \
+    --set "app.telemetry.metrics.apiKey.secretKeyRef.name=${METRICS_SECRET}" \
+    --set app.telemetry.metrics.apiKey.secretKeyRef.key=apiKey \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade (metrics enabled, key from secretKeyRef)"
+
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
+  pass "Workers pod ready with the key delivered from a Secret"
+
+  # The probe still carries nothing — a kubelet httpGet cannot read a Secret,
+  # which is precisely why the liveness path must not be gated.
+  assert_eq "Worker /healthz stays unauthenticated under secretKeyRef delivery" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /healthz)" "200 no-samples"
+
+  # The value really made it out of the Secret and into the auth gate.
+  assert_eq "Worker /metrics serves samples using the Secret-delivered key" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics "$METRICS_KEY")" \
+    "200 samples"
+
+  # The Secret is deliberately left in place. Deleting it here would leave the
+  # live release referencing a Secret that no longer exists, and any pod that
+  # restarted before the next suite's upgrade would wedge in
+  # CreateContainerConfigError. The next suite re-applies values-e2e.yaml
+  # (metrics off), which drops the reference; the namespace teardown reclaims
+  # the Secret itself.
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: upgrade across the Deployment-strategy boundary
 #
 # Reproduces the actual customer upgrade path: app/workers are already
 # running from test_app/test_workers with NO strategy key rendered (the
 # pre-#5083 chart never set one, so the live Deployments carry only the
-# k8s-API-server-defaulted RollingUpdate). This suite seeds a legacy
-# `contentLayout=postgres` dataset directly via SQL — the app's own UI/API
-# can no longer create postgres-layout rows (read-only migration source
-# since #4895) — then upgrades with local-FS + the migration hook enabled
-# for the FIRST time, which is exactly when the Deployment strategy flips
-# to the kill-then-start RollingUpdate override. A regression here means
-# `helm upgrade` breaks for every existing self-hosted install.
+# k8s-API-server-defaulted RollingUpdate). This suite upgrades with the
+# local-FS stored-objects backend enabled for the FIRST time, which is
+# exactly when the Deployment strategy flips to the kill-then-start
+# RollingUpdate override. A regression here means `helm upgrade` breaks
+# for every existing self-hosted install.
 # ─────────────────────────────────────────────────────────────────────────────
-test_dataset_s3_migration_upgrade() {
-  sep; info "Suite: dataset S3 migration upgrade"
+test_upgrade_strategy_boundary() {
+  sep; info "Suite: upgrade across the Deployment-strategy boundary"
 
-  local pg_pod="${RELEASE}-postgresql-0"
-
-  # psql over stdin (no `-c "<sql>"` argv layer) so double-quoted identifiers
-  # need no shell escaping at all.
-  pg_exec() {
-    kc exec -i "$pg_pod" -- env PGPASSWORD=e2etest psql -U postgres -d langwatch -v ON_ERROR_STOP=1 "$@"
-  }
-
-  # Minimal org/team/project/dataset graph, inserted directly (no auth flow
-  # needed — this is disposable seed data, not an auth-path test). IDs are
-  # explicit because Prisma's @default(nanoid()) is applied client-side, not
-  # a DB default. Delete-before-insert makes this safe to re-run against a
-  # reused cluster (KEEP_CLUSTER=true local dev loop) — CI always starts from
-  # a fresh Kind cluster, but a local rerun without this would hit a
-  # duplicate-key error on the second pass.
-  pg_exec <<'SQL' >/dev/null
-DELETE FROM "DatasetRecord" WHERE "projectId" = 'e2e_project';
-DELETE FROM "Dataset" WHERE "projectId" = 'e2e_project';
-DELETE FROM "Project" WHERE id = 'e2e_project';
-DELETE FROM "Team" WHERE id = 'e2e_team';
-DELETE FROM "Organization" WHERE id = 'e2e_org';
-INSERT INTO "Organization" (id, name, slug) VALUES ('e2e_org', 'E2E Org', 'e2e-org');
-INSERT INTO "Team" (id, name, slug, "organizationId") VALUES ('e2e_team', 'E2E Team', 'e2e-team', 'e2e_org');
-INSERT INTO "Project" (id, name, slug, "apiKey", "teamId", language, framework) VALUES ('e2e_project', 'E2E Project', 'e2e-project', 'e2e_api_key', 'e2e_team', 'other', 'other');
-INSERT INTO "Dataset" (id, "projectId", name, slug, "columnTypes", "contentLayout", status) VALUES ('e2e_legacy_ds', 'e2e_project', 'Legacy Dataset', 'legacy-dataset', '[{"name":"input","type":"string"}]', 'postgres', 'ready');
-INSERT INTO "DatasetRecord" (id, "datasetId", "projectId", entry)
-  SELECT 'e2e_rec_' || g, 'e2e_legacy_ds', 'e2e_project', jsonb_build_object('input', 'row ' || g)
-  FROM generate_series(1,5) g;
-SQL
-  pass "Seeded legacy contentLayout=postgres dataset (5 records)"
-
-  # The actual regression test: this upgrade is the first to render a
-  # Deployment strategy at all. On the pre-fix chart (`type: Recreate` +
-  # `rollingUpdate: null`) this failed with "spec.strategy.rollingUpdate:
-  # Forbidden" because Helm's 3-way merge can't delete a live
-  # k8s-defaulted field the previous release's manifest never mentioned.
   hc upgrade "$RELEASE" "$CHART_DIR" \
     -f "$CHART_DIR/tests/values-e2e.yaml" \
     --set app.replicaCount=1 \
     --set workers.enabled=true \
     --set workers.replicaCount=1 \
     --set app.storedObjects.localFilesystem.enabled=true \
-    --set datasetS3Migration.enabled=true \
     --wait --timeout "${TIMEOUT}s"
   pass "helm upgrade succeeds across the strategy boundary"
 
@@ -454,29 +596,6 @@ SQL
 
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
-
-  local job_status
-  job_status=$(kc get job "${RELEASE}-dataset-s3-migration" \
-    -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')
-  assert_eq "migration Job completed" "$job_status" "True"
-
-  local layout row_count
-  layout=$(pg_exec -tA <<'SQL'
-SELECT "contentLayout" FROM "Dataset" WHERE id='e2e_legacy_ds';
-SQL
-  )
-  row_count=$(pg_exec -tA <<'SQL'
-SELECT "rowCount" FROM "Dataset" WHERE id='e2e_legacy_ds';
-SQL
-  )
-  assert_eq "dataset flipped to s3_jsonl" "$layout" "s3_jsonl"
-  assert_eq "migrated rowCount matches seeded records" "$row_count" "5"
-
-  local app_pod chunk_lines
-  app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" -o jsonpath='{.items[0].metadata.name}')
-  chunk_lines=$(kc exec "$app_pod" -- sh -c \
-    "wc -l < /var/lib/langwatch/objects/datasets/e2e_project/e2e_legacy_ds/chunk-00000.jsonl" | tr -d ' ')
-  assert_eq "PVC chunk file has all 5 migrated rows" "$chunk_lines" "5"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -636,9 +755,9 @@ main() {
   app_image="${app_repo}:${app_tag}"
   if ! docker image inspect "$app_image" &>/dev/null 2>&1; then
     local repo_root="${CHART_DIR}/../.."
-    if [[ -f "$repo_root/Dockerfile" ]]; then
+    if [[ -f "$repo_root/infra/docker/Dockerfile" ]]; then
       info "Building app image: $app_image"
-      docker build -t "$app_image" "$repo_root"
+      docker build -t "$app_image" -f "$repo_root/infra/docker/Dockerfile" "$repo_root"
     fi
   fi
   if docker image inspect "$app_image" &>/dev/null 2>&1; then
@@ -655,7 +774,8 @@ main() {
   test_resources
   test_app
   test_workers
-  test_dataset_s3_migration_upgrade
+  test_metrics_collection
+  test_upgrade_strategy_boundary
   test_upgrade
   test_external_clickhouse
   test_cold_storage_and_backup

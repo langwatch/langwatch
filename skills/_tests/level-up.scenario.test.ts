@@ -1,6 +1,5 @@
 import scenario from "@langwatch/scenario";
 import fs from "fs";
-import { execSync } from "child_process";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
 import os from "os";
@@ -8,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
+  copyFixtureToWorkDir,
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
@@ -36,9 +36,10 @@ describe("Level-up Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-level-up-py-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-openai",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -88,9 +89,10 @@ describe("Level-up Skill", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-level-up-ts-")
       );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "typescript-vercel",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -138,9 +140,10 @@ describe("Level-up Skill", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-level-up-langgraph-")
       );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-langgraph",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -187,9 +190,10 @@ describe("Level-up Skill", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-level-up-mastra-")
       );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/typescript-mastra")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "typescript-mastra",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({

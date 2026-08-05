@@ -45,3 +45,14 @@ Feature: Expanded text dialog handles overflow for large content
     Given a large JSON object displayed in the ExpandedTextDialog
     When I toggle the "Formatted" switch off
     Then all content is accessible within the dialog
+
+  # ============================================================================
+  # The overflow probe never outlives the component
+  # ============================================================================
+
+  @integration
+  Scenario: The overflow measurement is dropped when the text is unmounted
+    Given a HoverableBigText is on the page with its overflow probe pending
+    When the component is unmounted before the probe runs
+    Then no measurement remains scheduled
+    And running every pending timer raises nothing

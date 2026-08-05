@@ -1,0 +1,55 @@
+{%- capture _emoji -%}{% if trigger.alertType == 'INFO' %}ℹ️{% elsif trigger.alertType == 'CRITICAL' %}🔴{% else %}🚨{% endif %}{%- endcapture -%}
+{%- capture _metric_field -%}
+*Metric*
+{{ metric.label | mrkdwn_escape }}
+{%- endcapture -%}
+{%- capture _condition_field -%}
+*Condition*
+{{ condition.operatorLabel }} {{ condition.threshold }} over the {{ condition.timePeriodLabel }}
+{%- endcapture -%}
+{%- capture _value_field -%}
+*Current value*
+{{ currentValue }}{% if previousValue != nil %} (was {{ previousValue }}){% endif %}
+{%- endcapture -%}
+{%- comment -%}
+`history` runs oldest-first and can hold far more points than the chart shows.
+A plain `limit: 20` would plot the OLDEST 20 buckets — the breach that fired the
+alert would be missing from its own chart. So skip ahead to the last 20 buckets
+with an offset, keeping the series chronological for the x-axis.
+{%- endcomment -%}
+{%- assign _history_size = history | size -%}
+{%- assign _chart_offset = _history_size | minus: 20 -%}
+{%- if _chart_offset < 0 -%}{%- assign _chart_offset = 0 -%}{%- endif -%}
+{%- capture _points -%}
+{%- for point in history offset: _chart_offset limit: 20 -%}
+{% unless forloop.first %},{% endunless %}{ "label": {{ point.timestamp | date: "%H:%M" | json }}, "value": {{ point.value }} }
+{%- endfor -%}
+{%- endcapture -%}
+{%- capture _categories -%}
+{%- for point in history offset: _chart_offset limit: 20 -%}
+{% unless forloop.first %},{% endunless %}{{ point.timestamp | date: "%H:%M" | json }}
+{%- endfor -%}
+{%- endcapture -%}
+{%- assign _newest_first = history | reverse -%}
+{%- capture _recent -%}
+Recent: {% for point in _newest_first limit: 8 %}`{{ point.timestamp | date: "%H:%M" }}` {{ point.value }}{% unless forloop.last %} · {% endunless %}{% endfor %}
+{%- endcapture -%}
+{%- capture _links -%}
+<{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>
+{%- endcapture -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | truncate: 140 | prepend: " " | prepend: _emoji | json }}, "emoji": true } },
+  { "type": "section", "fields": [
+    { "type": "mrkdwn", "text": {{ _metric_field | json }} },
+    { "type": "mrkdwn", "text": {{ _condition_field | json }} },
+    { "type": "mrkdwn", "text": {{ _value_field | json }} }
+  ] }
+  {%- if reason == "heartbeat-absence" -%}
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": "_No qualifying data was seen in the window._" } }
+  {%- endif -%}
+  {%- if history != empty -%}
+  ,{ "type": "data_visualization", "block_id": "metric_trend", "title": {{ metric.label | truncate: 50 | json }}, "chart": { "type": "area", "series": [{ "name": {{ metric.label | truncate: 20 | json }}, "data": [ {{ _points }} ] }], "axis_config": { "categories": [ {{ _categories }} ], "x_label": "Time", "y_label": {{ metric.label | truncate: 50 | json }} } } }
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _recent | json }} }] }
+  {%- endif -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _links | json }} }] }
+]

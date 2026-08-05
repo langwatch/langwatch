@@ -1,0 +1,78 @@
+---
+title: Run Langy on Your Own OpenAI Plan (Codex)
+description: Sign in with your OpenAI account so Langy runs on your ChatGPT subscription through the LangWatch AI Gateway instead of per-token API billing.
+sidebarTitle: Codex
+keywords: codex, run codex on your own openai plan, openai subscription harness, langy codex
+---
+
+Codex signs in with OpenAI's device-code OAuth, the same flow the Codex CLI itself uses to authenticate. It is the one provider you connect by signing in rather than pasting an API key.
+
+<Frame caption="When Langy asks for a model, Codex leads the provider grid with a Recommended badge. Every other provider takes an API key; Codex takes a sign-in.">
+  ![The Langy panel's model setup, with Codex recommended at the top of the provider grid](/images/langy/codex/onboarding-recommended.png)
+</Frame>
+
+## Sign in with your OpenAI account
+
+<Steps>
+  <Step title="Open settings and add a provider">
+    In model-provider settings, choose **Add provider**, then pick **Codex (OpenAI account)** from the list.
+
+    <Frame caption="The Add Model Provider list. Codex (OpenAI account) is at the bottom.">
+      ![The Add Model Provider list with Codex at the bottom](/images/langy/codex/settings-add-provider.png)
+    </Frame>
+  </Step>
+  <Step title="Choose Codex and connect">
+    Codex replaces the usual API-key field with an OpenAI account sign-in. Pick the scope, then connect. Once connected, the drawer shows the account and confirms that usage counts against your OpenAI subscription, not API credits.
+
+    <Frame caption="The Codex provider drawer, connected to an OpenAI account. Usage counts against your OpenAI subscription, not API credits.">
+      ![The Codex provider drawer connected to an OpenAI account](/images/langy/codex/signin-drawer.png)
+    </Frame>
+  </Step>
+  <Step title="Approve the device code">
+    Open `auth.openai.com/codex/device`, enter the code shown, and approve. The approval lands on OpenAI's own Codex sign-in screen because Langy uses the same OAuth client the Codex CLI uses. Once approved, the connection completes on its own.
+
+    <Frame caption="The device-code step. Enter the code on OpenAI's device page while Langy waits for the approval.">
+      ![The Langy panel showing a device code and waiting for approval on OpenAI's device page](/images/langy/codex/device-code.png)
+    </Frame>
+  </Step>
+</Steps>
+
+After you connect, a dialog offers to set Codex as your coding default. Accepting applies Codex to the Langy and Fast roles. Your playground, evaluations, and workflows keep their current model.
+
+Once connected, the `gpt-5.6` models in the Langy model menu run through Codex and carry the Codex icon, distinct from the plain OpenAI mark.
+
+<Frame caption="The Langy model menu after connecting. The gpt-5.6 models carry the Codex icon; gpt-5.6-terra is the default.">
+  ![The Langy model menu with gpt-5.6 models carrying the Codex icon](/images/langy/models/model-menu-codex-icon.png)
+</Frame>
+
+## What Codex is scoped to
+
+Codex runs only through the LangWatch AI Gateway, on the gateway's Responses endpoint, riding the same per-project virtual key the rest of Langy uses. Tracing, rate limits, budgets, and model policy still apply, exactly as they do for any other model. See [Models and bring your own key](/langy/models).
+
+Codex is available only for Langy and the Fast tier, not for the playground, evaluations, or workflows. This scope follows OpenAI's terms, which the product states verbatim as licensing Codex for "coding-assistant harnesses and light AI assists, not general inference."
+
+<Note>
+Codex uses your OpenAI subscription via OAuth device sign-in. Every other provider, including Anthropic, is configured with an API key. See [Models and bring your own key](/langy/models).
+</Note>
+
+## Why teams run Langy on their own plan
+
+Langy reads production trace data and does heavy token work over many turns. Running it on your own OpenAI subscription keeps that token flow, and the account it bills, under your control:
+
+- **Cost.** A flat subscription instead of per-token API billing for Langy's usage.
+- **Data control.** The token flow stays on your own account. For what leaves your environment and where it goes, see [Data flow and privacy](/langy/security/data-flow-and-privacy).
+
+## Troubleshooting
+
+- **Session expired.** If the OAuth session dies, Langy shows a re-auth card. Sign in again through the same settings drawer.
+- **Plan limit reached.** If your plan hits its usage cap, Langy shows a switch-model card. Pick another model in the composer for the turn. See [Models and bring your own key](/langy/models).
+
+<Info>
+**Also check:** [Models and bring your own key](/langy/models), [Token usage and cost](/langy/token-usage-and-cost).
+</Info>
+
+## Reference
+
+- [Models and bring your own key](/langy/models)
+- [Token usage and cost](/langy/token-usage-and-cost)
+- [Data flow and privacy](/langy/security/data-flow-and-privacy)

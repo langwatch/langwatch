@@ -1,0 +1,31 @@
+{%- capture _sub -%}
+{{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}
+{%- endcapture -%}
+{%- assign _count = traces | size -%}
+{%- assign _total_cost = 0 -%}
+{%- for t in traces -%}{%- assign _total_cost = _total_cost | plus: t.costUsd -%}{%- endfor -%}
+{%- capture _body -%}
+{%- if report.isEmpty -%}
+Nothing matched in this window.
+{%- else -%}
+*{{ _count }}* {% if _count == 1 %}trace{% else %}traces{% endif %} · ${{ _total_cost | round: 4 }} total
+{%- endif -%}
+{%- endcapture -%}
+{%- capture _rows_md -%}
+{% for t in traces limit: 10 %}• <{{ t.url }}|`{{ t.traceId | truncate: 10 }}`> {{ t.input | truncate: 80 | mrkdwn_escape }}{% unless forloop.last %}
+{% endunless %}{% endfor %}
+{%- endcapture -%}
+{%- capture _view -%}
+<{{ viewUrl }}|View in LangWatch ↗> · {{ occurredAt | date: "%b %d, %H:%M" }}
+{%- endcapture -%}
+[
+  { "type": "card",
+    "title": { "type": "mrkdwn", "text": {{ trigger.name | prepend: "📊 " | truncate: 150 | json }} },
+    "subtitle": { "type": "mrkdwn", "text": {{ _sub | truncate: 150 | json }} },
+    "body": { "type": "mrkdwn", "text": {{ _body | json }} }
+  }
+  {%- unless report.isEmpty -%}
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _rows_md | json }} } }
+  {%- endunless -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _view | json }} }] }
+]

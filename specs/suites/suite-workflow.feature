@@ -317,12 +317,9 @@ Feature: Suite Workflow — Create, Run, See Results
     When I expand the run row
     Then I see "100% (3/3)" for that pair
 
-  @integration @unimplemented
-  Scenario: Most recent run is expanded by default
-    Given suite "Critical Path" has 2 completed runs
-    When I view the run history
-    Then the most recent run is expanded
-    And the older run is collapsed
+  # Most-recent-run-expanded behavior is specced and bound in
+  # specs/suites/simulations-performance.feature ("Only the most recent
+  # execution starts expanded").
 
   @integration @unimplemented
   Scenario: Collapse and expand run rows

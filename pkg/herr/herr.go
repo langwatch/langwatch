@@ -45,6 +45,10 @@ type M map[string]any
 func New(ctx context.Context, code Code, meta M, reasons ...error) E {
 	spanContext := trace.SpanContextFromContext(ctx)
 
+	// Guard against a nil reason: a nil in the reasons slice is always a caller
+	// bug (a helper returned (nil, nil) and the caller wrapped it unconditionally)
+	// and would otherwise surface as a confusing nil-deref far from the source.
+	// Fail loud at the construction site instead.
 	for _, reason := range reasons {
 		if reason == nil {
 			panic("herr.New: nil reason provided for " + code.String())
@@ -65,6 +69,30 @@ func New(ctx context.Context, code Code, meta M, reasons ...error) E {
 		TraceID: spanContext.TraceID(),
 		SpanID:  spanContext.SpanID(),
 		Stack:   stack,
+		Reasons: reasons,
+	}
+}
+
+// NewLight is New without stack capture — for EXPECTED, handled control-flow
+// codes that fire on the hot path and never need a stack to debug (e.g.
+// conversation-busy, session-not-found). It skips stacktrace.GetCallerFrames so
+// a per-request occurrence doesn't pay the runtime.Callers cost. Everything else
+// (code, meta, OTel span context, reasons, the nil-reason guard) matches New;
+// only Stack is left empty.
+func NewLight(ctx context.Context, code Code, meta M, reasons ...error) E {
+	spanContext := trace.SpanContextFromContext(ctx)
+
+	for _, reason := range reasons {
+		if reason == nil {
+			panic("herr.NewLight: nil reason provided for " + code.String())
+		}
+	}
+
+	return E{
+		Code:    code,
+		Meta:    meta,
+		TraceID: spanContext.TraceID(),
+		SpanID:  spanContext.SpanID(),
 		Reasons: reasons,
 	}
 }
