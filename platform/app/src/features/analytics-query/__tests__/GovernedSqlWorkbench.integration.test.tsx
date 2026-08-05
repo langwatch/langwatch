@@ -16,6 +16,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GovernedSqlWorkbench } from "../components/GovernedSqlWorkbench";
@@ -83,6 +84,23 @@ vi.mock("~/utils/compat/next-dynamic", () => {
 
   return { __esModule: true, default: () => StubMonacoEditor };
 });
+
+// Chart mode's own behavior is covered by its own suites; what belongs to THIS
+// suite is the wiring — which result and which label the workbench hands the
+// chart slot. The stub makes both observable.
+vi.mock("../components/LazyGovernedSqlChartMode", () => ({
+  LazyGovernedSqlChartMode: (props: {
+    result: { rows: readonly Record<string, unknown>[] };
+    submittedLabel?: string;
+  }) => (
+    <div
+      data-testid="stub-chart-mode"
+      data-submitted-label={props.submittedLabel}
+    >
+      {JSON.stringify(props.result.rows)}
+    </div>
+  ),
+}));
 
 const SQL =
   "SELECT trace_id FROM analytics.traces_daily WHERE id = {since:String}";
@@ -172,6 +190,25 @@ describe("the governed SQL workbench", () => {
         expect(
           screen.getByRole("button", { name: "Run query" }),
         ).toBeInTheDocument();
+      });
+    });
+
+    describe("when the member opens Chart mode on a successful result", () => {
+      /** @scenario "Switching between Table and Chart never reruns SQL" */
+      it("feeds the chart the submitted result and its query, and sends nothing", async () => {
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+        await screen.findByTestId("governed-sql-result-summary");
+
+        await userEvent.click(screen.getByRole("tab", { name: "Chart" }));
+
+        const chart = await screen.findByTestId("stub-chart-mode");
+        // The rows the transport returned, not the draft or a re-fetch.
+        expect(chart).toHaveTextContent("trace-1");
+        // The outcome's own statement describes the chart, collapsed to a line.
+        expect(chart).toHaveAttribute("data-submitted-label", SQL);
+        expect(harness.mutation).toHaveBeenCalledTimes(1);
       });
     });
 

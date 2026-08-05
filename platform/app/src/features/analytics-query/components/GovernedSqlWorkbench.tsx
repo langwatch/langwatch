@@ -30,6 +30,7 @@ import { GovernedSchemaBrowser } from "./GovernedSchemaBrowser";
 import { GovernedSqlEditor } from "./GovernedSqlEditor";
 import { GovernedSqlParametersEditor } from "./GovernedSqlParametersEditor";
 import { GovernedSqlResultPane } from "./GovernedSqlResultPane";
+import { LazyGovernedSqlChartMode } from "./LazyGovernedSqlChartMode";
 
 /** What a refusal gives the editor and the parameters form to work with. */
 interface FailureView {
@@ -39,6 +40,18 @@ interface FailureView {
 
 /** Stable identity, so an unchanged "nothing to report" never re-renders a form. */
 const NO_FAILURE_VIEW: FailureView = { markers: [], missingParameters: [] };
+
+/**
+ * The chart's accessible description of what it draws: the submitted statement
+ * that produced the visible result — the outcome's own snapshot, so a stale
+ * result is described by the query that ran, not the one being typed —
+ * collapsed to one line and cut short, because an accessible name is read
+ * aloud in full.
+ */
+function chartResultLabel(sql: string): string {
+  const collapsed = sql.replace(/\s+/g, " ").trim();
+  return collapsed.length > 120 ? `${collapsed.slice(0, 117)}…` : collapsed;
+}
 
 function failureView(state: GovernedSqlRequestState): FailureView {
   const { outcome } = state;
@@ -198,7 +211,20 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
           missingParameters={failure.missingParameters}
         />
 
-        <GovernedSqlResultPane state={query.state} />
+        <GovernedSqlResultPane
+          state={query.state}
+          // The lazy boundary, not `GovernedSqlChartMode`: importing that here
+          // would put the whole Vega runtime in the entry chunk, and nothing
+          // would look wrong (vegaLazyBoundary.unit.test.ts is what would).
+          chartSlot={
+            query.state.outcome?.kind === "result" ? (
+              <LazyGovernedSqlChartMode
+                result={query.state.outcome.result}
+                submittedLabel={chartResultLabel(query.state.outcome.snapshot.sql)}
+              />
+            ) : undefined
+          }
+        />
       </VStack>
     </HStack>
   );
