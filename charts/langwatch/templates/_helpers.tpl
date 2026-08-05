@@ -597,6 +597,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: BASE_HOST
   value: {{ .Values.app.http.baseHost | default "http://localhost:5560" }}
 
+{{/* The address this installation answers on, and the one BetterAuth measures
+     every callback, redirect and same-origin check against. Shared rather than
+     app-only: the auth module is imported wherever the app code is, so a
+     workers or cronjob process without it boots into
+     "[better-auth] Base URL could not be determined" and builds its links off
+     nothing. Same value everywhere, so no process can disagree with another
+     about what this installation is called. */}}
+- name: NEXTAUTH_URL
+  value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
+
 - name: SKIP_ENV_VALIDATION
   value: {{ .Values.app.features.skipEnvValidation | default false | quote }}
 {{- if .Values.app.features.disableStrictPiiRedaction }}
