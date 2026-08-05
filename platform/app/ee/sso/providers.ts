@@ -2,7 +2,8 @@
 /**
  * Identity-provider wiring for enterprise SSO: the BetterAuth
  * `socialProviders` map (Google, GitHub, GitLab, Azure AD) and the
- * genericOAuth configs (Auth0, Okta, AWS Cognito, OneLogin).
+ * genericOAuth configs (Auth0, Okta, AWS Cognito, OneLogin, and any other
+ * OpenID Connect provider).
  * `src/server/better-auth/index.ts` is
  * the assembly point that feeds these into `betterAuth()`; the federation
  * capability itself lives here, under the Enterprise license, alongside the
@@ -177,6 +178,19 @@ export const parseIssuerUrl = (issuer: string, envName: string): URL => {
 };
 
 /**
+ * The callback URL an operator registers with their identity provider. One
+ * shape for every provider we document, which is the whole reason the legacy
+ * path is pinned rather than left at the plugin default.
+ */
+export const legacyCallbackUrl = ({
+  baseUrl,
+  providerId,
+}: {
+  baseUrl: string;
+  providerId: string;
+}): string => `${baseUrl}/api/auth/callback/${providerId}`;
+
+/**
  * Discovery URL for an OpenID Connect issuer. Normalizes the issuer first, so
  * an operator who omits the scheme or leaves a trailing slash still gets a
  * well-formed URL rather than a 404 at first sign-in.
@@ -224,7 +238,7 @@ export const oidcProviderConfig = ({
   discoveryUrl: discoveryUrlFor(issuer, issuerEnvName),
   scopes: ["openid", "email", "profile"],
   pkce: true,
-  redirectURI: `${baseUrl}/api/auth/callback/${providerId}`,
+  redirectURI: legacyCallbackUrl({ baseUrl, providerId }),
   mapProfileToUser: (profile) => ({
     name: fallbackName(profile),
     email: profile.email,
@@ -257,6 +271,9 @@ type GenericOAuthEnv = Pick<typeof env, "NEXTAUTH_PROVIDER" | "NEXTAUTH_URL"> &
       | "ONELOGIN_CLIENT_ID"
       | "ONELOGIN_CLIENT_SECRET"
       | "ONELOGIN_ISSUER"
+      | "OIDC_CLIENT_ID"
+      | "OIDC_CLIENT_SECRET"
+      | "OIDC_ISSUER"
     >
   >;
 
@@ -269,7 +286,7 @@ type GenericOAuthEnv = Pick<typeof env, "NEXTAUTH_PROVIDER" | "NEXTAUTH_URL"> &
  * helpers and each carries a quirk of its own (Auth0 forces a fresh login
  * prompt, Okta needs its issuer normalized before the helper concatenates it).
  */
-const PLAIN_OIDC_PROVIDERS = [
+export const PLAIN_OIDC_PROVIDERS = [
   {
     providerId: "cognito",
     issuerEnvName: "COGNITO_ISSUER",
@@ -292,7 +309,41 @@ const PLAIN_OIDC_PROVIDERS = [
       issuer: e.ONELOGIN_ISSUER,
     }),
   },
+  {
+    // Any other OpenID Connect identity provider. Everything above is this
+    // with a name on it: the named entries exist because operators look for
+    // their provider by name and each has setup steps worth documenting, not
+    // because the wiring differs. Anyone whose IdP is not listed configures it
+    // here rather than having to claim it is one of the others.
+    providerId: "oidc",
+    issuerEnvName: "OIDC_ISSUER",
+    credentials: (e: GenericOAuthEnv) => ({
+      clientId: e.OIDC_CLIENT_ID,
+      clientSecret: e.OIDC_CLIENT_SECRET,
+      issuer: e.OIDC_ISSUER,
+    }),
+  },
 ] as const;
+
+/**
+ * Every generic-OAuth provider whose `redirectURI` is pinned to the legacy
+ * `/api/auth/callback/<providerId>` path instead of the genericOAuth plugin's
+ * own `/api/auth/oauth2/callback/<providerId>`.
+ *
+ * `createApiRouter` registers its legacy-callback rewrites from this list, so
+ * the two halves cannot drift: a provider that pins the legacy path without a
+ * matching rewrite sends its IdP round-trip to better-auth's core social
+ * callback instead of the plugin's, which is a second code path nobody chose
+ * and which no test would notice, because sign-in still succeeds.
+ *
+ * Derived from the table above rather than restated, so adding a row is enough.
+ * Auth0 and Okta are listed by hand because they are hand-coded branches.
+ */
+export const LEGACY_CALLBACK_PROVIDER_IDS: readonly string[] = [
+  "auth0",
+  "okta",
+  ...PLAIN_OIDC_PROVIDERS.map((provider) => provider.providerId),
+];
 
 /**
  * Builds the BetterAuth genericOAuth `config` array from environment
@@ -335,7 +386,10 @@ export const buildGenericOAuthConfigs = (
       // BetterAuth serves that path because the genericOAuth plugin registers
       // each config in `ctx.socialProviders`, which is what the core callback
       // route resolves against.
-      redirectURI: `${e.NEXTAUTH_URL}/api/auth/callback/auth0`,
+      redirectURI: legacyCallbackUrl({
+        baseUrl: e.NEXTAUTH_URL,
+        providerId: "auth0",
+      }),
       mapProfileToUser: (profile) => ({
         name: fallbackName(profile),
         email: profile.email,
@@ -363,7 +417,10 @@ export const buildGenericOAuthConfigs = (
       // Same backward-compat reasoning as auth0 above — pin the legacy
       // NextAuth callback path so existing Okta applications don't need
       // their allowed callback list updated during cutover.
-      redirectURI: `${e.NEXTAUTH_URL}/api/auth/callback/okta`,
+      redirectURI: legacyCallbackUrl({
+        baseUrl: e.NEXTAUTH_URL,
+        providerId: "okta",
+      }),
       mapProfileToUser: (profile) => ({
         name: fallbackName(profile),
         email: profile.email,

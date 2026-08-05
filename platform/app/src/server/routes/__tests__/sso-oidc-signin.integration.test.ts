@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Proves the Cognito and OneLogin wiring end to end at the HTTP layer
- * (specs/auth/sso-cognito-onelogin.feature).
+ * (specs/auth/sso-oidc-providers.feature).
  *
  * Nothing on the path under test is stubbed: this boots the real app auth
  * route, which builds a real BetterAuth instance from our real provider
@@ -73,6 +73,9 @@ const TOUCHED = [
   "ONELOGIN_CLIENT_ID",
   "ONELOGIN_CLIENT_SECRET",
   "ONELOGIN_ISSUER",
+  "OIDC_CLIENT_ID",
+  "OIDC_CLIENT_SECRET",
+  "OIDC_ISSUER",
 ];
 
 /**
@@ -156,6 +159,9 @@ describe("given a self-hosted deployment federating to an OIDC identity provider
     process.env.ONELOGIN_CLIENT_ID = "onelogin-client-id";
     process.env.ONELOGIN_CLIENT_SECRET = "onelogin-client-secret";
     process.env.ONELOGIN_ISSUER = idp.issuer;
+    process.env.OIDC_CLIENT_ID = "oidc-client-id";
+    process.env.OIDC_CLIENT_SECRET = "oidc-client-secret";
+    process.env.OIDC_ISSUER = idp.issuer;
   });
 
   afterAll(async () => {
@@ -170,6 +176,7 @@ describe("given a self-hosted deployment federating to an OIDC identity provider
   describe.each([
     { provider: "cognito", clientId: "cognito-client-id" },
     { provider: "onelogin", clientId: "onelogin-client-id" },
+    { provider: "oidc", clientId: "oidc-client-id" },
   ])("when NEXTAUTH_PROVIDER is $provider", ({ provider, clientId }) => {
     let started: { status: number; url: string | undefined };
     let authorizeUrl: URL;

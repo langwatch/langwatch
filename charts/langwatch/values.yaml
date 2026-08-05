@@ -476,7 +476,7 @@ app:
     # Authentication provider to use. This value is passed to the app verbatim
     # as NEXTAUTH_PROVIDER, so it has to be one the app recognises:
     #   email (default), google, github, gitlab, azure-ad, auth0, okta,
-    #   cognito, onelogin
+    #   cognito, onelogin, oidc
     # Note that Azure AD is 'azure-ad' here while its credentials live under
     # providers.azureAd below — the first is the app's provider id, the second
     # is this chart's key for the AZURE_AD_* variables.
@@ -494,9 +494,6 @@ app:
     providers:
       # Auth0 OAuth integration
       ## @extra app.nextAuth.providers.auth0 Auth0 OAuth configuration.
-      ## @param app.nextAuth.providers.auth0.clientId.value [string] Auth0 client ID.
-      ## @param app.nextAuth.providers.auth0.clientSecret.value [string] Auth0 client secret.
-      ## @param app.nextAuth.providers.auth0.issuer.value [string] Auth0 issuer URL.
       auth0:
         clientId:
           ## @param app.nextAuth.providers.auth0.clientId.value [string] Auth0 client ID.
@@ -627,6 +624,25 @@ app:
           ## @param app.nextAuth.providers.onelogin.issuer.value [string] OneLogin issuer URL.
           value: ""
           ## @param app.nextAuth.providers.onelogin.issuer.secretKeyRef [object] Secret ref for OneLogin issuer URL.
+          secretKeyRef: { name: "", key: "" }
+      # Any other OpenID Connect provider, configured by issuer alone
+      ## @extra app.nextAuth.providers.oidc Generic OpenID Connect configuration.
+      oidc:
+        clientId:
+          ## @param app.nextAuth.providers.oidc.clientId.value [string] OIDC client ID.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.clientId.secretKeyRef [object] Secret ref for OIDC client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.oidc.clientSecret.value [string] OIDC client secret.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.clientSecret.secretKeyRef [object] Secret ref for OIDC client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # Whatever your provider publishes .well-known/openid-configuration under.
+          ## @param app.nextAuth.providers.oidc.issuer.value [string] OIDC issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.issuer.secretKeyRef [object] Secret ref for OIDC issuer URL.
           secretKeyRef: { name: "", key: "" }
 
   # Telemetry and monitoring configuration

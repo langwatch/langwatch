@@ -5,6 +5,8 @@ description: "Set up Single Sign-On for LangWatch with your identity provider"
 
 LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
 
+If your provider is not named here and speaks OpenID Connect, use the generic [`oidc`](#any-other-openid-connect-provider) provider. The named entries exist because each has setup steps worth spelling out, not because the others are unsupported.
+
 <Warning>
 **SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so nobody is locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
 
@@ -24,6 +26,7 @@ The decision is made once at startup, so a license activated on a running server
 | Google | `google` | Client ID, Client Secret |
 | Okta | `okta` | Client ID, Client Secret, Issuer |
 | OneLogin | `onelogin` | Client ID, Client Secret, Issuer |
+| Any other OpenID Connect provider | `oidc` | Client ID, Client Secret, Issuer |
 
 ## OAuth Redirect URL
 
@@ -33,7 +36,7 @@ When configuring your identity provider, set the redirect/callback URL to:
 https://your-langwatch-domain.com/api/auth/callback/{provider}
 ```
 
-Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, `okta`, or `onelogin`. This is the same value you set as `NEXTAUTH_PROVIDER`.
+Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, `okta`, `onelogin`, or `oidc`. This is the same value you set as `NEXTAUTH_PROVIDER`.
 
 <Note>
 A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are missing, starts the deployment in email mode and logs which provider it could not mount. That keeps a licensed deployment signable-in while you correct the value, rather than pointing the sign-in page at an identity provider that was never wired up.
@@ -252,6 +255,44 @@ app:
 
 <Note>
 If OneLogin sits behind another identity provider, for example a Cognito user pool that federates to it, point LangWatch at whichever one it talks to directly and let that one handle the hop. LangWatch only needs one OIDC issuer.
+</Note>
+
+### Any other OpenID Connect provider
+
+Anything that publishes an OpenID Connect discovery document works without being named above: Keycloak, Authentik, Zitadel, Ping, JumpCloud, a self-hosted IdP, whatever you run.
+
+1. Register an OIDC client with your provider, with the authorization code flow and the `openid`, `email` and `profile` scopes
+2. Set its redirect URI to `https://your-domain.com/api/auth/callback/oidc`
+
+```yaml
+app:
+  nextAuth:
+    provider: oidc
+    providers:
+      oidc:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: oidcClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: oidcClientSecret }
+        issuer:
+          value: "https://idp.example.com"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `oidc` |
+| `OIDC_CLIENT_ID` | Client ID |
+| `OIDC_CLIENT_SECRET` | Client secret |
+| `OIDC_ISSUER` | Whatever your provider publishes `.well-known/openid-configuration` under |
+
+<Note>
+Check the issuer is right by fetching its discovery document, which is exactly what LangWatch does at sign-in:
+
+```bash
+curl https://idp.example.com/.well-known/openid-configuration
+```
+
+If that returns JSON with an `authorization_endpoint`, the issuer is correct.
 </Note>
 
 ## Domain-to-Organization Mapping

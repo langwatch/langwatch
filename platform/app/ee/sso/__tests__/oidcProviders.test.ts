@@ -6,7 +6,7 @@
  * NEXTAUTH_PROVIDER, what discovery URL the issuer turns into, and the callback
  * URL an operator has to register with their identity provider.
  *
- * Covers specs/auth/sso-cognito-onelogin.feature.
+ * Covers specs/auth/sso-oidc-providers.feature.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -133,6 +133,28 @@ describe("buildGenericOAuthConfigs", () => {
     });
   });
 
+  describe("when NEXTAUTH_PROVIDER is oidc", () => {
+    /** @scenario Any other OpenID Connect provider */
+    it("mounts a provider for an identity provider we never named", () => {
+      const configs = buildGenericOAuthConfigs(
+        envWith({
+          NEXTAUTH_PROVIDER: "oidc",
+          OIDC_CLIENT_ID: "oidc-client-id",
+          OIDC_CLIENT_SECRET: "oidc-client-secret",
+          OIDC_ISSUER: "https://idp.acme.test",
+        }),
+      );
+
+      expect(providerIds(configs)).toEqual(["oidc"]);
+      expect(configFor(configs, "oidc")?.discoveryUrl).toBe(
+        "https://idp.acme.test/.well-known/openid-configuration",
+      );
+      expect(configFor(configs, "oidc")?.redirectURI).toBe(
+        `${BASE_URL}/api/auth/callback/oidc`,
+      );
+    });
+  });
+
   describe("when a credential is missing", () => {
     /** @scenario A provider missing its credentials falls back to email mode */
     it("mounts nothing for cognito without a client secret", () => {
@@ -170,9 +192,14 @@ describe("buildGenericOAuthConfigs", () => {
   describe("when the operator registers the callback URL", () => {
     /** @scenario The callback URL follows the same rule as every other provider */
     it("uses the same /api/auth/callback/<provider> shape the docs give for every provider", () => {
-      for (const provider of ["cognito", "onelogin"]) {
+      for (const provider of ["cognito", "onelogin", "oidc"]) {
         const configs = buildGenericOAuthConfigs(
-          envWith({ NEXTAUTH_PROVIDER: provider }),
+          envWith({
+            NEXTAUTH_PROVIDER: provider,
+            OIDC_CLIENT_ID: "oidc-client-id",
+            OIDC_CLIENT_SECRET: "oidc-client-secret",
+            OIDC_ISSUER: "https://idp.acme.test",
+          }),
         );
 
         expect(configFor(configs, provider)?.redirectURI).toBe(

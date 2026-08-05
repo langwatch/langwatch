@@ -1,4 +1,4 @@
-Feature: Sign in with Amazon Cognito or OneLogin
+Feature: Sign in with Amazon Cognito, OneLogin or any other OIDC provider
 
   Self-hosted deployments federate to one identity provider, named by
   NEXTAUTH_PROVIDER. Cognito and OneLogin join the providers already supported,
@@ -33,6 +33,17 @@ Feature: Sign in with Amazon Cognito or OneLogin
     And ONELOGIN_CLIENT_ID, ONELOGIN_CLIENT_SECRET and ONELOGIN_ISSUER are set
     When the deployment starts
     Then a "onelogin" provider is mounted
+    And its endpoints are discovered from the issuer
+
+  # Naming a provider buys documented setup steps, not capability: anything that
+  # publishes a discovery document works without being named, so nobody has to
+  # claim their identity provider is one of the listed ones to use it.
+  @unit
+  Scenario: Any other OpenID Connect provider
+    Given NEXTAUTH_PROVIDER is "oidc"
+    And OIDC_CLIENT_ID, OIDC_CLIENT_SECRET and OIDC_ISSUER are set
+    When the deployment starts
+    Then a "oidc" provider is mounted
     And its endpoints are discovered from the issuer
 
   @unit
@@ -101,6 +112,7 @@ Feature: Sign in with Amazon Cognito or OneLogin
       | provider |
       | cognito  |
       | onelogin |
+      | oidc     |
 
   # ==========================================================================
   # Signing in
@@ -119,6 +131,7 @@ Feature: Sign in with Amazon Cognito or OneLogin
       | provider |
       | cognito  |
       | onelogin |
+      | oidc     |
 
   # A profile without a display name must not block sign-in: Cognito pools can
   # be configured without the name attribute, and OneLogin returns the fields
@@ -152,6 +165,7 @@ Feature: Sign in with Amazon Cognito or OneLogin
       | provider |
       | cognito  |
       | onelogin |
+      | oidc     |
 
   # ==========================================================================
   # Configuring it on Kubernetes
@@ -172,11 +186,19 @@ Feature: Sign in with Amazon Cognito or OneLogin
       | provider |
       | cognito  |
       | onelogin |
+      | oidc     |
 
   @integration
   Scenario: Credentials can be supplied as secret references
     Given the chart is rendered with a provider whose client secret is a secret reference
     Then the container reads that value from the referenced secret rather than the manifest
+
+  # Otherwise an operator who configured one identity provider would ship empty
+  # credentials for every other provider the chart knows about.
+  @integration
+  Scenario: Unconfigured providers contribute no environment variables
+    Given the chart is rendered with no identity provider configured
+    Then the application container receives no provider credentials at all
 
   # ==========================================================================
   # Proven against a real identity provider

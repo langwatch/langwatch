@@ -32,16 +32,38 @@ fail() {
   failures=$((failures + 1))
 }
 
+# Renders the chart once per flag set and caches the result, because three
+# assertions over two providers otherwise pay for eight full renders.
+#
+# A failed render yields an empty manifest rather than killing the run under
+# `set -e`, so a chart that stops rendering is reported as the assertion it
+# broke. helm's own message is echoed rather than discarded: "got: (empty)" on
+# its own does not say why, and the operator would have to reproduce locally.
+RENDER_CACHE="$(mktemp -d)"
+trap 'rm -rf "$RENDER_CACHE"' EXIT
+
+render() {
+  local flags="$1" key out
+  key=$(printf '%s' "$flags" | cksum | tr -d ' ')
+  out="$RENDER_CACHE/$key.yaml"
+  if [[ ! -e "$out" ]]; then
+    # shellcheck disable=SC2086
+    if ! helm template lw . $flags >"$out" 2>"$out.err"; then
+      echo "helm template failed for: $flags" >&2
+      cat "$out.err" >&2
+      : >"$out"
+    fi
+  fi
+  cat "$out"
+}
+
 # Every SSO-related env name in the app Deployment, sorted, one per line.
-# A failed render yields no names rather than killing the run under `set -e`,
-# so a chart that stops rendering is reported as the assertion it broke.
 sso_env_of() {
   local flags="$1"
-  # shellcheck disable=SC2086
-  { helm template lw . $flags 2>/dev/null || true; } | awk '
+  render "$flags" | awk '
     $0 ~ "^# Source: langwatch/templates/app/deployment.yaml" { grab=1; next }
     grab && /^# Source:/ { grab=0 }
-    grab && /- name: (NEXTAUTH_PROVIDER|AUTH0_|AZURE_AD_|COGNITO_|GITHUB_CLIENT|GITLAB_|GOOGLE_|OKTA_|ONELOGIN_)/ {
+    grab && /- name: (NEXTAUTH_PROVIDER|AUTH0_|AZURE_AD_|COGNITO_|GITHUB_CLIENT|GITLAB_|GOOGLE_|OKTA_|ONELOGIN_|OIDC_)/ {
       gsub(/^[ -]*name: /, ""); print
     }
   ' | sort -u
@@ -50,8 +72,7 @@ sso_env_of() {
 # The value of one env var in the app Deployment.
 env_value_of() {
   local flags="$1" name="$2"
-  # shellcheck disable=SC2086
-  { helm template lw . $flags 2>/dev/null || true; } | awk -v want="$name" '
+  render "$flags" | awk -v want="$name" '
     $0 ~ "^# Source: langwatch/templates/app/deployment.yaml" { grab=1; next }
     grab && /^# Source:/ { grab=0 }
     grab && $0 ~ "- name: " want "$" { found=1; next }
@@ -65,8 +86,7 @@ env_value_of() {
 # The secret name a given env var reads from, empty if it is an inline value.
 env_secret_of() {
   local flags="$1" name="$2"
-  # shellcheck disable=SC2086
-  { helm template lw . $flags 2>/dev/null || true; } | awk -v want="$name" '
+  render "$flags" | awk -v want="$name" '
     $0 ~ "^# Source: langwatch/templates/app/deployment.yaml" { grab=1; next }
     grab && /^# Source:/ { grab=0 }
     grab && $0 ~ "- name: " want "$" { found=1; next }
@@ -88,7 +108,7 @@ flags_for() {
 # @scenario "Configuring a provider through the chart reaches the container"
 test_provider_env_reaches_the_container() {
   local provider prefix flags actual
-  for provider in cognito onelogin; do
+  for provider in cognito onelogin oidc; do
     prefix=$(echo "$provider" | tr '[:lower:]' '[:upper:]')
     flags=$(flags_for "$provider")
     actual=$(sso_env_of "$flags")
@@ -140,7 +160,9 @@ test_client_secret_can_come_from_a_secret_reference() {
 }
 
 # A provider left at its defaults must contribute nothing, or an operator who
-# configured one identity provider would ship empty credentials for six others.
+# configured one identity provider would ship empty credentials for the seven
+# others the chart declares.
+# @scenario "Unconfigured providers contribute no environment variables"
 test_unconfigured_providers_emit_nothing() {
   local actual
   actual=$(sso_env_of "$BASE")
