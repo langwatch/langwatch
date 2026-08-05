@@ -557,6 +557,35 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/* ============================================================ */}}
+{{/* Email provider guard                                          */}}
+{{/* ============================================================ */}}
+
+{{/* Fail the render when app.email.provider names a gateway that nothing
+     configures. The app treats EMAIL_PROVIDER as authoritative and never falls
+     back to another gateway, so without this the mistake surfaces at the first
+     alert instead of at install time.
+
+     Skipped when extraEnvs or extraEnvFrom are in play: those can carry the
+     provider's settings (an SMTP_URL from a pre-existing Secret, AWS_REGION
+     alongside IRSA credentials) and the chart cannot see inside them. */}}
+{{- define "langwatch.emailProviderGuard" -}}
+{{- $providers := .Values.app.email.providers }}
+{{- $configured := dict
+      "sendgrid" (or $providers.sendgrid.apiKey.value $providers.sendgrid.apiKey.secretKeyRef.name)
+      "resend"   (or $providers.resend.apiKey.value $providers.resend.apiKey.secretKeyRef.name)
+      "smtp"     (or $providers.smtp.url.value $providers.smtp.url.secretKeyRef.name $providers.smtp.host)
+      "ses"      $providers.ses.region }}
+{{- $provider := .Values.app.email.provider }}
+{{- if not (hasKey $configured $provider) }}
+{{- fail (printf "app.email.provider is %q, which is not one of: sendgrid, ses, smtp, resend." $provider) }}
+{{- end }}
+{{- $escapeHatch := or .Values.app.extraEnvs .Values.app.extraEnvFrom .Values.workers.extraEnvs .Values.workers.extraEnvFrom }}
+{{- if and (not (get $configured $provider)) (not $escapeHatch) }}
+{{- fail (printf "app.email.enabled is true and app.email.provider is %q, but app.email.providers.%s is empty. Configure it, pick another provider, or supply its settings through app.extraEnvs / app.extraEnvFrom." $provider $provider) }}
+{{- end }}
+{{- end -}}
+
+{{/* ============================================================ */}}
 {{/* Shared Environment Variables                                  */}}
 {{/* ============================================================ */}}
 {{/* Common env vars shared between app and workers deployments */}}
@@ -820,6 +849,73 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       name: {{ include "langwatch.appSecretName" . }}
       key: nextAuthSecret
 {{- end }}
+
+# Enterprise license. Optional: without one the deployment runs the open
+# source edition, which caps nothing it stores on your own infrastructure.
+# Setting it here entitles the whole instance, so an operator does not have
+# to activate a license per organization through the UI.
+#
+# In sharedEnv rather than the app Deployment because plan resolution runs in
+# the workers too, and a worker that reads a different entitlement than the
+# app would enforce different limits on the same organization.
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
+
+# Email gateway. In sharedEnv rather than the app Deployment because scheduled
+# reports and alert notifications are dispatched by the workers, so a workers
+# pod without a gateway configured fails every send it is responsible for.
+{{- if .Values.app.email.enabled }}
+{{- include "langwatch.emailProviderGuard" . }}
+- name: EMAIL_DEFAULT_FROM
+  value: {{ .Values.app.email.defaultFrom | quote }}
+- name: EMAIL_PROVIDER
+  value: {{ .Values.app.email.provider | quote }}
+{{- if eq .Values.app.email.provider "sendgrid" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SENDGRID_API_KEY" "fieldValues" .Values.app.email.providers.sendgrid.apiKey) }}
+{{- end }}
+{{- if eq .Values.app.email.provider "ses" }}
+# USE_AWS_SES is what the mailer checks; credentials come from the pod's IAM
+# role (IRSA) unless AWS_* are supplied via app.extraEnvs.
+- name: USE_AWS_SES
+  value: "true"
+{{- /* Emitted only when set: an empty entry would shadow an AWS_REGION
+       supplied through app.extraEnvs / app.extraEnvFrom. */}}
+{{- if .Values.app.email.providers.ses.region }}
+- name: AWS_REGION
+  value: {{ .Values.app.email.providers.ses.region | quote }}
+{{- end }}
+{{- if .Values.app.email.providers.ses.endpoint }}
+- name: AWS_SES_ENDPOINT
+  value: {{ .Values.app.email.providers.ses.endpoint | quote }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.app.email.provider "smtp" }}
+{{- if or .Values.app.email.providers.smtp.url.value .Values.app.email.providers.smtp.url.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SMTP_URL" "fieldValues" .Values.app.email.providers.smtp.url) }}
+{{- else if .Values.app.email.providers.smtp.host }}
+- name: SMTP_HOST
+  value: {{ .Values.app.email.providers.smtp.host | quote }}
+{{- if .Values.app.email.providers.smtp.port }}
+- name: SMTP_PORT
+  value: {{ .Values.app.email.providers.smtp.port | quote }}
+{{- end }}
+{{- /* Emptiness, not truthiness: `secure: false` is a real setting
+       (force STARTTLS on 465) and must not be dropped. */}}
+{{- if ne (toString .Values.app.email.providers.smtp.secure) "" }}
+- name: SMTP_SECURE
+  value: {{ .Values.app.email.providers.smtp.secure | toString | quote }}
+{{- end }}
+{{- if .Values.app.email.providers.smtp.user }}
+- name: SMTP_USER
+  value: {{ .Values.app.email.providers.smtp.user | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SMTP_PASSWORD" "fieldValues" .Values.app.email.providers.smtp.password) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.app.email.provider "resend" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "RESEND_API_KEY" "fieldValues" .Values.app.email.providers.resend.apiKey) }}
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{/* ============================================================ */}}
@@ -906,6 +1002,47 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   would still create the RWO PVC and mount it into multiple replicas — only
   one would attach, the others crash-loop (Sergio review 2026-05-20).
 */}}
+{{/*
+  Worker-pool size for the evaluations service, derived from the CPU the
+  container is actually allowed to use.
+
+  The service sizes its gunicorn pool from its own get_cpu_count(), whose
+  "Kubernetes" branch reads /sys/fs/cgroup/cpu/cpu.shares — a cgroup **v1**
+  path. Every current node runs cgroup v2, where that file does not exist, so
+  the lookup raises and it falls through to sched_getaffinity(), which reports
+  the NODE's CPU count. A container limited to 500m therefore forks one worker
+  per node core: eight on an 8-vCPU node, sixty-four on a 64-vCPU one.
+
+  That matters because the pool is not cheap. Each worker lazily loads its OWN
+  copy of every local model it serves (PII detection, language detection), so
+  resident memory grows by roughly 2.1Gi per worker as traffic round-robins
+  across the pool, until every worker holds every model. Measured on a 1-CPU
+  container on an 8-vCPU node: 11Gi and still climbing, having OOM-killed at
+  the chart's own 8Gi default. Pinned to one worker, the same load holds flat
+  at 2.5Gi.
+
+  CPU_COUNT is the env var get_cpu_count() honours before any of that
+  detection, so setting it from the limit restores the relationship an operator
+  expects: ask for less CPU, get a smaller pool and a smaller footprint.
+
+  Emitted only when the operator has not set CPU_COUNT in extraEnvs, so an
+  explicit choice always wins.
+*/}}
+{{- define "langwatch.langevals.cpuCount" -}}
+{{- $cpu := "" -}}
+{{- with .Values.langevals.resources -}}
+{{- $cpu = (dig "limits" "cpu" (dig "requests" "cpu" "" .) .) -}}
+{{- end -}}
+{{- $cpu = $cpu | toString -}}
+{{- if eq $cpu "" -}}
+1
+{{- else if hasSuffix "m" $cpu -}}
+{{- max 1 (ceil (divf (float64 (trimSuffix "m" $cpu)) 1000.0)) -}}
+{{- else -}}
+{{- max 1 (ceil (float64 $cpu)) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "langwatch.storedObjects.localFilesystemIsActive" -}}
 {{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}
 true

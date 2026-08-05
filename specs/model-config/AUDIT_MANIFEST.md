@@ -9,13 +9,13 @@ Classes:
 - **DUPLICATE** — already covered by an existing test or another scenario; cross-link in Phase 1.
 
 Investigation anchors:
-- `langwatch/src/server/modelProviders/modelIdBoundary.ts` (+ `__tests__/modelIdBoundary.unit.test.ts`)
-- `langwatch/src/server/prompt-config/reasoningBoundary.ts` (+ `__tests__/reasoningBoundary.unit.test.ts`)
-- `langwatch/src/server/api/routers/modelProviders.utils.ts` (`prepareLitellmParams`, `getParameterConstraints`)
-- `langwatch/src/server/modelProviders/registry.ts` (`parameterConstraints`, `reasoningConfig`)
-- `langwatch/src/components/llmPromptConfigs/LLMConfigPopover.tsx` (+ `__tests__/LLMConfigPopover.test.tsx`)
-- `langwatch/src/components/llmPromptConfigs/parameterConfig.ts` (+ `__tests__/parameterConfig.unit.test.ts`)
-- `langwatch/src/components/ModelSelector.tsx`
+- `platform/app/src/server/modelProviders/modelIdBoundary.ts` (+ `__tests__/modelIdBoundary.unit.test.ts`)
+- `platform/app/src/server/prompt-config/reasoningBoundary.ts` (+ `__tests__/reasoningBoundary.unit.test.ts`)
+- `platform/app/src/server/api/routers/modelProviders.utils.ts` (`prepareLitellmParams`, `getParameterConstraints`)
+- `platform/app/src/server/modelProviders/registry.ts` (`parameterConstraints`, `reasoningConfig`)
+- `platform/app/src/components/llmPromptConfigs/LLMConfigPopover.tsx` (+ `__tests__/LLMConfigPopover.test.tsx`)
+- `platform/app/src/components/llmPromptConfigs/parameterConfig.ts` (+ `__tests__/parameterConfig.unit.test.ts`)
+- `platform/app/src/components/ModelSelector.tsx`
 - `langwatch_nlp/langwatch_nlp/studio/dspy/template_adapter.py` (`_filter_empty_content_messages`)
 - `langwatch_nlp/langwatch_nlp/studio/utils.py` (`translate_model_id_for_litellm`, `map_reasoning_to_provider`)
 - No `syncModelRegistry` script exists anywhere in the tree (verified via `find` + `grep`).

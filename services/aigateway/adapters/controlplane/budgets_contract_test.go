@@ -169,11 +169,13 @@ func TestControlPlaneBucketSeparatorsAreStable(t *testing.T) {
 	}
 }
 
-// The debit attribution seam: the gateway stamps the dispatched provider on
-// the customer span; the control plane's accumulation allowlist and the
-// trace-fold reactor read the same key. If either side renames it,
-// provider-filtered budgets stop accruing, and the failure is silent: every request
-// still succeeds. This test makes the drift loud.
+// The provider attribution seam. The gateway names the dispatched provider
+// twice: on the customer span, which the control plane's accumulation
+// allowlist must carry into the fold for the usage views, and on the spend
+// commands, which is what actually debits. Both are the same ModelProvider
+// row id. If either side renames it, provider-filtered budgets stop
+// accruing, and the failure is silent: every request still succeeds. This
+// test makes the drift loud.
 func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 	require.Equal(t, "langwatch.model_provider_id", customertracebridge.AttrModelProviderID,
 		"the Go constant is the wire name the control plane reads")
@@ -185,9 +187,22 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 		t.Error("the accumulation allowlist dropped langwatch.model_provider_id, so the fold will never see the provider")
 	}
 
-	reactor := readControlPlaneSource(t, "ee", "governance", "reactors", "gatewayBudgetSync.reactor.ts")
-	if !strings.Contains(reactor, `attributes["`+customertracebridge.AttrModelProviderID+`"]`) {
-		t.Error("gatewayBudgetSync.reactor.ts no longer reads langwatch.model_provider_id off the fold state")
+	// The span attribute is the command field under the reserved prefix.
+	const commandField = "model_provider_id"
+	require.True(t, strings.HasSuffix(customertracebridge.AttrModelProviderID, commandField),
+		"the span attribute and the spend command field must name the same thing")
+
+	commands := readControlPlaneSource(t,
+		"src", "server", "event-sourcing", "pipelines", "gateway-spend-processing",
+		"schemas", "commands.ts")
+	if !strings.Contains(commands, commandField+": z.string()") {
+		t.Error("the spend command schema no longer declares model_provider_id, so no debit can name a provider")
+	}
+
+	debits := readControlPlaneSource(t,
+		"ee", "governance", "process-manager", "gatewayDebits.process.ts")
+	if !strings.Contains(debits, "payload."+commandField) {
+		t.Error("gatewayDebits.process.ts no longer reads model_provider_id, so provider-filtered budgets stop accruing")
 	}
 }
 

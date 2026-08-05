@@ -123,7 +123,7 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 	// plain streaming; Ctrl-C (or the driver killing us) ends it and the
 	// deferred teardown still destroys everything.
 	if d.isAgent || !stdoutIsTTY() {
-		if err := d.orch.PlayLaunch(ctx, pr.Number, checkout, filepath.Join(checkout, "langwatch")); err != nil && ctx.Err() == nil {
+		if err := d.orch.PlayLaunch(ctx, pr.Number, checkout, filepath.Join(checkout, "platform", "app")); err != nil && ctx.Err() == nil {
 			return err
 		}
 		return teardown()

@@ -42,7 +42,7 @@ tables were pulled back in the 2026-07-07 stack review.
 
 ```bash
 make quickstart all-local-nlp      # need NLP engine for evaluator runs
-pnpm dev                            # from langwatch/
+pnpm dev                            # from platform/app/
 ```
 
 - **ClickHouse migrations.** This PR ships 00040-00041. `clickhouse-client

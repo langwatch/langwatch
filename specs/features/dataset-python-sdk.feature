@@ -5,12 +5,12 @@ Feature: Dataset Python SDK
 
   # All scenarios remain @unimplemented because parity bindings (`/** @scenario */`
   # JSDoc) only resolve in TypeScript test roots scanned by
-  # langwatch/scripts/check-feature-parity.ts: langwatch/src, langwatch/ee,
-  # mcp-server/src, typescript-sdk/src, python-sdk/src — but `python-sdk/src`
-  # has no `.test.ts` files; Python tests live in `python-sdk/tests/*.py`.
+  # platform/app/scripts/check-feature-parity.ts: platform/app/src, platform/app/ee,
+  # mcp/typescript/src, sdks/typescript/src, sdks/python/src — but `sdks/python/src`
+  # has no `.test.ts` files; Python tests live in `sdks/python/tests/*.py`.
   # The scenarios below are AUDIT_MANIFEST KEEP-class — covered by
-  # python-sdk/tests/dataset/test_dataset_api_service_integration.py and
-  # python-sdk/tests/dataset/test_dataset_facade_unit.py — but cannot bind via
+  # sdks/python/tests/dataset/test_dataset_api_service_integration.py and
+  # sdks/python/tests/dataset/test_dataset_facade_unit.py — but cannot bind via
   # the TS-only parity checker. Aspirational pending a Python-side parity
   # mechanism. Tracked under #3458.
 

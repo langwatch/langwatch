@@ -25,6 +25,7 @@ type App struct {
 	cache      CacheEvaluator
 	models     ModelResolver
 	traces     AITraceEmitter
+	spend      pipeline.SpendEmitter
 	metrics    MetricsRecorder
 	breaker    CircuitBreaker
 	logger     *zap.Logger
@@ -44,6 +45,9 @@ func WithPolicy(p PolicyMatcher) Option          { return func(app *App) { app.p
 func WithCache(c CacheEvaluator) Option          { return func(app *App) { app.cache = c } }
 func WithModels(m ModelResolver) Option          { return func(app *App) { app.models = m } }
 func WithTraces(t AITraceEmitter) Option         { return func(app *App) { app.traces = t } }
+
+// WithSpend wires the spend emitter that records billing lifecycle events.
+func WithSpend(e pipeline.SpendEmitter) Option   { return func(app *App) { app.spend = e } }
 func WithMetrics(m MetricsRecorder) Option       { return func(app *App) { app.metrics = m } }
 func WithCircuitBreaker(b CircuitBreaker) Option { return func(app *App) { app.breaker = b } }
 func WithLogger(l *zap.Logger) Option            { return func(app *App) { app.logger = l } }
@@ -72,6 +76,11 @@ func New(opts ...Option) *App {
 
 func (a *App) buildInterceptors() []pipeline.Interceptor {
 	var chain []pipeline.Interceptor
+	// Spend is OUTERMOST so every request that reaches the pipeline admits
+	// a spend record, including ones the chain itself rejects further down.
+	if a.spend != nil {
+		chain = append(chain, pipeline.Spend(a.spend))
+	}
 	if a.ratelimit != nil {
 		chain = append(chain, pipeline.RateLimit(a.ratelimit.Allow))
 	}

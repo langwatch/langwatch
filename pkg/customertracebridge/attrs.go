@@ -9,11 +9,12 @@ const (
 	AttrVirtualKeyID = "langwatch.virtual_key_id"
 	AttrGatewayReqID = "langwatch.gateway_request_id"
 	// AttrModelProviderID is the ModelProvider row id the request was
-	// dispatched to. The control plane's trace fold reads this exact key to
-	// decide which provider-filtered budgets a debit belongs to
-	// (trace-attribute-accumulation.service.ts allowlists it,
-	// gatewayBudgetSync.reactor.ts consumes it); a dispatch without it
-	// debits unfiltered budgets only.
+	// dispatched to. The control plane's fold allowlists this exact key
+	// (trace-attribute-accumulation.service.ts) so usage views can break
+	// spend down by vendor. The same id travels on the spend commands as
+	// `model_provider_id`, which is what decides the provider-filtered
+	// budgets a debit belongs to; a dispatch without it debits unfiltered
+	// budgets only.
 	AttrModelProviderID       = "langwatch.model_provider_id"
 	AttrGenAIUsageIn          = "gen_ai.usage.input_tokens"
 	AttrGenAIUsageCacheRead   = "gen_ai.usage.cache_read.input_tokens"
@@ -31,4 +32,18 @@ const (
 	// exact key into metadata.labels (otel.traces.ts), which the Trace
 	// Explorer filters as "Label".
 	AttrLabels = "langwatch.labels"
+
+	// AttrEndUserID is the caller's external end-user id (their customer's
+	// user, not a LangWatch principal), resolved from the
+	// x-langwatch-end-user-id header, its x-litellm-end-user-id migration
+	// alias, or the OpenAI `user` body param, in that order. The trace fold
+	// copies it into per-request spend events and the attributed-user
+	// budget buckets key on it.
+	AttrEndUserID = "langwatch.end_user_id"
+
+	// AttrRequestMetadata is the caller's x-langwatch-metadata echo: a raw
+	// JSON object (4KB cap, validated at the edge) round-tripped verbatim
+	// into billing spend events so the caller's billing system can join
+	// events back to its own entities without a lookup.
+	AttrRequestMetadata = "langwatch.reserved.request_metadata"
 )

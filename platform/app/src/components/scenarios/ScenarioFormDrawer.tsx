@@ -1,0 +1,676 @@
+import {
+  Button,
+  Grid,
+  GridItem,
+  Heading,
+  HStack,
+  Text,
+} from "@chakra-ui/react";
+import { generate } from "@langwatch/ksuid";
+import type { Scenario } from "@prisma/client";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type FieldErrors,
+  type UseFormReturn,
+  useWatch,
+} from "react-hook-form";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
+import { useRouter } from "~/utils/compat/next-router";
+import {
+  clearFlowCallbacks,
+  getComplexProps,
+  setFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "../../hooks/useDrawer";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRunScenario } from "../../hooks/useRunScenario";
+import { useScenarioTarget } from "../../hooks/useScenarioTarget";
+import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
+import type { TypedAgent } from "../../server/agents/agent.repository";
+import { withApplicableRedTeamConfig } from "../../server/scenarios/red-team-input";
+import { api } from "../../utils/api";
+import { KSUID_RESOURCES } from "../../utils/constants";
+import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
+import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
+import { hasScenarioInputMapping } from "../suites/ScenarioInputMappingSection";
+import { Drawer } from "../ui/drawer";
+import { TagList } from "../ui/TagList";
+import { toaster } from "../ui/toaster";
+import { SaveAndRunMenu } from "./SaveAndRunMenu";
+import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
+import {
+  ScenarioForm,
+  type ScenarioFormData,
+  type ScenarioInitialData,
+} from "./ScenarioForm";
+import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
+import type { TargetValue } from "./TargetSelector";
+
+export type ScenarioFormDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
+  onSuccess?: (scenario: Scenario) => void;
+  scenarioId?: string;
+} & Partial<ScenarioInitialData>;
+
+/**
+ * Model overrides chosen in the run dialog. Omitted on a plain save so the
+ * scenario's existing models are left untouched (undefined = no-op in the
+ * Prisma update).
+ */
+type ModelOverrides = {
+  simulatorModel: string | null;
+  judgeModel: string | null;
+};
+
+/**
+ * URL-based wrapper for ScenarioFormDrawer.
+ * Reads scenarioId from drawer URL params and passes it as a prop.
+ * Use this when rendering via the drawer registry / URL navigation.
+ */
+export function ScenarioFormDrawerFromUrl(
+  props: Omit<ScenarioFormDrawerProps, "scenarioId">,
+) {
+  const params = useDrawerParams();
+  const { drawerOpen } = useDrawer();
+  // When rendered from the drawer registry (CurrentDrawer), no `open` prop is
+  // passed.  Fall back to checking the URL so the drawer actually opens.
+  const open = props.open ?? drawerOpen("scenarioEditor");
+  return (
+    <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />
+  );
+}
+
+/**
+ * A stored row as the form's own shape. Prisma types `redTeamConfig` as
+ * JsonValue and `redTeamStrategy` as a plain string, so both are narrowed
+ * here; anything that does not fit reads as "not configured" rather than
+ * putting a value the editor cannot render into the form.
+ */
+function toFormDefaults(scenario: Scenario): Partial<ScenarioFormData> {
+  const { redTeamConfig, redTeamStrategy, ...rest } = scenario;
+  const isKnownStrategy =
+    redTeamStrategy === "goat" || redTeamStrategy === "crescendo";
+  const isConfigObject =
+    !!redTeamConfig &&
+    typeof redTeamConfig === "object" &&
+    !Array.isArray(redTeamConfig);
+  return {
+    ...rest,
+    redTeamStrategy: isKnownStrategy ? redTeamStrategy : null,
+    redTeamConfig: isConfigObject
+      ? (redTeamConfig as ScenarioFormData["redTeamConfig"])
+      : null,
+  };
+}
+
+/**
+ * Drawer container for scenario create/edit form.
+ * Two-column layout: form on left, help sidebar on right.
+ * Bottom bar with Quick Test and Save and Run.
+ *
+ * When opened without a scenarioId (new scenario flow), the first save
+ * creates the record and transitions to edit mode by updating the URL
+ * with the new scenarioId. This prevents the double-save bug where
+ * subsequent saves would create duplicates.
+ */
+export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
+  const { project } = useOrganizationTeamProject();
+  const router = useRouter();
+  const { closeDrawer, openDrawer } = useDrawer();
+  const rawComplexProps = getComplexProps();
+  const complexPropsData =
+    rawComplexProps && "initialFormData" in rawComplexProps
+      ? (rawComplexProps as Partial<ScenarioInitialData>)
+      : {};
+  const utils = api.useContext();
+  const [formInstance, setFormInstance] =
+    useState<UseFormReturn<ScenarioFormData> | null>(null);
+  const { runScenario, isRunning } = useRunScenario({
+    projectId: project?.id,
+    projectSlug: project?.slug,
+  });
+  const scenarioId = props.scenarioId;
+
+  // Target selection with localStorage persistence
+  const { target: persistedTarget, setTarget: persistTarget } =
+    useScenarioTarget(scenarioId);
+  const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
+  const [isRedTeamScenario, setIsRedTeamScenario] = useState(false);
+  const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
+  const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
+
+  // Run-model dialog: after a target is picked in Save and Run, the user
+  // confirms which user-simulator and judge models to run with. null = follow
+  // the project default.
+  const [runModelDialogOpen, setRunModelDialogOpen] = useState(false);
+  const [pendingRunTarget, setPendingRunTarget] = useState<TargetValue>(null);
+  const [runSimulatorModel, setRunSimulatorModel] = useState<string | null>(
+    null,
+  );
+  const [runJudgeModel, setRunJudgeModel] = useState<string | null>(null);
+
+  // Initialize from persisted target when scenario loads
+  useEffect(() => {
+    if (persistedTarget && !selectedTarget) {
+      setSelectedTarget(persistedTarget);
+    }
+  }, [persistedTarget, selectedTarget]);
+
+  // Update persistence when target changes
+  const handleTargetChange = useCallback(
+    (target: TargetValue) => {
+      setSelectedTarget(target);
+      if (target && scenarioId) {
+        persistTarget(target);
+      }
+    },
+    [persistTarget, scenarioId],
+  );
+  const handleCreateAgent = useCallback(() => {
+    const onAgentSaved = (agent: TypedAgent) => {
+      const targetType = agent.type as NonNullable<TargetValue>["type"];
+      handleTargetChange({ type: targetType, id: agent.id });
+      toaster.create({
+        title: "Agent created",
+        description: `"${agent.name}" is now selected as the target.`,
+        type: "success",
+        meta: { closable: true },
+      });
+    };
+    setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("agentCodeEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("workflowSelector", { onSave: onAgentSaved });
+    setAgentTypeSelectorOpen(true);
+  }, [handleTargetChange]);
+
+  const isOpen = props.open !== false && props.open !== undefined;
+  const onClose = props.onClose ?? closeDrawer;
+  const { data: scenario } = api.scenarios.getById.useQuery(
+    { projectId: project?.id ?? "", id: scenarioId ?? "" },
+    { enabled: !!project && !!scenarioId },
+  );
+  const createMutation = api.scenarios.create.useMutation({
+    onSuccess: (data: Scenario) => {
+      void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
+      props.onSuccess?.(data);
+    },
+    onError: (error) => {
+      if (
+        formInstance &&
+        applyHandledErrorToForm({
+          error,
+          form: formInstance,
+          hasFormErrorSlot: true,
+        })
+      )
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't create scenario" });
+    },
+  });
+  const updateMutation = api.scenarios.update.useMutation({
+    onSuccess: (data: Scenario) => {
+      void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
+      void utils.scenarios.getById.invalidate({
+        projectId: project?.id ?? "",
+        id: data.id,
+      });
+      props.onSuccess?.(data);
+    },
+    onError: (error) => {
+      if (
+        formInstance &&
+        applyHandledErrorToForm({
+          error,
+          form: formInstance,
+          hasFormErrorSlot: true,
+        })
+      )
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't save scenario" });
+    },
+  });
+
+  /**
+   * Transition from create mode to edit mode after first save.
+   * Updates the URL with the new scenarioId so subsequent saves
+   * trigger updates instead of creating duplicates.
+   */
+  const transitionToEditMode = useCallback(
+    (newScenarioId: string) => {
+      openDrawer(
+        "scenarioEditor",
+        {
+          urlParams: { scenarioId: newScenarioId },
+        },
+        { resetStack: true },
+      );
+    },
+    [openDrawer],
+  );
+
+  // Edit mode: the scenario already exists, so the save is a plain update.
+  // Mutation errors are caught here so a save failure never surfaces as
+  // "Failed to run scenario" in the save-and-run path — updateMutation's own
+  // onError toast is what the user sees.
+  const updateExisting = useCallback(
+    async ({
+      projectId,
+      scenarioId,
+      data,
+      models,
+    }: {
+      projectId: string;
+      scenarioId: string;
+      data: ScenarioFormData;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      try {
+        return await updateMutation.mutateAsync({
+          projectId,
+          id: scenarioId,
+          ...data,
+          ...(models ?? {}),
+        });
+      } catch {
+        // Error toast already surfaced by updateMutation.onError; return null
+        // so the save-and-run caller doesn't re-report it as a run failure.
+        return null;
+      }
+    },
+    [updateMutation],
+  );
+
+  const createScenario = useCallback(
+    async ({
+      projectId,
+      data,
+      skipTransition,
+      models,
+    }: {
+      projectId: string;
+      data: ScenarioFormData;
+      skipTransition: boolean;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      try {
+        const result = await createMutation.mutateAsync({
+          projectId,
+          ...data,
+          ...(models ?? {}),
+        });
+        // Transition to edit mode to prevent double-create on subsequent saves.
+        // Skip when the drawer is about to close (save-without-running).
+        if (!skipTransition) {
+          transitionToEditMode(result.id);
+        }
+        return result;
+      } catch {
+        // Error already handled by global mutation cache if license error
+        return null;
+      }
+    },
+    [createMutation, transitionToEditMode],
+  );
+
+  const handleSave = useCallback(
+    async ({
+      data,
+      skipTransition = false,
+      models,
+    }: {
+      data: ScenarioFormData;
+      skipTransition?: boolean;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      const projectId = project?.id;
+      if (!projectId) return null;
+
+      // The form deliberately keeps a Crescendo attack plan while the user is
+      // looking at GOAT, so switching across and back does not throw the plan
+      // away. This is where that draft becomes a write, so it is where the
+      // settings the chosen strategy ignores come off — a GOAT scenario is
+      // never stored carrying a plan it will not read.
+      const payload = withApplicableRedTeamConfig(data);
+
+      return scenario
+        ? await updateExisting({
+            projectId,
+            scenarioId: scenario.id,
+            data: payload,
+            models,
+          })
+        : await createScenario({
+            projectId,
+            data: payload,
+            skipTransition,
+            models,
+          });
+    },
+    [project?.id, scenario, updateExisting, createScenario],
+  );
+  const handleSaveAndRun = useCallback(
+    async (target: TargetValue) => {
+      const form = formInstance;
+      if (!form || !project?.id || !project?.slug) return;
+      if (!target) {
+        toaster.create({
+          title: "Select a target",
+          description:
+            "Please select a prompt or agent to run the scenario against.",
+          type: "warning",
+          meta: { closable: true },
+        });
+        return;
+      }
+
+      // Gate: workflow agents require valid scenario mappings before running.
+      if (target.type === "workflow") {
+        try {
+          const agent = await utils.agents.getById.fetch({
+            id: target.id,
+            projectId: project.id,
+          });
+          if (agent) {
+            const config = agent.config as CustomComponentConfig;
+            const mappings = config.scenarioMappings ?? {};
+            // Run gate is input-only by design (#3412): a scenario needs only one
+            // input ("input" or "messages") mapped to be runnable; output mapping
+            // is optional (auto-populates to first output, or graceful stringify
+            // fallback). Uses shared hasScenarioInputMapping SSOT so the run gate
+            // and editor Save gate agree on the same input rule.
+            if (!hasScenarioInputMapping(mappings)) {
+              // Fallback affordance (#3411): even if the auto-open below races,
+              // is dismissed, or fails, the toast itself links back to the editor.
+              const openAgentEditor = () =>
+                openDrawer("agentWorkflowEditor", {
+                  urlParams: { agentId: target.id },
+                });
+              toaster.create({
+                title: "Configure scenario mappings",
+                description:
+                  'Map at least one scenario input — "input" or "messages" — to an agent input before running this workflow agent.',
+                type: "warning",
+                action: {
+                  label: "Open agent editor",
+                  onClick: openAgentEditor,
+                },
+                meta: { closable: true },
+              });
+              // Auto-open the editor now; the toast action above is the manual
+              // fallback if this auto-open races, is dismissed, or fails.
+              openAgentEditor();
+              return;
+            }
+          }
+        } catch {
+          // If agent fetch fails, allow the run to proceed — server will validate.
+        }
+      }
+
+      // Validate the scenario before asking for models so the dialog never
+      // pops over an invalid form. Then pre-fill the run-model dialog from the
+      // scenario's stored choices (null = follow the project default) and open
+      // it — the actual save + run happens on confirm.
+      const valid = await form.trigger();
+      if (!valid) return;
+
+      setRunSimulatorModel(scenario?.simulatorModel ?? null);
+      setRunJudgeModel(scenario?.judgeModel ?? null);
+      setPendingRunTarget(target);
+      setRunModelDialogOpen(true);
+    },
+    [project?.id, project?.slug, formInstance, utils, openDrawer, scenario],
+  );
+
+  /**
+   * Say why the save did not happen.
+   *
+   * `handleSubmit` swallows an invalid form: the callback never runs and, with
+   * no second argument, nothing else does either — the button is pressed and
+   * the drawer sits there. Every field renders its own message, but the field
+   * can be scrolled off, or inside the collapsed Advanced section, so the
+   * press needs an answer of its own.
+   */
+  const reportInvalid = useCallback((errors: FieldErrors<ScenarioFormData>) => {
+    // Only the messages this form authored. A server-set field error is put
+    // there by applyHandledErrorToForm, which already renders it at its field,
+    // and its text is copy we did not write — so it never becomes the summary.
+    const fieldMessages = Object.values(errors)
+      .filter(
+        (entry) => (entry as { type?: string } | undefined)?.type !== "server",
+      )
+      .map((entry) => (entry as { message?: string } | undefined)?.message)
+      .filter((text): text is string => !!text);
+    toaster.create({
+      title: "Check the highlighted fields",
+      description: fieldMessages[0] ?? "Some values need fixing before saving.",
+      type: "warning",
+      meta: { closable: true },
+    });
+  }, []);
+
+  const confirmRunWithModels = useCallback(async () => {
+    const form = formInstance;
+    const target = pendingRunTarget;
+    if (!form || !target || !project?.id || !project?.slug) return;
+    setRunModelDialogOpen(false);
+
+    try {
+      await form.handleSubmit(async (data) => {
+        // skipTransition: don't open the edit-mode drawer mid-save — we're
+        // navigating away to /simulations next, so the create→edit URL push
+        // would race with our redirect (lw#3586 F11). The whole `await` is
+        // also why the redirect itself MUST be the only router.push that
+        // fires after — `onClose()` does its own router.push inside
+        // closeDrawer, and back-to-back router.push calls get coalesced
+        // (the cleanup push wins, the redirect gets dropped silently).
+        const savedScenario = await handleSave({
+          data,
+          skipTransition: true,
+          models: {
+            simulatorModel: runSimulatorModel,
+            judgeModel: runJudgeModel,
+          },
+        });
+        if (!savedScenario) return;
+
+        // Persist the target selection for this scenario
+        persistTarget(target);
+
+        // Generate batchRunId so the simulations page can show a placeholder immediately
+        const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
+
+        // Fire the run — no callbacks, simulations page picks up via SSE
+        void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
+
+        // Navigate to simulations — drawer closes implicitly via route change.
+        // Intentionally NOT calling onClose() here: closeDrawer() does its
+        // own router.push to strip drawer.* params, which would race with
+        // this redirect and silently win (lw#3586 F11).
+        void router.push(
+          `/${project.slug}/simulations?pendingBatch=${batchRunId}`,
+        );
+      }, reportInvalid)();
+    } catch (error) {
+      showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
+    }
+  }, [
+    formInstance,
+    pendingRunTarget,
+    project?.id,
+    project?.slug,
+    handleSave,
+    persistTarget,
+    runScenario,
+    router,
+    runSimulatorModel,
+    runJudgeModel,
+    reportInvalid,
+  ]);
+  const handleSaveWithoutRunning = useCallback(async () => {
+    const form = formInstance;
+    if (!form) return;
+    await form.handleSubmit(async (data) => {
+      try {
+        const saved = await handleSave({ data, skipTransition: true });
+        if (saved) {
+          toaster.create({
+            title: scenario ? "Scenario updated" : "Scenario created",
+            type: "success",
+            meta: { closable: true },
+          });
+          onClose();
+        }
+      } catch {
+        // Error already handled by mutation onError callback
+      }
+    }, reportInvalid)();
+  }, [handleSave, scenario, formInstance, onClose, reportInvalid]);
+  const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
+    setFormInstance(form);
+  }, []);
+  const isSubmitting =
+    createMutation.isPending || updateMutation.isPending || isRunning;
+
+  // Use initial data from complexProps (new scenario from modal) or from DB (editing)
+  const initialFormData =
+    props.initialFormData ?? complexPropsData.initialFormData;
+  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
+    () =>
+      scenario ? toFormDefaults(scenario) : (initialFormData ?? undefined),
+    [scenario, initialFormData],
+  );
+
+  return (
+    <Drawer.Root
+      open={isOpen}
+      onOpenChange={({ open }) => !open && onClose()}
+      size="xl"
+    >
+      <Drawer.Content
+        bg="bg"
+        // A thin rim so an adversarial scenario is identifiable at a glance
+        // without repainting the whole surface.
+        colorPalette="redteam"
+        borderWidth={isRedTeamScenario ? "1px" : undefined}
+        // emphasized, not solid: the edge should mark the drawer as an attack
+        // without competing with the content inside it.
+        borderColor={isRedTeamScenario ? "colorPalette.emphasized" : undefined}
+      >
+        <Drawer.CloseTrigger />
+        <Drawer.Header borderBottomWidth="1px">
+          <Heading size="md">
+            {scenario ? "Edit Scenario" : "Create Scenario"}
+          </Heading>
+        </Drawer.Header>
+        <Drawer.Body padding={0} overflow="hidden">
+          <Grid templateColumns="1fr 320px" height="full" overflow="hidden">
+            {/* Left: Form */}
+            <GridItem
+              overflowY="auto"
+              padding={6}
+              borderRightWidth="1px"
+              borderColor="border"
+            >
+              {formInstance && <FormServerError form={formInstance} />}
+              <ScenarioForm
+                key={scenarioId ?? "new"}
+                defaultValues={defaultValues}
+                formRef={setFormRef}
+                onIsRedTeamChange={setIsRedTeamScenario}
+              />
+            </GridItem>
+            {/* Right: Help Sidebar */}
+            <GridItem overflowY="auto" padding={4} bg="bg.muted">
+              <ScenarioEditorSidebar form={formInstance} />
+            </GridItem>
+          </Grid>
+        </Drawer.Body>
+        {/* Bottom Bar */}
+        <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
+          {formInstance && <FooterLabels form={formInstance} />}
+          <HStack gap={2} flexShrink={0}>
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <SaveAndRunMenu
+              selectedTarget={selectedTarget}
+              onTargetChange={handleTargetChange}
+              onSaveAndRun={handleSaveAndRun}
+              onSaveWithoutRunning={handleSaveWithoutRunning}
+              onCreateAgent={handleCreateAgent}
+              onCreatePrompt={() => setPromptDrawerOpen(true)}
+              isLoading={isSubmitting}
+            />
+          </HStack>
+        </Drawer.Footer>
+      </Drawer.Content>
+
+      {/* Run-model dialog: choose user-simulator + judge models before running */}
+      <ScenarioRunModelDialog
+        open={runModelDialogOpen}
+        onOpenChange={setRunModelDialogOpen}
+        simulatorModel={runSimulatorModel}
+        judgeModel={runJudgeModel}
+        onSimulatorChange={setRunSimulatorModel}
+        onJudgeChange={setRunJudgeModel}
+        onConfirm={confirmRunWithModels}
+        isRunning={isSubmitting}
+      />
+
+      {/* Agent Type Selector Drawer */}
+      <AgentTypeSelectorDrawer
+        open={agentTypeSelectorOpen}
+        onClose={() => {
+          setAgentTypeSelectorOpen(false);
+          clearFlowCallbacks();
+        }}
+      />
+
+      {/* Prompt Creation Drawer */}
+      <PromptEditorDrawer
+        open={promptDrawerOpen}
+        onClose={() => setPromptDrawerOpen(false)}
+        onSave={(prompt) => {
+          // Auto-select the newly created prompt
+          handleTargetChange({ type: "prompt", id: prompt.id });
+          setPromptDrawerOpen(false);
+          toaster.create({
+            title: "Prompt created",
+            description: `"${prompt.name}" is now selected as the target.`,
+            type: "success",
+            meta: { closable: true },
+          });
+        }}
+      />
+    </Drawer.Root>
+  );
+}
+
+function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
+  const labels = useWatch({ control: form.control, name: "labels" });
+
+  return (
+    <HStack gap={2} flex={1} overflow="hidden" flexWrap="wrap">
+      <Text fontSize="xs" fontWeight="medium" color="fg.muted" flexShrink={0}>
+        Labels
+      </Text>
+      <TagList
+        labels={labels}
+        onRemove={(_label, index) =>
+          form.setValue(
+            "labels",
+            labels.filter((_, i) => i !== index),
+          )
+        }
+        onAdd={(label) => form.setValue("labels", [...labels, label])}
+      />
+    </HStack>
+  );
+}

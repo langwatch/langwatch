@@ -16,12 +16,12 @@ Feature: License to PlanInfo Mapping
       | evaluationsCredit   | 100    |
       | maxWorkflows        | 25     |
     When I map the license to PlanInfo
+    # Only seat + message limits surface on PlanInfo. Projects, workflows,
+    # evaluationsCredit, etc. stay in the signed license payload but are
+    # OSS/uncapped, so they are not mapped onto the active plan.
     Then the PlanInfo has:
       | maxMembers          | 5      |
-      | maxProjects         | 10     |
       | maxMessagesPerMonth | 50000  |
-      | evaluationsCredit   | 100    |
-      | maxWorkflows        | 25     |
 
   Scenario: Maps canPublish flag correctly when true
     Given a license with canPublish true
@@ -67,22 +67,23 @@ Feature: License to PlanInfo Mapping
     And the plan free is true
     And the plan overrideAddingLimitations is true
     And maxMembers is Number.MAX_SAFE_INTEGER
-    And maxProjects is Number.MAX_SAFE_INTEGER
     And maxMessagesPerMonth is Number.MAX_SAFE_INTEGER
-    And maxWorkflows is Number.MAX_SAFE_INTEGER
     And canPublish is true
 
   # ============================================================================
   # Constants: FREE_PLAN
   # ============================================================================
 
-  Scenario: FREE_PLAN has correct limits for expired/invalid licenses
+  # FREE_PLAN is the Cloud free tier. A self-hosted deployment never lands here:
+  # with no license, or one we did not sign, it resolves to the uncapped
+  # open-source baseline, and a license past its end date keeps the numbers it
+  # sold. See expired-license-enforcement.feature.
+
+  Scenario: FREE_PLAN has the Cloud free-tier limits
     When I access the FREE_PLAN constant
     Then the plan type is "FREE"
     And the plan name is "Free"
     And the plan free is true
     And maxMembers is 1
-    And maxProjects is 2
     And maxMessagesPerMonth is 1000
-    And maxWorkflows is 3
     And canPublish is false

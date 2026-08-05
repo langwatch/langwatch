@@ -40,6 +40,14 @@ Feature: Projection replay
     Then aggregates that already completed are not replayed again
     And the remaining aggregates are replayed to completion
 
+  @integration
+  Scenario: A full rebuild replays aggregates an interrupted run had completed
+    Given a replay of a projection was interrupted after completing some aggregates
+    And the projection's stored records were then emptied
+    When the operator starts a full rebuild of that projection
+    Then the aggregates the interrupted run had completed are replayed again
+    And their records are restored from the event history
+
   Scenario: Replaying fold and map projections together
     Given a registered fold projection "traceSummary" for aggregate type "trace"
     When an operator starts a replay covering both "traceSummary" and "spanStorage"

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -122,6 +123,14 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized:
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	case resp.StatusCode == http.StatusForbidden:
+		// The control plane distinguishes the reversible disable from the
+		// one-way revoke in its error code; forward the distinction so a
+		// disabled tenant is not told its credential is gone for good.
+		if strings.Contains(string(respBody), "virtual_key_disabled") {
+			return nil, herr.New(ctx, domain.ErrKeyDisabled, herr.M{
+				"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
+			})
+		}
 		return nil, herr.New(ctx, domain.ErrKeyRevoked, nil)
 	case resp.StatusCode != http.StatusOK:
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, fmt.Errorf("control plane returned %d", resp.StatusCode))
@@ -283,6 +292,40 @@ func (c *Client) FetchConfig(ctx context.Context, vkID string) (domain.BundleCon
 		return domain.BundleConfig{}, err
 	}
 	return wire.toDomain(), nil
+}
+
+// BudgetBucketSpend reads the current-period spend for one attributed-user
+// bucket: the enforcement figure behind per-end-user templates. Cached by
+// the caller (adapters/budget.CachedBucketSpend); this is the cold path.
+func (c *Client) BudgetBucketSpend(ctx context.Context, budgetID, endUserID string) (int64, error) {
+	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/budget-bucket-spend")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return 0, err
+	}
+	q := req.URL.Query()
+	q.Set("budget_id", budgetID)
+	q.Set("end_user_id", endUserID)
+	req.URL.RawQuery = q.Encode()
+	c.setCommonHeaders(req)
+	c.sign(req, nil)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("budget bucket spend returned %d", resp.StatusCode)
+	}
+	var wire struct {
+		SpentMicroUSD int64 `json:"spent_micro_usd"`
+	}
+	if err := json.Unmarshal(body, &wire); err != nil {
+		return 0, err
+	}
+	return wire.SpentMicroUSD, nil
 }
 
 // Health performs the signed control-plane connectivity probe backing the
