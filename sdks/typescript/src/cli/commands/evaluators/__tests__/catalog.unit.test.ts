@@ -18,6 +18,18 @@ describe("the CLI's evaluator-type catalog", () => {
     it("rejects the stale slug the live failure was built on", () => {
       expect(isValidEvaluatorType("ragas/answer_relevancy")).toBe(false);
     });
+
+    it("rejects every legacy-prefixed slug", () => {
+      // The CLI validates against the generated platform catalog, so a
+      // regeneration that reintroduced the removed family would surface here
+      // rather than as a 422 at the API boundary.
+      expect(isValidEvaluatorType("legacy/ragas_answer_relevancy")).toBe(false);
+      expect(
+        evaluatorTypeCatalog().filter((entry) =>
+          entry.slug.startsWith("legacy/"),
+        ),
+      ).toEqual([]);
+    });
   });
 
   describe("when ranking the closest types for a miss", () => {

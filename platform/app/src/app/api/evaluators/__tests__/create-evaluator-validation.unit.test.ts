@@ -65,7 +65,7 @@ describe("creating an evaluator with an unknown type", () => {
     });
 
     /** @scenario The rejection lists every type that would have been accepted */
-    it("lists the slug a stale ragas name should be corrected to", async () => {
+    it("names the current ragas slug that replaces the stale one", async () => {
       const res = await post(staleSlug);
 
       const body = await res.json();

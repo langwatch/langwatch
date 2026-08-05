@@ -1,3 +1,4 @@
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -30,6 +31,12 @@ describe("getProjectLambdaArn", () => {
 
   beforeEach(async () => {
     setConfig("123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest");
+    // Creating a project Lambda also provisions its log group. Stubbed so the
+    // suite never reaches the network, which otherwise costs a real AWS
+    // round trip per create-path test and fails noisily without credentials.
+    vi.spyOn(CloudWatchLogsClient.prototype as any, "send").mockResolvedValue(
+      {},
+    );
     await clearLambdaArnCache();
   });
 
@@ -261,6 +268,43 @@ describe("getProjectLambdaArn", () => {
     it("exposes a TTL constant tuned for minute-scale burst absorption", () => {
       expect(LAMBDA_ARN_CACHE_TTL_MS).toBeGreaterThanOrEqual(60_000);
       expect(LAMBDA_ARN_CACHE_TTL_MS).toBeLessThanOrEqual(60 * 60_000);
+    });
+  });
+
+  describe("when a project's Lambda is created", () => {
+    it("provisions it at the sized memory allocation", async () => {
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        // GetFunction (existence) misses, so the create path runs.
+        .mockRejectedValueOnce(
+          Object.assign(new Error("not found"), {
+            name: "ResourceNotFoundException",
+          }),
+        )
+        .mockResolvedValueOnce({ FunctionArn: mockLambdaConfig.FunctionArn })
+        .mockResolvedValue({
+          Configuration: mockLambdaConfig,
+          Code: {
+            ImageUri:
+              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+          },
+        });
+
+      await getProjectLambdaArn(mockProjectId);
+
+      const createCall = send.mock.calls
+        .map(([command]: any) => command)
+        .find(
+          (command: any) =>
+            command?.input?.FunctionName !== undefined &&
+            command?.input?.MemorySize !== undefined,
+        );
+
+      // Pinned because the allocation is a sizing decision made against
+      // production data, not an arbitrary default: Max Memory Used peaks at
+      // 507MB across 806k invocations, so 1024MB is the smallest size that
+      // still clears the tail with room to spare.
+      expect(createCall?.input?.MemorySize).toBe(1024);
     });
   });
 });

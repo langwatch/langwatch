@@ -60,13 +60,11 @@ describe("evaluator environment", () => {
       await syncVenvs(ctxWith("ENVIRONMENT=local\n"), bus);
 
       const extras = extrasFrom(execCalls[0]!.args);
-      expect(extras).not.toContain("presidio");
-      expect(extras).not.toContain("lingua");
-      expect(extras).not.toContain("all");
-      // The rest still have to be there — a missing extra means that
-      // evaluator's route is never registered and every call 404s.
-      expect(extras).toEqual(
-        expect.arrayContaining(["azure", "langevals", "openai", "ragas", "topic_clustering"]),
+      // Exact set: a missing extra means that evaluator's route is never
+      // registered and every call 404s, and an unexpected one means the lean
+      // install quietly stopped being lean.
+      expect([...extras].sort()).toEqual(
+        ["azure", "langevals", "openai", "ragas", "topic_clustering"].sort(),
       );
     });
   });
@@ -79,13 +77,25 @@ describe("evaluator environment", () => {
       expect(extras).not.toContain("lingua");
     });
 
-    it("supports both together", async () => {
+    it("installs both extras when both toggles are enabled", async () => {
       await syncVenvs(
         ctxWith("LANGWATCH_ENABLE_PRESIDIO=true\nLANGWATCH_ENABLE_LINGUA=true\n"),
         bus,
       );
       const extras = extrasFrom(execCalls[0]!.args);
-      expect(extras).toEqual(expect.arrayContaining(["presidio", "lingua"]));
+      // Exact set rather than a containment check: this pins the whole extras
+      // list, so an extra nobody asked for cannot slip in unnoticed.
+      expect([...extras].sort()).toEqual(
+        [
+          "azure",
+          "langevals",
+          "lingua",
+          "openai",
+          "presidio",
+          "ragas",
+          "topic_clustering",
+        ].sort(),
+      );
     });
   });
 
