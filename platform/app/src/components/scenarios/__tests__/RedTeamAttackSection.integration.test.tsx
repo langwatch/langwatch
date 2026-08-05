@@ -192,7 +192,10 @@ describe("the attack section", () => {
       /** @scenario Switch a scenario to red team */
       it("reveals the attack configuration", async () => {
         const user = userEvent.setup();
-        renderForm({ name: "Bank support agent", situation: "A support agent." });
+        renderForm({
+          name: "Bank support agent",
+          situation: "A support agent.",
+        });
 
         expect(screen.queryByText("Attack")).not.toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: /red team/i }));

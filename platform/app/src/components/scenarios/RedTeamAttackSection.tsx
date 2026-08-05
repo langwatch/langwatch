@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { type UseFormReturn, useWatch } from "react-hook-form";
 
 import type { RedTeamStrategyName } from "~/server/scenarios/execution/types";
+import { Tooltip } from "../ui/tooltip";
 import { AdvancedSettings } from "./redTeam/AdvancedSettings";
 import { ObjectiveField } from "./redTeam/ObjectiveField";
-import { ATTACK_HELP } from "./redTeam/strategies";
 import { StrategyPicker } from "./redTeam/StrategyPicker";
+import { ATTACK_HELP } from "./redTeam/strategies";
 import { TurnsField } from "./redTeam/TurnsField";
 import type { ScenarioFormData } from "./ScenarioForm";
 import { SectionHeader } from "./ui/SectionHeader";
-import { Tooltip } from "../ui/tooltip";
 
 /**
  * The attack configuration, inline in the scenario editor.

@@ -1,4 +1,11 @@
-import { Button, Field, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Field,
+  HStack,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import type {
   FieldErrors,
@@ -7,7 +14,10 @@ import type {
 } from "react-hook-form";
 
 import { Menu } from "~/components/ui/menu";
-import { OBJECTIVE_HELP, RED_TEAM_OBJECTIVE_GROUPS } from "../redTeamObjectives";
+import {
+  OBJECTIVE_HELP,
+  RED_TEAM_OBJECTIVE_GROUPS,
+} from "../redTeamObjectives";
 import type { ScenarioFormData } from "../ScenarioForm";
 import { LabelWithHelp } from "./LabelWithHelp";
 
