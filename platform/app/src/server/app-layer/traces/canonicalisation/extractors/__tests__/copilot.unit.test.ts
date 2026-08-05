@@ -166,7 +166,9 @@ describe("CopilotExtractor", () => {
       // recognized from the scope alone or the span is misclassified.
       const ctx = createExtractorContext(
         { "gen_ai.operation.name": "execute_tool" },
-        { instrumentationScope: { name: "github.copilot", version: "1.0.71-0" } },
+        {
+          instrumentationScope: { name: "github.copilot", version: "1.0.71-0" },
+        },
       );
 
       new CopilotExtractor().apply(ctx);
