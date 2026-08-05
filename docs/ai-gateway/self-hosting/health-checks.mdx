@@ -163,16 +163,16 @@ Point the monitor at `https://gateway.your-corp.com/health`. Set `ingress.health
 
 1. **Immediately**: `MarkDraining()` flips `/readyz` to 503 with `status:"draining"`. The Service's endpoint controller and the LB observe and stop routing new traffic.
 2. **Pre-drain wait**: the pod keeps accepting connections for `shutdown.preDrainWaitSeconds` (default 5) while the LB catches up on the `/readyz` flip.
-3. **Drain window**: existing in-flight requests continue for up to `shutdown.timeoutSeconds` (default 15). SSE streams continue until the upstream provider closes them or the request finishes naturally.
+3. **Drain window**: existing in-flight requests continue for up to `shutdown.timeoutSeconds` (default 60). SSE streams continue until the upstream provider closes them or the request finishes naturally.
 4. **Process exits 0**.
 
 Match your `terminationGracePeriodSeconds` to `preDrainWaitSeconds + timeoutSeconds` plus a few seconds of slack:
 
 ```yaml
-terminationGracePeriodSeconds: 30  # chart default: 5 + 15 + 10 slack
+terminationGracePeriodSeconds: 75  # chart default: 5 + 60 + 10 slack
 ```
 
-`preDrainWaitSeconds` exists precisely to give the LB time to notice `/readyz=503` before the listener stops accepting — if you still see a fraction of in-flight requests hit an already-draining replica during rolling deploys, bump `shutdown.preDrainWaitSeconds` (and `terminationGracePeriodSeconds` to match) rather than reaching for a manual `preStop` sleep.
+`preDrainWaitSeconds` exists precisely to give the LB time to notice `/readyz=503` before the listener stops accepting, so if you still see a fraction of in-flight requests hit an already-draining replica during rolling deploys, bump `shutdown.preDrainWaitSeconds` (and `terminationGracePeriodSeconds` to match) rather than reaching for a manual `preStop` sleep. A `preStop` hook does the same job less precisely: it delays SIGTERM instead of delaying the listener shutdown, so the pod is not yet reporting `/readyz=503` for any of that time and the LB has no signal to act on.
 
 ## End-to-end synthetic check
 
@@ -201,4 +201,4 @@ On alert:
 | `/health` 503 with `control_plane: unreachable for Ns`           | Control plane down, unroutable, or the shared internal secret does not match (a mismatch 401s the probe and reads the same) | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods, then check the Service and DNS. The `statusprobe_control_plane_unreachable` log line carries the underlying probe failure |
 | `/health` 503 while completions still succeed                    | Expected during a control-plane outage longer than 60 s: warm keys keep serving from the auth cache, cold ones do not | Confirm it is a real outage and not a secret mismatch (row above, which reads identically), then fix whichever side is wrong. `/readyz` stays 200 on purpose so warm traffic keeps flowing |
 | `/readyz` flips to 503 mid-life                                  | Pod received `SIGTERM` (rolling deploy, eviction, OOMKill) | `kubectl describe pod` for the termination reason                   |
-| 502 from LB for a small window during rolling deploy             | LB hasn't yet removed the draining replica             | Add a `preStop: sleep 3` lifecycle hook (see Graceful shutdown above) |
+| 502 from LB for a small window during rolling deploy             | LB hasn't yet removed the draining replica             | Raise `shutdown.preDrainWaitSeconds`, and `terminationGracePeriodSeconds` to match (see Graceful shutdown above) |

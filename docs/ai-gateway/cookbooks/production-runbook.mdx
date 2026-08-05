@@ -101,7 +101,7 @@ go tool pprof http://localhost:6060/debug/pprof/heap
 
 - `internal/auth.(*Cache).Put` holding more than ~1 MB per cached bundle, unusual, a bundle should be ≤ 50 KB. Oversized `policy_rules.urls.allow` with thousands of entries can trigger this.
 - `internal/dispatch` buffered responses, if streaming responses are being accumulated instead of flushed per-chunk, every request consumes full response size. Check for `bufio.NewWriter` wrapping a streaming writer anywhere.
-- Cached bundles never being evicted, a very large tenant count with long `HARD_GRACE` keeps every bundle resident. Check `gateway_auth_cache_size{tier="l1"}` against your expected VK count.
+- Cached bundles never being evicted, a very large tenant count with long `HARD_GRACE_SECONDS` keeps every bundle resident. Check `gateway_auth_cache_size{tier="l1"}` against your expected VK count.
 
 ## Recipe 4: Mutex or block profiling for contention
 
@@ -168,7 +168,7 @@ gateway request -> spend command -> local spool -> drainer -> control-plane inge
 
 **Symptom:** A pod stays in `Terminating` for the full `terminationGracePeriodSeconds`, then gets SIGKILLed. In-flight requests ended abruptly. Alertmanager fires on the `gateway_draining` gauge being 1 for > grace.
 
-The pod received SIGTERM but at least one request handler never returned before `shutdown.timeout` expired. The drain pipeline exposes this via two gauges:
+The pod received SIGTERM but at least one request handler never returned before `shutdown.timeoutSeconds` expired. The drain pipeline exposes this via two gauges:
 
 | Metric | During healthy drain | During stuck drain |
 |---|---|---|
@@ -194,7 +194,7 @@ curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | \
 
 **Common causes, in order of likelihood:**
 
-1. **Upstream dial hanging without a deadline.** Streaming fallback into a dead region that never returns TLS handshake. `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` should be < `shutdown.timeout`; if it is, the handler should cancel on its own.
+1. **Upstream dial hanging without a deadline.** Streaming fallback into a dead region that never returns TLS handshake. `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` should be < `shutdown.timeoutSeconds`; if it is, the handler should cancel on its own.
 2. **Guardrail evaluator hanging past its budget.** `pre`/`post` have a `guardrail.preTimeout`, `postTimeout` of 1500 ms, but a misconfigured evaluator can still hang if it doesn't respect context cancellation. Check the evaluator service's own SLO.
 3. **A breaker with `open` state but no surrounding deadline.** Rare; closed previously, but worth ruling out if the stack shows `internal/circuit` waiting.
 4. **Slow custom middleware.** If you've forked the gateway and added middleware that does I/O without context propagation, that's where to look first.
@@ -203,17 +203,17 @@ curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | \
 
 | Cause | Action |
 |---|---|
-| Upstream hang | Lower `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` below `shutdown.timeout`. Default 60 s, bump `shutdown.timeout` to 65 s + `terminationGracePeriodSeconds` to 80 s if you genuinely need 60 s upstream calls |
+| Upstream hang | Lower `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` below `shutdown.timeoutSeconds`. Default 60 s, bump `shutdown.timeoutSeconds` to 65 s + `terminationGracePeriodSeconds` to 80 s if you genuinely need 60 s upstream calls |
 | Guardrail hang | Raise evaluator SLO or set `guardrails.request_fail_open: true` on the VK to fall through on timeout |
 | Custom middleware | Thread `r.Context()` through every I/O call |
 
-**Temporary workaround:** bump `shutdown.timeout` + `terminationGracePeriodSeconds` to give the hanging request time to complete. Only appropriate while you diagnose the root cause, long grace periods slow down rolling deploys and make HPA scale-downs feel sluggish.
+**Temporary workaround:** bump `shutdown.timeoutSeconds` + `terminationGracePeriodSeconds` to give the hanging request time to complete. Only appropriate while you diagnose the root cause, long grace periods slow down rolling deploys and make HPA scale-downs feel sluggish.
 
 ## Recipe 8: Control-plane outage, stale-while-error
 
 **Symptom:** The LangWatch control plane is unreachable (deployment incident, DNS hiccup, network partition). The gateway's L1 auth cache is full of valid resolved-key bundles, but `/api/internal/gateway/resolve-key` is returning errors. Operator wants to know: are customers being rejected, or is the gateway riding through?
 
-The gateway's auth resolver runs **stale-while-error** by default: when the cached entry's JWT crosses its natural expiry AND the control-plane refresh fails for **transport-class reasons** (network error, dial timeout, 5xx, connection refused, malformed/unparseable response, JWT verify failure), it bumps the soft expiry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and serves the cached bundle. This continues every refresh attempt up to the hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` past the JWT exp (default `6h`). The hard cap is deliberately generous, the soft-bump path runs on **every** refresh attempt without a successful response, so the hard cap is the true outage backstop, not a steady-state knob.
+The gateway's auth resolver runs **stale-while-error** by default: when the cached entry's JWT crosses its natural expiry AND the control-plane refresh fails for **transport-class reasons** (network error, dial timeout, 5xx, connection refused, malformed/unparseable response, JWT verify failure), it bumps the soft expiry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` (default `300`, 5 minutes) and serves the cached bundle. This continues every refresh attempt up to the hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` past the JWT exp (default `21600`, 6 hours). The hard cap is deliberately generous, the soft-bump path runs on **every** refresh attempt without a successful response, so the hard cap is the true outage backstop, not a steady-state knob.
 
 **Auth-class rejections**: explicit `401`, `403`, `404` from `/resolve-key`, bypass the grace window entirely and evict immediately. A revoked credential never gets stale-served.
 
@@ -239,7 +239,7 @@ The three log lines form a ladder operators read in order:
 |---|---|---|---|
 | `auth_cache_serve_stale` | INFO | Grace is active; cached bundle is being served past JWT exp | None, this is expected behaviour during outage. Includes `vk_id`, `stale_for`, `hard_grace_remaining`, `refresh_error_class` |
 | `auth_cache_refresh_transport_failure` | WARN | Each refresh attempt is failing; soft expiry bumped. Includes `error`, `error_class`, `new_soft_expires_at` | Investigate control plane (this is the actual outage signal). Stop bumping once CP returns |
-| `auth_cache_hard_evict` | ERROR | Grace cap exceeded OR auth rejection. `reason` field disambiguates: `hard_cap_exceeded` (outage too long) vs `auth_rejection` (real bad-credential evict) vs `auth_rejection_async`, `hard_cap_exceeded_on_lookup` | If `hard_cap_exceeded`, customers start seeing 401s. Bump `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` if outage is ongoing and you'd rather extend than reject |
+| `auth_cache_hard_evict` | ERROR | Grace cap exceeded OR auth rejection. `reason` field disambiguates: `hard_cap_exceeded` (outage too long) vs `auth_rejection` (real bad-credential evict) vs `auth_rejection_async`, `hard_cap_exceeded_on_lookup` | If `hard_cap_exceeded`, customers start seeing 401s. Bump `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` if outage is ongoing and you'd rather extend than reject |
 
 **Customer-facing behaviour during the grace window:**
 
@@ -251,9 +251,9 @@ The three log lines form a ladder operators read in order:
 
 | Knob | When to lower | When to raise |
 |---|---|---|
-| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` | If you want refresh attempts to back off less aggressively (e.g. 1m for tighter retry density) | If your control plane is consistently slow under load and you want to reduce refresh-attempt churn during partial degradation |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` | If you have strict revocation-latency SLOs (compliance, regulated deployments) and would rather hard-fail than serve a long-stale bundle | If your control plane has known multi-hour planned-maintenance windows and you'd rather ride through |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE=0s` | **Restores legacy behaviour:** any refresh failure past JWT exp evicts immediately. Pick this if you operate under a security regime where stale-while-error is unacceptable | n/a (zero is the disable signal) |
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | If you want refresh attempts to back off less aggressively (e.g. `60` for tighter retry density) | If your control plane is consistently slow under load and you want to reduce refresh-attempt churn during partial degradation |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | If you have strict revocation-latency SLOs (compliance, regulated deployments) and would rather hard-fail than serve a long-stale bundle | If your control plane has known multi-hour planned-maintenance windows and you'd rather ride through |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS=-1` | **Restores legacy behaviour:** any refresh failure past JWT exp evicts immediately. Pick this if you operate under a security regime where stale-while-error is unacceptable | n/a (a negative value is the disable signal; `0` means unset and takes the 6 h default) |
 
 **Alert pattern (log-based, no metric infra required):**
 
@@ -274,7 +274,7 @@ The gateway is a cache of the control plane, so a surprising amount continues to
 
 | Component down | Customer impact | How long gateway stays up | Notes |
 |---|---|---|---|
-| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default 6 h) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the OTel span and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the OTel span and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite, circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
 | Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite, L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
 | Gateway pod (crash, eviction) | None, HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |
