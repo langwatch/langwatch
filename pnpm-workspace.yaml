@@ -84,7 +84,7 @@ overrides:
   react-dom: ^19.2.7
   react-is: ^19.2.7
   kysely: 0.28.17
-  postcss: ^8.5.13
+  postcss: ^8.5.23
   lodash: ^4.18.1
   glob: ^11.1.0
   picomatch: ">=4.0.4"
@@ -100,7 +100,7 @@ overrides:
 
   # --- Security ---
   # shell-quote quote() newline escaping (CRITICAL)
-  "shell-quote@<1.8.4": ">=1.8.4"
+  "shell-quote@<1.9.0": ">=1.9.0"
   # esbuild Deno binary integrity RCE + dev-server file read
   # (GHSA-gv7w-rqvm-qjhr / GHSA-g7r4-m6w7-qqqr)
   "esbuild@<0.28.1": ">=0.28.1"
@@ -131,12 +131,16 @@ overrides:
   "undici@>=7.0.0 <7.28.0": ">=7.28.0 <8"
   # vitest advisory floor
   "vitest@<4.1.0": ">=4.1.0"
-  "brace-expansion@>=4.0.0 <5.0.6": ">=5.0.6"
+  # brace-expansion ReDoS, scoped per major line: the tree carries 1.x, 2.x and
+  # 5.x in parallel and a single union selector would force them onto one major.
+  "brace-expansion@<1.1.18": ">=1.1.18 <2"
+  "brace-expansion@>=2.0.0 <2.1.4": ">=2.1.4 <3"
+  "brace-expansion@>=4.0.0 <5.0.9": ">=5.0.9 <6"
   "file-type@>=13.0.0 <21.3.1": ">=21.3.1 <22"
   "prismjs@<1.30.0": ">=1.30.0"
   "@grpc/grpc-js@<1.14.4": ">=1.14.4"
   "js-yaml@>=3.0.0 <3.15.0": ">=3.15.0 <4"
-  "dompurify@<3.4.11": ">=3.4.11 <4"
+  "dompurify@<3.4.12": ">=3.4.12 <4"
   # validator incomplete filtering (#216) via class-validator
   "validator@<13.15.22": ">=13.15.22"
   # express-rate-limit DoS (from mcp/typescript)
@@ -152,7 +156,7 @@ overrides:
   # fast-xml-builder attribute value quote bypass (#1028)
   "fast-xml-builder@<1.1.7": ">=1.1.7"
   # fast-uri path traversal + host confusion (#1031-#1042)
-  "fast-uri@<3.1.2": ">=3.1.2"
+  "fast-uri@<3.1.5": ">=3.1.5 <4"
   # protobufjs code execution, prototype pollution, DoS, Any-expansion DoS and
   # property shadowing (GHSA-xq3m-2v4x-88gg, GHSA-66ff-xgx4-vchm,
   # GHSA-75px-5xx7-5xc7, GHSA-jvwf-75h9-cwgg, GHSA-685m-2w69-288q,
@@ -188,10 +192,23 @@ overrides:
   # platform/app/'s narrower `>=10.6 <11`)
   "hono@<4.12.25": ">=4.12.25"
   "uuid@<11.1.1": ">=11.1.1 <12"
-  "ip-address@<=10.1.0": ">=10.1.1"
+  "ip-address@<10.3.1": ">=10.3.1"
   "qs@>=6.11.1 <=6.15.1": ">=6.15.2"
   "form-data@<4.0.6": ">=4.0.6"
-  "js-yaml@>=4.0.0 <4.2.0": ">=4.2.0 <5"
+  "js-yaml@>=4.0.0 <4.3.1": ">=4.3.1 <5"
+  "js-yaml@>=5.0.0 <5.2.2": ">=5.2.2 <6"
+  # mermaid: prototype pollution and DoS in the diagram parsers
+  "mermaid@<11.16.1": ">=11.16.1 <12"
+  # systeminformation command injection via si.inetLatency and friends
+  "systeminformation@<5.31.7": ">=5.31.7"
+  # body-parser DoS (1.x line only; the tree also carries a patched 2.x)
+  "body-parser@<1.20.6": ">=1.20.6 <2"
+  # Deliberately NOT touching the @opentelemetry packages here (alerts #1880
+  # core, #1886 propagator-jaeger). Forcing them moved core onto 2.10.0 and the
+  # app then returned 500 on OTLP span ingestion, failing the SDK e2e suite with
+  # `OTLPExporterError: Internal Server Error`. The otel tree is pinned around a
+  # deliberate @opentelemetry/otlp-transformer@0.55.0 (see the protobufjs note
+  # above), so it needs to move as one coordinated change, not a floor bump.
 
   # --- vite ---
   # platform/app/pnpm-workspace.yaml carried an unconditional `vite: 8.0.10`, but
