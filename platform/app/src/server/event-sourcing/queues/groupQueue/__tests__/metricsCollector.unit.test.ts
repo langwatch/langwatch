@@ -33,11 +33,11 @@ function zrangebyscoreModel({
   rest: unknown[];
 }): string[] {
   const minStr = String(min);
-  const exclusive = minStr.startsWith("(");
-  const minVal = Number(exclusive ? minStr.slice(1) : minStr);
+  const isExclusive = minStr.startsWith("(");
+  const minVal = Number(isExclusive ? minStr.slice(1) : minStr);
   const maxVal = max === "+inf" ? Infinity : Number(max);
 
-  const withScores = rest.includes("WITHSCORES");
+  const shouldIncludeScores = rest.includes("WITHSCORES");
   const limitIdx = rest.indexOf("LIMIT");
   const offset = limitIdx >= 0 ? Number(rest[limitIdx + 1]) : 0;
   const count = limitIdx >= 0 ? Number(rest[limitIdx + 2]) : Infinity;
@@ -45,11 +45,14 @@ function zrangebyscoreModel({
   return [...entries]
     .filter(
       (e) =>
-        (exclusive ? e.score > minVal : e.score >= minVal) && e.score <= maxVal,
+        (isExclusive ? e.score > minVal : e.score >= minVal) &&
+        e.score <= maxVal,
     )
     .sort((a, b) => a.score - b.score)
     .slice(offset, offset + count)
-    .flatMap((e) => (withScores ? [e.member, String(e.score)] : [e.member]));
+    .flatMap((e) =>
+      shouldIncludeScores ? [e.member, String(e.score)] : [e.member],
+    );
 }
 
 /**
@@ -240,41 +243,43 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
     });
   });
 
-  describe("when 50 long-delayed groups outnumber a single day-old retry-backoff group", () => {
-    it("still surfaces the retry-backoff group's age (regression: nearest-first sampling)", async () => {
-      // Regression for the 2026-08-05 incident this gauge exists to catch:
-      // fifty monitor-timer groups scored hours out must NOT displace a
-      // retry-backoff group (scored only seconds out) from the sample. Under
-      // the old zrevrange(0, 49) sampling — largest scores first — the 50
-      // far-future groups would fill the sample and this test fails; the
-      // nearest-first zrangebyscore sampling ranks the backoff group first.
-      const now = Date.now();
-      const readyZset: ReadyEntry[] = [];
-      const headJobScores: Record<string, string[]> = {};
+  describe("given 50 long-delayed groups and a single day-old retry-backoff group", () => {
+    describe("when metrics are collected", () => {
+      it("still surfaces the retry-backoff group's age (regression: nearest-first sampling)", async () => {
+        // Regression for the 2026-08-05 incident this gauge exists to catch:
+        // fifty monitor-timer groups scored hours out must NOT displace a
+        // retry-backoff group (scored only seconds out) from the sample. Under
+        // the old zrevrange(0, 49) sampling — largest scores first — the 50
+        // far-future groups would fill the sample and this test fails; the
+        // nearest-first zrangebyscore sampling ranks the backoff group first.
+        const now = Date.now();
+        const readyZset: ReadyEntry[] = [];
+        const headJobScores: Record<string, string[]> = {};
 
-      for (let i = 0; i < 50; i++) {
-        const groupId = `tenant/sub/trace:long-delayed-${i}`;
-        readyZset.push({ member: groupId, score: now + 3_600_000 });
-        headJobScores[`${PREFIX}group:${groupId}:jobs`] = [
-          "job-future",
-          String(now + 3_600_000),
+        for (let i = 0; i < 50; i++) {
+          const groupId = `tenant/sub/trace:long-delayed-${i}`;
+          readyZset.push({ member: groupId, score: now + 3_600_000 });
+          headJobScores[`${PREFIX}group:${groupId}:jobs`] = [
+            "job-future",
+            String(now + 3_600_000),
+          ];
+        }
+
+        const backoffGroupId = "tenant/sub/trace:day-old-backoff";
+        readyZset.push({ member: backoffGroupId, score: now + 5_000 });
+        headJobScores[`${PREFIX}group:${backoffGroupId}:jobs`] = [
+          "job-1",
+          String(now - 86_400_000),
         ];
-      }
 
-      const backoffGroupId = "tenant/sub/trace:day-old-backoff";
-      readyZset.push({ member: backoffGroupId, score: now + 5_000 });
-      headJobScores[`${PREFIX}group:${backoffGroupId}:jobs`] = [
-        "job-1",
-        String(now - 86_400_000),
-      ];
+        const redis = makeRedis({ readyZset, headJobScores });
 
-      const redis = makeRedis({ readyZset, headJobScores });
+        await runCollect(redis);
 
-      await runCollect(redis);
-
-      const backlogAge = await readBacklogGauge();
-      expect(backlogAge).toBeGreaterThanOrEqual(86_400_000);
-      expect(backlogAge).toBeLessThan(86_400_000 + 60_000);
+        const backlogAge = await readBacklogGauge();
+        expect(backlogAge).toBeGreaterThanOrEqual(86_400_000);
+        expect(backlogAge).toBeLessThan(86_400_000 + 60_000);
+      });
     });
   });
 });
