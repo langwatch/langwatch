@@ -230,24 +230,29 @@ for (const { name, entry } of ENTRIES) {
       }
       files.add(input);
     }
-  }
-  // Dynamic imports of JSON from an external package. These survive into the
-  // bundle verbatim, so Node resolves them through the ESM loader, which
-  // rejects JSON without an import attribute (ERR_IMPORT_ATTRIBUTE_MISSING).
-  // tsx absorbs the missing attribute, so this only ever breaks in production,
-  // and it breaks quietly wherever the caller catches and degrades — the
-  // tokenizer skipped tokenization entirely for exactly this reason.
-  for (const input of scannedSources) {
-    if (!/\.(ts|tsx|mts|cts|js|mjs|cjs)$/.test(input)) continue;
-    const source = readFileSync(path.join(APP, input), "utf8");
+    // Dynamic imports of JSON from an external package. These survive into the
+    // bundle verbatim, so Node resolves them through the ESM loader, which
+    // rejects JSON without an import attribute (ERR_IMPORT_ATTRIBUTE_MISSING).
+    // tsx absorbs the missing attribute, so this only ever breaks in
+    // production, and it breaks quietly wherever the caller catches and
+    // degrades — the tokenizer skipped tokenization entirely for exactly this
+    // reason.
     for (const m of source.matchAll(
       /import\s*\(\s*(["'])([^"'\n]+\.json)\1\s*([,)])/g,
     )) {
       const spec = m[2] ?? "";
       // Relative JSON is bundled in, so the loader never sees it.
       if (/^(\.|\/|~\/|@app\/|@ee\/)/.test(spec)) continue;
-      // A closing paren right after the specifier means no attribute argument.
-      if (m[3] !== ")") continue;
+      // Only a literal `with: { type: "json" }` second argument satisfies the
+      // loader. Anything else still throws at runtime: `{}`, an options
+      // variable the scan can't see into, or `assert` (removed in Node 22).
+      if (
+        m[3] === "," &&
+        /^\s*\{\s*with\s*:\s*\{\s*type\s*:\s*(["'])json\1/.test(
+          source.slice((m.index ?? 0) + m[0].length),
+        )
+      )
+        continue;
       let files = jsonImportsWithoutAttribute.get(spec);
       if (!files) {
         files = new Set();
@@ -282,7 +287,7 @@ if (undeclared.size > 0) {
 }
 for (const [spec, files] of jsonImportsWithoutAttribute) {
   console.error(
-    `  error: dynamic import of "${spec}" in ${[...files].join(", ")} has no import attribute — Node's ESM loader rejects JSON without one (ERR_IMPORT_ATTRIBUTE_MISSING). Write: import("${spec}", { with: { type: "json" } })`,
+    `  error: dynamic import of "${spec}" in ${[...files].join(", ")} lacks a literal \`with: { type: "json" }\` import attribute — Node's ESM loader rejects JSON without it (ERR_IMPORT_ATTRIBUTE_MISSING). Write: import("${spec}", { with: { type: "json" } })`,
   );
 }
 if (
