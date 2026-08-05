@@ -85,6 +85,12 @@ jobs:
       coverage: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          # The gate reads no working-tree content: on pull_request events
+          # dorny/paths-filter takes the changed-file list from the API, and
+          # every file this job needs on disk lives under .github/. Checking
+          # out the rest of the tree is pure runner time.
+          sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
