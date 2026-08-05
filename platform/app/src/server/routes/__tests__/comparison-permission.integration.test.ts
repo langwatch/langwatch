@@ -20,6 +20,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { getTestProject } from "~/utils/testUtils";
 
@@ -120,30 +121,21 @@ describe("POST /api/experiments/:slug/comparison permission enforcement", () => 
     experimentId = experiment.id;
   });
 
-  afterAll(async () => {
-    if (experimentId) {
-      await prisma.experiment.deleteMany({
-        where: { id: experimentId, projectId },
-      });
-    }
-    // Role bindings reference the key, so they go before it.
-    if (organizationId) {
-      await prisma.roleBinding.deleteMany({
-        where: { organizationId, OR: [{ userId }, { apiKeyId }] },
-      });
-    }
-    if (apiKeyId) {
-      await prisma.apiKey.deleteMany({
-        where: { id: apiKeyId, organizationId },
-      });
-    }
-    if (userId) {
-      await prisma.organizationUser.deleteMany({
-        where: { userId, organizationId },
-      });
-      await prisma.user.deleteMany({ where: { id: userId } });
-    }
-  });
+  // Ordered child-before-parent, and routed through the guarded helper: every
+  // id here is assigned inside `beforeAll`, so any of them is undefined exactly
+  // when setup failed, and a raw `deleteMany` would then drop the key from the
+  // filter and sweep the shared database (#6219).
+  afterAll(() =>
+    cleanupTestRows(prisma, [
+      ["experiment", { id: experimentId, projectId }],
+      // Role bindings reference the key, so they go before it.
+      ["roleBinding", { organizationId, userId }],
+      ["roleBinding", { organizationId, apiKeyId }],
+      ["apiKey", { id: apiKeyId, organizationId }],
+      ["organizationUser", { userId, organizationId }],
+      ["user", { id: userId }],
+    ]),
+  );
 
   const attach = (headers: Record<string, string>) =>
     request(`/api/experiments/${slug}/comparison`, {
