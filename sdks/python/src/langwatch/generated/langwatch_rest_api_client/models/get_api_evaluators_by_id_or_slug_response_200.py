@@ -39,6 +39,7 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
         updated_at (str):
         fields (list[GetApiEvaluatorsByIdOrSlugResponse200FieldsItem]):
         output_fields (list[GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem]):
+        platform_url (str):
         workflow_name (str | Unset):
         workflow_icon (str | Unset):
     """
@@ -55,6 +56,7 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
     updated_at: str
     fields: list[GetApiEvaluatorsByIdOrSlugResponse200FieldsItem]
     output_fields: list[GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem]
+    platform_url: str
     workflow_name: str | Unset = UNSET
     workflow_icon: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -101,6 +103,8 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
             output_fields_item = output_fields_item_data.to_dict()
             output_fields.append(output_fields_item)
 
+        platform_url = self.platform_url
+
         workflow_name = self.workflow_name
 
         workflow_icon = self.workflow_icon
@@ -121,6 +125,7 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
                 "updatedAt": updated_at,
                 "fields": fields,
                 "outputFields": output_fields,
+                "platformUrl": platform_url,
             }
         )
         if workflow_name is not UNSET:
@@ -207,6 +212,8 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
 
             output_fields.append(output_fields_item)
 
+        platform_url = d.pop("platformUrl")
+
         workflow_name = d.pop("workflowName", UNSET)
 
         workflow_icon = d.pop("workflowIcon", UNSET)
@@ -224,6 +231,7 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
             updated_at=updated_at,
             fields=fields,
             output_fields=output_fields,
+            platform_url=platform_url,
             workflow_name=workflow_name,
             workflow_icon=workflow_icon,
         )

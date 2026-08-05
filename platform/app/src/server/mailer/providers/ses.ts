@@ -81,11 +81,11 @@ export const sesProvider: EmailProviderPort = {
         (content.attachments && content.attachments.length > 0) ||
         hasCustomHeaders
       ) {
-        // BCC recipients are NOT written into the MIME headers — SES uses the
+        // BCC recipients are NOT written into the MIME headers. SES uses the
         // envelope `Destinations` from `SendRawEmail` to deliver them invisibly,
         // so `buildRawMimeMessage` intentionally receives no bcc and renders no
         // `Bcc:` header. Recipients only see the public To list. Custom headers
-        // (List-Unsubscribe) also force this raw path — SendEmail can't carry
+        // (List-Unsubscribe) also force this raw path, because SendEmail can't carry
         // arbitrary headers.
         const rawMessage = buildRawMimeMessage({
           from,
@@ -98,7 +98,7 @@ export const sesProvider: EmailProviderPort = {
         });
 
         // SES routes envelope to `Destinations`, which is the union of
-        // To/Cc/Bcc — the MIME headers above do NOT carry a Bcc line, so
+        // To/Cc/Bcc. The MIME headers above do NOT carry a Bcc line, so
         // recipients only see the public To list. This is the canonical way
         // to BCC through SendRawEmail.
         const allDestinations = [...toAddresses, ...bccAddresses];

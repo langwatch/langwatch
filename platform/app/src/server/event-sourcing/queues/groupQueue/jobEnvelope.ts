@@ -210,6 +210,23 @@ export interface EnvelopeHeader {
   ref?: BlobRef;
   /** GQ2 per-stage lease holder identity for this staged occupancy. */
   h?: string;
+  /**
+   * Serialized payload size in bytes, BEFORE compression and before any offload
+   * to the blob store — the size the payload has once it is back in a worker's
+   * hands (ADR-066 pillar 2).
+   *
+   * It exists because the stored value's own length answers a different
+   * question. A body over {@link INLINE_CEILING_BYTES} leaves only a reference
+   * behind, and a body over {@link COMPRESSION_THRESHOLD_BYTES} is stored
+   * compressed, so `#value` can be two or three orders of magnitude under the
+   * bytes a coalesced batch will actually hold in memory and append downstream.
+   * The drain's byte budget reads this field, so its bound survives offload.
+   *
+   * In the header, never the body: the body is content-addressed and hashing it
+   * with a size field would be harmless but redundant, while the header is what
+   * both the Lua drain and the ops dashboard can read without blob I/O.
+   */
+  s?: number;
   /** Routing fields read by the Lua dispatcher and ops dashboard WITHOUT parsing the body. */
   p?: string;
   t?: string;
@@ -533,6 +550,10 @@ export async function encodeJobEnvelope({
     });
     const payloadBytes = bytes.length;
     assertPayloadWithinCap(payloadBytes, { projectId, queueName, logger });
+    // Recorded on every envelope, not just offloaded ones: an inline body over
+    // COMPRESSION_THRESHOLD_BYTES is stored compressed, so `#value` understates
+    // it too. See EnvelopeHeader.s.
+    header.s = payloadBytes;
 
     if (payloadBytes > INLINE_CEILING_BYTES) {
       const compression = writeCompression();
@@ -593,6 +614,7 @@ export async function encodeJobEnvelope({
     );
   }
   const header = routingHeader(jobData, 1);
+  header.s = jsonBytes;
   if (blobs && jsonBytes > BLOB_OFFLOAD_THRESHOLD_BYTES) {
     const id = randomUUID();
     await blobs.put({ id, data: await compress(json, writeCompression()) });
@@ -731,6 +753,61 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
   } catch {
     return { pipelineName: null, jobType: null, jobName: null };
   }
+}
+
+/**
+ * How many bytes this job costs a coalesced batch: the header's recorded
+ * payload size when the value carries one, and for the values that carry none,
+ * whichever reading cannot let the batch overshoot.
+ *
+ * Three cases, only one of which is a plain measurement:
+ *
+ * 1. `s` present and a non-negative safe integer — the payload size the encoder
+ *    recorded. Exact. Anything else in that field (fractional, `Infinity`,
+ *    `NaN`, negative) is not a byte count and is not trusted: a forged or
+ *    corrupt header must not be able to talk the budget down, and `Infinity`
+ *    would reach the Lua drain as an unparseable ARGV. Those fall through to
+ *    the encoding rule below, so an offloaded body still costs the cap.
+ * 2. No `s`, body inline and uncompressed (`e:"j"`), or legacy bare JSON — the
+ *    stored length IS the payload. Exact enough.
+ * 3. No `s`, body compressed or offloaded (`e` of `gz`/`ref`/`redis`/`s3`, or
+ *    absent) — the stored length is a fraction of the payload and there is
+ *    nothing in the value that says by how much. Worth {@link MAX_BLOB_BYTES}:
+ *    an unreadable payload is treated as the largest payload we accept.
+ *
+ * Case 3 exists for the length of a rolling deploy: old workers keep staging
+ * pre-`s` envelopes while new ones drain them, and a deep backlog is exactly
+ * where it does not age out promptly — which is also exactly where the byte
+ * bound is load-bearing. Reading the stored length there would reinstate the
+ * defect this field was added to close, for the window with the most jobs
+ * queued. Costing the cap instead makes such a job drain alone (any sane
+ * `coalesceMaxBytes` is far under 50 MiB), so the rollout loses coalescing on
+ * those jobs rather than losing the bound. Coalescing is an optimization; the
+ * bound is what keeps a worker from assembling a batch it cannot hold.
+ *
+ * Never throws: a value this cannot parse at all is worth its stored length,
+ * not an exception on the drain path.
+ *
+ * Has a Lua twin: `gqPayloadSize` in `scripts.ts` makes the same three
+ * decisions, because the drain spends the byte budget inside Redis while this
+ * sets its starting point. An envelope-format change — new prefix, renamed
+ * header field, different length-prefix encoding — has to land in both or the
+ * two ends of one budget silently disagree.
+ */
+export function readJobPayloadBytes(value: string): number {
+  try {
+    if (isEnvelope(value)) {
+      const { header } = splitEnvelope(value);
+      if (Number.isSafeInteger(header.s) && (header.s as number) >= 0) {
+        return header.s as number;
+      }
+      // No usable `s`: only a plain inline body is worth its stored length.
+      if (header.e !== "j") return MAX_BLOB_BYTES;
+    }
+  } catch {
+    // Fall through: an unreadable envelope still occupies its stored bytes.
+  }
+  return Buffer.byteLength(value, "utf8");
 }
 
 /**

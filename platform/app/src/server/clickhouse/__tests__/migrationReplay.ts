@@ -19,18 +19,30 @@ import type { ClickHouseClient } from "@clickhouse/client";
 const MIGRATIONS_DIR = join(__dirname, "..", "migrations");
 
 /**
- * The newest migration that rebuilds `gateway_budget_scope_totals` from the
- * ledger.
+ * Every migration that has to run, in order, to bring
+ * `gateway_budget_scope_totals` back to the shape the reader speaks.
  *
  * Tests that replay an older rollup migration to stage a pre-upgrade state
- * must replay this one to come back, not the one that happened to be
- * current when they were written: every rebuild both re-derives the rows
- * and re-declares the sorting key, so restoring an older one hands later
- * suites a rollup at a grain the reader no longer speaks. Point this at the
- * newest rebuild whenever one lands.
+ * must replay these to come back, not whichever one happened to be current
+ * when they were written: each restates part of the rollup's shape, and
+ * restoring only some of it hands later suites a rollup the reader cannot
+ * read. 00069 re-derives the rows and declares the sorting key; 00070 adds
+ * the nano-USD aggregate every spend read now sums. Append to this list
+ * whenever another lands.
  */
-export const CURRENT_ROLLUP_REBUILD_MIGRATION =
-  "00069_gateway_budget_scope_totals_budget_grain.sql";
+export const CURRENT_ROLLUP_REBUILD_MIGRATIONS = [
+  "00069_gateway_budget_scope_totals_budget_grain.sql",
+  "00070_gateway_budget_ledger_nano_usd.sql",
+] as const;
+
+/** Replays `CURRENT_ROLLUP_REBUILD_MIGRATIONS` in order. */
+export async function replayRollupRebuild(
+  client: ClickHouseClient,
+): Promise<void> {
+  for (const fileName of CURRENT_ROLLUP_REBUILD_MIGRATIONS) {
+    await replayGooseMigrationUp({ client, fileName });
+  }
+}
 
 export async function replayGooseMigrationUp({
   client,

@@ -50,7 +50,7 @@ export const listSpendEventsCommand = async (options: {
   const service = new SpendEventsApiService({ apiKey });
   const spinner = createSpinner("Fetching spend events...").start();
   try {
-    const page = await service.list({
+    const page = await service.listPage({
       from,
       to,
       cursor: options.cursor,
