@@ -213,6 +213,14 @@ const RULE_CATALOGUE: Record<
     code: "loader-blocked",
     summary: "The chart loader refuses every network and file load.",
   },
+  "render.failure": {
+    code: "render-failure",
+    summary: "Vega failed to compile or run an accepted specification.",
+  },
+  "encoding.empty": {
+    code: "empty-encoding",
+    summary: "Every encoded value was empty or missing.",
+  },
 };
 
 /** The full rule list, for review and for the tests that must cover each one. */

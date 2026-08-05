@@ -83,14 +83,19 @@ describe("the Vega-Lite validator and policy modules", () => {
           );
         }
 
-        // The schema module may name `vega-lite` exactly once, for its bundled
-        // JSON schema, and never for the runtime.
+        // The schema module reaches the bundled schema only through the
+        // ahead-of-time generated validator: it names no `vega-lite` module at
+        // all, and compiles nothing at runtime. `new Function` is what a
+        // Content-Security-Policy without `unsafe-eval` refuses, so a runtime
+        // `ajv.compile` here would be the chart layer's validation quietly
+        // dying in exactly the environment it is hardened for.
         const schemaSource =
           files.find(({ name }) => name === "vegaLiteSchema.ts")?.source ?? "";
         expect(schemaSource).toContain(
-          'from "vega-lite/vega-lite-schema.json"',
+          'from "./vegaLiteSchemaValidator.generated.js"',
         );
-        expect(schemaSource).not.toMatch(/from\s+["']vega-lite["']/);
+        expect(schemaSource).not.toMatch(/from\s+["']vega-lite[^"']*["']/);
+        expect(schemaSource).not.toMatch(/new Ajv|\.compile\(/);
 
         // Every exported entry point runs to completion here, under node.
         expect(typeof getVegaLiteSchemaValidator()).toBe("function");

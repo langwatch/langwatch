@@ -2,21 +2,26 @@
  * Schema validation against the official Vega-Lite v6 JSON Schema that ships
  * inside the `vega-lite` package.
  *
- * The schema is a static import, so it is part of the chart chunk and nothing
- * is ever fetched: a validator that reached the network to learn what is valid
- * would be a resource-loading path of its own.
+ * The validator is *generated* from that schema ahead of time and checked in
+ * (`vegaLiteSchemaValidator.generated.js`, written by
+ * `scripts/generate-vega-lite-validator.ts`). Ajv's runtime compiler builds its
+ * validate function with `new Function`, which a Content-Security-Policy
+ * without `unsafe-eval` refuses — the very policy the chart runtime is built to
+ * survive. Generating ahead of time moves that one `new Function` call to a
+ * developer's machine, so the browser loads code that already exists.
  *
- * ⚠ Ajv compiles a schema by building a function at runtime, which needs
- * `unsafe-eval`. The deployed Content-Security-Policy carries it for unrelated
- * scripts; if it is ever dropped, this module has to move to Ajv's standalone
- * (build-time) code generation, and only this module does.
+ * It also means nothing is ever fetched, and the 1.9 MB schema document itself
+ * never reaches the browser: a validator that reached the network to learn what
+ * is valid would be a resource-loading path of its own.
  */
 
-import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
+import type { ErrorObject } from "ajv";
 
-import vegaLiteSchemaJson from "vega-lite/vega-lite-schema.json";
 import { governedVegaError } from "./vegaLitePolicy";
 import { JSON_POINTER_ROOT } from "./vegaLiteStructure";
+import vegaLiteSchemaValidator, {
+  type VegaLiteSchemaValidator,
+} from "./vegaLiteSchemaValidator.generated.js";
 import type { VegaValidationError } from "./visualization.types";
 
 /** The canonical `$schema` for the supported version. */
@@ -37,29 +42,13 @@ const SUPPORTED_SCHEMA_URL =
  */
 const MAX_REPORTED_SCHEMA_ERRORS = 5;
 
-let compiled: ValidateFunction | null = null;
-
 /**
- * Compiles the schema on first use and keeps it. Compilation costs well over a
- * second, so it must not happen per keystroke — and it must not happen at module
- * load either, or importing the validator would cost that much on the server.
+ * The generated validator. There is nothing to compile and nothing to cache:
+ * the function was built when the module was generated, so the first keystroke
+ * costs the same as the thousandth.
  */
-export function getVegaLiteSchemaValidator(): ValidateFunction {
-  if (compiled === null) {
-    const ajv = new Ajv({
-      // The Vega-Lite schema is draft-07 and uses union types and keywords Ajv
-      // would otherwise refuse to compile.
-      strict: false,
-      // Every branch, because one root-level "must match a schema in anyOf" is
-      // not a repairable message. Bounded by the size and depth ceilings, which
-      // refuse an oversized spec before it ever reaches here.
-      allErrors: true,
-      // The schema declares `color-hex`, which is not a JSON Schema format.
-      validateFormats: false,
-    });
-    compiled = ajv.compile(vegaLiteSchemaJson);
-  }
-  return compiled;
+export function getVegaLiteSchemaValidator(): VegaLiteSchemaValidator {
+  return vegaLiteSchemaValidator;
 }
 
 /** True when `$schema` is absent (treated as v6) or names Vega-Lite v6. */

@@ -41,6 +41,10 @@ const RULES_COVERED_BY_NAMED_TESTS: Partial<
   "limit.maxRowsPerDataset": "vegaLiteLimits.unit.test.ts",
   "limit.maxRowsAllDatasets": "vegaLiteLimits.unit.test.ts",
   "loader.blocked": "noNetworkVegaLoader.unit.test.ts",
+  // Raised by the chart layer rather than by validation: there is no
+  // specification that "is" a Vega runtime failure or an all-empty result.
+  "render.failure": "governedChartFailures.unit.test.ts",
+  "encoding.empty": "governedChartFailures.unit.test.ts",
 };
 
 describe("governed rule coverage", () => {

@@ -99,6 +99,8 @@ export const GOVERNED_VEGA_RULE_IDS = [
   "limit.maxRowsPerDataset",
   "limit.maxRowsAllDatasets",
   "loader.blocked",
+  "render.failure",
+  "encoding.empty",
 ] as const;
 
 export type GovernedVegaRuleId = (typeof GOVERNED_VEGA_RULE_IDS)[number];
