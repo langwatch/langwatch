@@ -7696,7 +7696,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
@@ -7897,7 +7897,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
@@ -8059,7 +8059,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
@@ -8222,7 +8222,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
@@ -8379,7 +8379,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
@@ -8530,7 +8530,7 @@ export interface operations {
                             current_period_started_at: string;
                             /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
-                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
                             cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
