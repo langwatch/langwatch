@@ -11,7 +11,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   aliasesForFile,
   type ModuleAlias,
@@ -325,6 +325,25 @@ describe("reading a vitest config's alias table", () => {
     });
   });
 
+  describe("given the array table vite also accepts", () => {
+    /** @scenario "The check reads the alias table from the vitest configs" */
+    it("reads each find and replacement pair", () => {
+      expect(
+        parse(
+          [
+            "export default defineConfig({",
+            "  resolve: {",
+            "    alias: [",
+            '      { find: "~", replacement: resolve(__dirname, "./src") },',
+            "    ],",
+            "  },",
+            "});",
+          ].join("\n"),
+        ),
+      ).toEqual([{ find: "~", replacement: join(APP_ROOT, "src") }]);
+    });
+  });
+
   describe("given an entry built in a shape the reader does not know", () => {
     it("fails loudly rather than dropping the entry", () => {
       expect(() =>
@@ -332,24 +351,100 @@ describe("reading a vitest config's alias table", () => {
           [
             "export default defineConfig({",
             "  resolve: {",
-            "    alias: {",
-            '      "~/": buildSomehow(),',
-            "    },",
+            '    alias: { "~/": buildSomehow() },',
             "  },",
             "});",
           ].join("\n"),
         ),
       ).toThrow(/cannot read/);
     });
+
+    it("fails loudly on a table that is neither an object nor an array", () => {
+      expect(() =>
+        parse(
+          [
+            "export default defineConfig({",
+            "  resolve: { alias: sharedAliases },",
+            "});",
+          ].join("\n"),
+        ),
+      ).toThrow(/neither an object nor an array/);
+    });
+
+    it("fails loudly on an entry spread in from elsewhere", () => {
+      expect(() =>
+        parse(
+          [
+            "export default defineConfig({",
+            "  resolve: { alias: { ...sharedAliases } },",
+            "});",
+          ].join("\n"),
+        ),
+      ).toThrow(/not a simple/);
+    });
+
+    it("fails loudly on a regular-expression find, which cannot be prefix-matched", () => {
+      expect(() =>
+        parse(
+          [
+            "export default defineConfig({",
+            "  resolve: {",
+            '    alias: [{ find: /^~\\//, replacement: "./src/" }],',
+            "  },",
+            "});",
+          ].join("\n"),
+        ),
+      ).toThrow(/find is not a string literal/);
+    });
+
+    it("fails loudly on an entry carrying a custom resolver", () => {
+      expect(() =>
+        parse(
+          [
+            "export default defineConfig({",
+            "  resolve: {",
+            "    alias: [",
+            '      { find: "~", replacement: "./src", customResolver: r },',
+            "    ],",
+            "  },",
+            "});",
+          ].join("\n"),
+        ),
+      ).toThrow(/customResolver/);
+    });
+
+    it("fails loudly on a config whose table is partly in another file", () => {
+      expect(() =>
+        parse(
+          [
+            "export default mergeConfig(",
+            "  baseConfig,",
+            '  defineConfig({ resolve: { alias: { "~/": "./src/" } } }),',
+            ");",
+          ].join("\n"),
+        ),
+      ).toThrow(/mergeConfig/);
+    });
   });
 });
 
 describe("every tracked test file", () => {
-  const result = scanTrackedTestFiles();
+  let result: ReturnType<typeof scanTrackedTestFiles>;
+
+  // In `beforeAll` rather than the describe body: the walk shells out to git
+  // and reads the whole tree, and both it and the alias reader can throw. In
+  // the body those throws abort collection and surface as a file-level error
+  // with no test name attached.
+  beforeAll(() => {
+    result = scanTrackedTestFiles();
+  });
 
   describe("given the walk itself", () => {
     it("sees the test tree and the alias tables", () => {
-      expect(result.testFileCount).toBeGreaterThan(2000);
+      // Lower bounds that prove the walk found something, not a census of
+      // the tree: a count that tracks the repo goes stale on every merge and
+      // fails outright on a partial checkout.
+      expect(result.testFileCount).toBeGreaterThan(100);
       expect(result.configDirCount).toBeGreaterThan(5);
       expect(result.aliasCount).toBeGreaterThan(5);
     });

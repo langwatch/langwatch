@@ -199,12 +199,127 @@ function aliasReplacementOf(
   return undefined;
 }
 
+/** The property named `alias`, whatever shape its table takes. */
+function aliasTableOf(node: ts.Node): ts.Expression | undefined {
+  if (!ts.isPropertyAssignment(node)) return undefined;
+  if (!ts.isIdentifier(node.name) && !ts.isStringLiteral(node.name)) {
+    return undefined;
+  }
+  return node.name.text === "alias" ? node.initializer : undefined;
+}
+
+/** Where one alias entry is being read from, for the throw messages. */
+type AliasReadContext = { fileName: string; configDir: string };
+
+/** One `"key": value` entry of the object-shaped table. */
+function readObjectEntry(
+  property: ts.ObjectLiteralElementLike,
+  { fileName, configDir }: AliasReadContext,
+): ModuleAlias {
+  const entry = simpleEntryOf(property);
+  if (!entry) {
+    throw new Error(
+      `${fileName}: alias entry is not a simple "key": value pair`,
+    );
+  }
+  const replacement = aliasReplacementOf(entry.value, configDir);
+  if (replacement === undefined) {
+    throw new Error(
+      `${fileName}: alias "${entry.find}" is built in a way this scanner cannot read`,
+    );
+  }
+  return { find: entry.find, replacement };
+}
+
+/** The properties of one array-shaped entry, keyed by name. */
+function entryPropertiesOf(
+  element: ts.Expression,
+  { fileName }: AliasReadContext,
+): Map<string, ts.Expression> {
+  if (!ts.isObjectLiteralExpression(element)) {
+    throw new Error(`${fileName}: alias array entry is not an object literal`);
+  }
+  const parts = new Map<string, ts.Expression>();
+  for (const property of element.properties) {
+    const entry = simpleEntryOf(property);
+    if (!entry) {
+      throw new Error(
+        `${fileName}: alias array entry is not a simple "key": value pair`,
+      );
+    }
+    parts.set(entry.find, entry.value);
+  }
+  return parts;
+}
+
+/** One `{ find, replacement }` entry of vite's other accepted table shape. */
+function readArrayEntry(
+  element: ts.Expression,
+  context: AliasReadContext,
+): ModuleAlias {
+  const { fileName, configDir } = context;
+  const parts = entryPropertiesOf(element, context);
+
+  const extra = [...parts.keys()].filter(
+    (key) => key !== "find" && key !== "replacement",
+  );
+  if (extra.length > 0) {
+    // `customResolver` in particular can send a specifier anywhere, so an
+    // entry carrying one cannot be resolved by prefix substitution.
+    throw new Error(
+      `${fileName}: alias array entry carries ${extra.join(", ")}, which this scanner cannot read`,
+    );
+  }
+
+  const find = parts.get("find");
+  const replacementValue = parts.get("replacement");
+  if (!find || !replacementValue) {
+    throw new Error(
+      `${fileName}: alias array entry is missing find or replacement`,
+    );
+  }
+  if (!ts.isStringLiteral(find)) {
+    // A regular-expression `find` is legal here and cannot be prefix-matched.
+    throw new Error(
+      `${fileName}: alias array entry's find is not a string literal`,
+    );
+  }
+
+  const replacement = aliasReplacementOf(replacementValue, configDir);
+  if (replacement === undefined) {
+    throw new Error(
+      `${fileName}: alias "${find.text}" is built in a way this scanner cannot read`,
+    );
+  }
+  return { find: find.text, replacement };
+}
+
+/** Every entry of one alias table, in whichever of the two shapes it takes. */
+function readAliasTable(
+  table: ts.Expression,
+  context: AliasReadContext,
+): ModuleAlias[] {
+  if (ts.isObjectLiteralExpression(table)) {
+    return table.properties.map((property) =>
+      readObjectEntry(property, context),
+    );
+  }
+  if (ts.isArrayLiteralExpression(table)) {
+    return table.elements.map((element) => readArrayEntry(element, context));
+  }
+  throw new Error(
+    `${context.fileName}: alias table is neither an object nor an array literal`,
+  );
+}
+
 /**
- * The module-alias table one vitest config declares.
+ * The module-alias table one vitest config declares, in either shape vite
+ * accepts: `alias: { "~/": ... }` or `alias: [{ find, replacement }]`.
  *
- * Throws on an entry it cannot read rather than skipping it: an alias the
- * scanner silently drops turns every specifier using it into a false
- * failure, or hides a real one behind a bare-package skip.
+ * Throws on anything it cannot read rather than skipping it. A dropped alias
+ * is the worse failure of the two available: the specifiers relying on it
+ * stop looking like paths, get taken for package names, and are skipped, so
+ * the scanner goes quiet about exactly the files it was meant to check.
  */
 export function parseVitestConfigAliases({
   fileName,
@@ -221,41 +336,22 @@ export function parseVitestConfigAliases({
     ts.ScriptTarget.Latest,
     true,
   );
+  const context: AliasReadContext = { fileName, configDir };
   const aliases: ModuleAlias[] = [];
-
-  const readEntry = (property: ts.ObjectLiteralElementLike): ModuleAlias => {
-    const entry = simpleEntryOf(property);
-    if (!entry) {
-      throw new Error(
-        `${fileName}: alias entry is not a simple "key": value pair`,
-      );
-    }
-    const replacement = aliasReplacementOf(entry.value, configDir);
-    if (replacement === undefined) {
-      throw new Error(
-        `${fileName}: alias "${entry.find}" is built in a way this scanner cannot read`,
-      );
-    }
-    return { find: entry.find, replacement };
-  };
-
-  const readTable = (table: ts.ObjectLiteralExpression): void => {
-    for (const property of table.properties) {
-      aliases.push(readEntry(property));
-    }
-  };
 
   // `resolve.alias` and `test.alias` are both honoured by vitest, so take
   // the table wherever it is declared.
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isPropertyAssignment(node) &&
-      (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) &&
-      node.name.text === "alias" &&
-      ts.isObjectLiteralExpression(node.initializer)
-    ) {
-      readTable(node.initializer);
+    if (ts.isCallExpression(node) && calleeName(node) === "mergeConfig") {
+      // The aliases would then be partly in whatever config is merged in, and
+      // reading only this file would silently under-resolve every specifier
+      // relying on them.
+      throw new Error(
+        `${fileName}: the config is composed with mergeConfig, so its alias table is not all in this file`,
+      );
     }
+    const table = aliasTableOf(node);
+    if (table) aliases.push(...readAliasTable(table, context));
     ts.forEachChild(node, visit);
   };
   visit(source);
