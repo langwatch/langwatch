@@ -1,5 +1,7 @@
 import type Stripe from "stripe";
 import type { FilterService } from "~/server/filters/filter.service";
+import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
@@ -121,6 +123,19 @@ export interface AppDependencies {
   topicClustering: {
     status: TopicClusteringStatusService;
     topics: TopicService;
+  };
+  /**
+   * The gateway's ClickHouse-backed repositories. Undefined on a deployment
+   * without ClickHouse, where the budget service falls back to Postgres.
+   *
+   * Repositories rather than a service because the surfaces above them
+   * genuinely differ - some build a `GatewayBudgetService` around the budget
+   * ledger, others read virtual-key spend directly. What they must not do is
+   * each construct their own, which is the duplication this replaces.
+   */
+  gateway: {
+    budgets: GatewayBudgetClickHouseRepository | undefined;
+    virtualKeySpend: GatewayVirtualKeySpendRepository | undefined;
   };
   /** The values a filter can offer, read from the trace store. */
   filters: {

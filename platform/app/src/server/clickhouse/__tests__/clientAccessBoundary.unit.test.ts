@@ -17,7 +17,7 @@
  *     place tenant scoping, windowed reads and query shape can be enforced at
  *     all, instead of a convention forty files are free to ignore.
  *
- * Rule 2 has a backlog. Forty files predate the rule, and rewriting them all at
+ * Rule 2 has a backlog. Thirty-nine files predated the rule, and rewriting them all at
  * once would be a worse change than the one it fixes. They are named below, and
  * the list is a ratchet: a file not on it fails, and a file on it that no longer
  * needs to be fails too, so the list can only shrink. Nothing new gets in.
@@ -116,9 +116,6 @@ const RESOLVES_DIRECTLY_BACKLOG = new Set([
   "src/server/event-sourcing/projections/global/orgBillableEventsMeter.store.ts",
   "src/server/event-sourcing/replay/replayPreset.ts",
   "src/server/experiments-v3/services/experiment-run.service.ts",
-  "src/server/gateway/clickhouseRepos.ts",
-  "src/server/gateway/endUserCaps.service.ts",
-  "src/server/routes/auth-cli.ts",
   "src/server/routes/gateway-internal.ts",
   "src/server/routes/ingest/ingestionRoutes.ts",
   "src/server/routes/ops.ts",
@@ -126,7 +123,6 @@ const RESOLVES_DIRECTLY_BACKLOG = new Set([
   "src/server/scenarios/scenario.processor.ts",
   "src/server/stored-objects/stored-objects-cross-tenant-lookup.ts",
   "src/server/traces/clickhouse-trace.service.ts",
-  "src/server/traces/span-storage.service.ts",
   "src/server/traces/trace-blob-resolution.deps.ts",
   "src/server/workers/startWorkers.ts",
 ]);

@@ -34,6 +34,7 @@ import { FilterService } from "~/server/filters/filter.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import {
@@ -773,17 +774,28 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
+  // The gateway's ClickHouse-backed repositories, built once and handed out
+  // on the App. Every surface - tRPC routers, the REST apps, the CLI auth
+  // route - takes these instead of minting its own, which is how REST came to
+  // serve stale PG spend for the same budgets the UI showed live (#6248), and
+  // how the CLI route ended up with a second copy of the same constructor.
+  const gatewayBudgetRepository = clickhouseEnabled
+    ? new GatewayBudgetClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const gatewayVirtualKeySpendRepository = clickhouseEnabled
+    ? new GatewayVirtualKeySpendRepository(resolveClickHouseClient)
+    : undefined;
+
   // Gateway budget debits ride the spend pipeline and share its ClickHouse
   // gate: the ledger is the only store spend accrues in.
-  const gatewayDebits = clickhouseEnabled
-    ? {
-        prisma,
-        budgetCHRepository: new GatewayBudgetClickHouseRepository(
-          resolveClickHouseClient,
-        ),
-        changeEventDedupe: createBudgetChangeEventDedupeService(redis),
-      }
-    : undefined;
+  const gatewayDebits =
+    clickhouseEnabled && gatewayBudgetRepository
+      ? {
+          prisma,
+          budgetCHRepository: gatewayBudgetRepository,
+          changeEventDedupe: createBudgetChangeEventDedupeService(redis),
+        }
+      : undefined;
 
   const governanceKpisSync = clickhouseEnabled
     ? {
@@ -1312,6 +1324,10 @@ export function initializeDefaultApp(options?: {
       ),
       topics,
     },
+    gateway: {
+      budgets: gatewayBudgetRepository,
+      virtualKeySpend: gatewayVirtualKeySpendRepository,
+    },
     filters: {
       options: new FilterService(
         clickhouseEnabled
@@ -1535,6 +1551,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
       topics: new TopicService(new PrismaTopicRepository(testPrisma)),
     },
+    gateway: { budgets: undefined, virtualKeySpend: undefined },
     filters: { options: new FilterService(null) },
     codingAgents: {
       sessions: new CodingAgentSessionService(

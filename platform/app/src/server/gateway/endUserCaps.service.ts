@@ -10,9 +10,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-
-import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { bucketPeriodFloorMs, effectiveBudgetPeriod } from "./budgetPeriod";
 import {
   attributedUserBucketScopeId,
@@ -31,12 +29,19 @@ import { usdDisplayString } from "./wireMoney";
  */
 export async function applicableEndUserCaps({
   prisma,
+  budgetRepository,
   organizationId,
   endUserId,
   tenantIds,
   virtualKeyId,
 }: {
   prisma: PrismaClient;
+  /**
+   * The budget ledger, from the App. Passed in rather than resolved here so
+   * this function keeps one way to reach ClickHouse and the caller cannot
+   * accidentally give it a different client than the rest of the request.
+   */
+  budgetRepository: GatewayBudgetClickHouseRepository;
   organizationId: string;
   endUserId: string;
   tenantIds: string[];
@@ -64,11 +69,7 @@ export async function applicableEndUserCaps({
   const bucketFor = (t: (typeof templates)[number]) =>
     bucketScopeIdFor(t, attributedUserBucketScopeId(t.scopeId, endUserId));
 
-  const budgetCH = new GatewayBudgetClickHouseRepository(async (projectId) => {
-    const client = await getClickHouseClientForProject(projectId);
-    if (!client) throw new Error("clickhouse unavailable");
-    return client;
-  });
+  const budgetCH = budgetRepository;
   // One instant for the whole answer: the floor the spend is read from and
   // the period it is reported under have to be the same period.
   const now = new Date();

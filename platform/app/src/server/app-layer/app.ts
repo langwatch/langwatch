@@ -27,6 +27,7 @@ export class App {
     AppCommands["topicClustering"];
   readonly codingAgents: AppDependencies["codingAgents"] &
     AppCommands["codingAgents"];
+  readonly gateway: AppDependencies["gateway"];
   readonly filters: AppDependencies["filters"];
   readonly commands: AppCommands;
   readonly langy: AppDependencies["langy"];
@@ -95,6 +96,7 @@ export class App {
       ...deps.codingAgents,
       ...deps.commands.codingAgents,
     };
+    this.gateway = deps.gateway;
     this.filters = deps.filters;
     this.commands = deps.commands;
     this.langy = deps.langy;

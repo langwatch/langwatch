@@ -24,6 +24,7 @@ import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
@@ -385,8 +386,15 @@ secured.access(requires("gatewaySpend:view")).get(
       toMs,
       virtualKeyId: query.virtual_key_id,
     });
+    const budgetRepository = getApp().gateway.budgets;
+    if (!budgetRepository) {
+      // The ledger is the only store spend accrues in, so without ClickHouse
+      // there are no figures to report against these caps.
+      throw new ClickHouseUnavailableError();
+    }
     const caps = await applicableEndUserCaps({
       prisma,
+      budgetRepository,
       organizationId: organization.id,
       endUserId,
       tenantIds,
