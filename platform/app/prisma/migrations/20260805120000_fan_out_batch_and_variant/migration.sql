@@ -52,3 +52,11 @@ CREATE INDEX "FanOutVariant_batchId_idx" ON "FanOutVariant"("batchId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "FanOutVariant_batchId_scenarioId_key" ON "FanOutVariant"("batchId", "scenarioId");
+
+-- Down (manual): drops every fan-out batch and its review decisions. The
+-- generated Scenario rows survive, since they are ordinary library scenarios.
+--   DROP TABLE "FanOutVariant";
+--   DROP TABLE "FanOutBatch";
+--   DROP TYPE "FanOutVariantStatus";
+--   DROP TYPE "FanOutBatchStatus";
+--   DROP TYPE "FanOutSeedType";

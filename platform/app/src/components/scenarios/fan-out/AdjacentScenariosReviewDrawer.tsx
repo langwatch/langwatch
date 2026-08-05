@@ -333,7 +333,7 @@ function ReviewBody({
         <VariantRow
           key={variant.id}
           variant={variant}
-          selected={selected.has(variant.id)}
+          isSelected={selected.has(variant.id)}
           onToggle={() => onToggle(variant.id)}
           onApprove={() => onDecide([variant.id], "approve")}
           onReject={() => onDecide([variant.id], "reject")}
@@ -350,20 +350,20 @@ function ReviewBody({
 
 function VariantRow({
   variant,
-  selected,
+  isSelected,
   onToggle,
   onApprove,
   onReject,
   onEdit,
 }: {
   variant: ReviewVariant;
-  selected: boolean;
+  isSelected: boolean;
   onToggle: () => void;
   onApprove: () => void;
   onReject: () => void;
   onEdit: () => void;
 }) {
-  const decided = variant.status !== "PENDING";
+  const isDecided = variant.status !== "PENDING";
 
   return (
     <HStack
@@ -377,9 +377,9 @@ function VariantRow({
     >
       <Box paddingTop={1}>
         <Checkbox.Root
-          checked={selected}
+          checked={isSelected}
           onCheckedChange={onToggle}
-          disabled={decided}
+          disabled={isDecided}
           size="sm"
         >
           <Checkbox.HiddenInput />

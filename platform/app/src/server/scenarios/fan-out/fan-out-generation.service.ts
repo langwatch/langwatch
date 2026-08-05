@@ -188,27 +188,19 @@ export class FanOutGenerationService {
 
     const seedLabels = [`fan-out:seed-${input.seed.type.toLowerCase()}`];
 
-    const createdScenarios = await Promise.all(
-      generation.object.variants.map((variant) =>
-        this.scenarioRepository.create({
-          projectId: input.projectId,
-          name: variant.name,
-          situation: variant.situation,
-          criteria: variant.criteria,
-          labels: [...seedLabels, "fan-out", `fan-out:${variant.lens}`],
-          lastUpdatedById: input.createdById,
-        }),
-      ),
-    );
-
-    const variants = await this.fanOutRepository.createVariants(
-      generation.object.variants.map((variant, index) => ({
-        batchId: batch.id,
-        scenarioId: createdScenarios[index]!.id,
+    const variants = await this.fanOutRepository.createScenariosWithVariants({
+      projectId: input.projectId,
+      createdById: input.createdById,
+      batchId: batch.id,
+      entries: generation.object.variants.map((variant) => ({
+        name: variant.name,
+        situation: variant.situation,
+        criteria: variant.criteria,
+        labels: [...seedLabels, "fan-out", `fan-out:${variant.lens}`],
         lens: variant.lens,
         rationale: variant.rationale,
       })),
-    );
+    });
 
     // Only ready once the variants actually exist, so the batch can never
     // report READY_FOR_REVIEW with nothing to review.

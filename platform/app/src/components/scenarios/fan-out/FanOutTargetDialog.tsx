@@ -5,7 +5,7 @@ import type { FanOutTarget } from "../services/fanOutGeneration";
 import { TargetSelector, type TargetValue } from "../TargetSelector";
 
 /**
- * Asks which agent or prompt the generated scenarios should run against.
+ * Asks which target the generated scenarios should run against.
  *
  * A scenario carries no target of its own (it is picked at run time), so a
  * seed that didn't come from an existing run has nothing to inherit. Rather
@@ -34,7 +34,7 @@ export function FanOutTargetDialog({
         <Dialog.Body>
           <VStack align="stretch" gap={3}>
             <Text textStyle="sm" color="fg.muted">
-              Pick the agent or prompt the generated scenarios will run against.
+              Pick the target the generated scenarios will run against.
             </Text>
             <TargetSelector value={target} onChange={setTarget} />
           </VStack>

@@ -100,31 +100,70 @@ export class FanOutRepository {
     );
   }
 
-  async createVariants(
-    inputs: CreateFanOutVariantInput[],
-  ): Promise<FanOutVariant[]> {
+  /**
+   * Persists the generated scenarios and the variant rows that review them, in
+   * one transaction.
+   *
+   * They are written together because a scenario without its variant is an
+   * orphan: it sits in the library carrying fan-out labels with no review
+   * record and no way to reach one, which is exactly what the review gate
+   * exists to prevent. The LLM call stays outside, so no model latency is ever
+   * held inside a database transaction.
+   */
+  async createScenariosWithVariants(input: {
+    projectId: string;
+    createdById: string | null;
+    batchId: string;
+    entries: Array<{
+      name: string;
+      situation: string;
+      criteria: string[];
+      labels: string[];
+      lens: string;
+      rationale: string;
+    }>;
+  }): Promise<FanOutVariant[]> {
     return tracer.withActiveSpan(
-      "FanOutRepository.createVariants",
+      "FanOutRepository.createScenariosWithVariants",
       {
         kind: SpanKind.CLIENT,
         attributes: {
           "db.system": "postgresql",
           "db.operation": "INSERT",
           "db.table": "FanOutVariant",
-          "result.count": inputs.length,
+          "tenant.id": input.projectId,
+          "fan_out_batch.id": input.batchId,
+          "result.count": input.entries.length,
         },
       },
       async () => {
-        return Promise.all(
-          inputs.map((input) =>
-            this.prisma.fanOutVariant.create({
+        return this.prisma.$transaction(async (tx) => {
+          const variants: FanOutVariant[] = [];
+          for (const entry of input.entries) {
+            const scenario = await tx.scenario.create({
               data: {
-                id: generate(KSUID_RESOURCES.FAN_OUT_VARIANT).toString(),
-                ...input,
+                projectId: input.projectId,
+                name: entry.name,
+                situation: entry.situation,
+                criteria: entry.criteria,
+                labels: entry.labels,
+                lastUpdatedById: input.createdById,
               },
-            }),
-          ),
-        );
+            });
+            variants.push(
+              await tx.fanOutVariant.create({
+                data: {
+                  id: generate(KSUID_RESOURCES.FAN_OUT_VARIANT).toString(),
+                  batchId: input.batchId,
+                  scenarioId: scenario.id,
+                  lens: entry.lens,
+                  rationale: entry.rationale,
+                },
+              }),
+            );
+          }
+          return variants;
+        });
       },
     );
   }

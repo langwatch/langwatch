@@ -199,15 +199,15 @@ function LensBreakdown({ rows }: { rows: [string, LensCounts][] }) {
 }
 
 function LensRow({ lens, counts }: { lens: string; counts: LensCounts }) {
-  const anyFailed = counts.failed > 0;
+  const hasFailures = counts.failed > 0;
 
   return (
     <HStack justify="space-between">
       <Text textStyle="sm">{FAN_OUT_LENS_LABELS[lens] ?? lens}</Text>
       <Text
         textStyle="sm"
-        color={anyFailed ? "red.500" : "fg.muted"}
-        fontWeight={anyFailed ? "medium" : "normal"}
+        color={hasFailures ? "red.500" : "fg.muted"}
+        fontWeight={hasFailures ? "medium" : "normal"}
       >
         {counts.failed} of {counts.total} failed
       </Text>
@@ -276,37 +276,37 @@ function Headline({
   total: number;
   stillRunning: number;
 }) {
-  const anyFailed = failed > 0;
-  const anyFinished = finished > 0;
-  const percent = anyFinished ? Math.round((failed / finished) * 100) : 0;
+  const hasFailures = failed > 0;
+  const hasFinished = finished > 0;
+  const percent = hasFinished ? Math.round((failed / finished) * 100) : 0;
 
   return (
     <Box
       borderWidth="1px"
-      borderColor={anyFailed ? "red.200" : "border.muted"}
+      borderColor={hasFailures ? "red.200" : "border.muted"}
       borderRadius="md"
       padding={4}
-      bg={anyFailed ? "red.50" : "bg.subtle"}
+      bg={hasFailures ? "red.50" : "bg.subtle"}
       _dark={{
-        bg: anyFailed ? "red.950" : "bg.subtle",
-        borderColor: anyFailed ? "red.800" : "border.muted",
+        bg: hasFailures ? "red.950" : "bg.subtle",
+        borderColor: hasFailures ? "red.800" : "border.muted",
       }}
     >
       <VStack align="start" gap={2}>
-        <Heading size="lg" color={anyFailed ? "red.600" : "fg"}>
-          {anyFinished
+        <Heading size="lg" color={hasFailures ? "red.600" : "fg"}>
+          {hasFinished
             ? `${failed} of ${finished} also failed`
             : `Waiting on ${total} scenarios`}
         </Heading>
         <Text textStyle="sm" color="fg.muted">
           {summarize({ failed, finished })}
         </Text>
-        {anyFinished && (
+        {hasFinished && (
           <Progress.Root
             value={percent}
             size="sm"
             width="full"
-            colorPalette={anyFailed ? "red" : "green"}
+            colorPalette={hasFailures ? "red" : "green"}
           >
             <Progress.Track>
               <Progress.Range />
@@ -331,17 +331,17 @@ function StillRunning({ count }: { count: number }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const failed =
+  const isFailed =
     status === "FAILED" || status === "ERROR" || status === "CANCELLED";
-  const passed = status === "SUCCESS";
+  const isPassed = status === "SUCCESS";
 
   return (
     <Badge
       size="sm"
       variant="subtle"
-      colorPalette={failed ? "red" : passed ? "green" : "gray"}
+      colorPalette={isFailed ? "red" : isPassed ? "green" : "gray"}
     >
-      {failed ? "Failed" : passed ? "Passed" : "Running"}
+      {isFailed ? "Failed" : isPassed ? "Passed" : "Running"}
     </Badge>
   );
 }
