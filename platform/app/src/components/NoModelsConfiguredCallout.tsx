@@ -29,7 +29,7 @@
  */
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
-import { modelProviderIcons } from "../server/modelProviders/iconsMap";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 
 interface Props {
   size?: "sm" | "md" | "full";

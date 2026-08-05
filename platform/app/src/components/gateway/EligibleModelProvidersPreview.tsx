@@ -1,10 +1,9 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
-
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Link } from "~/components/ui/link";
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
 import {
   buildScopeHierarchy,

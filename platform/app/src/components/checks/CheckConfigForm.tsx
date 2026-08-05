@@ -31,6 +31,7 @@ import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
 } from "../../server/evaluations/evaluationMappings";
+import { evaluatorTempNameMap } from "../../server/evaluations/evaluatorDisplayNames";
 import {
   type Evaluators,
   type EvaluatorTypes,
@@ -55,7 +56,7 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Tooltip } from "../ui/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
-import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
+import { EvaluatorSelection } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
 
