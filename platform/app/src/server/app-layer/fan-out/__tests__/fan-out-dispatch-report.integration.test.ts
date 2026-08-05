@@ -14,6 +14,7 @@ import { FanOutRepository } from "~/server/scenarios/fan-out/fan-out.repository"
 import { getFanOutSetId } from "~/server/scenarios/fanout-set-id";
 import { ScenarioRepository } from "~/server/scenarios/scenario.repository";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "~/utils/testUtils";
 import { FanOutReportService } from "../fan-out-report.service";
 import { FanOutRunService } from "../fan-out-run.service";
@@ -100,9 +101,14 @@ describe("fan-out dispatch and report", () => {
   });
 
   beforeEach(async () => {
-    await prisma.fanOutVariant.deleteMany({ where: { batch: { projectId } } });
-    await prisma.fanOutBatch.deleteMany({ where: { projectId } });
-    await prisma.scenario.deleteMany({ where: { projectId } });
+    // Routed through cleanupTestRows because `projectId` is assigned in
+    // beforeAll: unassigned, Prisma would drop it from the filter and the
+    // teardown would sweep every row in the shared database (#6219).
+    await cleanupTestRows(prisma, [
+      ["fanOutVariant", { batch: { projectId } }],
+      ["fanOutBatch", { projectId }],
+      ["scenario", { projectId }],
+    ]);
     await seedApprovedBatch();
   });
 

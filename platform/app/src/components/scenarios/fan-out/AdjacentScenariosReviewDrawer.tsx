@@ -48,10 +48,11 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
   const { closeDrawer, openDrawer } = useDrawer();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
+  const canQuery = !!project?.id && !!batchId;
   const batchQuery = api.fanOut.getBatch.useQuery(
     { projectId: project?.id ?? "", batchId: batchId ?? "" },
-    { enabled: !!project?.id && !!batchId },
+    { enabled: canQuery },
   );
 
   const decide = api.fanOut.decide.useMutation({
@@ -74,11 +75,11 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
     },
   });
 
-  const variants = batchQuery.data?.variants ?? [];
-  const pendingVariants = useMemo(
-    () => variants.filter((v) => v.status === "PENDING"),
-    [variants],
+  const variants = useMemo(
+    () => batchQuery.data?.variants ?? [],
+    [batchQuery.data?.variants],
   );
+  const pendingCount = variants.filter((v) => v.status === "PENDING").length;
   const approvedCount = variants.filter((v) => v.status === "APPROVED").length;
 
   const applyDecision = useCallback(
@@ -129,7 +130,7 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
                 fallbackTitle="Couldn't load these scenarios"
               />
             </Box>
-          ) : batchQuery.isLoading ? (
+          ) : !canQuery || batchQuery.isLoading ? (
             <HStack justify="center" padding={10}>
               <Spinner size="sm" />
               <Text textStyle="sm" color="fg.muted">
@@ -200,7 +201,7 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
             </HStack>
           ) : (
             <Text textStyle="sm" color="fg.muted">
-              {pendingVariants.length} awaiting review
+              {pendingCount} awaiting review
             </Text>
           )}
 
@@ -309,8 +310,12 @@ function VariantRow({
             </Text>
             {variant.scenario.criteria.length > 0 && (
               <VStack align="start" gap={0.5} width="full">
-                {variant.scenario.criteria.map((criterion) => (
-                  <Text key={criterion} textStyle="xs" color="fg.muted">
+                {variant.scenario.criteria.map((criterion, index) => (
+                  <Text
+                    key={`${index}-${criterion}`}
+                    textStyle="xs"
+                    color="fg.muted"
+                  >
                     {"•"} {criterion}
                   </Text>
                 ))}
@@ -325,7 +330,7 @@ function VariantRow({
           <Button
             size="xs"
             variant="ghost"
-            aria-label={`Actions for this variant`}
+            aria-label={`Actions for ${variant.scenario?.name ?? variant.lens}`}
           >
             <MoreVertical size={14} />
           </Button>

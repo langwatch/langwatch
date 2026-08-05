@@ -12,11 +12,21 @@ import { prisma } from "~/server/db";
 import { FanOutRepository } from "~/server/scenarios/fan-out/fan-out.repository";
 import { getFanOutSetId } from "~/server/scenarios/fanout-set-id";
 import { ScenarioRepository } from "~/server/scenarios/scenario.repository";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "~/utils/testUtils";
 import { FanOutReviewService } from "../fan-out-review.service";
 
 let projectId: string;
 let otherProjectId: string;
+
+/**
+ * Both ids, for teardown. Filtering on a `let` that setup never assigned is
+ * how a teardown becomes an unfiltered sweep, so this is routed through
+ * cleanupTestRows, which refuses an entry it cannot fully identify (#6219).
+ */
+function projectIds(): string[] {
+  return [projectId, otherProjectId].filter(Boolean);
+}
 
 function service() {
   return FanOutReviewService.create({
@@ -84,15 +94,11 @@ describe("FanOutReviewService", () => {
   });
 
   beforeEach(async () => {
-    await prisma.fanOutVariant.deleteMany({
-      where: { batch: { projectId: { in: [projectId, otherProjectId] } } },
-    });
-    await prisma.fanOutBatch.deleteMany({
-      where: { projectId: { in: [projectId, otherProjectId] } },
-    });
-    await prisma.scenario.deleteMany({
-      where: { projectId: { in: [projectId, otherProjectId] } },
-    });
+    await cleanupTestRows(prisma, [
+      ["fanOutVariant", { batch: { projectId: { in: projectIds() } } }],
+      ["fanOutBatch", { projectId: { in: projectIds() } }],
+      ["scenario", { projectId: { in: projectIds() } }],
+    ]);
   });
 
   describe("given a batch pending review", () => {
@@ -246,6 +252,32 @@ describe("FanOutReviewService", () => {
       expect(untouched.every((variant) => variant.status === "PENDING")).toBe(
         true,
       );
+    });
+  });
+
+  describe("given a decision names the same variant twice", () => {
+    it("refuses rather than letting the last one silently win", async () => {
+      const { batch, variants } = await seedBatch({
+        batchId: "fanoutbatch_duplicate_decision",
+        ownerProjectId: projectId,
+      });
+
+      await expect(
+        service().decide({
+          projectId,
+          batchId: batch.id,
+          decisions: [
+            { variantId: variants[0]!.id, decision: "approve" },
+            { variantId: variants[0]!.id, decision: "reject" },
+          ],
+          decidedById: null,
+        }),
+      ).rejects.toMatchObject({ code: "fan_out_variant_not_in_batch" });
+
+      const after = await prisma.fanOutVariant.findMany({
+        where: { batchId: batch.id },
+      });
+      expect(after.every((variant) => variant.status === "PENDING")).toBe(true);
     });
   });
 

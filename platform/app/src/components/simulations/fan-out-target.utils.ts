@@ -3,9 +3,20 @@ import type { FanOutTarget } from "~/components/scenarios/services/fanOutGenerat
 type RunMetadata = {
   langwatch?: {
     targetReferenceId?: string;
-    targetType?: FanOutTarget["type"];
+    targetType?: string;
   };
 };
+
+/**
+ * Run metadata is stored as JSON, so the type on the way out is a claim rather
+ * than a guarantee. An unrecognised value is treated as "we don't know".
+ */
+const TARGET_TYPES: readonly FanOutTarget["type"][] = [
+  "prompt",
+  "http",
+  "code",
+  "workflow",
+];
 
 /**
  * The target a fan-out seeded from this run can inherit.
@@ -20,8 +31,9 @@ export function fanOutTargetFromRunMetadata(
 ): FanOutTarget | undefined {
   const langwatch = metadata?.langwatch;
   if (!langwatch?.targetReferenceId || !langwatch.targetType) return undefined;
-  return {
-    type: langwatch.targetType,
-    referenceId: langwatch.targetReferenceId,
-  };
+
+  const type = TARGET_TYPES.find((known) => known === langwatch.targetType);
+  if (!type) return undefined;
+
+  return { type, referenceId: langwatch.targetReferenceId };
 }

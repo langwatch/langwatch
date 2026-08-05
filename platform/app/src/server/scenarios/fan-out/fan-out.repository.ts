@@ -107,6 +107,7 @@ export class FanOutRepository {
     projectId: string;
     status: FanOutBatchStatus;
     batchRunId?: string;
+    seedScenarioRunId?: string;
   }): Promise<FanOutBatch> {
     return tracer.withActiveSpan(
       "FanOutRepository.updateBatchStatus",
@@ -126,6 +127,9 @@ export class FanOutRepository {
           data: {
             status: input.status,
             ...(input.batchRunId ? { batchRunId: input.batchRunId } : {}),
+            ...(input.seedScenarioRunId
+              ? { seedScenarioRunId: input.seedScenarioRunId }
+              : {}),
           },
         });
       },
@@ -164,6 +168,15 @@ export class FanOutRepository {
       async (span) => {
         return this.prisma.$transaction(async (tx) => {
           const ids = input.decisions.map((decision) => decision.variantId);
+          // A repeated id would pass a set-size membership check and then be
+          // updated twice, with the last decision winning silently. Two
+          // conflicting decisions for one variant is a caller bug, not
+          // something to resolve by ordering.
+          if (new Set(ids).size !== ids.length) {
+            span.setAttribute("result.found", false);
+            return null;
+          }
+
           const found = await tx.fanOutVariant.findMany({
             where: {
               id: { in: ids },
@@ -173,7 +186,7 @@ export class FanOutRepository {
             select: { id: true },
           });
 
-          if (found.length !== new Set(ids).size) {
+          if (found.length !== ids.length) {
             span.setAttribute("result.found", false);
             return null;
           }

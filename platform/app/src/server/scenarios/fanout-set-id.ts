@@ -19,7 +19,13 @@ export const FANOUT_SET_SUFFIX = "__fanout";
  * Checks if a set ID belongs to a fan-out batch.
  */
 export function isFanOutSetId(setId: string): boolean {
-  return setId.startsWith(INTERNAL_SET_PREFIX) && setId.endsWith(FANOUT_SET_SUFFIX);
+  // Length guard, not just prefix and suffix: without it a string where the
+  // two overlap satisfies both checks and extraction returns an empty batch id.
+  return (
+    setId.length > INTERNAL_SET_PREFIX.length + FANOUT_SET_SUFFIX.length &&
+    setId.startsWith(INTERNAL_SET_PREFIX) &&
+    setId.endsWith(FANOUT_SET_SUFFIX)
+  );
 }
 
 /**

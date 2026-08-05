@@ -12,7 +12,7 @@ import { TargetSelector, type TargetValue } from "../TargetSelector";
  * than guess, ask once before generating.
  *
  * See specs/scenarios/adjacent-scenario-generation.feature
- * ("Annotated-trace seed requires an explicit target").
+ * ("A run with no recorded target type still offers the entry point").
  */
 export function FanOutTargetDialog({
   open,

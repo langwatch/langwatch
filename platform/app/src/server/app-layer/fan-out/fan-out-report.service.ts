@@ -17,10 +17,17 @@ import type { FanOutRepository } from "~/server/scenarios/fan-out/fan-out.reposi
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
+/**
+ * A run counts against the blast radius when it did not demonstrate the agent
+ * handling the case. STALLED belongs here with the rest: it finished without
+ * meeting the criteria, and scoring it as a pass would quietly shrink the
+ * blast radius every time a run wedged.
+ */
 const FAILING_STATUSES = new Set<ScenarioRunStatus>([
   ScenarioRunStatus.FAILED,
   ScenarioRunStatus.ERROR,
   ScenarioRunStatus.CANCELLED,
+  ScenarioRunStatus.STALLED,
 ]);
 
 export type VariantReportEntry = {
@@ -94,6 +101,10 @@ export class FanOutReportService {
       batchRunId: params.batchRunId,
     });
 
+    // `BatchRunDataResult` is a discriminated union: the `changed: false`
+    // branch carries no `runs` at all. This call passes no `sinceTimestamp`,
+    // so the store always answers `changed: true` and the empty branch is
+    // unreachable in practice, but the narrowing is what makes `runs` legal.
     const runs = result.changed ? result.runs : [];
     const runsByScenarioRunId = new Map(
       runs.map((run) => [run.scenarioRunId, run]),

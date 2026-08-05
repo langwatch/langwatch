@@ -299,6 +299,37 @@ describe("FanOutRunService", () => {
       });
     });
 
+    it("repoints the batch at the run id the baseline was dispatched under", async () => {
+      const { service, fanOutRepository, queueSimulationRun } =
+        serviceWithBatch({
+          id: "batch_1",
+          scenarioSetId: "__internal__batch_1__fanout",
+          seedScenarioId: "scenario_seed",
+          // The original failure's run id, which is not part of this batch run.
+          seedScenarioRunId: "scenariorun_original_failure",
+          seedTarget: target,
+          variants: [
+            variant({ id: "v1", scenarioId: "s1", status: "APPROVED" }),
+          ],
+        });
+
+      await service.dispatchBatch({
+        projectId: "project_1",
+        batchId: "batch_1",
+      });
+
+      const seedCall = queueSimulationRun.mock.calls.find(
+        ([data]) => data.scenarioId === "scenario_seed",
+      );
+      const written =
+        fanOutRepository.updateBatchStatus.mock.calls[0]![0].seedScenarioRunId;
+
+      // Leaving the original id in place would make the report look up a run
+      // that is not in this batch, so the baseline comparison never appears.
+      expect(written).toBe(seedCall![0].scenarioRunId);
+      expect(written).not.toBe("scenariorun_original_failure");
+    });
+
     /** @scenario "Running a batch with nothing approved is refused" */
     it("refuses a batch with nothing approved", async () => {
       const { service, queueSimulationRun } = serviceWithBatch({

@@ -41,10 +41,11 @@ export function AdjacentScenariosReportDrawer({ batchId }: Props) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
 
+  const canQuery = !!project?.id && !!batchId;
   const reportQuery = api.fanOut.report.useQuery(
     { projectId: project?.id ?? "", batchId: batchId ?? "" },
     {
-      enabled: !!project?.id && !!batchId,
+      enabled: canQuery,
       // Runs land asynchronously, so keep pulling until everything settles.
       refetchInterval: (data) =>
         data && data.finishedVariants < data.totalVariants ? 3000 : false,
@@ -85,7 +86,7 @@ export function AdjacentScenariosReportDrawer({ batchId }: Props) {
               error={reportQuery.error}
               fallbackTitle="Couldn't load the blast radius"
             />
-          ) : reportQuery.isLoading ? (
+          ) : !canQuery || reportQuery.isLoading ? (
             <HStack justify="center" padding={10}>
               <Spinner size="sm" />
               <Text textStyle="sm" color="fg.muted">
@@ -214,7 +215,9 @@ function Headline({
     >
       <VStack align="start" gap={2}>
         <Heading size="lg" color={failed > 0 ? "red.600" : "fg"}>
-          {failed} of {finished || total} also failed
+          {finished > 0
+            ? `${failed} of ${finished} also failed`
+            : `Waiting on ${total} scenarios`}
         </Heading>
         <Text textStyle="sm" color="fg.muted">
           {failed === 0 && finished > 0

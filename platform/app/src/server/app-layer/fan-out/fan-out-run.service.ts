@@ -28,6 +28,8 @@ export type FanOutRunResult = {
   batchRunId: string;
   scenarioSetId: string;
   itemCount: number;
+  /** The run id the seed baseline was dispatched under, when there is a seed. */
+  seedScenarioRunId?: string;
 };
 
 const TARGET_TYPES = ["prompt", "http", "code", "workflow"] as const;
@@ -124,6 +126,13 @@ export class FanOutRunService {
       projectId: params.projectId,
       status: "DISPATCHING",
       batchRunId: result.batchRunId,
+      // The baseline gets a fresh run id inside this batch run. Leaving the
+      // column pointing at the original failure would make the report look up
+      // a run id that is not part of this batch, so the seed comparison the
+      // report exists to show would silently never appear.
+      ...(result.seedScenarioRunId
+        ? { seedScenarioRunId: result.seedScenarioRunId }
+        : {}),
     });
 
     return result;
@@ -152,22 +161,19 @@ export class FanOutRunService {
       name: params.variantNames.get(variant.scenarioId),
     }));
 
+    const seedItem = params.seedScenarioId
+      ? {
+          scenarioId: params.seedScenarioId,
+          scenarioRunId: generate(KSUID_RESOURCES.SCENARIO_RUN).toString(),
+          name: params.seedName,
+        }
+      : null;
+
     const items: Array<{
       scenarioId: string;
       scenarioRunId: string;
       name: string | undefined;
-    }> = [
-      ...(params.seedScenarioId
-        ? [
-            {
-              scenarioId: params.seedScenarioId,
-              scenarioRunId: generate(KSUID_RESOURCES.SCENARIO_RUN).toString(),
-              name: params.seedName,
-            },
-          ]
-        : []),
-      ...variantItems,
-    ];
+    }> = [...(seedItem ? [seedItem] : []), ...variantItems];
 
     logger.debug(
       { projectId: params.projectId, batchRunId, itemCount: items.length },
@@ -187,7 +193,7 @@ export class FanOutRunService {
       ),
     );
 
-    await Promise.allSettled(
+    const settled = await Promise.allSettled(
       items.map((item) =>
         this.queueSimulationRunCommand({
           tenantId: params.projectId,
@@ -208,10 +214,37 @@ export class FanOutRunService {
       ),
     );
 
+    // One item failing to queue must not abandon the ones that did, which is
+    // why this stays allSettled. But a silently dropped item would sit in
+    // totalVariants and never in finishedVariants, so the blast radius would
+    // keep a denominator it can never reach. Report what was actually queued.
+    const rejected = settled.filter((outcome) => outcome.status === "rejected");
+    if (rejected.length > 0) {
+      logger.error(
+        {
+          projectId: params.projectId,
+          batchRunId,
+          failedCount: rejected.length,
+          itemCount: items.length,
+          reasons: rejected.map((outcome) =>
+            outcome.reason instanceof Error
+              ? outcome.reason.message
+              : String(outcome.reason),
+          ),
+        },
+        "Some fan-out runs could not be queued",
+      );
+    }
+
+    const queuedCount = items.length - rejected.length;
+
     return {
       batchRunId,
       scenarioSetId: params.scenarioSetId,
-      itemCount: items.length,
+      itemCount: queuedCount,
+      ...(seedItem && settled[0]?.status === "fulfilled"
+        ? { seedScenarioRunId: seedItem.scenarioRunId }
+        : {}),
     };
   }
 }

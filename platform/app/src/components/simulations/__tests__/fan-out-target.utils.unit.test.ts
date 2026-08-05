@@ -29,6 +29,17 @@ describe("fanOutTargetFromRunMetadata", () => {
     });
   });
 
+  describe("given a run whose recorded target type is not one we know", () => {
+    it("says it does not know, rather than trusting the stored string", () => {
+      // Metadata is JSON, so the declared type is a claim, not a guarantee.
+      expect(
+        fanOutTargetFromRunMetadata({
+          langwatch: { targetReferenceId: "prompt_abc", targetType: "banana" },
+        }),
+      ).toBeUndefined();
+    });
+  });
+
   describe("given a run with no langwatch metadata at all", () => {
     it("says it does not know", () => {
       expect(fanOutTargetFromRunMetadata({})).toBeUndefined();

@@ -127,6 +127,25 @@ describe("FanOutReportService", () => {
       });
     });
 
+    describe("when a run stalled without reaching a verdict", () => {
+      it("counts it as a failure, not a pass", async () => {
+        const variants = [variant({ id: "v1", scenarioRunId: "run_1" })];
+        const runs = [
+          run({ scenarioRunId: "run_1", status: ScenarioRunStatus.STALLED }),
+        ];
+
+        const report = await serviceReturning(runs).getBlastRadiusReport({
+          ...baseParams,
+          variants,
+        });
+
+        // A wedged run never showed the agent handling the case, so scoring it
+        // as a pass would quietly shrink the blast radius.
+        expect(report.failedVariants).toBe(1);
+        expect(report.blastRadius).toBe(1);
+      });
+    });
+
     describe("when a run errored rather than failing its criteria", () => {
       it("counts it as a failure", async () => {
         const variants = [variant({ id: "v1", scenarioRunId: "run_1" })];

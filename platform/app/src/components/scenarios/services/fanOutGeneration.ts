@@ -75,10 +75,14 @@ export async function generateAdjacentScenarios({
   target: FanOutTarget;
   count?: number;
 }): Promise<FanOutGenerationResult> {
+  // The server stops its own model calls at 60s, so a request still open well
+  // past that is the connection hanging rather than generation being slow.
+  // Without this the modal spins until the user gives up.
   const response = await fetch("/api/scenario/fan-out/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ projectId, seed, target, count }),
+    signal: AbortSignal.timeout(120_000),
   });
 
   let payload: unknown;
