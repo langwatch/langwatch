@@ -195,6 +195,34 @@ describe("Feature: Object storage provider parity and migration", () => {
     expect(state.rows.get("project-1")?.[0]?.storage_uri).toBe(row.storage_uri);
   });
 
+  /** @scenario Rows outside both providers are reported, never silently dropped */
+  it("Rows outside both providers are reported, never silently dropped", async () => {
+    const state = setup();
+    const eligible = seedStoredObject(state);
+    const foreign = storedObject({
+      projectId: "project-1",
+      bytes: Buffer.from("local-era-object"),
+      storageUri: `file:///var/lib/langwatch/project-1/${digest(Buffer.from("local-era-object"))}`,
+    });
+    state.rows.set("project-1", [eligible, foreign]);
+
+    const plan = await state.migration.plan();
+    // The plan names what will NOT migrate — a total that silently excluded
+    // the file:// row would claim the migration covers more than it does.
+    expect(plan.eligibleStoredObjects).toBe(1);
+    expect(plan.foreignSchemeRows).toBe(1);
+    expect(plan.foreignSchemes).toEqual(["file"]);
+
+    // ...and the foreign row is untouched by copy + finalize.
+    const report = await state.migration.copy();
+    expect(report.foreignSchemeRows).toBe(1);
+    await state.migration.finalize();
+    expect(
+      state.rows.get("project-1")?.find((r) => r.id === foreign.id)
+        ?.storage_uri,
+    ).toBe(foreign.storage_uri);
+  });
+
   it("plans every page without materializing the global inventory", async () => {
     const state = setup();
     state.rows.set(

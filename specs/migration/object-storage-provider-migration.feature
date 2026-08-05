@@ -45,6 +45,13 @@ Feature: Object storage provider parity and migration
     And no bytes or storage addresses are changed
 
   @integration
+  Scenario: Rows outside both providers are reported, never silently dropped
+    Given a live stored object addressed by a scheme that is neither the source nor the destination
+    When the operator runs the migration plan
+    Then the plan reports how many such rows exist and which schemes they use
+    And those rows are not copied, rewritten, or deleted by any phase
+
+  @integration
   Scenario: Global provider migration excludes private S3 projects
     Given a project uses a private S3 bucket
     When the operator plans a global provider migration

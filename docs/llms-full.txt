@@ -53633,6 +53633,13 @@ pnpm run task migrateObjectStorage verify
 
 After `finalize` succeeds, update `STORED_OBJECTS_BACKEND` and the active provider credentials while traffic remains paused, deploy that configuration, run `verify`, then resume traffic. A global migration excludes projects with private S3 buckets; they remain on their tenant-owned S3 destination.
 
+**Keep the source provider's read credentials configured through the rollback window.** Finalization rewrites stored-object addresses to the destination scheme, so a rollback that reverts `STORED_OBJECTS_BACKEND` *and* removes the destination provider's credentials leaves every rewritten address unreadable — the bytes still exist on both providers (no phase deletes them), but the deployment can no longer serve that scheme. Concretely:
+
+- **S3 → Azure**: after cutover, keep `S3_BUCKET_NAME` + S3 credentials configured (Helm: `app.dataplane.legacyS3ReadBucket`) so pre-migration `s3://` history stays readable. If you roll back to S3, keep the `AZURE_BLOB_*` settings configured (Helm: `app.dataplane.legacyAzureRead: true`) so the finalized `azure-blob://` addresses stay readable.
+- **Azure → S3**: the mirror image — keep `AZURE_BLOB_*` (Helm: `legacyAzureRead`) after cutover, and keep the S3 settings if you roll back.
+
+A rollback with the flag set is fully non-destructive: reads resolve per address scheme, and a reverse migration can later re-home the bytes. Also note: the plan reports rows addressed by a scheme outside both providers (for example `file://` from a local-storage era) — those rows are out of the migration's scope, stay on their current addresses, and remain readable as long as that scheme's backend stays configured.
+
 | Migration variable | Description |
 |---|---|
 | `OBJECT_STORAGE_MIGRATION_SOURCE_PROVIDER` | `s3` or `azure` |

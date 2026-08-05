@@ -114,6 +114,15 @@ export function createMigrationStorageEndpoint({
 export type MigrationPlan = {
   eligibleStoredObjects: number;
   eligibleDatasetChunks: number;
+  /**
+   * Live rows whose scheme is neither the source nor the destination (e.g.
+   * `file://` on a deployment that once used local storage). They are outside
+   * this migration's scope — untouched, still readable through scheme
+   * dispatch — but the plan must say they exist: a total that silently
+   * excludes them tells the operator the migration covers more than it does.
+   */
+  foreignSchemeRows: number;
+  foreignSchemes: string[];
   excludedProjects: string[];
   blockingDatasets: Array<{
     id: string;
@@ -389,13 +398,14 @@ export class ObjectStorageMigration {
         await this.acceptDestinationOnlyChunk(chunk);
         continue;
       }
-      const sourceBytes = await readAll(
+      // Verification never needs the bytes resident — hash both streams.
+      const sourceSha256 = await sha256OfStream(
         await this.deps.source.driver.get(chunk.sourceUri),
       );
       await assertUriDigest(
         this.deps.destination.driver,
         chunk.destinationUri,
-        sha256(sourceBytes),
+        sourceSha256,
       );
     }
   }
@@ -421,8 +431,13 @@ export class ObjectStorageMigration {
   private async buildPlan(scope: EligibleScope): Promise<MigrationPlan> {
     let eligibleStoredObjects = 0;
     let eligibleDatasetChunks = 0;
+    let foreignSchemeRows = 0;
+    const foreignSchemes = new Set<string>();
     const blockingDatasets: MigrationPlan["blockingDatasets"] = [];
-    for await (const _row of this.eligibleStoredObjects(scope)) {
+    for await (const _row of this.eligibleStoredObjects(scope, (scheme) => {
+      foreignSchemeRows += 1;
+      foreignSchemes.add(scheme);
+    })) {
       eligibleStoredObjects += 1;
     }
     for await (const dataset of this.datasets(scope)) {
@@ -444,13 +459,24 @@ export class ObjectStorageMigration {
     return {
       eligibleStoredObjects,
       eligibleDatasetChunks,
+      foreignSchemeRows,
+      foreignSchemes: [...foreignSchemes].sort(),
       excludedProjects: scope.excludedProjects,
       blockingDatasets,
     };
   }
 
+  /**
+   * Yields rows on the source or destination scheme; anything else — a
+   * `file://` row from a local-filesystem deployment, an address left by an
+   * unrelated earlier migration — is out of this migration's scope. Those
+   * rows are NOT touched and stay readable through scheme dispatch, but they
+   * must never vanish silently: `onForeignScheme` lets `buildPlan` count and
+   * name them so the operator's plan states what will not migrate.
+   */
   private async *eligibleStoredObjects(
     scope: EligibleScope,
+    onForeignScheme?: (scheme: string) => void,
   ): AsyncGenerator<StoredObject> {
     for (const projectId of [...scope.eligibleProjectIds].sort()) {
       for await (const row of paginate((request) =>
@@ -462,6 +488,8 @@ export class ObjectStorageMigration {
           scheme === this.deps.destination.scheme
         ) {
           yield row;
+        } else {
+          onForeignScheme?.(scheme);
         }
       }
     }
@@ -538,6 +566,10 @@ async function copyVerified({
   expectedSha256?: string;
   mediaType: string;
 }): Promise<"copied" | "repaired" | "skippedVerified"> {
+  // The ONLY full copy held in memory: `StorageDriver.put` takes a Buffer,
+  // so the source bytes must be resident to write them. Every digest below
+  // hashes its stream chunk-by-chunk instead of buffering a second (or
+  // third) copy alongside — peak residency is one object, not two or three.
   const sourceBytes = await readAll(await source.driver.get(sourceUri));
   const sourceSha256 = sha256(sourceBytes);
   if (expectedSha256 && sourceSha256 !== expectedSha256) {
@@ -546,10 +578,10 @@ async function copyVerified({
     );
   }
   if (await destination.driver.exists(destinationUri)) {
-    const destinationBytes = await readAll(
+    const destinationSha256 = await sha256OfStream(
       await destination.driver.get(destinationUri),
     );
-    if (sha256(destinationBytes) === sourceSha256) {
+    if (destinationSha256 === sourceSha256) {
       return "skippedVerified";
     }
     await destination.driver.put(destinationUri, sourceBytes, mediaType);
@@ -569,8 +601,7 @@ async function assertUriDigest(
   if (!(await driver.exists(uri))) {
     throw new Error(`Destination object is missing: ${redactStorageUri(uri)}`);
   }
-  const bytes = await readAll(await driver.get(uri));
-  const actual = sha256(bytes);
+  const actual = await sha256OfStream(await driver.get(uri));
   if (actual !== expectedSha256) {
     throw new Error(
       `Destination object verification failed for ${redactStorageUri(uri)}: expected ${expectedSha256}, got ${actual}`,
@@ -588,4 +619,13 @@ async function readAll(stream: Readable): Promise<Buffer> {
 
 function sha256(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+/** Digest a stream chunk-by-chunk — nothing is retained beyond the hash state. */
+async function sha256OfStream(stream: Readable): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of stream) {
+    hash.update(chunk as Buffer);
+  }
+  return hash.digest("hex");
 }
