@@ -215,7 +215,7 @@ describe("buildJudgeAnnotationPairs", () => {
     });
   });
 
-  describe("across a mixed batch of rows", () => {
+  describe("given a batch mixing resolved, unannotated, trace-less, and conflicting rows", () => {
     it("reports accurate coverage counts alongside the resolved pairs", () => {
       const rows = [
         makeRow({ index: 0, traceId: "trace-a", passed: true }), // annotated, resolved

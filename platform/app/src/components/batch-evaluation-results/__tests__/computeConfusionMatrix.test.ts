@@ -307,5 +307,15 @@ describe("kappaAgreementLabel", () => {
       expect(kappaAgreementLabel(0.7)).toBe("substantial");
       expect(kappaAgreementLabel(0.9)).toBe("almost perfect");
     });
+
+    // Every band is an inclusive upper bound. Interior values alone pass
+    // just as happily against exclusive ones, so the boundaries are where
+    // the band definition is actually pinned.
+    it("puts each band's upper bound in the lower band", () => {
+      expect(kappaAgreementLabel(0.2)).toBe("slight");
+      expect(kappaAgreementLabel(0.4)).toBe("fair");
+      expect(kappaAgreementLabel(0.6)).toBe("moderate");
+      expect(kappaAgreementLabel(0.8)).toBe("substantial");
+    });
   });
 });

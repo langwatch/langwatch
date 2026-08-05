@@ -19,7 +19,16 @@ import type { BatchResultRow } from "./types";
 
 export type JudgeAnnotationCoverage = {
   pairs: JudgeAnnotationPair[];
+  /** Rows this coverage was computed over. Past the cap, a leading slice. */
   totalRows: number;
+  /**
+   * Rows in the run. Equal to `totalRows` unless the annotation lookup was
+   * capped, in which case `totalRows` is the slice that was checked and this
+   * is what it was a slice of. Reporting only the slice makes a bounded walk
+   * read as full coverage: 90 of 125 checked looks like most of the run when
+   * the run holds 2000 rows.
+   */
+  runRows: number;
   /** Rows with at least one reviewer annotation, resolved or conflicting. */
   annotatedRows: number;
   /** Subset of annotatedRows where reviewers disagreed, excluded from pairs. */
@@ -35,8 +44,8 @@ export type JudgeAnnotationCoverage = {
 
 /**
  * The judge's own verdict for one row, or null when there is nothing to
- * score: no trace id to join reviewers on, or an evaluator that never
- * resolved to a pass/fail.
+ * score: no trace id to join reviewers on, an evaluation that skipped or
+ * errored, or an evaluator that never resolved to a pass/fail.
  */
 const judgeVerdictFor = ({
   row,
@@ -50,9 +59,14 @@ const judgeVerdictFor = ({
   const target = row.targets[targetId];
   if (!target?.traceId) return null;
 
-  const passed = target.evaluatorResults.find(
+  const scored = target.evaluatorResults.find(
     (result) => result.evaluatorId === evaluatorId,
-  )?.passed;
+  );
+  // A skipped or errored evaluation can still carry a `passed` value, and
+  // scoring it would enter a verdict the judge never actually reached.
+  if (scored?.status !== "processed") return null;
+
+  const passed = scored.passed;
   if (passed === null || passed === undefined) return null;
 
   return { traceId: target.traceId, passed };
@@ -138,6 +152,9 @@ export const buildJudgeAnnotationPairs = ({
   return {
     pairs,
     totalRows: rows.length,
+    // Only the caller knows whether `rows` was capped, so it overrides this
+    // when it hands over a slice.
+    runRows: rows.length,
     annotatedRows,
     conflictingRows,
   };

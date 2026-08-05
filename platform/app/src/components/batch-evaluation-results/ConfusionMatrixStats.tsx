@@ -24,9 +24,10 @@ export function CoverageNote({
 }) {
   // When the lookup was capped, `totalRows` is the slice that was checked
   // rather than the whole run, so say "of the rows checked" and the numerator
-  // keeps meaning "annotated".
+  // keeps meaning "annotated". The run's own size goes in too: without it, a
+  // bounded walk reads as near-full coverage of a run it barely touched.
   const denominator = coverage.truncated
-    ? `the ${coverage.totalRows} rows checked are annotated`
+    ? `the ${coverage.totalRows} rows checked are annotated, out of ${coverage.runRows} in the run`
     : `${coverage.totalRows} rows annotated`;
   const conflicts = coverage.conflictingRows;
 

@@ -143,6 +143,14 @@ function MatrixCell({
       outline={selected ? "2px solid" : "none"}
       outlineColor="border.emphasized"
       outlineOffset="-2px"
+      // Every cell is a button, so the selection outline must not be the only
+      // outline: without this a keyboard user tabbing the matrix cannot see
+      // where they are on any cell that is not the selected one.
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "blue.solid",
+        outlineOffset: "-2px",
+      }}
     >
       <Text fontSize="xl" fontWeight="bold">
         {value}

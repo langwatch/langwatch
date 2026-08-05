@@ -122,7 +122,13 @@ const makeRunData = ({
   },
 });
 
-/** One agreeing thumbs-up per trace of the first `annotatedRowCount` rows. */
+/**
+ * One thumbs-up per trace of the first `annotatedRowCount` rows. The reviewer
+ * always passes while `makeRows` alternates the judge verdict, so the pairs
+ * split into true positives and false negatives rather than agreeing. These
+ * tests assert which cards are offered, not what the metrics say, so the
+ * lopsided matrix is deliberate.
+ */
 const annotateRows = ({
   annotatedRowCount,
 }: {
@@ -197,7 +203,7 @@ describe("ComparisonCharts confusion matrix availability", () => {
     };
 
     describe("when the feature is not enabled", () => {
-      /** @scenario Feature flag gates the whole surface */
+      /** @scenario The whole surface stays off until the feature is turned on */
       it("offers no confusion-matrix card regardless of coverage", () => {
         renderCharts({
           comparisonData: runWithCoverage(),

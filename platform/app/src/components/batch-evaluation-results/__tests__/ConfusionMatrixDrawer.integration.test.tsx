@@ -59,6 +59,7 @@ const coverageWith = (
 ): JudgeAnnotationCoverage => ({
   pairs,
   totalRows: 6,
+  runRows: 6,
   annotatedRows: pairs.length,
   conflictingRows: 0,
 });
@@ -220,20 +221,31 @@ describe("ConfusionMatrixDrawer", () => {
   });
 
   describe("given the annotation lookup was capped", () => {
+    const cappedCoverage = {
+      coverage: {
+        ...coverageWith([{ rowIndex: 0, predicted: true, actual: true }]),
+        totalRows: 125,
+        runRows: 2000,
+        annotatedRows: 90,
+        truncated: true,
+      },
+      rows: [makeRow(0)],
+    };
+
     it("keeps the annotated count as the numerator in the coverage line", () => {
-      renderDrawer({
-        coverage: {
-          ...coverageWith([{ rowIndex: 0, predicted: true, actual: true }]),
-          totalRows: 50,
-          annotatedRows: 8,
-          truncated: true,
-        },
-        rows: [makeRow(0)],
-      });
+      renderDrawer(cappedCoverage);
 
       expect(
-        screen.getByText(/8 of the 50 rows checked are annotated/),
+        screen.getByText(/90 of the 125 rows checked are annotated/),
       ).toBeDefined();
+    });
+
+    /** @scenario A capped lookup reports the run's size, not the slice's */
+    it("names the run's own size so the slice does not read as full coverage", () => {
+      renderDrawer(cappedCoverage);
+
+      // 90 of 125 reads as most of the run. It is 4.5% of it.
+      expect(screen.getByText(/out of 2000 in the run/)).toBeDefined();
     });
   });
 });

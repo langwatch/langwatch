@@ -108,6 +108,9 @@ const isPassFailVerdict = ({
   comparisonEvaluatorIds: Set<string>;
 }): boolean =>
   !comparisonEvaluatorIds.has(result.evaluatorId) &&
+  // A skipped or errored evaluation can still carry a `passed` value, and
+  // scoring it would enter a verdict the judge never actually reached.
+  result.status === "processed" &&
   result.passed !== null &&
   result.passed !== undefined;
 
@@ -1158,6 +1161,10 @@ export const ComparisonCharts = ({
             evaluatorId: candidate.evaluatorId,
             annotationsByTraceId,
           }),
+          // The builder only saw the slice, so it reports the slice as the
+          // run. The run's real row count is what makes the coverage figure
+          // readable: a bounded walk otherwise reads as near-full coverage.
+          runRows: confusionMatrixRows.length,
           truncated,
         },
       }))

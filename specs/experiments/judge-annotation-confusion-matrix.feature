@@ -95,6 +95,16 @@ Feature: Judge-vs-annotation confusion matrix
     # thing this chart must never do: invent coverage out of a request that
     # was never made.
 
+  @integration
+  Scenario: A capped lookup reports the run's size, not the slice's
+    Given the annotation lookup stopped at its cap partway through the run
+    When I open the expanded confusion matrix
+    Then the coverage note names how many rows were checked
+    And it also names how many rows the run holds
+    # 90 annotated of 125 checked reads as most of the run. On a 2000-row run
+    # it is 4.5% of it, and a denominator that never mentions the run lets a
+    # bounded walk pass for full coverage.
+
   @unit
   Scenario: Derived metrics accompany the raw matrix
     Given the matrix in the prior scenario (5 TP, 1 FP, 2 FN, 4 TN)
@@ -207,8 +217,8 @@ Feature: Judge-vs-annotation confusion matrix
     # withdraws rather than silently scoring only the first run.
 
   @integration
-  Scenario: Feature flag gates the whole surface
-    Given the "release_ui_judge_annotation_confusion_matrix_enabled" flag is off
+  Scenario: The whole surface stays off until the feature is turned on
+    Given the confusion-matrix feature is disabled for my project
     When I view the results page Metrics
     Then no confusion-matrix chart option is offered regardless of annotation coverage
 

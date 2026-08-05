@@ -12,6 +12,7 @@
  * (specs/experiments/judge-annotation-confusion-matrix.feature).
  */
 import { Box, Grid, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { useMemo } from "react";
 import { LuMaximize2 } from "react-icons/lu";
 
 import { useDrawer } from "~/hooks/useDrawer";
@@ -50,13 +51,21 @@ export type ConfusionMatrixChartProps = {
  */
 function AccuracyHeadline({
   metrics,
-  annotatedRows,
+  scoredRows,
   totalRows,
+  runRows,
   truncated,
 }: {
   metrics: ConfusionMatrixMetrics;
-  annotatedRows: number;
+  /**
+   * Rows the accuracy above rests on. Deliberately not `coverage.annotatedRows`,
+   * which also counts the rows reviewers conflicted on: those are annotated but
+   * unscoreable, so they belong in the drawer's coverage line and not in the
+   * denominator of a figure computed without them.
+   */
+  scoredRows: number;
   totalRows: number;
+  runRows: number;
   truncated?: boolean;
 }) {
   const { cohensKappa } = metrics;
@@ -84,12 +93,20 @@ function AccuracyHeadline({
           κ {cohensKappa === null ? "—" : cohensKappa.toFixed(2)}
         </Text>
       </HStack>
-      <Text fontSize="2xs" color="fg.muted">
-        {/* When the lookup was capped, `totalRows` is the slice that was
-            checked, not the whole run. Same phrasing rule as the drawer's
-            coverage line, so the card never implies fuller coverage than
-            the drawer would admit to. */}
-        accuracy · {annotatedRows} of {totalRows} rows
+      {/* When the lookup was capped, `totalRows` is the slice that was
+          checked, not the whole run, so the card says "checked" and the
+          tooltip carries the run's own size. The card can only fit one
+          figure, so it shows the strictest one and the drawer expands it. */}
+      <Text
+        fontSize="2xs"
+        color="fg.muted"
+        title={
+          truncated
+            ? `${scoredRows} scored of the ${totalRows} rows checked, out of ${runRows} in the run`
+            : `${scoredRows} scored of ${totalRows} rows`
+        }
+      >
+        accuracy · {scoredRows} of {totalRows} rows
         {truncated ? " checked" : ""}
       </Text>
     </HStack>
@@ -163,7 +180,12 @@ export function ConfusionMatrixChart({
   chartHeight,
 }: ConfusionMatrixChartProps) {
   const { openDrawer } = useDrawer();
-  const metrics = computeConfusionMatrix(coverage.pairs);
+  // Memoised to match the drawer: several of these cards share one metrics
+  // row that re-renders on unrelated chart state.
+  const metrics = useMemo(
+    () => computeConfusionMatrix(coverage.pairs),
+    [coverage.pairs],
+  );
 
   const onExpand = () => {
     // Passed straight through openDrawer's own props (not a preceding
@@ -228,8 +250,9 @@ export function ConfusionMatrixChart({
       <VStack align="stretch" gap={2}>
         <AccuracyHeadline
           metrics={metrics}
-          annotatedRows={coverage.pairs.length}
+          scoredRows={coverage.pairs.length}
           totalRows={coverage.totalRows}
+          runRows={coverage.runRows}
           truncated={coverage.truncated}
         />
         <MiniMatrix metrics={metrics} height={Math.max(chartHeight - 46, 60)} />
