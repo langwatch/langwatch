@@ -24,16 +24,6 @@ const getById = vi.fn();
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
-// Plan limits are enforced by middleware that counts rows. Not what this file
-// is about, and it needs a real database to answer.
-vi.mock("~/app/api/middleware/resource-limit", () => ({
-  resourceLimitMiddleware:
-    () => async (_c: unknown, next: () => Promise<void>) =>
-      await next(),
-  enforceResourceLimitOrRespond: async () => null,
-  resolveOrganizationId: async () => "org_test",
-}));
-
 vi.mock("~/server/scenarios/scenario.service", () => ({
   ScenarioService: {
     create: () => ({
