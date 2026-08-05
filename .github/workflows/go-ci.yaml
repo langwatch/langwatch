@@ -58,9 +58,12 @@ jobs:
             # is the only spelling that stays one: the earlier per-prefix list
             # left out `internal/**` and root-level `*.go`, so a code declared
             # there changed the generated artifact while the drift job skipped
-            # and `go-ci-complete` went green on it. The whole `platform/app/` tree
-            # is still deliberately NOT listed, since a frontend-only PR has no
-            # Go to check.
+            # and `go-ci-complete` went green on it. The rest of the
+            # `platform/app/` tree is still deliberately NOT listed, since a
+            # frontend-only PR has no Go to check — but llmModels.json is the
+            # source modelcapsgen reads, so a registry-only edit has to reach
+            # the drift job or the generated capability table silently stops
+            # matching the registry it claims to mirror.
             go:
               - '**/*.go'
               - 'services/**'
@@ -70,6 +73,7 @@ jobs:
               - 'sdks/go/**'
               - 'infra/clickhouse-serverless/**'
               - 'packages/handled-error/**'
+              - 'platform/app/src/server/modelProviders/llmModels.json'
               - 'go.mod'
               - 'go.sum'
               - '.golangci.yml'
@@ -104,7 +108,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/...
+      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/modelcapsgen/...
 
   lint:
     needs: changes
@@ -147,7 +151,7 @@ jobs:
           args: >-
             --disable=funlen,gocognit,revive
             ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/...
-            ./tools/migrationorder/... ./tools/herrgen/...
+            ./tools/migrationorder/... ./tools/herrgen/... ./tools/modelcapsgen/...
 
       # funlen / gocognit / revive encode house rules over a codebase that
       # predates them (331 pre-existing hits), so they are gated on new and
@@ -182,12 +186,18 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/...
+      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/modelcapsgen/...
 
   # packages/handled-error/src/codes.generated.ts mirrors the services' herr
   # codes; the TypeScript presentation registry is keyed off it, so a Go code
   # added without regenerating would silently ship with no customer copy.
   # Spec: specs/ci/herr-codes-generation.feature
+  #
+  # reasoningcaps.generated.go mirrors the model registry's endpoint-scoped
+  # reasoning capabilities the other way, into the table nlpgo enforces at
+  # dispatch. A registry edit without a regeneration ships a dispatcher that
+  # disagrees with the registry it claims to mirror.
+  # Spec: specs/model-config/reasoning-tools-endpoint-compatibility.feature
   generated:
     needs: changes
     if: ${{ needs.changes.outputs.go == 'true' }}
@@ -202,6 +212,7 @@ jobs:
       # Through the Makefile, so the check CI runs and the check a developer
       # runs cannot drift apart.
       - run: make herrgen-check
+      - run: make modelcapsgen-check
 
   # The single required status check. Every job above is `if:`-gated and so
   # cannot be required directly — a skipped job never reports, and branch

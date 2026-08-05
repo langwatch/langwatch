@@ -539,3 +539,98 @@ func TestPlaygroundProxy_NilDispatcherFallsBackTo501(t *testing.T) {
 		t.Errorf("body = %s, want herr-formatted error envelope", respBody)
 	}
 }
+
+// judgeBody is the scenario judge's request shape: two function tools, a
+// forced tool choice, and no reasoning field at all. Production 400s on
+// this for the gpt-5.6 family because the model applies its own
+// server-side default effort, so there is nothing here to strip.
+const judgeBody = `{"model":"openai/gpt-5.6-sol","messages":[{"role":"user","content":"hi"}],` +
+	`"tools":[{"type":"function","function":{"name":"continue_test"}},` +
+	`{"type":"function","function":{"name":"finish_test"}}],"tool_choice":"required"}`
+
+func okProxy() *fakeProxy {
+	return &fakeProxy{
+		syncResp: &playgroundProxyResponse{
+			StatusCode: 200,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body:       []byte(`{"id":"chatcmpl-1","choices":[]}`),
+		},
+	}
+}
+
+func postProxy(t *testing.T, srv *httptest.Server, path, body, model string) *http.Response {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-litellm-model", model)
+	req.Header.Set("x-litellm-api_key", "sk-test")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, respBody)
+	}
+	return resp
+}
+
+// @scenario "a conflicting model sending tools has its reasoning turned off"
+func TestPlaygroundProxy_ToolCarryingJudgeRequestGetsReasoningDisabled(t *testing.T) {
+	fake := okProxy()
+	srv := newProxyTestServer(t, fake)
+
+	postProxy(t, srv, "/go/proxy/v1/chat/completions", judgeBody, "openai/gpt-5.6-sol")
+
+	if !bytes.Contains(fake.gotRequest.Body, []byte(`"reasoning_effort":"none"`)) {
+		t.Errorf("reasoning_effort must be pinned to none, got: %s", fake.gotRequest.Body)
+	}
+	if !bytes.Contains(fake.gotRequest.Body, []byte(`"finish_test"`)) {
+		t.Errorf("the tools must survive; a judge with no finish_test returns no verdict, got: %s", fake.gotRequest.Body)
+	}
+	if !bytes.Contains(fake.gotRequest.Body, []byte(`"tool_choice":"required"`)) {
+		t.Errorf("tool_choice must survive, got: %s", fake.gotRequest.Body)
+	}
+}
+
+// @scenario "the conflict is scoped to the endpoint it was declared on"
+func TestPlaygroundProxy_SameModelOnResponsesKeepsItsReasoning(t *testing.T) {
+	fake := okProxy()
+	srv := newProxyTestServer(t, fake)
+
+	postProxy(t, srv, "/go/proxy/v1/responses", judgeBody, "openai/gpt-5.6-sol")
+
+	if bytes.Contains(fake.gotRequest.Body, []byte(`"reasoning_effort"`)) {
+		t.Errorf("/v1/responses accepts the pair; nothing should be added, got: %s", fake.gotRequest.Body)
+	}
+}
+
+// @scenario "a reasoning model with no declared conflict keeps its reasoning"
+func TestPlaygroundProxy_UnconflictedReasoningModelKeepsItsEffort(t *testing.T) {
+	fake := okProxy()
+	srv := newProxyTestServer(t, fake)
+
+	body := `{"model":"openai/gpt-5.1","reasoning_effort":"high","messages":[],` +
+		`"tools":[{"type":"function","function":{"name":"finish_test"}}]}`
+	postProxy(t, srv, "/go/proxy/v1/chat/completions", body, "openai/gpt-5.1")
+
+	if !bytes.Contains(fake.gotRequest.Body, []byte(`"reasoning_effort":"high"`)) {
+		t.Errorf("a model with no declared conflict must keep its effort, got: %s", fake.gotRequest.Body)
+	}
+}
+
+func TestEndpointForRequestType(t *testing.T) {
+	cases := map[domain.RequestType]string{
+		domain.RequestTypeChat:        "chat_completions",
+		domain.RequestTypeResponses:   "responses",
+		domain.RequestTypeMessages:    "messages",
+		domain.RequestTypeEmbeddings:  "",
+		domain.RequestTypePassthrough: "",
+	}
+	for reqType, want := range cases {
+		if got := endpointForRequestType(reqType); got != want {
+			t.Errorf("endpointForRequestType(%q) = %q, want %q", reqType, got, want)
+		}
+	}
+}

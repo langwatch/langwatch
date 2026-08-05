@@ -1164,12 +1164,18 @@ ${diff}
         }),
       );
 
-      // A commit message is one short string: a plain-text completion, not a
-      // function-tool round-trip. Function tools combined with reasoning_effort
-      // are rejected on /v1/chat/completions for the gpt-5 family (the provider
-      // asks for /v1/responses), and these model calls go through the
-      // OpenAI-compatible chat-completions proxy. Generating text directly
-      // sidesteps that incompatibility and behaves the same across providers.
+      // A commit message is one short string, so a plain-text completion
+      // is the natural shape for it — no function-tool round-trip needed.
+      //
+      // This used to double as a workaround: some models reject function
+      // tools combined with reasoning on /v1/chat/completions, which is
+      // the endpoint every call here goes out on. That constraint now
+      // lives in one place — declared on the model in llmModels.json
+      // (reasoningConfig.toolsIncompatibleOn) and enforced for every
+      // request at the nlpgo proxy
+      // (services/nlpgo/adapters/litellm/reasoningcaps.go) — so avoiding
+      // tools here is no longer load-bearing. Adding tools would be safe;
+      // this call simply has no use for them.
 
       // TODO: save call costs to user account
 

@@ -151,6 +151,19 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 			HTTPPath:   httpPath,
 		}
 
+		// A few models reject reasoning combined with function tools on
+		// one endpoint but not another, so the correction needs the
+		// classified request type rather than the model id alone. Every
+		// tool-carrying caller on this proxy — the scenario judge, the
+		// evaluators, the playground — passes through here, which is why
+		// the rule is enforced at this seam and not at each caller.
+		if err := enforceReasoningToolCompat(ctx, &req); err != nil {
+			writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+				"reason": "enforce_reasoning_tool_compat",
+			}, err))
+			return
+		}
+
 		// /v1beta/* (Gemini-native generateContent / streamGenerateContent
 		// and friends, called by gemini-cli + the Google GenAI SDK) flows
 		// through the dispatcher's passthrough mode rather than the typed
@@ -243,6 +256,63 @@ func applyReasoningOverridesToBody(body []byte, modelID string) ([]byte, error) 
 	}
 	litellm.ApplyReasoningOverrides(modelID, generic)
 	return json.Marshal(generic)
+}
+
+// endpointForRequestType maps the proxy's classified request type onto the
+// endpoint name the model registry declares capabilities against. An
+// unclassified (passthrough) request gets an empty endpoint, which matches
+// no declaration — a Gemini-native generateContent call is not a
+// chat-completions call and must not inherit its rules.
+func endpointForRequestType(reqType domain.RequestType) string {
+	switch reqType {
+	case domain.RequestTypeChat:
+		return litellm.EndpointChatCompletions
+	case domain.RequestTypeResponses:
+		return litellm.EndpointResponses
+	case domain.RequestTypeMessages:
+		return litellm.EndpointMessages
+	default:
+		return ""
+	}
+}
+
+// enforceReasoningToolCompat pins reasoning effort to "none" on req.Body
+// when the model rejects reasoning alongside the function tools the request
+// carries. The rewrite logic and the reasons for it live in
+// litellm.EnforceReasoningToolCompat — this is the raw-bytes-in /
+// raw-bytes-out wrapper, and it re-marshals only when something changed so
+// a request that needs nothing keeps its original bytes.
+func enforceReasoningToolCompat(ctx context.Context, req *playgroundProxyRequest) error {
+	endpoint := endpointForRequestType(req.Type)
+	if len(req.Body) == 0 || endpoint == "" {
+		return nil
+	}
+	var generic map[string]any
+	if err := json.Unmarshal(req.Body, &generic); err != nil {
+		return err
+	}
+	switch litellm.EnforceReasoningToolCompat(req.Model, endpoint, generic) {
+	case litellm.ReasoningToolsIrreconcilable:
+		// Deliberately not an error: the request goes upstream unchanged
+		// and the provider's own rejection is the answer. Logged so the
+		// 400 that follows is attributable to a known condition rather
+		// than looking like a random provider fault.
+		clog.Get(ctx).Warn("reasoning_tools_irreconcilable",
+			zap.String("model", req.Model),
+			zap.String("endpoint", endpoint),
+			zap.String("fault", "platform"))
+	case litellm.ReasoningToolsDisabled:
+		rewritten, err := json.Marshal(generic)
+		if err != nil {
+			return err
+		}
+		req.Body = rewritten
+		clog.Get(ctx).Info("reasoning_disabled_for_tools",
+			zap.String("model", req.Model),
+			zap.String("endpoint", endpoint))
+	case litellm.ReasoningToolsCompatible:
+	}
+	return nil
 }
 
 // peekBodyMetadata reads the body once to extract the OpenAI-shape
