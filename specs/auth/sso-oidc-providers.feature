@@ -114,6 +114,15 @@ Feature: Sign in with Amazon Cognito, OneLogin or any other OIDC provider
       | onelogin |
       | oidc     |
 
+  # Identity providers compare redirect URLs by exact string, so a deployment
+  # URL written with a trailing slash would send a URL that does not match what
+  # the operator registered, and the provider would refuse the sign-in.
+  @unit
+  Scenario: A trailing slash on the deployment URL does not change the callback URL
+    Given the deployment URL is written with a trailing slash
+    When the deployment starts
+    Then the provider's redirect URL still has a single slash before the callback path
+
   # ==========================================================================
   # Signing in
   # ==========================================================================

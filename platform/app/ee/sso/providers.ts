@@ -181,6 +181,12 @@ export const parseIssuerUrl = (issuer: string, envName: string): URL => {
  * The callback URL an operator registers with their identity provider. One
  * shape for every provider we document, which is the whole reason the legacy
  * path is pinned rather than left at the plugin default.
+ *
+ * Identity providers compare redirect URIs by exact string, so a trailing
+ * slash on the base URL is not cosmetic: it would send
+ * `https://host//api/auth/callback/x` against a registration of
+ * `https://host/api/auth/callback/x` and the provider would refuse the
+ * request.
  */
 export const legacyCallbackUrl = ({
   baseUrl,
@@ -188,7 +194,7 @@ export const legacyCallbackUrl = ({
 }: {
   baseUrl: string;
   providerId: string;
-}): string => `${baseUrl}/api/auth/callback/${providerId}`;
+}): string => `${baseUrl.replace(/\/+$/, "")}/api/auth/callback/${providerId}`;
 
 /**
  * Discovery URL for an OpenID Connect issuer. Normalizes the issuer first, so

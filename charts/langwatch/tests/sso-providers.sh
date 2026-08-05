@@ -32,8 +32,8 @@ fail() {
   failures=$((failures + 1))
 }
 
-# Renders the chart once per flag set and caches the result, because three
-# assertions over two providers otherwise pay for eight full renders.
+# Renders the chart once per flag set and caches the result. Every assertion
+# otherwise pays for a full render, and they mostly ask about the same one.
 #
 # A failed render yields an empty manifest rather than killing the run under
 # `set -e`, so a chart that stops rendering is reported as the assertion it
@@ -160,8 +160,8 @@ test_client_secret_can_come_from_a_secret_reference() {
 }
 
 # A provider left at its defaults must contribute nothing, or an operator who
-# configured one identity provider would ship empty credentials for the seven
-# others the chart declares.
+# configured one identity provider would ship empty credentials for every
+# other one the chart declares.
 # @scenario "Unconfigured providers contribute no environment variables"
 test_unconfigured_providers_emit_nothing() {
   local actual

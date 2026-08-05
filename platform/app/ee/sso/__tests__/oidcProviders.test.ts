@@ -207,6 +207,27 @@ describe("buildGenericOAuthConfigs", () => {
         );
       }
     });
+
+    /**
+     * The redirect URL is compared by exact string at the identity provider,
+     * so `https://host//api/auth/callback/cognito` is a different URL from the
+     * one the operator registered and gets refused. NEXTAUTH_URL is written by
+     * hand, in a values file or an env var, which is exactly where a trailing
+     * slash comes from.
+     */
+    /** @scenario A trailing slash on the deployment URL does not change the callback URL */
+    it("ignores a trailing slash on the deployment URL", () => {
+      const configs = buildGenericOAuthConfigs(
+        envWith({
+          NEXTAUTH_PROVIDER: "cognito",
+          NEXTAUTH_URL: `${BASE_URL}/`,
+        }),
+      );
+
+      expect(configFor(configs, "cognito")?.redirectURI).toBe(
+        `${BASE_URL}/api/auth/callback/cognito`,
+      );
+    });
   });
 
   describe("when the identity provider returns a profile with no name", () => {

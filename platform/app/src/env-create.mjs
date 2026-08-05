@@ -412,7 +412,8 @@ export function createEnvConfig() {
       ONELOGIN_CLIENT_SECRET: z.string().optional(),
       ONELOGIN_ISSUER: z.string().optional(),
 
-      // Any other OpenID Connect provider, configured by issuer alone
+      // Any other OpenID Connect provider. Its endpoints are discovered from
+      // the issuer, so there is nothing to configure beyond these three.
       OIDC_CLIENT_ID: z.string().optional(),
       OIDC_CLIENT_SECRET: z.string().optional(),
       OIDC_ISSUER: z.string().optional(),

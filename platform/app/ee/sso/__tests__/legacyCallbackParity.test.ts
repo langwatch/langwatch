@@ -13,6 +13,7 @@
  *
  * So this asserts the two halves agree, both ways.
  */
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   buildGenericOAuthConfigs,
@@ -90,7 +91,6 @@ describe("legacy callback rewrites", () => {
      * been unrolled back into hand-written per-provider lines.
      */
     it("registers the rewrites from that same list, not by hand", async () => {
-      const { readFile } = await import("node:fs/promises");
       const source = await readFile(
         new URL("../../../src/server/api-router.ts", import.meta.url),
         "utf8",

@@ -259,7 +259,7 @@ If OneLogin sits behind another identity provider, for example a Cognito user po
 
 ### Any other OpenID Connect provider
 
-Anything that publishes an OpenID Connect discovery document works without being named above: Keycloak, Authentik, Zitadel, Ping, JumpCloud, a self-hosted IdP, whatever you run.
+Any provider that publishes an OpenID Connect discovery document and supports the authorization code flow with PKCE works without being named above: Keycloak, Authentik, Zitadel, Ping, JumpCloud, a self-hosted IdP, whatever you run.
 
 1. Register an OIDC client with your provider, with the authorization code flow and the `openid`, `email` and `profile` scopes
 2. Set its redirect URI to `https://your-domain.com/api/auth/callback/oidc`
@@ -292,7 +292,7 @@ Check the issuer is right by fetching its discovery document, which is exactly w
 curl https://idp.example.com/.well-known/openid-configuration
 ```
 
-If that returns JSON with an `authorization_endpoint`, the issuer is correct.
+JSON back means the issuer is right. LangWatch then reads `authorization_endpoint`, `token_endpoint` and `userinfo_endpoint` from that document, so all three have to be there, and the client you registered has to allow the authorization code flow with PKCE.
 </Note>
 
 ## Domain-to-Organization Mapping
