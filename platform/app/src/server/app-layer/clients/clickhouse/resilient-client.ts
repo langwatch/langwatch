@@ -321,7 +321,32 @@ function guardInbandException<
 }
 
 /**
- * Wraps a ClickHouseClient with structured logging and insert retry.
+ * Wraps a ClickHouseClient with structured logging, error translation, and
+ * retry on reads only.
+ *
+ * Reads retry here because they are idempotent and nothing above them will do
+ * it: a transient overload would otherwise surface as a failed page.
+ *
+ * Writes deliberately do not. Every insert in this system is issued from a job
+ * on the group queue, which retries the whole job on its own backoff, so a
+ * client-side retry does not add resilience - it multiplies attempts. The two
+ * layers compounded: 4 attempts here inside up to 25 there, so one insert could
+ * be tried ~100 times against a server that was rejecting precisely because it
+ * was overloaded.
+ *
+ * It was also the unsafe half. These are async inserts
+ * (`async_insert` + `wait_for_async_insert`, see ~/server/clickhouse/queryDefaults)
+ * and `async_insert_deduplicate` is not set anywhere, so it takes ClickHouse's
+ * default of off. A failure raised after the server has accepted the batch into
+ * its buffer - `Query was cancelled`, or the memory limit hit while executing
+ * `WaitForAsyncInsert`, which between them were most of the insert retries in
+ * production - can still flush. Retrying then writes the rows twice.
+ * ReplacingMergeTree collapses that for the tables keyed to collapse it; the
+ * rollup and analytics tables just double-count.
+ *
+ * If insert retries are ever wanted back, make them idempotent first: set
+ * `async_insert_deduplicate`, or pass a deterministic `insert_deduplication_token`
+ * per batch.
  */
 export function createResilientClickHouseClient({
   client,
@@ -370,12 +395,8 @@ export function createResilientClickHouseClient({
       "unknown";
     const start = performance.now();
     try {
-      const result = await withTransientRetry(() => client.insert(params), {
-        operation: "insert",
-        maxRetries,
-        baseDelayMs,
-        maxDelayMs,
-      });
+      // Deliberately NOT retried here. See the note on this function.
+      const result = await client.insert(params);
       const durationMs = performance.now() - start;
       logSuccess({ operation: "insert", durationMs, params });
       observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
