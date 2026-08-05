@@ -7,6 +7,7 @@ import {
   gqBlockedGroups,
   gqFastqActive,
   gqFastqPending,
+  gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
   gqParkedGroups,
   gqPendingGroups,
@@ -20,6 +21,16 @@ import type { DispatchResult, GroupStagingScripts } from "./scripts";
  * oldest-pending-age gauge excludes it — see the computation in collect().
  */
 const READY_UNBLOCK_SENTINEL_SCORE = 1;
+
+/**
+ * How many of the most-deferred ready groups the backlog-age gauge samples per
+ * collect. Retry-pinned groups sit at the deferred END of the ready zset (their
+ * score is now+backoff, larger than any eligible group's), so a small sample
+ * from that end catches them; in-flight groups sampled alongside contribute
+ * nothing because their head job is not due. Bounded so a collect cycle stays
+ * O(sample) pipeline commands whatever the backlog size.
+ */
+const OLDEST_BACKLOG_SAMPLE_GROUPS = 50;
 
 /**
  * Periodically collects metrics from the group queue processing and staging layers.
@@ -151,6 +162,50 @@ export class GroupQueueMetricsCollector {
       gqOldestPendingAgeMilliseconds.set(
         { queue_name: this.params.queueName },
         age,
+      );
+
+      // Backlog age regardless of eligibility. The gauge above is structurally
+      // blind to a group pinned in retry backoff: every failed attempt rewrites
+      // the group's ready score to now+backoff, so it is either future-scored
+      // (excluded) or freshly re-scored (reads as seconds old) — a head job due
+      // for a day never surfaces (2026-08-05 incident: day-old
+      // codingAgentSpanFactsDispatch backlogs under a ~2.5s gauge). The
+      // per-group jobs zset keeps the job's ORIGINAL due time across retries,
+      // so clock off that instead, sampling the deferred end of ready where
+      // retry-pinned groups live, and folding in the eligible head so an old
+      // eligible group past the sample bound still registers.
+      let oldestDueMs: number | null =
+        oldestEligible.length >= 2 ? Number(oldestEligible[1]) : null;
+      const deferredGroups = await this.params.redisConnection.zrevrange(
+        readyKey,
+        0,
+        OLDEST_BACKLOG_SAMPLE_GROUPS - 1,
+      );
+      if (deferredGroups.length > 0) {
+        const headPipeline = this.params.redisConnection.pipeline();
+        for (const groupId of deferredGroups) {
+          headPipeline.zrange(
+            `${keyPrefix}group:${groupId}:jobs`,
+            0,
+            0,
+            "WITHSCORES",
+          );
+        }
+        const headResults = (await headPipeline.exec()) ?? [];
+        for (const [err, value] of headResults) {
+          if (err) continue;
+          const arr = value as string[];
+          if (arr.length < 2) continue;
+          const dueMs = Number(arr[1]);
+          // Only DUE jobs are backlog: a head legitimately scheduled in the
+          // future (delayed stage, monitor timers hours out) is not late work.
+          if (!Number.isFinite(dueMs) || dueMs > nowMs) continue;
+          if (oldestDueMs === null || dueMs < oldestDueMs) oldestDueMs = dueMs;
+        }
+      }
+      gqOldestBacklogAgeMilliseconds.set(
+        { queue_name: this.params.queueName },
+        oldestDueMs === null ? 0 : Math.max(0, nowMs - oldestDueMs),
       );
     } catch (error) {
       this.params.logger.debug(

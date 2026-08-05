@@ -11,6 +11,7 @@ import {
   decodeJobEnvelope,
   readJobRoutingMeta,
 } from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
+import { legacyStagedJobAttempt } from "~/server/event-sourcing/queues/groupQueue/legacyStagedJobAttempt";
 import { RedisJobBlobStore } from "~/server/event-sourcing/queues/groupQueue/redisJobBlobStore";
 import {
   GROUP_QUEUE_REGISTRY_KEY,
@@ -407,12 +408,24 @@ function stripHashTag(name: string): string {
   return name;
 }
 
-function parseRetryCount(id: string | null): number | null {
-  if (!id) return null;
-  const match = id.match(/\/r\/(\d+)$/);
-  if (!match) return null;
-  const n = parseInt(match[1]!, 10);
-  return n < 1000 ? n : null;
+/**
+ * The head job's retry count, ADR-080 first: the group's retry chain lives in
+ * the `group:{id}:attempt` key (TTL'd past the max backoff), written on every
+ * restage. The `/r/<n>` job-id suffix stopped being written at ADR-080, so
+ * parsing only the id read "—" for every retrying group — during the
+ * 2026-08-05 backup it made day-old retry loops look never-attempted. The
+ * legacy id parse stays as the last-resort fallback for jobs staged before an
+ * ADR-080 deploy.
+ */
+function resolveRetryCount(
+  attemptRaw: string | null,
+  jobId: string | null,
+): number | null {
+  const attempt = attemptRaw === null ? Number.NaN : parseInt(attemptRaw, 10);
+  if (Number.isInteger(attempt) && attempt > 0) return attempt;
+  if (!jobId) return null;
+  const legacy = legacyStagedJobAttempt(jobId);
+  return legacy > 0 ? legacy : null;
 }
 
 // ── Repository Implementation ────────────────────────────────────────
@@ -494,11 +507,20 @@ export class QueueRedisRepository implements QueueRepository {
     const totalPendingKey = `${prefix}stats:total-pending`;
     const parkedTenantsKey = `${prefix}parked-tenants`;
 
+    // Sample BOTH ends of the ready zset. The zset is scored by dispatch
+    // eligibility, so its ends hold the two distinct stuck-group classes: the
+    // high end is the most-deferred groups (in-flight, retry backoff — where a
+    // failing group hides between attempts), the low end is the most-eligible
+    // ones (an old due head the dispatcher is starving). A single-ended
+    // ZREVRANGE sampled only the deferred end, so an aged eligible backlog past
+    // `limit` never appeared in the dashboard at all. When the zset fits in
+    // `limit` the two ranges coincide and dedup makes this identical to before.
     const [
       readyCount,
       blockedCount,
       dlqCount,
       topReadyMembers,
+      bottomReadyMembers,
       totalPendingRaw,
       parkedTenants,
     ] = await Promise.all([
@@ -506,6 +528,7 @@ export class QueueRedisRepository implements QueueRepository {
       this.redis.scard(blockedKey),
       this.redis.scard(dlqKey),
       this.redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
+      this.redis.zrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
       this.redis.get(totalPendingKey),
       this.redis.smembers(parkedTenantsKey),
     ]);
@@ -528,11 +551,14 @@ export class QueueRedisRepository implements QueueRepository {
 
     const groupIds: string[] = [];
     const readyScores = new Map<string, number>();
-    for (let i = 0; i < topReadyMembers.length; i += 2) {
-      const groupId = topReadyMembers[i]!;
-      const score = parseFloat(topReadyMembers[i + 1]!);
-      groupIds.push(groupId);
-      readyScores.set(groupId, score);
+    for (const members of [topReadyMembers, bottomReadyMembers]) {
+      for (let i = 0; i < members.length; i += 2) {
+        const groupId = members[i]!;
+        if (readyScores.has(groupId)) continue;
+        const score = parseFloat(members[i + 1]!);
+        groupIds.push(groupId);
+        readyScores.set(groupId, score);
+      }
     }
 
     const blockedMembers =
@@ -549,7 +575,7 @@ export class QueueRedisRepository implements QueueRepository {
 
     const allGroupIds = [...groupIds, ...blockedGroupIds];
 
-    const CMDS_PER_GROUP = 6;
+    const CMDS_PER_GROUP = 7;
     const pipeline = this.redis.pipeline();
     for (const groupId of allGroupIds) {
       const jobsKey = `${prefix}group:${groupId}:jobs`;
@@ -560,6 +586,7 @@ export class QueueRedisRepository implements QueueRepository {
       pipeline.zrange(jobsKey, -1, -1, "WITHSCORES");
       pipeline.sismember(blockedKey, groupId);
       pipeline.ttl(`${prefix}group:${groupId}:active`);
+      pipeline.get(`${prefix}group:${groupId}:attempt`);
     }
 
     const pipelineResults = await pipeline.exec();
@@ -621,6 +648,7 @@ export class QueueRedisRepository implements QueueRepository {
       const isBlocked = (pipelineResults?.[base + 4]?.[1] as number) === 1;
       const activeKeyTtlSec =
         (pipelineResults?.[base + 5]?.[1] as number) ?? -2;
+      const attemptRaw = (pipelineResults?.[base + 6]?.[1] as string) ?? null;
 
       const oldestJobMs =
         oldestArr.length >= 2 ? parseFloat(oldestArr[1]!) : null;
@@ -663,7 +691,7 @@ export class QueueRedisRepository implements QueueRepository {
         errorTimestamp: errorInfo?.timestamp
           ? parseFloat(errorInfo.timestamp)
           : null,
-        retryCount: parseRetryCount(firstJobIds[i]!.jobId),
+        retryCount: resolveRetryCount(attemptRaw, firstJobIds[i]!.jobId),
         activeKeyTtlSec: activeKeyTtlSec > 0 ? activeKeyTtlSec : null,
         processingDurationMs: null,
       });

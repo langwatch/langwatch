@@ -190,6 +190,21 @@ export const gqOldestPendingAgeMilliseconds = new Gauge({
   labelNames: ["queue_name"] as const,
 });
 
+/**
+ * Backlog age the eligible-waiting gauge is structurally blind to. A group
+ * pinned in retry backoff has its ready score REWRITTEN to now+backoff on every
+ * failed attempt, so `gq_oldest_pending_age_milliseconds` (which clocks off the
+ * ready score) reads seconds even while the group's head job has been due for a
+ * day. This gauge clocks off the per-group jobs zset instead, whose scores are
+ * preserved across retries/blocks/parks, sampling the most-deferred ready
+ * groups — exactly where retry-pinned and in-flight groups live.
+ */
+export const gqOldestBacklogAgeMilliseconds = new Gauge({
+  name: "gq_oldest_backlog_age_milliseconds",
+  help: "Age of the oldest due job across sampled groups regardless of dispatch eligibility (catches groups pinned in retry backoff)",
+  labelNames: ["queue_name"] as const,
+});
+
 // --- Blob lifecycle observability (ADR-030 hardening + review 2026-06-24) ---
 
 /** A stored blob exceeded the decode cap — possible tamper / zip-bomb. Distinct from a missing blob. */
