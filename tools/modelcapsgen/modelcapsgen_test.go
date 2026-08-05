@@ -2,6 +2,7 @@ package modelcapsgen
 
 import (
 	"bytes"
+	"go/format"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,7 +44,11 @@ func TestReadCapabilities_PicksUpADeclaredConflictFromRegistryDataAlone(t *testi
 		t.Errorf("capability = %+v; want the new model with canDisable true", got)
 	}
 
-	rendered := string(Render(capabilities))
+	renderedBytes, err := Render(capabilities)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	rendered := string(renderedBytes)
 	if !strings.Contains(rendered, `"openai/brand-new-model"`) {
 		t.Errorf("rendered table is missing the new model:\n%s", rendered)
 	}
@@ -60,7 +65,7 @@ func TestReadCapabilities_PicksUpADeclaredConflictFromRegistryDataAlone(t *testi
 func TestRender_IsDeterministicAndSorted(t *testing.T) {
 	path := writeRegistry(t, `{"models":{
 		"openai/zeta":{"reasoningConfig":{"supported":true,"canDisable":true,
-			"toolsIncompatibleOn":["responses","chat_completions","chat_completions"]}},
+			"toolsIncompatibleOn":["chat_completions","chat_completions"]}},
 		"openai/alpha":{"reasoningConfig":{"supported":true,"canDisable":false,
 			"toolsIncompatibleOn":["chat_completions"]}}
 	}}`)
@@ -73,16 +78,68 @@ func TestRender_IsDeterministicAndSorted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadCapabilities: %v", err)
 	}
-	if !bytes.Equal(Render(first), Render(second)) {
+	firstOut, err := Render(first)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	secondOut, err := Render(second)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if !bytes.Equal(firstOut, secondOut) {
 		t.Fatal("two runs over the same registry rendered different bytes")
 	}
 	if first[0].ModelID != "openai/alpha" {
 		t.Errorf("capabilities are not sorted by model id: %+v", first)
 	}
-	// Duplicate endpoints collapse, and the order is the sorted one.
-	endpoints := first[1].ConflictEndpoints
-	if len(endpoints) != 2 || endpoints[0] != "chat_completions" || endpoints[1] != "responses" {
+	// Duplicate endpoints collapse.
+	if endpoints := first[1].ConflictEndpoints; len(endpoints) != 1 ||
+		endpoints[0] != "chat_completions" {
 		t.Errorf("endpoints = %v; want sorted and deduplicated", endpoints)
+	}
+}
+
+// Render's output is the file gofmt runs over in CI, so it has to come out
+// already formatted rather than merely parseable.
+func TestRender_OutputIsGofmtClean(t *testing.T) {
+	rendered, err := Render([]Capability{
+		{ModelID: "openai/a", ConflictEndpoints: []string{"chat_completions"}, CanDisable: true},
+		{ModelID: "openai/b", ConflictEndpoints: []string{"chat_completions"}, CanDisable: false},
+	})
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	formatted, err := format.Source(rendered)
+	if err != nil {
+		t.Fatalf("generated source does not parse: %v", err)
+	}
+	if !bytes.Equal(rendered, formatted) {
+		t.Errorf("generated source is not gofmt-clean:\n%s", rendered)
+	}
+}
+
+// The runtime rewrite is written to the chat-completions wire shape, so a
+// declaration naming any other endpoint has to be refused at generation
+// rather than emitted and silently mis-rewritten at dispatch. /v1/responses
+// carries reasoning as a nested object and /v1/messages calls it
+// `thinking`; either would be destroyed by the top-level `reasoning_effort`
+// rewrite. This matters because /v1/responses is the named follow-up for
+// the can't-disable case, so it is the declaration someone is most likely
+// to reach for next.
+func TestReadCapabilities_RefusesEndpointsTheRuntimeCannotHonor(t *testing.T) {
+	for _, endpoint := range []string{"responses", "messages"} {
+		registry := `{"models":{"openai/a":{"reasoningConfig":{"supported":true,
+			"canDisable":true,"toolsIncompatibleOn":["` + endpoint + `"]}}}}`
+
+		_, err := ReadCapabilities(writeRegistry(t, registry))
+
+		if err == nil {
+			t.Fatalf("%q was accepted; the runtime cannot honor it, so it must be refused", endpoint)
+		}
+		if !strings.Contains(err.Error(), "unknown endpoint") ||
+			!strings.Contains(err.Error(), endpoint) {
+			t.Errorf("error for %q = %v; want it to name the endpoint", endpoint, err)
+		}
 	}
 }
 

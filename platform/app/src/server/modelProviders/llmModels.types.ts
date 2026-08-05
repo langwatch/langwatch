@@ -88,10 +88,20 @@ export type ReasoningConfig = {
    * or hardcode one endpoint's rule into a name that does not say so.
    *
    * Declaring this is only half an answer: `canDisable` decides what a
-   * dispatcher can do about it. See `resolveReasoningToolCompatibility`
-   * in `resolveSupportedParameters.ts` for the three-way rule, and
-   * `services/nlpgo/adapters/litellm/reasoningcaps.go` for the runtime
-   * that enforces it.
+   * dispatcher can do about it. The three-way rule and the runtime that
+   * enforces it both live in Go, in
+   * `services/nlpgo/adapters/litellm/reasoningcaps.go` — there is
+   * deliberately no TypeScript twin of the rule, because two
+   * implementations of it drifted apart the moment they existed.
+   *
+   * `ModelEndpoint` is wider than what the runtime can currently act on.
+   * Only `chat_completions` is honoured: the rewrite sets a top-level
+   * `reasoning_effort` string, which is the wrong shape for
+   * `/v1/responses` (nested `reasoning` object) and `/v1/messages`
+   * (Anthropic's `thinking`). `tools/modelcapsgen/registry.go` refuses to
+   * generate a table entry for the other two rather than let a
+   * declaration be silently mis-rewritten at dispatch, so declaring one
+   * of them fails the build until the runtime learns that endpoint.
    */
   toolsIncompatibleOn?: ModelEndpoint[];
 };

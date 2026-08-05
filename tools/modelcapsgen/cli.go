@@ -30,7 +30,11 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	generated := Render(capabilities)
+	generated, err := Render(capabilities)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
 	target := filepath.Join(*root, *out)
 
 	if *check {

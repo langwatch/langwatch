@@ -28,9 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
-
-	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
@@ -291,13 +288,9 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 	// out on chat/completions (see the package doc), and the structured-
 	// output branch above can add tools of its own, so the check runs
 	// after the body is fully assembled rather than off req.Tools.
-	if outcome := litellm.EnforceReasoningToolCompat(
+	litellm.EnforceReasoningToolCompat(
 		translatedModel, litellm.EndpointChatCompletions, body,
-	); outcome != litellm.ReasoningToolsCompatible {
-		clog.Get(ctx).Info("reasoning_tool_compat_applied",
-			zap.String("model", translatedModel),
-			zap.String("outcome", outcome.String()))
-	}
+	).Log(ctx, translatedModel, litellm.EndpointChatCompletions)
 
 	// Build inline credentials from litellm_params.
 	creds, err := litellm.FromLiteLLMParams(provider, req.LiteLLMParams)

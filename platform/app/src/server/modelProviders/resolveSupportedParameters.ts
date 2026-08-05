@@ -2,7 +2,6 @@ import type {
   CustomModelEntry,
   SupportedParameter,
 } from "./customModel.schema";
-import type { ModelEndpoint, ReasoningConfig } from "./llmModels.types";
 import { llmModels } from "./loadModelCatalog";
 import { getModelMetadata } from "./registry";
 
@@ -95,72 +94,6 @@ export function filterUnsupportedSamplingParams<
     }
   }
   return out as T;
-}
-
-/**
- * What a dispatcher should do when it wants to send function tools to a
- * model on a given endpoint.
- *
- * - `allow` — send the request unchanged. This is the answer for every
- *   model that does not reason, and for the large majority of models that
- *   do (reasoning and tools coexist fine on them).
- * - `disable-reasoning` — the provider rejects the combination here, and
- *   the model lets reasoning be turned off. Pin `parameterName` to
- *   `value` and send the tools.
- * - `irreconcilable` — the provider rejects the combination here and the
- *   model cannot turn reasoning off, so no rewrite of this request can
- *   satisfy both. See the note on the constant below for what dispatchers
- *   do with it.
- */
-export type ReasoningToolCompatibility =
-  | { action: "allow" }
-  | { action: "disable-reasoning"; parameterName: string; value: "none" }
-  | { action: "irreconcilable"; parameterName: string };
-
-const ALLOW_REASONING_TOOLS: ReasoningToolCompatibility = { action: "allow" };
-
-/**
- * Resolve whether a model accepts reasoning together with function tools
- * on `endpoint`, and what to do if it does not.
- *
- * Three questions, in order, all of which have to be answered from the
- * registry rather than from a model-name pattern:
- *
- *   1. Does the model reason at all? (`reasoningConfig.supported`)
- *   2. Is reasoning incompatible with tools *on this endpoint*?
- *      (`reasoningConfig.toolsIncompatibleOn`)
- *   3. Can reasoning be disabled? (`reasoningConfig.canDisable`)
- *
- * Only all three true yields `disable-reasoning`. A blanket "strip
- * reasoning whenever tools are present" rule would answer question 1 and
- * skip the other two, silently downgrading every reasoning model that has
- * no problem with tools — which is nearly all of them.
- *
- * The caller supplies the *endpoint*, not the provider: the same model
- * behind the same provider answers differently on
- * `/v1/chat/completions` and `/v1/responses`.
- */
-export function resolveReasoningToolCompatibility({
-  modelId,
-  endpoint,
-}: {
-  modelId: string;
-  endpoint: ModelEndpoint;
-}): ReasoningToolCompatibility {
-  const reasoning: ReasoningConfig | undefined =
-    llmModels.models[modelId]?.reasoningConfig;
-  if (!reasoning?.supported) return ALLOW_REASONING_TOOLS;
-  if (!reasoning.toolsIncompatibleOn?.includes(endpoint)) {
-    return ALLOW_REASONING_TOOLS;
-  }
-  if (reasoning.canDisable) {
-    return {
-      action: "disable-reasoning",
-      parameterName: reasoning.parameterName,
-      value: "none",
-    };
-  }
-  return { action: "irreconcilable", parameterName: reasoning.parameterName };
 }
 
 /**

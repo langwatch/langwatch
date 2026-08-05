@@ -542,8 +542,7 @@
           "none",
           "low",
           "medium",
-          "high",
-          "xhigh"
+          "high"
         ],
         "defaultValue": "none",
         "canDisable": true,
@@ -596,8 +595,7 @@
           "none",
           "low",
           "medium",
-          "high",
-          "xhigh"
+          "high"
         ],
         "defaultValue": "none",
         "canDisable": true,
@@ -650,8 +648,7 @@
           "none",
           "low",
           "medium",
-          "high",
-          "xhigh"
+          "high"
         ],
         "defaultValue": "none",
         "canDisable": true,
@@ -704,8 +701,7 @@
           "none",
           "low",
           "medium",
-          "high",
-          "xhigh"
+          "high"
         ],
         "defaultValue": "none",
         "canDisable": true,
@@ -758,8 +754,7 @@
           "none",
           "low",
           "medium",
-          "high",
-          "xhigh"
+          "high"
         ],
         "defaultValue": "none",
         "canDisable": true,
@@ -812,8 +807,7 @@
           "none",
           "low",
           "medium",
-          "high",
-          "xhigh"
+          "high"
         ],
         "defaultValue": "none",
         "canDisable": true,

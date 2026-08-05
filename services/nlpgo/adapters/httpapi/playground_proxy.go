@@ -291,26 +291,18 @@ func enforceReasoningToolCompat(ctx context.Context, req *playgroundProxyRequest
 	if err := json.Unmarshal(req.Body, &generic); err != nil {
 		return err
 	}
-	switch litellm.EnforceReasoningToolCompat(req.Model, endpoint, generic) {
-	case litellm.ReasoningToolsIrreconcilable:
-		// Deliberately not an error: the request goes upstream unchanged
-		// and the provider's own rejection is the answer. Logged so the
-		// 400 that follows is attributable to a known condition rather
-		// than looking like a random provider fault.
-		clog.Get(ctx).Warn("reasoning_tools_irreconcilable",
-			zap.String("model", req.Model),
-			zap.String("endpoint", endpoint),
-			zap.String("fault", "platform"))
-	case litellm.ReasoningToolsDisabled:
+	outcome := litellm.EnforceReasoningToolCompat(req.Model, endpoint, generic)
+	// Irreconcilable is deliberately not an error: the request goes
+	// upstream unchanged and the provider's own rejection is the answer.
+	// It is logged so the 400 that follows is attributable to a known
+	// condition rather than looking like a random provider fault.
+	outcome.Log(ctx, req.Model, endpoint)
+	if outcome == litellm.ReasoningToolsDisabled {
 		rewritten, err := json.Marshal(generic)
 		if err != nil {
 			return err
 		}
 		req.Body = rewritten
-		clog.Get(ctx).Info("reasoning_disabled_for_tools",
-			zap.String("model", req.Model),
-			zap.String("endpoint", endpoint))
-	case litellm.ReasoningToolsCompatible:
 	}
 	return nil
 }

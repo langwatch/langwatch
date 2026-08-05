@@ -29,10 +29,29 @@ const DefaultRegistry = "platform/app/src/server/modelProviders/llmModels.json"
 // DefaultOut is the generated Go file, relative to the repository root.
 const DefaultOut = "services/nlpgo/adapters/litellm/reasoningcaps.generated.go"
 
-// knownEndpoints mirrors the ModelEndpoint union in llmModels.types.ts. A
-// value outside it is a typo that would otherwise generate a table entry
-// no dispatcher can ever match, so the generator rejects it.
-var knownEndpoints = []string{"chat_completions", "responses", "messages"}
+// knownEndpoints is deliberately NARROWER than the ModelEndpoint union in
+// llmModels.types.ts, which also spells `responses` and `messages`.
+//
+// The union describes what is *representable*; this list describes what the
+// runtime can actually honor. The rewrite in reasoningcaps.go is written to
+// the chat-completions wire shape: it sets a top-level `reasoning_effort`
+// string and collapses the four alias spellings into it. On /v1/responses
+// that is wrong twice over — reasoning there is a nested
+// `reasoning: {effort, summary}` object, so the collapse would destroy a
+// legitimate request and replace it with a top-level key the endpoint
+// rejects. On /v1/messages Anthropic's field is `thinking`, with the same
+// problem.
+//
+// So a declaration naming those endpoints is refused HERE, at generation,
+// rather than being emitted and silently mis-rewritten at dispatch. That
+// matters more than a usual latent-bug guard: /v1/responses is the named
+// follow-up for the can't-disable case, so the next person in this code is
+// the most likely person to add such a declaration. They get a build-time
+// error naming the endpoint instead of a corrupted request body.
+//
+// Widening this list is the *last* step of teaching the runtime a new
+// endpoint, never the first.
+var knownEndpoints = []string{"chat_completions"}
 
 // Capability is one model's endpoint-scoped reasoning/tools conflict, as
 // the generated Go table needs it.

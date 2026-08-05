@@ -1,9 +1,14 @@
 package litellm
 
 import (
+	"context"
 	"reflect"
 	"slices"
 	"strings"
+
+	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/clog"
 )
 
 // Endpoint names the API surface a request is dispatched on. Reasoning
@@ -158,6 +163,32 @@ func EnforceReasoningToolCompat(modelID, endpoint string, body map[string]any) R
 	NormalizeReasoningEffort(body)
 	body["reasoning_effort"] = reasoningEffortDisabled
 	return ReasoningToolsDisabled
+}
+
+// Log writes the one canonical log line for a compat decision. Both call
+// sites (the proxy handler and the in-process executor) go through it, so
+// the same decision cannot surface under two event names at two levels —
+// which it did, leaving anything alerting on the irreconcilable path
+// seeing only half of them.
+//
+// One event name, with the outcome as a field: `outcome` is what you
+// filter on, and the level carries the urgency. Irreconcilable is the only
+// one worth waking up for, because it is the only one where a request goes
+// upstream that we know the provider will reject.
+func (o ReasoningToolOutcome) Log(ctx context.Context, modelID, endpoint string) {
+	if o == ReasoningToolsCompatible {
+		return
+	}
+	logger := clog.Get(ctx).With(
+		zap.String("model", modelID),
+		zap.String("endpoint", endpoint),
+		zap.String("outcome", o.String()),
+	)
+	if o == ReasoningToolsIrreconcilable {
+		logger.Warn("reasoning_tool_compat", zap.String("fault", "platform"))
+		return
+	}
+	logger.Info("reasoning_tool_compat")
 }
 
 // bodyCarriesTools reports whether the request declares function tools.

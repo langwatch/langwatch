@@ -3,15 +3,18 @@ import { describe, expect, it } from "vitest";
 import type { ModelEndpoint, ReasoningConfig } from "../llmModels.types";
 import { MODEL_ENDPOINTS } from "../llmModels.types";
 import { llmModels } from "../loadModelCatalog";
-import {
-  findUndeclaredReasoningModels,
-  resolveReasoningToolCompatibility,
-} from "../resolveSupportedParameters";
+import { findUndeclaredReasoningModels } from "../resolveSupportedParameters";
 
 /**
  * The family that took production down: the provider rejects reasoning
  * combined with function tools on /v1/chat/completions, and the scenario
  * judge always sends tools.
+ *
+ * The rule that acts on this lives in Go
+ * (services/nlpgo/adapters/litellm/reasoningcaps.go) and is tested there.
+ * These tests cover the half TypeScript still owns: that the registry data
+ * the Go table is generated FROM is coherent, and that a model arriving in
+ * the original broken state gets noticed.
  */
 const GPT_56_MODELS = [
   "openai/gpt-5.6-sol",
@@ -21,111 +24,6 @@ const GPT_56_MODELS = [
   "openai/gpt-5.6-terra",
   "openai/gpt-5.6-terra-pro",
 ];
-
-describe("resolveReasoningToolCompatibility", () => {
-  describe("when the model declares the conflict on this endpoint", () => {
-    /** @scenario a conflicting model sending tools has its reasoning turned off */
-    it("asks the caller to disable reasoning", () => {
-      for (const modelId of GPT_56_MODELS) {
-        expect(
-          resolveReasoningToolCompatibility({
-            modelId,
-            endpoint: "chat_completions",
-          }),
-        ).toEqual({
-          action: "disable-reasoning",
-          parameterName: "reasoning_effort",
-          value: "none",
-        });
-      }
-    });
-
-    /** @scenario the conflict is scoped to the endpoint it was declared on */
-    it("allows the same model on every other endpoint", () => {
-      const others = MODEL_ENDPOINTS.filter(
-        (endpoint) => endpoint !== "chat_completions",
-      );
-      for (const endpoint of others) {
-        expect(
-          resolveReasoningToolCompatibility({
-            modelId: "openai/gpt-5.6-sol",
-            endpoint,
-          }),
-        ).toEqual({ action: "allow" });
-      }
-    });
-  });
-
-  describe("when the model reasons but declares no conflict", () => {
-    /** @scenario a reasoning model with no declared conflict keeps its reasoning */
-    it("allows reasoning and tools together", () => {
-      // Each of these reasons, lists tools, and would be downgraded by a
-      // blanket "no reasoning when tools are present" rule.
-      for (const modelId of [
-        "openai/gpt-5.1",
-        "openai/gpt-5.2",
-        "openai/gpt-5",
-        "gemini/gemini-3.6-flash",
-        "anthropic/claude-opus-4-8-fast",
-      ]) {
-        expect(
-          resolveReasoningToolCompatibility({
-            modelId,
-            endpoint: "chat_completions",
-          }),
-        ).toEqual({ action: "allow" });
-      }
-    });
-  });
-
-  describe("when the model is not in the registry", () => {
-    it("allows the request rather than guessing", () => {
-      expect(
-        resolveReasoningToolCompatibility({
-          modelId: "custom/Qwen/Qwen2.5-32B-Instruct",
-          endpoint: "chat_completions",
-        }),
-      ).toEqual({ action: "allow" });
-    });
-  });
-
-  describe("when a conflicting model cannot disable reasoning", () => {
-    /** @scenario a model that cannot disable reasoning is passed through untouched */
-    it("reports the conflict as irreconcilable rather than silently degrading", () => {
-      // No registry entry is in this state today, so the case is built
-      // rather than looked up. It is representable on purpose: the rule
-      // has to have an answer for it before a model arrives in it.
-      const registry = llmModels.models as Record<
-        string,
-        { reasoningConfig?: ReasoningConfig }
-      >;
-      const modelId = "openai/gpt-5.6-fixture-locked";
-      registry[modelId] = {
-        reasoningConfig: {
-          supported: true,
-          parameterName: "reasoning_effort",
-          allowedValues: ["low", "medium", "high"],
-          defaultValue: "medium",
-          canDisable: false,
-          toolsIncompatibleOn: ["chat_completions"],
-        },
-      };
-      try {
-        expect(
-          resolveReasoningToolCompatibility({
-            modelId,
-            endpoint: "chat_completions",
-          }),
-        ).toEqual({
-          action: "irreconcilable",
-          parameterName: "reasoning_effort",
-        });
-      } finally {
-        delete registry[modelId];
-      }
-    });
-  });
-});
 
 describe("the model registry's reasoning capabilities", () => {
   const declared = Object.entries(llmModels.models).filter(
@@ -167,10 +65,36 @@ describe("the model registry's reasoning capabilities", () => {
     expect(inconsistent).toEqual([]);
   });
 
+  /**
+   * The runtime only knows how to rewrite chat-completions bodies, so a
+   * declaration naming another endpoint is refused by the generator
+   * (tools/modelcapsgen/registry.go). Pin the registry to that narrower
+   * set here too, otherwise such a declaration passes this file's
+   * consistency check and fails the Go build instead, which is a worse
+   * place to find out.
+   */
+  it("declares conflicts only on the endpoint the runtime can honour", () => {
+    const honoured = new Set(["chat_completions"]);
+    const unhonourable = declared.flatMap(([id, entry]) =>
+      (entry.reasoningConfig?.toolsIncompatibleOn ?? [])
+        .filter((endpoint) => !honoured.has(endpoint))
+        .map((endpoint) => `${id}: ${endpoint}`),
+    );
+    expect(unhonourable).toEqual([]);
+  });
+
   /** @scenario the gpt-5.6 family is no longer undeclared */
   it("no longer leaves the gpt-5.6 family undeclared", () => {
     const undeclared = findUndeclaredReasoningModels();
     expect(undeclared.filter((id) => id.includes("gpt-5.6"))).toEqual([]);
+  });
+
+  it("declares the whole gpt-5.6 family, not only the model seen failing", () => {
+    for (const modelId of GPT_56_MODELS) {
+      expect(
+        llmModels.models[modelId]?.reasoningConfig?.toolsIncompatibleOn,
+      ).toEqual(["chat_completions"]);
+    }
   });
 
   /**
@@ -179,9 +103,9 @@ describe("the model registry's reasoning capabilities", () => {
    * asserting that reasoning and tools work together without anyone
    * having checked. That is exactly how the gpt-5.6 family shipped
    * broken. This is a baseline, not a clean bill of health: the listed
-   * models are still undeclared and would need the same curation if we
-   * started dispatching reasoning to them. Adding to it is a decision,
-   * removing from it is progress.
+   * models remain undeclared and unverified, and would need the same
+   * curation if we started dispatching reasoning to them. Adding to it is
+   * a decision, removing from it is progress.
    */
   /** @scenario a reasoning-class model claiming tools with no capability is caught */
   it("catches reasoning-class models that claim tools with no capability declared", () => {

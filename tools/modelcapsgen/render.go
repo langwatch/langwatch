@@ -3,6 +3,7 @@ package modelcapsgen
 import (
 	"bytes"
 	"fmt"
+	"go/format"
 	"strconv"
 	"strings"
 )
@@ -29,15 +30,22 @@ const footer = `}
 `
 
 // Render returns the generated Go source for the capability table.
-func Render(capabilities []Capability) []byte {
+//
+// The output goes through go/format rather than being hand-aligned.
+// Hand-aligning struct field padding works only for as long as the
+// longest field name never changes: adding one longer field silently
+// leaves the generated file failing gofmt, which is a lint failure in a
+// file nobody edits and everybody skips reading. format.Source makes the
+// alignment the formatter's problem.
+func Render(capabilities []Capability) ([]byte, error) {
 	var out bytes.Buffer
 	out.WriteString(header)
 	for _, capability := range capabilities {
 		// Lowercased at generation so the runtime lookup, which
 		// lowercases the inbound model id, cannot miss on case alone.
 		key := strings.ToLower(capability.ModelID)
-		fmt.Fprintf(&out, "\t%s: {\n", strconv.Quote(key))
-		out.WriteString("\t\tconflictEndpoints: []string{")
+		fmt.Fprintf(&out, "%s: {\n", strconv.Quote(key))
+		out.WriteString("conflictEndpoints: []string{")
 		for i, endpoint := range capability.ConflictEndpoints {
 			if i > 0 {
 				out.WriteString(", ")
@@ -45,9 +53,14 @@ func Render(capabilities []Capability) []byte {
 			out.WriteString(strconv.Quote(endpoint))
 		}
 		out.WriteString("},\n")
-		fmt.Fprintf(&out, "\t\tcanDisable:        %t,\n", capability.CanDisable)
-		out.WriteString("\t},\n")
+		fmt.Fprintf(&out, "canDisable: %t,\n", capability.CanDisable)
+		out.WriteString("},\n")
 	}
 	out.WriteString(footer)
-	return out.Bytes()
+
+	formatted, err := format.Source(out.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("format generated source: %w", err)
+	}
+	return formatted, nil
 }
