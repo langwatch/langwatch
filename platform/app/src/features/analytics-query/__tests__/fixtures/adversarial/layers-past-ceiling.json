@@ -1,0 +1,53 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"layer": [
+		{
+			"mark": {
+				"type": "point"
+			}
+		},
+		{
+			"mark": {
+				"type": "point"
+			}
+		},
+		{
+			"mark": {
+				"type": "point"
+			}
+		},
+		{
+			"mark": {
+				"type": "point"
+			}
+		},
+		{
+			"mark": {
+				"type": "point"
+			}
+		},
+		{
+			"mark": {
+				"type": "point"
+			}
+		},
+		{
+			"mark": {
+				"type": "point"
+			}
+		},
+		{
+			"mark": {
+				"type": "point"
+			}
+		},
+		{
+			"mark": {
+				"type": "point"
+			}
+		}
+	]
+}
