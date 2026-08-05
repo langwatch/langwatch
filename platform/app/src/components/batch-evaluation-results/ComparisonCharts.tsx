@@ -1074,10 +1074,12 @@ export const ComparisonCharts = ({
   // digest of the ids and names is everything the pipeline below reacts to.
   // Keying on it instead of on the columns array keeps a parent re-render that
   // rebuilds the array around the same columns from re-firing the whole matrix
-  // pipeline, which walks every row of the run.
-  const targetColumnsKey = confusionMatrixColumns
-    .map((column) => `${column.id} ${column.name}`)
-    .join("");
+  // pipeline, which walks every row of the run. Serialised rather than joined
+  // on a separator, so no id or name can spell one and collide two different
+  // column sets into the same key.
+  const targetColumnsKey = JSON.stringify(
+    confusionMatrixColumns.map((column) => [column.id, column.name]),
+  );
 
   const targetNameById = useMemo(
     () =>
