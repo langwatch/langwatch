@@ -138,55 +138,44 @@ describe("createTenantRouter", () => {
     });
   });
 
-  describe("given a tenant that moves organisation", () => {
-    it("stops using the old organisation once the entry expires", async () => {
-      // The bug this replaces cached forever, so a moved project kept reading
-      // its previous organisation's ClickHouse until the process restarted.
-      let organizationId = "org_old";
-      let now = 0;
+  describe("given the same tenant resolved many times", () => {
+    it("asks the directory once, because the mapping cannot change", async () => {
+      // A project belongs to a team and a team to an organisation, and neither
+      // link is reassignable, so a resolved answer is final. There is nothing
+      // for an expiry to protect against; the bound below covers memory.
+      const organizationForTenant = vi.fn(async () => "org_1");
       const router = createTenantRouter({
-        table: tableOf({
-          org_old: "http://old:8123",
-          org_new: "http://new:8123",
-        }),
-        directory: { organizationForTenant: async () => organizationId },
-        cacheTtlMs: 1_000,
-        clock: { now: () => now },
+        table: tableOf({ org_1: "http://acme:8123" }),
+        directory: { organizationForTenant },
       });
 
-      await expect(router.route("project_1")).resolves.toMatchObject({
-        organizationId: "org_old",
-      });
+      for (let i = 0; i < 50; i++) {
+        await expect(router.route("project_1")).resolves.toMatchObject({
+          organizationId: "org_1",
+        });
+      }
 
-      organizationId = "org_new";
-      now = 1_001;
-
-      await expect(router.route("project_1")).resolves.toMatchObject({
-        organizationId: "org_new",
-        url: "http://new:8123",
-      });
+      expect(organizationForTenant).toHaveBeenCalledTimes(1);
     });
+  });
 
-    it("can be corrected immediately by invalidating the tenant", async () => {
-      let organizationId = "org_old";
+  describe("given a tenant that does not exist yet", () => {
+    it("does not cache the failure, so it routes once it is created", async () => {
+      let known = false;
       const router = createTenantRouter({
-        table: tableOf({
-          org_old: "http://old:8123",
-          org_new: "http://new:8123",
-        }),
-        directory: { organizationForTenant: async () => organizationId },
+        table: tableOf({}),
+        directory: {
+          organizationForTenant: async () => (known ? "org_1" : null),
+        },
       });
 
-      await expect(router.route("project_1")).resolves.toMatchObject({
-        organizationId: "org_old",
-      });
+      await expect(router.route("project_new")).rejects.toBeInstanceOf(
+        UnknownTenantError,
+      );
+      known = true;
 
-      organizationId = "org_new";
-      router.invalidate("project_1");
-
-      await expect(router.route("project_1")).resolves.toMatchObject({
-        organizationId: "org_new",
-        url: "http://new:8123",
+      await expect(router.route("project_new")).resolves.toEqual({
+        kind: "shared",
       });
     });
   });

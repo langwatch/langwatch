@@ -12,11 +12,11 @@
  * where a mistake is least visible - the query succeeds and returns plausible
  * rows.
  *
- * The lookup from tenant to organisation is cached, and the cache is bounded
- * and expiring. An unbounded cache that is never invalidated grows without
- * limit and, worse, pins a tenant to whichever organisation it had the first
- * time it was seen: move a project between organisations and it keeps reading
- * the old organisation's data until the process restarts.
+ * The lookup from tenant to organisation is cached and the cache is bounded.
+ * It does not expire, and that is deliberate rather than an omission: a
+ * project belongs to a team and a team to an organisation, and neither link is
+ * reassignable, so the answer is fixed once it is known. The bound exists for
+ * memory alone, since a long-lived worker sees a great many tenants.
  */
 
 /** Where a tenant's statements should be sent. */
@@ -107,49 +107,41 @@ export interface TenantDirectory {
   organizationForTenant(tenantId: string): Promise<string | null>;
 }
 
-export interface Clock {
-  now(): number;
-}
-
-export const systemClock: Clock = { now: () => Date.now() };
-
 export interface TenantRouterOptions {
   table: RoutingTable;
   directory: TenantDirectory;
   /**
-   * How long a tenant->organisation answer may be reused. Bounded because the
-   * mapping can change: a project can move organisation, and a stale answer
-   * routes it at the wrong instance for as long as it is kept.
+   * Bounds memory. The oldest entry is dropped past this.
+   *
+   * This is the only reason the cache evicts. A tenant's organisation is fixed
+   * at creation - a project belongs to a team, a team to an organisation, and
+   * nothing reassigns either - so a cached answer cannot go stale and there is
+   * no expiry to get right. What remains is a long-lived worker that sees many
+   * tenants, which without a bound grows this map for the life of the process.
    */
-  cacheTtlMs?: number | undefined;
-  /** Bounds memory. The least-recently-resolved entry is dropped past this. */
   maxCacheEntries?: number | undefined;
-  clock?: Clock | undefined;
 }
 
 export interface TenantRouter {
   route(tenantId: string): Promise<TenantRoute>;
-  /** Drop a cached mapping. Call when a tenant's organisation changes. */
-  invalidate(tenantId: string): void;
+  /**
+   * Drop every cached mapping. Nothing in normal operation needs this - the
+   * mapping is immutable - but it keeps a test deterministic and gives an
+   * operator a way to clear state after a directory misconfiguration.
+   */
   invalidateAll(): void;
   /** Entries currently cached; exposed so a caller can meter the bound. */
   size(): number;
 }
 
-const DEFAULT_CACHE_TTL_MS = 60_000;
 const DEFAULT_MAX_CACHE_ENTRIES = 10_000;
 
 export function createTenantRouter({
   table,
   directory,
-  cacheTtlMs = DEFAULT_CACHE_TTL_MS,
   maxCacheEntries = DEFAULT_MAX_CACHE_ENTRIES,
-  clock = systemClock,
 }: TenantRouterOptions): TenantRouter {
-  const cache = new Map<
-    string,
-    { organizationId: string; expiresAt: number }
-  >();
+  const cache = new Map<string, string>();
 
   const remember = (tenantId: string, organizationId: string): void => {
     // Map preserves insertion order, so the first key is the oldest write.
@@ -157,21 +149,18 @@ export function createTenantRouter({
       const oldest = cache.keys().next();
       if (!oldest.done) cache.delete(oldest.value);
     }
-    cache.set(tenantId, {
-      organizationId,
-      expiresAt: clock.now() + cacheTtlMs,
-    });
+    cache.set(tenantId, organizationId);
   };
 
   const organizationFor = async (tenantId: string): Promise<string> => {
     const cached = cache.get(tenantId);
-    if (cached !== undefined && cached.expiresAt > clock.now()) {
-      return cached.organizationId;
-    }
-    if (cached !== undefined) cache.delete(tenantId);
+    if (cached !== undefined) return cached;
 
     const resolved = await directory.organizationForTenant(tenantId);
     if (resolved === null || resolved === "") {
+      // Deliberately not cached. A tenant that does not exist yet is a
+      // different thing from one that never will, and caching the negative
+      // would make a newly created project unroutable until eviction.
       throw new UnknownTenantError(tenantId);
     }
     remember(tenantId, resolved);
@@ -187,9 +176,6 @@ export function createTenantRouter({
       return url === undefined
         ? { kind: "shared" }
         : { kind: "private", organizationId, url };
-    },
-    invalidate(tenantId) {
-      cache.delete(tenantId);
     },
     invalidateAll() {
       cache.clear();

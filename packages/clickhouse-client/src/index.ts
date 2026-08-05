@@ -63,7 +63,6 @@ export {
 export type { RetryNotice, RetryOptions } from "./retry";
 export { retry } from "./retry";
 export type {
-  Clock,
   RoutingTable,
   TenantDirectory,
   TenantRoute,
@@ -75,7 +74,6 @@ export {
   DuplicateRouteError,
   PRIVATE_ROUTE_ENV_PREFIX,
   parseRoutingTable,
-  systemClock,
   UnknownTenantError,
 } from "./tenancy";
 export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard";
