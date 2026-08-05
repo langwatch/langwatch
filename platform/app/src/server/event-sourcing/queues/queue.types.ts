@@ -99,6 +99,16 @@ export type DeduplicationStrategy<Payload> =
  */
 export interface JobDelivery {
   attempt: number;
+  /**
+   * True when this handler call is a later sub-batch of the SAME locked
+   * dispatch, after an earlier sub-batch of this delivery already committed
+   * (set by the GroupQueue's batch bisection). Delivery-scoped state written by
+   * the handler — the fold store's applied-event-id set — must be EXTENDED on a
+   * continuation, never replaced: each commit in the chain only carries its own
+   * sub-batch's ids, and replacing would erase the ids the earlier commits
+   * recorded, letting a retry re-apply them (#6578).
+   */
+  continuation?: boolean;
 }
 
 /**

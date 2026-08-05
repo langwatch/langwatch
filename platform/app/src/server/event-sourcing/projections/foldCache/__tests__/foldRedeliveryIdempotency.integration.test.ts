@@ -43,7 +43,10 @@ import {
 import { createTenantId } from "../../../domain/tenantId";
 import type { Event } from "../../../domain/types";
 import { GroupQueueProcessor } from "../../../queues/groupQueue/groupQueue";
-import type { EventSourcedQueueDefinition } from "../../../queues/queue.types";
+import type {
+  EventSourcedQueueDefinition,
+  JobDelivery,
+} from "../../../queues/queue.types";
 import { createMockFoldProjectionDefinition } from "../../../services/__tests__/testHelpers";
 import type { FoldProjectionStore } from "../../foldProjection.types";
 import { FoldProjectionExecutor } from "../../foldProjectionExecutor";
@@ -140,6 +143,29 @@ function toEvent(
   } as unknown as Event;
 }
 
+/**
+ * Pre-fold rejector for the bisection scenario: fails any batch carrying the
+ * poison id while failures remain, and records every delivery it sees.
+ * Module-level so the test body stays within the complexity gate.
+ */
+function makePoisonRejector({
+  poisonId,
+  poison,
+  deliveries,
+}: {
+  poisonId: string;
+  poison: { failuresLeft: number };
+  deliveries: JobDelivery[];
+}) {
+  return (jobs: FoldJob[], delivery?: JobDelivery) => {
+    if (delivery) deliveries.push(delivery);
+    const poisoned = jobs.some((job) => job.eventId === poisonId);
+    if (!poisoned || poison.failuresLeft <= 0) return;
+    poison.failuresLeft--;
+    throw new Error("unprocessable while the poison id is present");
+  };
+}
+
 describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
   let redis: Redis;
   const queues: GroupQueueProcessor<FoldJob>[] = [];
@@ -184,6 +210,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     aggregateId = AGGREGATE,
     tenantId = TENANT,
     durableFactory = createDurableStore,
+    rejectBefore,
   }: {
     keyPrefix: string;
     failFirstBatch?: boolean;
@@ -193,6 +220,13 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     aggregateId?: string;
     tenantId?: ReturnType<typeof createTenantId>;
     durableFactory?: DurableStoreFactory;
+    /**
+     * Pre-fold failure: called before the fold runs; a throw models a batch
+     * the handler cannot process at all (nothing stored). This is the shape
+     * bisection splits on — unlike `failures`, which models the post-store
+     * redelivery window.
+     */
+    rejectBefore?: (jobs: FoldJob[], delivery?: JobDelivery) => void;
   }) {
     const durable = durableFactory();
     const cached = new RedisCachedFoldStore<CounterState>(
@@ -230,15 +264,17 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
       ? Number.POSITIVE_INFINITY
       : (failures ?? (failFirstBatch ? 1 : 0));
 
-    const runBatch = async (
-      jobs: FoldJob[],
-      delivery?: { attempt: number },
-    ) => {
+    const runBatch = async (jobs: FoldJob[], delivery?: JobDelivery) => {
+      rejectBefore?.(jobs, delivery);
       applied.push(jobs.map((job) => job.eventId));
       await executor.executeBatch(
         fold,
         jobs.map((job) => toEvent(job, aggregateId, tenantId)),
-        { ...context, deliveryAttempt: delivery?.attempt },
+        {
+          ...context,
+          deliveryAttempt: delivery?.attempt,
+          deliveryContinuation: delivery?.continuation,
+        },
       );
       if (failuresLeft > 0) {
         failuresLeft--;
@@ -724,6 +760,71 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
         const ids = await readAppliedIds();
         expect(ids).toEqual(["batch3-e0"]);
       }, 60_000);
+    });
+
+    describe("given a bisected batch whose later sub-batch fails", () => {
+      /**
+       * The #6578 scenario: the whole batch fails pre-fold, bisection commits
+       * two prefix leaves as SEPARATE fold writes within the same locked
+       * dispatch, the final singleton fails, and the queue redelivers. Without
+       * the continuation flag the second leaf's commit REPLACES the applied
+       * set, erasing the first leaf's ids, and the retry double-applies them —
+       * final count 6, not 4. This drives the real GroupQueue bisection, the
+       * real executor, and the real cached store end to end.
+       */
+      it("extends the applied set across leaves so the retry folds each event exactly once", async () => {
+        // root, [c2,c3], [c3] — the fourth c3-carrying delivery passes.
+        const poison = { failuresLeft: 3 };
+        const deliveries: JobDelivery[] = [];
+        const { queue, durable, order, applied } = createFoldQueue({
+          keyPrefix: "it_bisect_chain",
+          coalesce: 10,
+          rejectBefore: makePoisonRejector({
+            poisonId: "c3",
+            poison,
+            deliveries,
+          }),
+        });
+        await queue.waitUntilReady();
+
+        // Future-dated so all four are STAGED before any becomes due — staging
+        // races the dispatcher, and a root batch that only coalesces a subset
+        // never exercises the multi-event leaf this scenario is about.
+        const base = Date.now() + 750;
+        await queue.sendBatch(
+          ["c0", "c1", "c2", "c3"].map((eventId, index) => ({
+            eventId,
+            groupId: AGGREGATE,
+            occurredAt: base + index,
+          })),
+        );
+
+        // Dispatch 1 walks: [c0..c3] fails → [c0,c1] commits (replace) →
+        // [c2,c3] fails → [c2] commits (continuation → merge) → [c3] fails →
+        // redelivery. Attempt 2 folds ONLY what the applied set does not
+        // already hold.
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(4), {
+          timeout: 20_000,
+          interval: 50,
+        });
+
+        // The descent this scenario depends on actually happened: the root
+        // coalesced all four, and the committing prefix leaf carried MORE than
+        // one event (a single-event leaf takes the single-event executor path
+        // and cannot reproduce the replace-vs-extend hazard).
+        expect(applied[0]).toEqual(["c0", "c1"]);
+
+        // Every event folded exactly once across the whole story — the
+        // assertion that fails (count 6, duplicates for c0/c1) if a leaf
+        // commit replaces the applied set instead of extending it.
+        expect([...order].sort()).toEqual(["c0", "c1", "c2", "c3"]);
+
+        // The mechanism, not just the outcome: the leaf that committed after
+        // the first successful leaf carried the continuation flag.
+        expect(
+          deliveries.some((delivery) => delivery.continuation === true),
+        ).toBe(true);
+      }, 40_000);
     });
 
     describe("given a retry chain that has not yet acked", () => {

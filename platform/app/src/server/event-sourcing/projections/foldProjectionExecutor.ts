@@ -276,7 +276,18 @@ export class FoldProjectionExecutor {
     loadedAppliedIds: readonly string[];
     freshIds: readonly string[];
   }): string[] {
-    return (context.deliveryAttempt ?? 1) > 1
+    // Replace ONLY on the first commit of a fresh delivery — that is the
+    // garbage collection that keeps the applied set bounded at one delivery's
+    // ids instead of growing forever. Everything else extends:
+    // - a retry (attempt > 1) must keep what earlier attempts recorded, or the
+    //   redelivery re-applies it;
+    // - a continuation (a later sub-batch of the same locked dispatch, from
+    //   batch bisection) must keep what the earlier sub-batches recorded — each
+    //   commit only carries its own sub-batch's ids, and replacing would erase
+    //   the rest of the chain, so a redelivery after a failed later sub-batch
+    //   would double-apply the committed prefix (#6578).
+    const isRetry = (context.deliveryAttempt ?? 1) > 1;
+    return isRetry || context.deliveryContinuation
       ? mergeAppliedEventIds({ previous: loadedAppliedIds, applied: freshIds })
       : [...freshIds];
   }

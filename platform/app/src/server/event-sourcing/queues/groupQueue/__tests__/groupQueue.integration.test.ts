@@ -17,7 +17,10 @@ import {
 } from "../../../__tests__/integration/testContainers";
 import { ConfigurationError } from "../../../services/errorHandling";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
-import { GroupQueueProcessor } from "../groupQueue";
+import {
+  GroupQueueProcessor,
+  MAX_BISECTION_SPLITS_PER_DISPATCH,
+} from "../groupQueue";
 
 async function foreignSiblingsRestagedCount(
   queueName: string,
@@ -1111,6 +1114,73 @@ describe.skipIf(!hasTestcontainers)(
           await new Promise((resolve) => setTimeout(resolve, 500));
           expect(attempts.every((n) => n === attempts[0])).toBe(true);
           expect(Math.min(...attempts)).toBeGreaterThan(1);
+        });
+      });
+
+      describe("when a batch degrades toward singletons", () => {
+        // Driven through the bisector directly rather than via staged dispatch:
+        // how large a root the drain assembles varies with staging timing, and
+        // this contract — bounded work per locked attempt — must hold for any
+        // shape, so the test pins it on the worst one deterministically.
+        it("stops splitting at the budget and rethrows to the retry path", async () => {
+          const sizes: number[] = [];
+          const queue = createQueue(async () => {}, {
+            processBatch: async (ps) => {
+              sizes.push(ps.length);
+              // Only singletons fit: without a budget this walks the entire
+              // tree — 127 calls for 64 payloads — inside one locked attempt.
+              if (ps.length > 1) {
+                throw new Error("only singletons fit");
+              }
+            },
+            coalesceMaxBatch: () => 64,
+          });
+          await queue.waitUntilReady();
+
+          const entries = Array.from({ length: 64 }, (_, i) => ({
+            payload: { id: `j${i}`, groupId: "group-a", value: String(i) },
+            stagedJobId: `job-${i}`,
+          }));
+          const span = {
+            addEvent: () => {},
+            setAttribute: () => {},
+          } as never;
+
+          await expect(
+            (
+              queue as unknown as {
+                processBatchBisecting: (args: {
+                  entries: typeof entries;
+                  attempt: number;
+                  routingLabels: Record<string, string>;
+                  span: never;
+                }) => Promise<void>;
+              }
+            ).processBatchBisecting({
+              entries,
+              attempt: 1,
+              routingLabels: {
+                queue_name: "q",
+                pipeline_name: "p",
+                job_type: "t",
+                job_name: "n",
+              },
+              span,
+            }),
+          ).rejects.toThrow("only singletons fit");
+
+          // Splits are the calls that failed with more than one payload; the
+          // budget caps them at MAX_BISECTION_SPLITS_PER_DISPATCH. Total calls
+          // stay far below the 127-call full walk that completing without a
+          // budget would require — and the throw above is the yield itself:
+          // the dispatch fails to the normal restage/backoff machinery instead
+          // of finishing the walk under the group lock.
+          const splits = sizes.filter((n) => n > 1).length;
+          expect(splits).toBeLessThanOrEqual(
+            MAX_BISECTION_SPLITS_PER_DISPATCH + 1,
+          );
+          expect(sizes.length).toBeLessThan(80);
+          expect(sizes.length).toBeGreaterThan(5);
         });
       });
 

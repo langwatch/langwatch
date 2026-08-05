@@ -99,6 +99,24 @@ import {
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
 
 /**
+ * Splits one dispatch may perform before bisection gives up and lets the
+ * normal retry/backoff path take over. Sized to cover every useful descent
+ * (isolating one poison payload in a 256 batch costs 8 splits; converging to
+ * sub-batches of 8 costs 31) while cutting off the pathological
+ * singleton-degradation walk (~2N calls) that would otherwise run under the
+ * group lock for the whole tree.
+ */
+export const MAX_BISECTION_SPLITS_PER_DISPATCH = 32;
+
+/** Mutable state shared across one dispatch's bisection descent. */
+interface BisectionDispatchState {
+  /** True once any sub-batch of this dispatch committed successfully. */
+  committed: boolean;
+  /** Splits performed so far — compared against the budget above. */
+  splits: number;
+}
+
+/**
  * How long the group's retry-chain counter survives without a refresh.
  *
  * It is re-set on every retry, so it only has to outlive ONE backoff — but it
@@ -1809,13 +1827,24 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * explicit decision about the gap, which is the side-lining work in #6482.
    *
    * Re-running a payload that already applied is safe — fold redelivery is
-   * idempotent via the store's applied-event-id set (#6016) — which is what
-   * makes a partially-applied batch a recoverable state rather than a
-   * double-count. Bisection therefore does not widen the known residual there
-   * (a lost cache can still double-count), it only reaches it by a new route.
+   * idempotent via the store's applied-event-id set (#6016) — but ONLY because
+   * every sub-batch call after the first successful commit carries
+   * `delivery.continuation`, which tells the fold commit to EXTEND that set
+   * rather than replace it. Without the flag, each sub-batch commit would erase
+   * the ids the earlier sub-batches recorded, and a retry after a failed later
+   * sub-batch would re-apply the committed prefix (#6578).
    *
    * Non-retryable failures are NOT split: they will fail identically at every
    * size, so bisecting one only multiplies the work before the same verdict.
+   *
+   * Work within one locked attempt is BOUNDED. Splitting happens while this
+   * job holds the group's active key (heartbeat-renewed), so an unbounded
+   * descent — a handler that only accepts singletons turns a full batch into
+   * ~2N sequential calls — would hold the group lock and a worker slot for the
+   * whole walk instead of yielding to retry/backoff. After
+   * MAX_BISECTION_SPLITS_PER_DISPATCH splits the current failure propagates
+   * un-split: committed prefixes stay committed, the failed remainder re-stages
+   * through the normal failure path, and backoff takes over.
    */
   private async processBatchBisecting({
     entries,
@@ -1823,6 +1852,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     routingLabels,
     span,
     narrowed = false,
+    dispatch = { committed: false, splits: 0 },
   }: {
     /**
      * Payloads paired with the staged job each came from, so a failure that
@@ -1837,6 +1867,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     span: Span;
     /** True in a recursive call — i.e. this batch is the product of a split. */
     narrowed?: boolean;
+    /**
+     * State shared across the whole descent of ONE dispatch, deliberately
+     * mutable: `committed` flips once the first sub-batch commits (every later
+     * call is a continuation and must carry the flag — see JobDelivery), and
+     * `splits` is the call budget that bounds work under the group lock.
+     */
+    dispatch?: BisectionDispatchState;
   }): Promise<void> {
     if (!this.processBatch) {
       throw new Error("processBatchBisecting called without a batch handler");
@@ -1845,8 +1882,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     try {
       await this.processBatch(
         entries.map((entry) => entry.payload),
-        { attempt },
+        { attempt, ...(dispatch.committed ? { continuation: true } : {}) },
       );
+      dispatch.committed = true;
     } catch (err) {
       await this.splitFailedBatch({
         entries,
@@ -1854,6 +1892,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         routingLabels,
         span,
         narrowed,
+        dispatch,
         err,
       });
     }
@@ -1873,6 +1912,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     routingLabels,
     span,
     narrowed,
+    dispatch,
     err,
   }: {
     entries: { payload: Payload; stagedJobId: string }[];
@@ -1880,6 +1920,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     routingLabels: Record<string, string>;
     span: Span;
     narrowed: boolean;
+    dispatch: BisectionDispatchState;
     err: unknown;
   }): Promise<void> {
     // Fails the same way at every size, so splitting only multiplies the work
@@ -1899,6 +1940,34 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       });
       throw err;
     }
+
+    // Call budget: splitting runs under the group's heartbeat-renewed active
+    // key, so a batch degrading toward singletons must not walk the whole tree
+    // (~2N sequential handler calls for N payloads) inside one locked attempt.
+    // Past the budget the failure propagates un-split: committed prefixes stay
+    // committed, the remainder re-stages via the normal failure path, and
+    // exponential backoff takes over. The budget comfortably covers the useful
+    // descents — isolating one poison payload in a 256 batch costs 8 splits,
+    // converging to sub-batches of 8 costs 31 — and cuts off only the
+    // pathological walk where backoff is the right behaviour anyway.
+    if (dispatch.splits >= MAX_BISECTION_SPLITS_PER_DISPATCH) {
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          batchSize: entries.length,
+          splits: dispatch.splits,
+          attempt,
+          error: err instanceof Error ? err : new Error(String(err)),
+        },
+        "Bisection split budget exhausted; failing the remainder to the normal retry path",
+      );
+      span.addEvent("queue.batch_bisection_budget_exhausted", {
+        "queue.batch_size": entries.length,
+        "queue.batch_splits": dispatch.splits,
+      });
+      throw err;
+    }
+    dispatch.splits += 1;
 
     const mid = Math.ceil(entries.length / 2);
     gqBatchBisectionsTotal.inc(routingLabels);
@@ -1924,6 +1993,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       routingLabels,
       span,
       narrowed: true,
+      dispatch,
     });
     await this.processBatchBisecting({
       entries: entries.slice(mid),
@@ -1931,6 +2001,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       routingLabels,
       span,
       narrowed: true,
+      dispatch,
     });
   }
 
