@@ -84,10 +84,40 @@ jobs:
           IS_RELEASE="false"
           IMAGE_TAG="git-${SHORT_HASH}"
 
+          # Both branches below turn external input into a Docker tag. Reject a
+          # malformed one here, where the run has cost nothing, rather than at
+          # the manifest step after eight images have already been pushed.
+          #
+          # `case` rather than `grep -E '^…$'`: grep matches line by line, so a
+          # value whose FIRST line is well formed passes even when the rest is
+          # not — and a newline is the input that matters most here, because the
+          # `key=value` writes below are line-oriented and a second line would
+          # define further step outputs. A shell glob matches the whole string,
+          # newlines included.
+          assert_docker_tag() {
+            case "$2" in
+              "") echo "::error::$1 is empty"; exit 1 ;;
+              *[!A-Za-z0-9._-]* | [!A-Za-z0-9_]*)
+                echo "::error::$1 must match ^[A-Za-z0-9_][A-Za-z0-9._-]*$"; exit 1 ;;
+            esac
+            if [ "${#2}" -gt 128 ]; then
+              echo "::error::$1 is longer than the 128 characters a Docker tag allows"; exit 1
+            fi
+          }
+
           if [ "${EVENT_NAME}" = "release" ]; then
+            # The gate on this job accepts any `langwatch@` tag, including one
+            # without the `v`. The prefix strip below would then leave VERSION as
+            # the whole ref, and `@` is not a legal tag character.
+            case "${GITHUB_REF}" in
+              refs/tags/langwatch@v*) ;;
+              *) echo "::error::release ref ${GITHUB_REF} is not a langwatch@v* tag"; exit 1 ;;
+            esac
             VERSION="${GITHUB_REF#refs/tags/langwatch@v}"
+            assert_docker_tag "release version" "${VERSION}"
             IS_RELEASE="true"
           elif [ "${EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${INPUT_IMAGE_TAG}" ]; then
+            assert_docker_tag "image_tag" "${INPUT_IMAGE_TAG}"
             IMAGE_TAG="${INPUT_IMAGE_TAG}"
           fi
 
@@ -105,12 +135,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: meta
     outputs:
-      # A JSON `include:` list, one entry per (image, arch) still worth building,
-      # and the matching list of image names. These are matrices rather than four
-      # booleans because `jobs.<job_id>.if` cannot read the `matrix` context, so a
+      # A JSON `include:` list, one entry per (image, arch) worth rebuilding, and
+      # the matching list of image names. A matrix rather than four booleans
+      # because `jobs.<job_id>.if` cannot read the `matrix` context, so a
       # per-image gate has to be applied before the matrix is expanded.
+      #
+      # `built` is NOT the set of images that get a tag this run — every image
+      # gets one, see create-manifest. It is only the set that needs rebuilding.
       build-matrix: ${{ steps.select.outputs.build-matrix }}
-      images: ${{ steps.select.outputs.images }}
+      built: ${{ steps.select.outputs.built }}
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
@@ -202,7 +235,7 @@ jobs:
           )
 
           if [ "${IS_PUSH}" = "true" ]; then
-            IMAGES=$(jq -cn \
+            BUILT=$(jq -cn \
               --arg app "${LANGWATCH_APP}" \
               --arg nlp "${LANGWATCH_NLP_SERVICE}" \
               --arg evals "${LANGWATCH_LANGEVALS}" \
@@ -213,18 +246,18 @@ jobs:
                  "langwatch-gateway": $gateway}
                 | to_entries[] | select(.value == "true") | .key]')
           else
-            IMAGES=$(printf '%s' "${ALL}" | jq -c '[.[].image] | unique')
+            BUILT=$(printf '%s' "${ALL}" | jq -c '[.[].image] | unique')
           fi
 
-          MATRIX=$(printf '%s' "${ALL}" | jq -c --argjson images "${IMAGES}" \
-            '[.[] | select(.image as $i | $images | index($i))]')
-
-          echo "images=${IMAGES}" >> "$GITHUB_OUTPUT"
-          echo "build-matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
+          MATRIX=$(printf '%s' "${ALL}" | jq -c --argjson built "${BUILT}" \
+            '[.[] | select(.image as $i | $built | index($i))]')
 
           {
-            echo "Images selected: ${IMAGES}"
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "built=${BUILT}"
+            echo "build-matrix=${MATRIX}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Images to rebuild: ${BUILT}" >> "$GITHUB_STEP_SUMMARY"
 
   build-and-push:
     needs: [meta, changes]
@@ -294,9 +327,23 @@ jobs:
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
 
+  # EVERY image gets this commit's tag, including the ones the path filter
+  # skipped. The point of the whole workflow is that SaaS can pin one `git-<sha>`
+  # across the whole deployment; if a docs-plus-gateway commit published
+  # `langwatch-gateway:git-abc` and nothing else, that pin would fail to resolve
+  # for the other three. A skipped image is re-tagged from the manifest it
+  # already has, which costs a manifest PUT and no build.
+  #
+  # `!cancelled()` because build-and-push reports `skipped` when nothing needed
+  # rebuilding, and this job still has four tags to write in that case. It brings
+  # the implicit "all needs succeeded" check with it, hence the explicit results.
   create-manifest:
     needs: [meta, changes, build-and-push]
-    if: needs.changes.outputs.images != '[]'
+    if: >-
+      ${{ !cancelled()
+          && needs.meta.result == 'success'
+          && needs.changes.result == 'success'
+          && needs.build-and-push.result != 'failure' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -304,7 +351,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: ${{ fromJSON(needs.changes.outputs.images) }}
+        image:
+          - langwatch-app
+          - langwatch-nlp-service
+          - langwatch-langevals
+          - langwatch-gateway
     steps:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
@@ -329,24 +380,50 @@ jobs:
 
       # No `:latest` here, on purpose — see the header. The SaaS pipeline owns
       # that tag on these repositories.
-      - name: Create multi-arch manifest
+      - name: Publish this commit's tag
         env:
           IMAGE: ${{ matrix.image }}
           REPO: ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}
+          BUILT: ${{ needs.changes.outputs.built }}
           IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
           IS_RELEASE: ${{ needs.meta.outputs.is_release }}
           VERSION: ${{ needs.meta.outputs.version }}
         run: |
           set -euo pipefail
-          docker buildx imagetools create -t "${REPO}:${IMAGE_TAG}" \
-            "${REPO}:${IMAGE_TAG}-amd64" \
-            "${REPO}:${IMAGE_TAG}-arm64"
+
+          if printf '%s' "${BUILT}" | jq -e --arg i "${IMAGE}" 'index($i)' >/dev/null; then
+            # Rebuilt this run: assemble the index from the per-arch tags.
+            SOURCES=("${REPO}:${IMAGE_TAG}-amd64" "${REPO}:${IMAGE_TAG}-arm64")
+          else
+            # Not rebuilt: point this commit's tag at the index already published
+            # for the last commit that did change this image. `imagetools create`
+            # from a single index copies it, so this writes a manifest and moves
+            # no layers.
+            #
+            # Newest first, bare `git-<sha>` only — the per-arch `-amd64` /
+            # `-arm64` tags are pushed just before their index and are not
+            # multi-arch, so matching one here would publish a single-arch image
+            # under a tag consumers expect to be multi-arch.
+            PREVIOUS=$(aws ecr describe-images --repository-name "${IMAGE}" \
+              --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
+              --output text \
+              | tr '\t' '\n' | grep -E '^git-[0-9a-f]+$' | head -n 1 || true)
+
+            if [ -z "${PREVIOUS}" ]; then
+              # Expected until every image has been published once. A dispatch
+              # run builds all four and seeds them.
+              echo "::warning::${IMAGE} has no previous git-* manifest to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"
+              exit 0
+            fi
+            echo "Re-tagging ${IMAGE} ${PREVIOUS} -> ${IMAGE_TAG} (unchanged by this commit)"
+            SOURCES=("${REPO}:${PREVIOUS}")
+          fi
+
+          docker buildx imagetools create -t "${REPO}:${IMAGE_TAG}" "${SOURCES[@]}"
 
           TAGS="${IMAGE_TAG}"
           if [ "${IS_RELEASE}" = "true" ]; then
-            docker buildx imagetools create -t "${REPO}:${VERSION}" \
-              "${REPO}:${IMAGE_TAG}-amd64" \
-              "${REPO}:${IMAGE_TAG}-arm64"
+            docker buildx imagetools create -t "${REPO}:${VERSION}" "${SOURCES[@]}"
             TAGS="${TAGS}, ${VERSION}"
           fi
 
