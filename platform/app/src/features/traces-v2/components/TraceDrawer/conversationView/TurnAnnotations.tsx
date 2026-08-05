@@ -4,6 +4,7 @@ import {
   Edit3,
   Languages,
   Lightbulb,
+  ListPlus,
   MessageSquare,
 } from "lucide-react";
 import { forwardRef, useState } from "react";
@@ -15,6 +16,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import { AddToAnnotationQueueDialog } from "../../annotationQueue/AddToAnnotationQueueDialog";
 import { AnnotationPopover } from "./AnnotationPopover";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
@@ -51,6 +53,7 @@ export function TurnActionRow({
   const [openPopover, setOpenPopover] = useState<"annotate" | "suggest" | null>(
     null,
   );
+  const [queueDialogOpen, setQueueDialogOpen] = useState(false);
 
   const canManage = hasPermission("annotations:manage");
 
@@ -170,6 +173,34 @@ export function TurnActionRow({
               <Text textStyle="2xs">Dataset</Text>
             </Button>
           </Tooltip>
+          {/* Each turn is its own trace, so this reaches traces the header's
+              annotation-queue button (open trace only) cannot. */}
+          <Tooltip
+            content="Add this turn to an annotation queue"
+            positioning={{ placement: "top" }}
+          >
+            <Button
+              size="2xs"
+              variant="ghost"
+              color="fg.muted"
+              gap={1}
+              paddingX={2}
+              onClick={async (e) => {
+                e.stopPropagation();
+                const allowed = await annotationsGate.requestEnable();
+                if (!allowed) return;
+                setQueueDialogOpen(true);
+              }}
+            >
+              <Icon as={ListPlus} boxSize={3} />
+              <Text textStyle="2xs">Queue</Text>
+            </Button>
+          </Tooltip>
+          <AddToAnnotationQueueDialog
+            open={queueDialogOpen}
+            onClose={() => setQueueDialogOpen(false)}
+            traceIds={[traceId]}
+          />
         </>
       )}
       <PersonalFeatureGateDialog state={annotationsGate.dialogState} />

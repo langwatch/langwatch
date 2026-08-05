@@ -91,6 +91,23 @@ Feature: Add traces to an annotation queue
       Then an error notice appears
       And the dialog stays open so the user can retry
 
+  Rule: Flagging a single turn from a conversation
+
+    # Each turn in a conversation is its own trace, so this reaches traces
+    # the header button (open trace only) cannot.
+
+    Scenario: A turn can be sent to a queue from its action row
+      Given the user is reading a conversation in the drawer
+      When the user picks "Queue" on a turn
+      And picks a teammate or a queue
+      And confirms the send
+      Then that turn's trace is queued
+
+    Scenario: The turn action gates like the other entry points
+      Given the user is on their own personal workspace with annotations off
+      When the user picks "Queue" on a turn
+      Then the user is asked to enable the advanced features first
+
   # ─── Permissions ────────────────────────────────────────────────────────
 
   Rule: Only reviewers who can manage annotations see the action
