@@ -314,6 +314,9 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
 
       expect(result.rejectedSpans).toBe(1);
       expect(result.errorMessage).toContain("span validation failed");
+      // The safe Zod issue paths are exposed so a misconfigured SDK learns
+      // which field to fix — values and raw messages stay server-side.
+      expect(result.errorMessage).toContain("spanId");
       // Sanity: the error message is bounded — even if 100 spans fail
       // identically, the output stays short.
       expect(result.errorMessage.length).toBeLessThan(500);

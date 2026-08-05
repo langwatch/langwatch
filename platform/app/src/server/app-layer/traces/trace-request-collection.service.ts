@@ -420,9 +420,18 @@ export class TraceRequestCollectionService {
       );
     }
     if (!spanParseResult.data) {
+      const fieldPaths = [
+        ...new Set(
+          (spanParseResult.error?.issues ?? [])
+            .map((issue) => issue.path.join("."))
+            .filter((path) => path.length > 0),
+        ),
+      ].sort();
       return {
         status: "dropped",
-        error: PUBLIC_REJECTION_MESSAGE.validation,
+        error: fieldPaths.length
+          ? `${PUBLIC_REJECTION_MESSAGE.validation}: ${fieldPaths.join(", ")}`
+          : PUBLIC_REJECTION_MESSAGE.validation,
         dropReason: "validation",
       };
     }
