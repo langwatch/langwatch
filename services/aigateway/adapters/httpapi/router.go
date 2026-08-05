@@ -73,6 +73,13 @@ type RouterDeps struct {
 	// answer 503: a gateway that cannot observe its control plane must not
 	// report itself healthy to a public status page.
 	Status StatusReporter
+	// ControlPlaneBaseURL is the resolved control-plane target this
+	// gateway process ships spend, budget and auth traffic to. Surfaced
+	// read-only on GET /debug/control-plane so dev tooling can tell a
+	// stale or foreign gateway apart from this worktree's own before
+	// reusing an already-bound port (specs/setup/
+	// aigateway-control-plane-target.feature).
+	ControlPlaneBaseURL string
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -115,6 +122,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 	if deps.Metrics != nil {
 		r.Handle("/metrics", deps.Metrics.Handler())
 	}
+
+	// Unauthenticated and kept off the public ingress the same way as the
+	// probes and /metrics above (charts/gateway/templates/ingress.yaml
+	// allowlists only /v1 and the exact /health path). Reveals nothing but
+	// a URL: dev tooling polls it to verify an already-running gateway
+	// before trusting it on a reused port.
+	r.Get("/debug/control-plane", debugControlPlaneHandler(deps.ControlPlaneBaseURL))
 
 	r.Route("/v1", func(v1 chi.Router) {
 		v1.Use(AuthMiddleware(deps.App.Auth()))

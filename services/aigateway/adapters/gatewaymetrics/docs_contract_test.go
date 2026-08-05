@@ -81,9 +81,10 @@ var notMetrics = map[string]string{
 	"gateway_scope_org_mismatch":          "REST error code",
 	"gateway_budget_cycle_anchor_invalid": "REST error code",
 
-	// SDK accessors. The API pages show the Python and TypeScript spellings
-	// side by side, so the snake_case half reads as metric-shaped.
-	"gateway_budgets": "Python SDK accessor (`langwatch.gateway_budgets`)",
+	// SDK facade names. The python SDK exposes each resource as a
+	// snake_case attribute, so a documented call reads as a
+	// `gateway_`-prefixed token without naming a series.
+	"gateway_budgets": "python SDK facade name",
 }
 
 // plannedMetrics are names the docs explicitly describe as not yet
