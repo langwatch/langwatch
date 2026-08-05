@@ -9,6 +9,9 @@
 #   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/EditedOriginalToggle.tsx (edited vs original)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/TraceEditDiffDialog.tsx          (unified diff)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/AttributeTable.tsx               (editable span params)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/TraceEditableInput.tsx  (trace input editor)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/useTraceMetadataEditing.ts (trace metadata editor)
+#   platform/app/src/server/traces/edit-overlay/traceMetadataEditableKeys.ts                    (which metadata keys are editable)
 #
 # Motivation: a reviewer curating production traces into an evaluation dataset
 # needs to correct the trace where they are already reading it. Bouncing to a
@@ -33,6 +36,17 @@
 #     changed, and can open a full diff.
 #   - Editing does not fight privacy. A redacted or restricted field carries no
 #     editor, because there is nothing on screen to correct.
+#   - The trace's own input is corrected beside its output. A dataset row is
+#     built from both, so a reviewer fixing a mislabelled question had to leave
+#     the drawer for the dataset editor to do it.
+#   - Trace metadata is corrected in place, except for the keys that decide
+#     where the trace belongs: the platform's own `langwatch.` namespace, and
+#     the grouping keys a conversation, a user, a customer or a scenario run is
+#     assembled from. Correcting those would re-parent the trace, which a
+#     correction read on top of the captured trace cannot honor.
+#   - A correction carries only what the reviewer actually changed. Touching a
+#     field and putting it back leaves nothing behind, and a field the reviewer
+#     never touched is never written, so nothing reads as edited that is not.
 
 Feature: Editing a trace in the drawer
   As a reviewer curating production traces
@@ -312,6 +326,138 @@ Feature: Editing a trace in the drawer
     Scenario: An attribute hidden from me carries no editor
       Given I am editing a span with an attribute I am not allowed to read
       Then that attribute cannot be edited
+
+  Rule: The trace's own input is corrected beside its output
+
+    @integration
+    Scenario: The trace input carries an editor while editing
+      Given I am editing the trace
+      When I read the summary
+      Then the trace input can be edited there
+      And the trace output can be edited there
+
+    @unit
+    Scenario: Correcting the trace input counts as a change
+      Given I am editing the trace
+      When I rewrite the trace input
+      Then there is one field to save
+      And the correction carries the rewritten trace input
+
+    @unit
+    Scenario: Typing the trace input back leaves nothing to save
+      Given I am editing the trace
+      And I have rewritten the trace input
+      When I type the captured input back
+      Then there is nothing to save
+
+    @integration
+    Scenario: A redacted trace input carries no editor
+      Given I am editing a trace whose input is hidden from me
+      Then the trace input cannot be edited
+
+  Rule: Trace metadata is corrected in place, except where it places the trace
+
+    @integration
+    Scenario: Changing a metadata value records it in the correction
+      Given I am editing a trace with metadata
+      When I change a metadata value
+      Then the correction carries the new value for that key
+
+    @integration
+    Scenario: Removing a metadata key strikes it through and can be undone
+      Given I am editing a trace with metadata
+      When I remove a metadata key
+      Then the metadata key reads as removed
+      And I can restore it
+
+    @integration
+    Scenario: Adding a metadata key records it in the correction
+      Given I am editing a trace with metadata
+      When I add a metadata key the trace does not have
+      Then the correction carries that key and its value
+
+    @integration
+    Scenario: The keys that place a trace carry no metadata editor
+      Given I am editing a trace with metadata
+      Then the conversation, user, customer and scenario run keys cannot be edited
+      And the platform's own metadata cannot be edited
+      And the trace's own labels can be edited
+
+    @unit
+    Scenario: Which metadata keys a reviewer may correct is one rule
+      Given the metadata keys a trace can carry
+      Then the platform namespace and the grouping keys are never editable
+      And labels and keys the caller sent are editable
+
+    @unit
+    Scenario: Corrected metadata is saved as one map of the keys that changed
+      Given I am editing a trace with metadata
+      When I change one metadata value and remove another
+      Then the correction names both keys and nothing else
+
+    @unit
+    Scenario: A metadata value put back leaves nothing to save
+      Given I am editing a trace with metadata
+      When I change a metadata value and type the captured one back
+      Then there is nothing to save
+
+  Rule: A correction carries only what the reviewer actually changed
+
+    @unit
+    Scenario: Correcting only the trace output stores no span correction
+      Given I am editing the trace
+      When I rewrite the trace output and save
+      Then the correction names no span at all
+
+    @unit
+    Scenario: An attribute typed over and typed back stores no attribute correction
+      Given I am editing a span with attributes
+      When I change an attribute value and type the captured one back
+      Then the correction names no span at all
+
+    @unit
+    Scenario: Retyping the captured text into an attribute recorded as text is not a change
+      Given I am editing a span whose attribute holds a JSON document as text
+      When I retype that document exactly as it was recorded
+      Then there is nothing to save
+
+    @integration
+    Scenario: An attribute editor keeps the shape the trace recorded
+      Given I am editing a span whose attribute holds a JSON document as text
+      When I retype that document into the attribute editor
+      Then the value recorded is still text, not a structure
+
+    @integration
+    Scenario: Only the attribute rows a correction really changed read as edited
+      Given the trace has a correction that changes one span attribute
+      Then only that attribute is highlighted as edited
+      And the attributes the correction left alone carry no marker
+
+    @integration
+    Scenario: An attribute the correction unpacked from recorded text is not marked as added
+      Given the trace has a correction that turned a recorded text attribute into a structure
+      Then the rows underneath it are not marked as added by an edit
+
+    @integration
+    Scenario: Saving is refused once the drawer moved to another trace
+      Given I am editing the trace
+      And the drawer has moved to a different trace
+      When the correction is saved
+      Then nothing is written
+
+    @unit
+    Scenario: Opening a different trace drops the draft from the last one
+      Given I am editing the trace
+      And I have renamed a span
+      When a different trace is opened
+      Then there is nothing left to save
+
+    @unit
+    Scenario: Re-entering edit mode on the same trace keeps the draft
+      Given I am editing the trace
+      And I have renamed a span
+      When edit mode is entered again for the same trace
+      Then my rename is still there
 
   Rule: Deleting a span is a draft decision, reversible until saved
 

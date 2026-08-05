@@ -269,6 +269,30 @@ describe("Trace edit overlay storage", () => {
         }),
       ).toBe(1);
     });
+
+    /** @scenario "Saving a correction that changes trace metadata stores it" */
+    it("stores corrected trace metadata alongside the span edits", async () => {
+      const traceId = `${TRACE_ID_PREFIX}-metadata`;
+
+      await caller.traceEditOverlay.upsert({
+        projectId: PROJECT_ID,
+        traceId,
+        patch: {
+          version: 1,
+          trace: { metadata: { environment: "production", reviewer: null } },
+          spans: [{ spanId: "span-1", name: "cleaned up" }],
+          deletedSpanIds: [],
+        },
+      });
+
+      const persisted = await prisma.traceEditOverlay.findUniqueOrThrow({
+        where: { projectId_traceId: { projectId: PROJECT_ID, traceId } },
+      });
+      expect(persisted.patch).toMatchObject({
+        trace: { metadata: { environment: "production", reviewer: null } },
+        spans: [{ spanId: "span-1", name: "cleaned up" }],
+      });
+    });
   });
 
   describe("when a reviewer removes a correction", () => {

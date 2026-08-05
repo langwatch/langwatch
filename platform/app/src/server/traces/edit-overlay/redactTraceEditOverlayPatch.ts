@@ -2,10 +2,13 @@ import { redactHiddenAttributes } from "~/server/traces/mappers/redactAttributes
 import type { Protections } from "~/server/traces/protections";
 import {
   TRACE_EDIT_SPAN_FIELDS,
+  TRACE_EDIT_TRACE_FIELDS,
   type TraceEditOverlayPatch,
   type TraceEditSpanField,
   type TraceEditSpanPatch,
+  type TraceEditTraceField,
 } from "./traceEditOverlay.schemas";
+import { traceAttributeKeyForMetadata } from "./traceMetadataEditableKeys";
 
 /**
  * The content category each editable span field belongs to. `params` rides
@@ -107,32 +110,113 @@ function redactSpanPatch({
 }
 
 /**
+ * The content category each trace-level field belongs to. Metadata rides under
+ * `input` because it is what the caller sent with the request, and the restrict
+ * rules that hide individual attributes apply to it as well.
+ */
+const TRACE_FIELD_CONTENT_CATEGORY: Record<
+  TraceEditTraceField,
+  "input" | "output"
+> = {
+  input: "input",
+  metadata: "input",
+  output: "output",
+};
+
+type TraceMetadataEdits = NonNullable<
+  NonNullable<TraceEditOverlayPatch["trace"]>["metadata"]
+>;
+
+/**
+ * Corrected metadata under the viewer's restrict rules. The rules are written
+ * against the attribute paths the trace was ingested with, so the map is put
+ * back into that spelling to be matched and read out of it again, keeping one
+ * definition of which attributes are hidden.
+ */
+function redactMetadataEdits({
+  metadata,
+  hiddenAttributes,
+}: {
+  metadata: TraceMetadataEdits | null;
+  hiddenAttributes: Protections["hiddenAttributes"];
+}): TraceMetadataEdits | null {
+  if (metadata === null) return metadata;
+
+  const byAttributeKey: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    byAttributeKey[traceAttributeKeyForMetadata(key)] = value;
+  }
+  const redacted = redactHiddenAttributes(byAttributeKey, hiddenAttributes);
+  if (redacted === byAttributeKey) return metadata;
+
+  const next: TraceMetadataEdits = {};
+  for (const key of Object.keys(metadata)) {
+    next[key] = redacted[traceAttributeKeyForMetadata(key)];
+  }
+  return next;
+}
+
+/**
+ * One corrected trace-level field as this viewer may read it, or undefined when
+ * it is withheld (or was never edited).
+ */
+function readableTraceFieldValue({
+  field,
+  traceEdits,
+  isDeniedByCategory,
+  hiddenAttributes,
+}: {
+  field: TraceEditTraceField;
+  traceEdits: NonNullable<TraceEditOverlayPatch["trace"]>;
+  isDeniedByCategory: IsDeniedByCategory;
+  hiddenAttributes: Protections["hiddenAttributes"];
+}): unknown {
+  const value = traceEdits[field];
+  if (value === undefined) return void 0;
+  if (isDeniedByCategory[TRACE_FIELD_CONTENT_CATEGORY[field]]) return void 0;
+  if (field === "metadata") {
+    return redactMetadataEdits({
+      metadata: traceEdits.metadata ?? null,
+      hiddenAttributes,
+    });
+  }
+  return value;
+}
+
+/**
  * The trace-level edits this viewer may read, or undefined when none survive.
  */
 function redactTraceEdits({
   traceEdits,
   isDeniedByCategory,
+  hiddenAttributes,
 }: {
   traceEdits: TraceEditOverlayPatch["trace"];
   isDeniedByCategory: IsDeniedByCategory;
+  hiddenAttributes: Protections["hiddenAttributes"];
 }): { value: TraceEditOverlayPatch["trace"]; changed: boolean } {
   if (!traceEdits) return { value: traceEdits, changed: false };
 
   const next: NonNullable<TraceEditOverlayPatch["trace"]> = {};
-  if (!isDeniedByCategory.input && traceEdits.input !== undefined) {
-    next.input = traceEdits.input;
-  }
-  if (!isDeniedByCategory.output && traceEdits.output !== undefined) {
-    next.output = traceEdits.output;
+  const draft = next as unknown as Record<TraceEditTraceField, unknown>;
+  let carriesEdit = false;
+  let changed = false;
+
+  for (const field of TRACE_EDIT_TRACE_FIELDS) {
+    const value = readableTraceFieldValue({
+      field,
+      traceEdits,
+      isDeniedByCategory,
+      hiddenAttributes,
+    });
+    changed ||= value !== traceEdits[field];
+    if (value === undefined) continue;
+    draft[field] = value;
+    carriesEdit = true;
   }
 
-  const present = (edits: NonNullable<TraceEditOverlayPatch["trace"]>) =>
-    [edits.input, edits.output].filter((value) => value !== undefined).length;
-  const kept = present(next);
-  if (kept === present(traceEdits)) {
-    return { value: traceEdits, changed: false };
-  }
-  return { value: kept > 0 ? next : void 0, changed: true };
+  if (!changed) return { value: traceEdits, changed: false };
+  return { value: carriesEdit ? next : void 0, changed: true };
 }
 
 /**
@@ -170,6 +254,7 @@ export function redactPatchForViewer({
   const traceEdits = redactTraceEdits({
     traceEdits: patch.trace,
     isDeniedByCategory,
+    hiddenAttributes,
   });
   let changed = traceEdits.changed;
 
@@ -286,6 +371,39 @@ function spansWithWithheldEdits({
   return { value, restored };
 }
 
+/**
+ * The saved metadata edits with the withheld keys carried over. Metadata is
+ * corrected key by key, so the carry-over is key by key too: a key this viewer
+ * never received faithfully comes back as stored, and everything they could
+ * read stays theirs to decide, including removing it.
+ */
+function metadataWithWithheld({
+  incoming,
+  stored,
+  readable,
+}: {
+  incoming: TraceMetadataEdits | null | undefined;
+  stored: TraceMetadataEdits | null | undefined;
+  readable: TraceMetadataEdits | null | undefined;
+}): { value: TraceMetadataEdits | null | undefined; restored: boolean } {
+  if (stored === undefined || readable === stored) {
+    return { value: incoming, restored: false };
+  }
+  // The whole map was withheld, or the correction cleared it: nothing about it
+  // could have been the viewer's decision.
+  if (stored === null || readable == null)
+    return { value: stored, restored: true };
+
+  const next: TraceMetadataEdits = { ...incoming };
+  let restored = false;
+  for (const [key, value] of Object.entries(stored)) {
+    if (readable[key] === value) continue;
+    next[key] = value;
+    restored = true;
+  }
+  return restored ? { value: next, restored } : { value: incoming, restored };
+}
+
 /** The saved trace-level edits with the withheld ones carried over. */
 function traceEditsWithWithheld({
   incoming,
@@ -299,16 +417,28 @@ function traceEditsWithWithheld({
   const value: NonNullable<TraceEditOverlayPatch["trace"]> = { ...incoming };
   let restored = false;
 
-  for (const category of ["input", "output"] as const) {
-    const storedValue = stored?.[category];
+  for (const field of ["input", "output"] as const) {
+    const storedValue = stored?.[field];
     const withheld =
-      storedValue !== undefined && readable?.[category] !== storedValue;
+      storedValue !== undefined && readable?.[field] !== storedValue;
     if (!withheld) continue;
-    value[category] = storedValue;
+    value[field] = storedValue;
     restored = true;
   }
 
-  const carriesEdit = value.input !== undefined || value.output !== undefined;
+  const metadata = metadataWithWithheld({
+    incoming: incoming?.metadata,
+    stored: stored?.metadata,
+    readable: readable?.metadata,
+  });
+  if (metadata.restored) {
+    value.metadata = metadata.value;
+    restored = true;
+  }
+
+  const carriesEdit = TRACE_EDIT_TRACE_FIELDS.some(
+    (field) => value[field] !== undefined,
+  );
   return { value: carriesEdit ? value : void 0, restored };
 }
 

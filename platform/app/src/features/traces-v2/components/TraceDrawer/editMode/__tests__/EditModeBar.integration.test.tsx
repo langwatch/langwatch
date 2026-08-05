@@ -219,6 +219,29 @@ describe("EditModeBar", () => {
       });
     });
 
+    describe("when the draft belongs to a trace the drawer left behind", () => {
+      /** @scenario "Saving is refused once the drawer moved to another trace" */
+      it("writes nothing", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {
+          // The refusal is logged, not shown: nothing on screen asked for it.
+        });
+        renderBar();
+        useTraceEditStore.getState().startEditing({ traceId: "trace-2" });
+        useTraceEditStore.getState().setSpanName({
+          spanId: "span-1",
+          name: "belongs to the other trace",
+          baselineName: "handler",
+        });
+
+        fireEvent.click(saveButton());
+
+        await waitFor(() => expect(warn).toHaveBeenCalled());
+        expect(fetchOverlay).not.toHaveBeenCalled();
+        expect(mutate).not.toHaveBeenCalled();
+        warn.mockRestore();
+      });
+    });
+
     describe("when saving fails", () => {
       /** @scenario "A failed save keeps the reviewer in edit mode with their work" */
       it("reports the failure and keeps the changes", async () => {

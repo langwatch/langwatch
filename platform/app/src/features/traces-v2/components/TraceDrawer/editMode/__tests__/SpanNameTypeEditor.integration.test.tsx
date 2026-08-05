@@ -28,14 +28,7 @@ const storedCorrection: TraceEditOverlayPatch = {
 };
 
 function draftState() {
-  const s = useTraceEditStore.getState();
-  return {
-    basePatch: s.basePatch,
-    spanDrafts: s.spanDrafts,
-    deletedSpanIds: s.deletedSpanIds,
-    restoredSpanIds: s.restoredSpanIds,
-    traceOutputDraft: s.traceOutputDraft,
-  };
+  return useTraceEditStore.getState();
 }
 
 function renderEditor() {

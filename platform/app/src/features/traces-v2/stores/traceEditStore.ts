@@ -14,6 +14,11 @@ import {
  */
 export type TraceOverlayView = "edited" | "original";
 
+/** The trace-metadata half of a correction: an overlay, a clear, or nothing. */
+type TraceMetadataEdits = NonNullable<
+  TraceEditOverlayPatch["trace"]
+>["metadata"];
+
 /**
  * One edited input or output. The drawer only ever sees a rendered string, so
  * the text it was seeded from travels alongside the edited text: a value that
@@ -77,7 +82,15 @@ interface TraceEditState {
   deletedSpanIds: string[];
   /** Spans the stored correction deleted that the reviewer brought back. */
   restoredSpanIds: string[];
+  traceInputDraft: SpanIODraft | null;
   traceOutputDraft: SpanIODraft | null;
+  /**
+   * Per-key overrides on the trace's own metadata, in the bare keys the
+   * canonical trace metadata uses. A `null` value removes that key. Only the
+   * keys the reviewer touched travel, so a correction to one label never
+   * restates the rest of the map.
+   */
+  traceMetadataDrafts: Record<string, unknown>;
   overlayView: TraceOverlayView;
   /**
    * Something that wants to leave the trace (closing the drawer, opening
@@ -124,6 +137,12 @@ interface TraceEditState {
   stopEditing: () => void;
   /** Drops every uncommitted change and leaves edit mode. */
   discard: () => void;
+  /**
+   * Drops a session left behind on another trace. A session on the trace being
+   * opened is left alone: a link straight into edit mode re-enters it on the
+   * same trace, and the work in progress has to survive that.
+   */
+  dropSessionForOtherTrace: (traceId: string) => void;
 
   /**
    * Records a rename. `baselineName` is what the field read before this session
@@ -161,11 +180,24 @@ interface TraceEditState {
   deleteSpan: (spanId: string) => void;
   restoreSpan: (spanId: string) => void;
 
+  setTraceInput: (params: {
+    text: string;
+    baselineText: string | null;
+  }) => void;
+  resetTraceInput: () => void;
   setTraceOutput: (params: {
     text: string;
     baselineText: string | null;
   }) => void;
   resetTraceOutput: () => void;
+
+  setTraceMetadata: (params: {
+    key: string;
+    /** `null` removes the key from the corrected trace. */
+    value: unknown;
+    baselineMetadata: Record<string, unknown>;
+  }) => void;
+  resetTraceMetadata: (key: string) => void;
 
   setOverlayView: (view: TraceOverlayView) => void;
 }
@@ -176,14 +208,18 @@ type TraceEditDraftState = Pick<
   | "spanDrafts"
   | "deletedSpanIds"
   | "restoredSpanIds"
+  | "traceInputDraft"
   | "traceOutputDraft"
+  | "traceMetadataDrafts"
 >;
 
 const EMPTY_DRAFTS = {
   spanDrafts: {} as Record<string, SpanEditDraft>,
   deletedSpanIds: [] as string[],
   restoredSpanIds: [] as string[],
+  traceInputDraft: null as SpanIODraft | null,
   traceOutputDraft: null as SpanIODraft | null,
+  traceMetadataDrafts: {} as Record<string, unknown>,
 };
 
 /** No session, and nothing left over from the last one. */
@@ -232,10 +268,43 @@ function rebasedParams(
   return next ?? drafts;
 }
 
-/** Whether two attribute values say the same thing. */
-function sameAttributeValue(a: unknown, b: unknown): boolean {
+function sameEntries(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): boolean {
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((key) => key in b && deepEqual(a[key], b[key]));
+}
+
+function sameItems(a: unknown[], b: unknown): boolean {
+  if (!Array.isArray(b) || a.length !== b.length) return false;
+  return a.every((item, i) => deepEqual(item, b[i]));
+}
+
+/** Whether two values say the same thing, all the way down. */
+function deepEqual(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
-  return JSON.stringify(a) === JSON.stringify(b);
+  if (Array.isArray(a)) return sameItems(a, b);
+  if (Array.isArray(b)) return false;
+  if (isPlainObject(a) && isPlainObject(b)) return sameEntries(a, b);
+  return false;
+}
+
+/**
+ * Whether writing this value leaves the field saying what it already said.
+ *
+ * A value the trace recorded as text stays text, so a reviewer who retypes a
+ * JSON document into it has changed nothing even though the editor hands back
+ * a parsed structure; comparing the parsed baseline is what keeps that from
+ * being stored as a correction.
+ */
+function valuesAgree(baseline: unknown, value: unknown): boolean {
+  if (deepEqual(baseline, value)) return true;
+  return (
+    typeof baseline === "string" &&
+    deepEqual(parsedOrUndefined(baseline), value)
+  );
 }
 
 /** Reads the value a nested attribute path holds, or undefined when it has none. */
@@ -264,10 +333,21 @@ function attributeIsUnchanged({
 }): boolean {
   const path = attributePathsByFlatKey(baselineParams).get(key);
   if (!path) return value === null;
-  return (
-    value !== null &&
-    sameAttributeValue(readAtPath(baselineParams, path), value)
-  );
+  return value !== null && valuesAgree(readAtPath(baselineParams, path), value);
+}
+
+/** The same question for one of the trace's own metadata keys, which are flat. */
+function metadataIsUnchanged({
+  baselineMetadata,
+  key,
+  value,
+}: {
+  baselineMetadata: Record<string, unknown>;
+  key: string;
+  value: unknown;
+}): boolean {
+  if (!(key in baselineMetadata)) return value === null;
+  return value !== null && valuesAgree(baselineMetadata[key], value);
 }
 
 /** The value a text field holds, when it holds JSON, and undefined when not. */
@@ -377,6 +457,13 @@ const sessionActions = (set: SetTraceEditState) => ({
   // names are kept because the call sites read as different intentions.
   stopEditing: () => set(CLEARED_SESSION),
   discard: () => set(CLEARED_SESSION),
+
+  dropSessionForOtherTrace: (traceId: string) =>
+    set((s) =>
+      s.editingTraceId !== null && s.editingTraceId !== traceId
+        ? CLEARED_SESSION
+        : {},
+    ),
 });
 
 /**
@@ -525,6 +612,14 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
   ...spanParamActions(set),
   ...spanRemovalActions(set),
 
+  setTraceInput: ({ text, baselineText }) =>
+    set({
+      traceInputDraft: ioTextIsUnchanged({ text, baselineText })
+        ? null
+        : { text, baselineText },
+    }),
+  resetTraceInput: () => set({ traceInputDraft: null }),
+
   setTraceOutput: ({ text, baselineText }) =>
     set({
       traceOutputDraft: ioTextIsUnchanged({ text, baselineText })
@@ -533,8 +628,31 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
     }),
   resetTraceOutput: () => set({ traceOutputDraft: null }),
 
+  setTraceMetadata: ({ key, value, baselineMetadata }) =>
+    set((s) => {
+      if (metadataIsUnchanged({ baselineMetadata, key, value })) {
+        return { traceMetadataDrafts: withoutKey(s.traceMetadataDrafts, key) };
+      }
+      return {
+        traceMetadataDrafts: { ...s.traceMetadataDrafts, [key]: value },
+      };
+    }),
+  resetTraceMetadata: (key) =>
+    set((s) => ({
+      traceMetadataDrafts: withoutKey(s.traceMetadataDrafts, key),
+    })),
+
   setOverlayView: (view) => set({ overlayView: view }),
 }));
+
+function withoutKey(
+  drafts: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> {
+  if (!(key in drafts)) return drafts;
+  const { [key]: _dropped, ...rest } = drafts;
+  return rest;
+}
 
 // ---------------------------------------------------------------------------
 // Selectors
@@ -576,11 +694,41 @@ export function selectSpanEditBaseline({
   return baseline;
 }
 
+/** The trace-level input the stored correction already carries, if any. */
+export function selectTraceInputBaseline(
+  basePatch: TraceEditOverlayPatch | null,
+): string | undefined {
+  return basePatch?.trace?.input?.value;
+}
+
 /** The trace-level output the stored correction already carries, if any. */
 export function selectTraceOutputBaseline(
   basePatch: TraceEditOverlayPatch | null,
 ): string | undefined {
   return basePatch?.trace?.output?.value;
+}
+
+/**
+ * The trace metadata an editor starts from: the captured keys with whatever a
+ * stored correction already changed about them laid over.
+ */
+export function selectTraceMetadataBaseline({
+  basePatch,
+  captured,
+}: {
+  basePatch: TraceEditOverlayPatch | null;
+  captured: Record<string, unknown>;
+}): Record<string, unknown> {
+  const stored = basePatch?.trace?.metadata;
+  if (stored === undefined) return captured;
+  if (stored === null) return {};
+
+  const baseline: Record<string, unknown> = { ...captured };
+  for (const [key, value] of Object.entries(stored)) {
+    if (value === null) delete baseline[key];
+    else baseline[key] = value;
+  }
+  return baseline;
 }
 
 /** True when this span is removed by the correction as it currently stands. */
@@ -635,7 +783,12 @@ export function summarizeTraceEdit(
   state: TraceEditDraftState,
 ): TraceEditSummary {
   const deleted = new Set(state.deletedSpanIds);
-  let changedFields = state.traceOutputDraft ? 1 : 0;
+  let changedFields = 0;
+  if (state.traceInputDraft) changedFields++;
+  if (state.traceOutputDraft) changedFields++;
+  // The metadata counts once however many keys were corrected, the way a span's
+  // attributes count once: the reviewer changed "the metadata".
+  if (Object.keys(state.traceMetadataDrafts).length > 0) changedFields++;
   for (const [spanId, draft] of Object.entries(state.spanDrafts)) {
     if (deleted.has(spanId)) continue;
     changedFields += draftFieldCount(draft);
@@ -769,7 +922,14 @@ function mergeSpanPatch({
   if (draft?.type !== undefined) merged.type = draft.type;
   if (draft?.input !== undefined) merged.input = encodeDraftIO(draft.input);
   if (draft?.output !== undefined) merged.output = encodeDraftIO(draft.output);
-  if (draft?.params !== undefined) merged.params = mergedParams(draft);
+  if (draft?.params !== undefined) {
+    // A correction replaces the whole attribute record, so it is only written
+    // when the record actually says something different. Without this, one
+    // attribute touched and put back would store every attribute the span
+    // carries as a correction, and every row of it would read as edited.
+    const params = mergedParams(draft);
+    if (!deepEqual(params, draft.paramsBase ?? {})) merged.params = params;
+  }
 
   const touchesSomething = Object.keys(merged).some((key) => key !== "spanId");
   return touchesSomething ? merged : null;
@@ -839,17 +999,37 @@ function mergeSpanPatches({
   return spans;
 }
 
-/** The trace's own corrected input and output, when either has one. */
+/**
+ * The trace's own corrected metadata, layered on whatever the stored correction
+ * already changed. A stored clear is replaced once new keys are corrected: the
+ * overlay says which keys change, and "clear everything except these" is not a
+ * thing it can say.
+ */
+function mergeTraceMetadata(state: TraceEditDraftState): TraceMetadataEdits {
+  const base = state.basePatch?.trace?.metadata;
+  if (Object.keys(state.traceMetadataDrafts).length === 0) return base;
+  return { ...(base ?? {}), ...state.traceMetadataDrafts };
+}
+
+/** The trace's own corrected input, output and metadata, when any has one. */
 function mergeTracePatch(
   state: TraceEditDraftState,
 ): TraceEditOverlayPatch["trace"] {
-  const base = state.basePatch;
-  const output = state.traceOutputDraft?.text ?? base?.trace?.output?.value;
-  const input = base?.trace?.input;
-  if (input === undefined && output === undefined) return undefined;
+  const base = state.basePatch?.trace;
+  const input = state.traceInputDraft
+    ? { value: state.traceInputDraft.text }
+    : base?.input;
+  const output = state.traceOutputDraft
+    ? { value: state.traceOutputDraft.text }
+    : base?.output;
+  const metadata = mergeTraceMetadata(state);
+  if (input === undefined && output === undefined && metadata === undefined) {
+    return undefined;
+  }
 
   return {
     ...(input !== undefined ? { input } : {}),
-    ...(output !== undefined ? { output: { value: output } } : {}),
+    ...(output !== undefined ? { output } : {}),
+    ...(metadata !== undefined ? { metadata } : {}),
   };
 }

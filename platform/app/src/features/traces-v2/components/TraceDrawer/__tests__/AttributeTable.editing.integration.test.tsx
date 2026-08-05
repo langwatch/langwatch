@@ -238,6 +238,130 @@ describe("AttributeTable editing", () => {
     });
   });
 
+  describe("given an attribute the trace recorded as text", () => {
+    const RECORDED = '{"tools":["search"],"retries":0}';
+
+    describe("when the same document is typed into the editor", () => {
+      /** @scenario "An attribute editor keeps the shape the trace recorded" */
+      it("records it as text rather than as a structure", () => {
+        const retyped = '{"tools": ["search"], "retries": 0}';
+        const onEditAttribute = vi.fn();
+        const { getByLabelText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{ "langwatch.params": RECORDED }}
+              editing={{
+                edits: {},
+                onEditAttribute,
+                onResetAttribute: vi.fn(),
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        fireEvent.change(getByLabelText("Edit langwatch.params"), {
+          target: { value: retyped },
+        });
+
+        expect(onEditAttribute).toHaveBeenCalledWith({
+          key: "langwatch.params",
+          value: retyped,
+        });
+      });
+    });
+  });
+
+  describe("given a key the metadata rules keep read-only", () => {
+    describe("when the attributes are being corrected", () => {
+      /** @scenario "The keys that place a trace carry no metadata editor" */
+      it("carries no editor and refuses to add it", () => {
+        const onEditAttribute = vi.fn();
+        const { queryByLabelText, getByLabelText, getByRole, getByText } =
+          render(
+            <ChakraProvider value={defaultSystem}>
+              <AttributeTable
+                attributes={{
+                  "metadata.environment": "staging",
+                  "gen_ai.conversation.id": "thread-1",
+                }}
+                editing={{
+                  edits: {},
+                  onEditAttribute,
+                  onResetAttribute: vi.fn(),
+                  isKeyEditable: (key) => key.startsWith("metadata."),
+                }}
+              />
+            </ChakraProvider>,
+          );
+
+        expect(
+          queryByLabelText("Edit gen_ai.conversation.id"),
+        ).not.toBeInTheDocument();
+        expect(getByLabelText("Edit metadata.environment")).toBeInTheDocument();
+
+        fireEvent.change(getByLabelText("New attribute name"), {
+          target: { value: "thread_id" },
+        });
+        fireEvent.click(getByRole("button", { name: "Add attribute" }));
+
+        expect(getByText("This key can't be edited")).toBeInTheDocument();
+        expect(onEditAttribute).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a correction that replaced a whole attribute record", () => {
+    describe("when only one of its keys really changed", () => {
+      /** @scenario "Only the attribute rows a correction really changed read as edited" */
+      it("marks that key alone", () => {
+        const { getAllByText, getByLabelText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{
+                "gen_ai.request.model": "gpt-5",
+                "gen_ai.request.temperature": 0.2,
+              }}
+              correctedFrom={{
+                "gen_ai.request.model": "gpt-5-mini",
+                "gen_ai.request.temperature": 0.2,
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        expect(getAllByText("Edited")).toHaveLength(1);
+        expect(
+          getByLabelText("gen_ai.request.model, edited. Original: gpt-5-mini"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when it turned a recorded text value into a structure", () => {
+      /** @scenario "An attribute the correction unpacked from recorded text is not marked as added" */
+      it("reads the rows underneath it as edited rather than added", () => {
+        const { queryByLabelText, getByLabelText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{
+                langwatch: { input: { type: "text", value: "hello" } },
+              }}
+              correctedFrom={{
+                langwatch: { input: '{"type":"text","value":"hello"}' },
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        expect(queryByLabelText(/added by an edit/)).not.toBeInTheDocument();
+        expect(
+          getByLabelText(
+            'langwatch.input.type, edited. Original: {"type":"text","value":"hello"}',
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given resource attributes", () => {
     describe("when the span attributes are being corrected", () => {
       it("leaves the resource attributes read-only", () => {

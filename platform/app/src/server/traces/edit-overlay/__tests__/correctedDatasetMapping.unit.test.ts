@@ -71,4 +71,36 @@ describe("mapping a corrected trace into a dataset", () => {
       ]);
     });
   });
+
+  describe("given a trace whose metadata was corrected", () => {
+    const capturedMetadataTrace = {
+      ...capturedTrace,
+      metadata: { environment: "staging", reviewer: "unassigned" },
+    } as unknown as Trace;
+
+    /** @scenario "Corrected metadata reaches the dataset mapping" */
+    it("fills the metadata column with the correction", () => {
+      const corrected = applyOverlayToTrace({
+        trace: capturedMetadataTrace,
+        patch: {
+          version: 1,
+          trace: { metadata: { environment: "production", reviewer: null } },
+          spans: [],
+          deletedSpanIds: [],
+        },
+      });
+
+      const [row] = mapTraceToDatasetEntry(
+        corrected as never,
+        {
+          environment: { source: "metadata", key: "environment" },
+          reviewer: { source: "metadata", key: "reviewer" },
+        },
+        new Set(),
+      );
+
+      expect(row).toEqual({ environment: "production", reviewer: undefined });
+      expect(capturedMetadataTrace.metadata.environment).toBe("staging");
+    });
+  });
 });

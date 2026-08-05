@@ -12,6 +12,7 @@ import {
   type TraceEditSpanField,
   type TraceEditSpanPatch,
 } from "./traceEditOverlay.schemas";
+import { traceAttributeKeyForMetadata } from "./traceMetadataEditableKeys";
 
 function buildChildrenIndex(
   links: ReadonlyArray<{ id: string; parentId?: string | null }>,
@@ -151,6 +152,35 @@ function correctedSpans({
 }
 
 /**
+ * The trace's metadata with the correction laid over it, or null when the
+ * correction says nothing about it.
+ *
+ * The correction is an overlay on the map rather than a replacement of it: a
+ * key it names replaces what the trace recorded, a `null` value removes that
+ * key, and a key it does not name stays as captured. That is what lets a
+ * correction change one label without restating everything the platform
+ * stamped. A `null` in place of the whole map clears the metadata.
+ */
+function correctedMetadata({
+  trace,
+  patch,
+}: {
+  trace: Trace;
+  patch: TraceEditOverlayPatch;
+}): Trace["metadata"] | null {
+  const edits = patch.trace?.metadata;
+  if (edits === undefined) return null;
+  if (edits === null) return {};
+
+  const next: Record<string, unknown> = { ...trace.metadata };
+  for (const [key, value] of Object.entries(edits)) {
+    if (value === null) delete next[key];
+    else next[key] = value;
+  }
+  return next as Trace["metadata"];
+}
+
+/**
  * Applies a correction to a canonical trace. Returns the very same trace when
  * the correction leaves every field it carries untouched, so a caller can
  * compare references to learn whether anything was corrected without diffing
@@ -176,10 +206,18 @@ export function applyOverlayToTrace({
   const spans = correctedSpans({ spans: trace.spans ?? [], patch });
   const input = patch.trace?.input ?? trace.input;
   const output = patch.trace?.output ?? trace.output;
+  const metadata = correctedMetadata({ trace, patch });
 
-  const unchanged = !spans && input === trace.input && output === trace.output;
+  const unchanged =
+    !spans && !metadata && input === trace.input && output === trace.output;
   if (unchanged) return trace;
-  return { ...trace, spans: spans ?? trace.spans, input, output };
+  return {
+    ...trace,
+    spans: spans ?? trace.spans,
+    input,
+    output,
+    metadata: metadata ?? trace.metadata,
+  };
 }
 
 function correctedTreeNode({
@@ -324,6 +362,52 @@ function correctedSpanCount({
 }
 
 /**
+ * The header's attribute map with the corrected metadata laid over it, or null
+ * when the correction says nothing about the metadata.
+ *
+ * The header keeps the ingested spelling of every key, so a corrected metadata
+ * key lands back on the attribute row it was read from. Header attributes are
+ * strings, so a corrected structure is rendered as JSON, exactly as the rest of
+ * the map already carries structured values.
+ */
+function correctedHeaderAttributes({
+  header,
+  patch,
+}: {
+  header: TraceHeader;
+  patch: TraceEditOverlayPatch;
+}): TraceHeader["attributes"] | null {
+  const edits = patch.trace?.metadata;
+  if (edits === undefined) return null;
+  if (edits === null) return {};
+
+  const next = { ...header.attributes };
+  for (const [key, value] of Object.entries(edits)) {
+    const attributeKey = traceAttributeKeyForMetadata(key);
+    if (value === null) delete next[attributeKey];
+    else next[attributeKey] = headerAttributeText(value);
+  }
+  return next;
+}
+
+function headerAttributeText(value: unknown): string {
+  if (typeof value === "string") return value;
+  return JSON.stringify(value) ?? "";
+}
+
+/**
+ * The trace metadata keys this correction replaces or removes. Drives the
+ * edited markers on the summary's metadata rows.
+ */
+export function changedTraceMetadataKeys(
+  patch: TraceEditOverlayPatch | null | undefined,
+): string[] {
+  const edits = patch?.trace?.metadata;
+  if (edits === undefined || edits === null) return [];
+  return Object.keys(edits);
+}
+
+/**
  * Applies the trace-level part of a correction to the v2 header. Durations and
  * cost stay as captured: they describe the run, not the corrected content.
  *
@@ -351,6 +435,11 @@ export function applyOverlayToTraceHeader({
   }
   if (patch.trace?.output !== undefined) {
     next.output = patch.trace.output.value;
+    changed = true;
+  }
+  const attributes = correctedHeaderAttributes({ header, patch });
+  if (attributes) {
+    next.attributes = attributes;
     changed = true;
   }
   const spanCount = correctedSpanCount({ header, patch, spans });

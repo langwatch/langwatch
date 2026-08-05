@@ -246,6 +246,134 @@ describe("redacting a correction for its reader", () => {
   });
 });
 
+describe("redacting corrected trace metadata", () => {
+  const metadataPatch = patchOf({
+    trace: {
+      metadata: { environment: "production", ticket: "SUP-42" },
+    },
+    spans: [{ spanId: "span-1", name: "renamed" }],
+    deletedSpanIds: ["span-2"],
+  });
+
+  describe("given a viewer who may not read captured input", () => {
+    /** @scenario "Corrected metadata is withheld from a viewer who may not read captured input" */
+    it("drops the corrected metadata and keeps the structural edits", () => {
+      const readable = redactPatchForViewer({
+        patch: metadataPatch,
+        protections: { ...openProtections, canSeeCapturedInput: false },
+      });
+
+      expect(readable.trace).toBeUndefined();
+      expect(readable.spans[0]?.name).toBe("renamed");
+      expect(readable.deletedSpanIds).toEqual(["span-2"]);
+    });
+  });
+
+  describe("given an attribute rule that hides one metadata key", () => {
+    /** @scenario "A hidden attribute rule applies to corrected metadata" */
+    it("replaces that key with the placeholder and keeps the others", () => {
+      const readable = redactPatchForViewer({
+        patch: metadataPatch,
+        protections: {
+          ...openProtections,
+          hiddenAttributes: [
+            { pattern: "metadata.ticket", visibleTo: "Admins" },
+          ],
+        },
+      });
+
+      expect(readable.trace?.metadata).toEqual({
+        environment: "production",
+        ticket: "[REDACTED] (visible to Admins)",
+      });
+    });
+
+    /** @scenario "A hidden attribute rule applies to corrected metadata" */
+    it("hands back the very same correction when no rule matches", () => {
+      expect(
+        redactPatchForViewer({
+          patch: metadataPatch,
+          protections: {
+            ...openProtections,
+            hiddenAttributes: [
+              { pattern: "gen_ai.prompt.id", visibleTo: "Admins" },
+            ],
+          },
+        }),
+      ).toBe(metadataPatch);
+    });
+  });
+});
+
+describe("saving over a correction whose metadata was read redacted", () => {
+  const hiddenTicket: Protections = {
+    ...openProtections,
+    hiddenAttributes: [{ pattern: "metadata.ticket", visibleTo: "Admins" }],
+  };
+
+  const storedMetadataPatch = patchOf({
+    trace: {
+      metadata: { environment: "production", ticket: "SUP-42" },
+    },
+  });
+
+  describe("given a reviewer who was never shown one of the keys", () => {
+    /** @scenario "A saved correction keeps the metadata edits the saver was never shown" */
+    it("keeps their keys and puts the withheld one back as stored", () => {
+      const readable = redactPatchForViewer({
+        patch: storedMetadataPatch,
+        protections: hiddenTicket,
+      });
+
+      const merged = restoreWithheldEdits({
+        incoming: patchOf({
+          trace: {
+            metadata: { ...readable.trace?.metadata, environment: "staging" },
+          },
+        }),
+        stored: storedMetadataPatch,
+        protections: hiddenTicket,
+      });
+
+      expect(merged.trace?.metadata).toEqual({
+        environment: "staging",
+        ticket: "SUP-42",
+      });
+    });
+
+    /** @scenario "A saved correction keeps the metadata edits the saver was never shown" */
+    it("puts the whole map back when the category was withheld", () => {
+      const merged = restoreWithheldEdits({
+        incoming: patchOf({ spans: [{ spanId: "span-1", name: "mine" }] }),
+        stored: storedMetadataPatch,
+        protections: { ...openProtections, canSeeCapturedInput: false },
+      });
+
+      expect(merged.trace?.metadata).toEqual({
+        environment: "production",
+        ticket: "SUP-42",
+      });
+      expect(merged.spans[0]?.name).toBe("mine");
+    });
+  });
+
+  describe("given a reviewer who may read all of it", () => {
+    it("lets them remove a metadata key they could see", () => {
+      const incoming = patchOf({
+        trace: { metadata: { environment: null } },
+      });
+
+      expect(
+        restoreWithheldEdits({
+          incoming,
+          stored: storedMetadataPatch,
+          protections: openProtections,
+        }),
+      ).toBe(incoming);
+    });
+  });
+});
+
 describe("saving over a correction that was read redacted", () => {
   const restrictedProtections: Protections = {
     ...openProtections,

@@ -170,13 +170,32 @@ export interface AttributeEditing {
   onEditAttribute: (params: { key: string; value: unknown }) => void;
   /** Drops the override for a key, returning it to what was captured. */
   onResetAttribute: (key: string) => void;
+  /**
+   * Whether this key can be corrected at all. Absent means every key can,
+   * which is the span case; the trace's own metadata carries keys that decide
+   * where the trace belongs and are read-only.
+   */
+  isKeyEditable?: (key: string) => boolean;
 }
 
 /**
- * Reads an attribute value out of a text field. Numbers, booleans and JSON
- * keep their shape; anything else stays the string the reviewer typed.
+ * Reads an attribute value out of a text field. Numbers, booleans and JSON keep
+ * their shape; anything else stays the string the reviewer typed.
+ *
+ * A value the trace recorded as text stays text however JSON-shaped it looks.
+ * Reading it back as a structure would rewrite what the trace says into
+ * something it never carried, and every leaf of that structure would then read
+ * as an attribute the correction added.
  */
-export function parseAttributeInput(text: string): unknown {
+export function parseAttributeInput({
+  text,
+  baseline,
+}: {
+  text: string;
+  /** What the trace recorded here, when it recorded anything. */
+  baseline?: unknown;
+}): unknown {
+  if (typeof baseline === "string") return text;
   const trimmed = text.trim();
   if (trimmed.length === 0) return text;
   try {
@@ -216,6 +235,27 @@ interface AttributeTableProps {
 interface AttributeCorrection {
   /** The captured value rendered for the tooltip, or null when it is new. */
   original: string | null;
+}
+
+/**
+ * The captured key one flat key sits underneath, when the capture had one.
+ * Walks the dotted path from the longest prefix down, so the nearest captured
+ * ancestor wins.
+ */
+function capturedAncestorKey({
+  key,
+  capturedFlat,
+}: {
+  key: string;
+  capturedFlat: Record<string, unknown>;
+}): string | null {
+  let cut = key.lastIndexOf(".");
+  while (cut > 0) {
+    const prefix = key.slice(0, cut);
+    if (prefix in capturedFlat) return prefix;
+    cut = key.lastIndexOf(".", cut - 1);
+  }
+  return null;
 }
 
 /** Synthetic, always-first row key for the injected span id. */
@@ -507,6 +547,8 @@ interface RowEditing {
   isRemoved: boolean;
   /** True when the correction replaces this key's value. */
   isChanged: boolean;
+  /** What the trace recorded here, so an edit keeps the shape it had. */
+  baseline: unknown;
   onChangeValue: (value: unknown) => void;
   onRemove: () => void;
   onRestore: () => void;
@@ -569,7 +611,12 @@ function EditableValueCell({
         aria-label={`Edit ${attrKey}`}
         value={editorText}
         onChange={(e) =>
-          editing.onChangeValue(parseAttributeInput(e.target.value))
+          editing.onChangeValue(
+            parseAttributeInput({
+              text: e.target.value,
+              baseline: editing.baseline,
+            }),
+          )
         }
         fontFamily="mono"
         bg={editing.isChanged ? "green.subtle" : undefined}
@@ -788,15 +835,19 @@ function rowEditingFor({
   editing,
   key,
   isLeading,
+  baseline,
 }: {
   editing?: AttributeEditing;
   key: string;
   isLeading: boolean;
+  baseline: unknown;
 }): RowEditing | undefined {
   if (!editing || isLeading) return undefined;
+  if (editing.isKeyEditable?.(key) === false) return undefined;
   return {
     isRemoved: editing.edits[key] === null,
     isChanged: key in editing.edits && editing.edits[key] !== null,
+    baseline,
     onChangeValue: (value) => editing.onEditAttribute({ key, value }),
     onRemove: () => editing.onEditAttribute({ key, value: null }),
     onRestore: () => editing.onResetAttribute(key),
@@ -815,6 +866,7 @@ function AttrSection({
   editing,
   allKeys,
   correctionFor,
+  baselineFor,
 }: {
   title: string;
   attributes: Record<string, unknown>;
@@ -836,6 +888,8 @@ function AttrSection({
   allKeys?: Set<string>;
   /** Resolves the captured value a stored correction replaced, when it did. */
   correctionFor?: (key: string) => AttributeCorrection | null;
+  /** Resolves what the trace recorded at a key, before this session's edits. */
+  baselineFor?: (key: string) => unknown;
 }) {
   const { project } = useOrganizationTeamProject();
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
@@ -905,7 +959,12 @@ function AttrSection({
                 correction={
                   correctionFor && !isLeading ? correctionFor(key) : null
                 }
-                editing={rowEditingFor({ editing, key, isLeading })}
+                editing={rowEditingFor({
+                  editing,
+                  key,
+                  isLeading,
+                  baseline: baselineFor ? baselineFor(key) : undefined,
+                })}
               />
             );
           })}
@@ -944,6 +1003,7 @@ function AttrSection({
 function AddAttributeRow({
   existingKeys,
   onEditAttribute,
+  isKeyEditable,
 }: AttributeEditing & { existingKeys: Set<string> }) {
   const [key, setKey] = useState("");
   const [value, setValue] = useState("");
@@ -956,7 +1016,14 @@ function AddAttributeRow({
       setError("This key already exists");
       return;
     }
-    onEditAttribute({ key: trimmedKey, value: parseAttributeInput(value) });
+    if (isKeyEditable?.(trimmedKey) === false) {
+      setError("This key can't be edited");
+      return;
+    }
+    onEditAttribute({
+      key: trimmedKey,
+      value: parseAttributeInput({ text: value }),
+    });
     setKey("");
     setValue("");
     setError(null);
@@ -1034,6 +1101,18 @@ export function AttributeTable({
   const [labelWidth, , applyLabelDelta] = useLabelColumnWidth();
   const handleLabelResize = applyLabelDelta;
 
+  // What the rows read before this session touched them, which is what an edit
+  // is measured against and what keeps an edited value in the shape the trace
+  // recorded it in.
+  const baselineFlat = useMemo(
+    () => flattenAttributes(attributes),
+    [attributes],
+  );
+  const baselineFor = useCallback(
+    (key: string) => baselineFlat[key],
+    [baselineFlat],
+  );
+
   const flatAttrs = useMemo(() => {
     const flat = flattenAttributes(attributes);
     // Attributes the correction adds are rows in their own right; ones it
@@ -1054,17 +1133,26 @@ export function AttributeTable({
   );
 
   // A row is marked when the correction gave it a different value than the one
-  // captured, or added it outright. The comparison is on the rendered value,
-  // which is what the reader is looking at.
+  // captured, or added it outright. The comparison is per row, on the rendered
+  // value, which is what the reader is looking at: a correction may replace a
+  // whole attribute record and leave most of it saying exactly what it said.
   const correctionFor = useMemo(() => {
     if (!correctedFrom) return undefined;
     const capturedFlat = flattenAttributes(correctedFrom);
     return (key: string): AttributeCorrection | null => {
-      if (!(key in capturedFlat)) return { original: null };
-      const captured = formatValue(capturedFlat[key]);
-      return captured === formatValue(flatAttrs[key])
-        ? null
-        : { original: captured };
+      if (key in capturedFlat) {
+        const captured = formatValue(capturedFlat[key]);
+        return captured === formatValue(flatAttrs[key])
+          ? null
+          : { original: captured };
+      }
+      // A correction that turned a value the trace recorded as one string into
+      // a structure gives every leaf under it a row the capture never had.
+      // Those rows correct the value above them rather than adding anything.
+      const ancestor = capturedAncestorKey({ key, capturedFlat });
+      return ancestor === null
+        ? { original: null }
+        : { original: formatValue(capturedFlat[ancestor]) };
     };
   }, [correctedFrom, flatAttrs]);
 
@@ -1134,6 +1222,7 @@ export function AttributeTable({
         editing={editing}
         allKeys={allAttributeKeys}
         correctionFor={correctionFor}
+        baselineFor={baselineFor}
       />
       {filterResAttrs && (
         <AttrSection

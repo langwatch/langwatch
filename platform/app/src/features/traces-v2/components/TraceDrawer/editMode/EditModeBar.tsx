@@ -41,7 +41,9 @@ function useTraceEditDraft() {
   const spanDrafts = useTraceEditStore((s) => s.spanDrafts);
   const deletedSpanIds = useTraceEditStore((s) => s.deletedSpanIds);
   const restoredSpanIds = useTraceEditStore((s) => s.restoredSpanIds);
+  const traceInputDraft = useTraceEditStore((s) => s.traceInputDraft);
   const traceOutputDraft = useTraceEditStore((s) => s.traceOutputDraft);
+  const traceMetadataDrafts = useTraceEditStore((s) => s.traceMetadataDrafts);
 
   return useMemo(
     () => ({
@@ -49,9 +51,19 @@ function useTraceEditDraft() {
       spanDrafts,
       deletedSpanIds,
       restoredSpanIds,
+      traceInputDraft,
       traceOutputDraft,
+      traceMetadataDrafts,
     }),
-    [basePatch, spanDrafts, deletedSpanIds, restoredSpanIds, traceOutputDraft],
+    [
+      basePatch,
+      spanDrafts,
+      deletedSpanIds,
+      restoredSpanIds,
+      traceInputDraft,
+      traceOutputDraft,
+      traceMetadataDrafts,
+    ],
   );
 }
 
@@ -78,6 +90,15 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
 
   const save = useCallback(async () => {
     if (!project) return;
+    // The draft belongs to the trace it was written against. If the drawer has
+    // moved on, saving it here would attribute one trace's correction to
+    // another, so the save is refused rather than guessed at.
+    if (useTraceEditStore.getState().editingTraceId !== traceId) {
+      console.warn(
+        "[traces-v2] trace edit save skipped: the draft belongs to another trace",
+      );
+      return;
+    }
     // Read the correction back before merging onto it. The one adopted when
     // editing started can be minutes old — a suggestion saved in between writes
     // the same record — and building on a stale one would drop whatever was

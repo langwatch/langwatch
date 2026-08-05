@@ -63,12 +63,30 @@ export const TRACE_EDIT_SPAN_FIELDS = [
 
 export type TraceEditSpanField = (typeof TRACE_EDIT_SPAN_FIELDS)[number];
 
+/** Every trace-level field a correction can carry, in presentation order. */
+export const TRACE_EDIT_TRACE_FIELDS = ["input", "output", "metadata"] as const;
+
+export type TraceEditTraceField = (typeof TRACE_EDIT_TRACE_FIELDS)[number];
+
+/**
+ * The trace's own metadata as the correction leaves it, in the bare keys the
+ * canonical `Trace.metadata` uses (`thread_id`, `labels`, and whatever the
+ * caller sent). It is an overlay on the map rather than a replacement of it:
+ * a key the correction names replaces what the trace recorded, a `null` value
+ * removes that key, and a key the correction does not name stays as captured.
+ * That is what lets a reviewer fix one label without the correction having to
+ * restate every key the platform stamped. `null` in place of the whole map
+ * clears the trace's metadata.
+ */
+const traceMetadataEditSchema = z.record(z.string(), z.unknown());
+
 const traceEditOverlayPatchObjectSchema = z.object({
   version: z.literal(TRACE_EDIT_OVERLAY_PATCH_VERSION),
   trace: z
     .object({
       input: traceIOEditSchema.optional(),
       output: traceIOEditSchema.optional(),
+      metadata: traceMetadataEditSchema.nullable().optional(),
     })
     .optional(),
   spans: z.array(traceEditSpanPatchSchema).default([]),
@@ -135,7 +153,9 @@ export function parseTraceEditOverlayPatch(
  *  nothing is rejected on write and treated as absent on read. */
 export function patchHasAnyEdit(patch: TraceEditOverlayPatch): boolean {
   if (patch.deletedSpanIds.length > 0) return true;
-  if (patch.trace?.input !== undefined || patch.trace?.output !== undefined) {
+  if (
+    TRACE_EDIT_TRACE_FIELDS.some((field) => patch.trace?.[field] !== undefined)
+  ) {
     return true;
   }
   return patch.spans.some((span) =>

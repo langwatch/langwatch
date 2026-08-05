@@ -104,6 +104,55 @@ describe("trace edit overlay patch contract", () => {
         }),
       ).toBe(true);
     });
+
+    /** @scenario "A metadata correction alone counts as a correction" */
+    it("reports corrected trace metadata as an edit", () => {
+      expect(
+        patchHasAnyEdit({
+          version: 1,
+          trace: { metadata: { environment: "production" } },
+          spans: [],
+          deletedSpanIds: [],
+        }),
+      ).toBe(true);
+    });
+
+    /** @scenario "A metadata correction alone counts as a correction" */
+    it("reports cleared trace metadata as an edit", () => {
+      expect(
+        patchHasAnyEdit({
+          version: 1,
+          trace: { metadata: null },
+          spans: [],
+          deletedSpanIds: [],
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("when a correction carries trace metadata", () => {
+    it("accepts a map of keys, a null value, and a cleared map", () => {
+      const parsed = traceEditOverlayPatchSchema.parse({
+        version: 1,
+        trace: {
+          metadata: { environment: "production", reviewer: null, count: 3 },
+        },
+        spans: [],
+      });
+
+      expect(parsed.trace?.metadata).toEqual({
+        environment: "production",
+        reviewer: null,
+        count: 3,
+      });
+      expect(
+        traceEditOverlayPatchSchema.parse({
+          version: 1,
+          trace: { metadata: null },
+          spans: [],
+        }).trace,
+      ).toHaveProperty("metadata", null);
+    });
   });
 });
 

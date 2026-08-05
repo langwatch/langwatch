@@ -37,6 +37,12 @@
 #     by the plan's visibility window, and attributes a restrict rule hides all
 #     drop out of the patch itself. Structural edits always survive, because
 #     they say what the trace should have looked like without quoting any of it.
+#   - Trace metadata is corrected as an overlay on the map: the keys the
+#     correction names replace what the trace recorded, a null value removes a
+#     key, and the keys it does not name stay as captured. That is what lets a
+#     reviewer fix one label without the correction having to restate the
+#     platform's own metadata, and it is why a corrected key reaches the dataset
+#     mapping through the same metadata reads as a captured one.
 #   - The existing "suggest an expected output" flow keeps writing its
 #     annotation and additionally merges an output-only correction, so the
 #     annotation stays the record of who suggested what and the overlay stays
@@ -220,6 +226,73 @@ Feature: Correcting a trace without rewriting it
       Given a correction that renames a span and rewrites its input and output
       When the corrected spans are mapped for a dataset
       Then every mapped span satisfies the dataset span shape
+
+  Rule: Trace metadata is corrected as an overlay on the map
+
+    @unit
+    Scenario: A metadata correction replaces the keys it names and leaves the rest
+      Given a trace carrying metadata the caller sent
+      When a correction changes one metadata key
+      Then the read trace carries the corrected key
+      And the metadata keys the correction did not name are unchanged
+
+    @unit
+    Scenario: A metadata correction removes a key by naming it null
+      Given a trace carrying metadata the caller sent
+      When a correction removes one metadata key
+      Then the read trace no longer carries that key
+
+    @unit
+    Scenario: A correction can clear the whole metadata map
+      Given a trace carrying metadata the caller sent
+      When a correction clears the metadata
+      Then the read trace carries no metadata
+
+    @unit
+    Scenario: A metadata correction alone counts as a correction
+      Given a correction whose only edit is to the trace metadata
+      Then it counts as a correction that changes something
+
+    @unit
+    Scenario: Corrected metadata reads on the drawer header
+      Given a correction that changes a metadata key
+      When the trace header is read
+      Then the header carries the corrected metadata value
+
+    @unit
+    Scenario: Corrected metadata reaches the dataset mapping
+      Given a trace whose metadata was corrected
+      When the trace is mapped into a dataset row
+      Then the metadata column holds the corrected value
+
+    @unit
+    Scenario: Corrected metadata is withheld from a viewer who may not read captured input
+      Given a correction that changes the trace metadata
+      And a privacy policy that hides captured input from me
+      When I read the correction for that trace
+      Then the corrected metadata does not come back
+      And the structural edits still do
+
+    @unit
+    Scenario: A hidden attribute rule applies to corrected metadata
+      Given a correction that changes the trace metadata
+      And an attribute rule that hides one of those keys from me
+      When I read the correction for that trace
+      Then that key reads as restricted rather than as the corrected value
+      And the other corrected metadata keys are there
+
+    @unit
+    Scenario: A saved correction keeps the metadata edits the saver was never shown
+      Given a stored correction holding corrected metadata
+      When a reviewer who may not read it saves their own edits over it
+      Then their edits are kept
+      And the corrected metadata comes back exactly as it was stored
+
+    @integration
+    Scenario: Saving a correction that changes trace metadata stores it
+      Given a trace with no correction
+      When I save a correction that changes a metadata key
+      Then the trace has a correction holding that metadata key
 
   Rule: Only the dataset path reads the corrected trace
 

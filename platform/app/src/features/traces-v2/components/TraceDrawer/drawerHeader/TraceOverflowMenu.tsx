@@ -161,17 +161,6 @@ export function TraceOverflowMenu({
         </Button>
       </Menu.Trigger>
       <Menu.Content minWidth="240px">
-        {/* Near the top: correcting a trace is the reason a reviewer opens
-            this menu, not a secondary escape hatch. */}
-        {canEditTrace && (
-          <Menu.Item value="edit-trace" onClick={handleEditTrace}>
-            <HStack gap={2}>
-              <Icon as={LuPencil} boxSize={3.5} />
-              <Text>Edit trace</Text>
-            </HStack>
-          </Menu.Item>
-        )}
-
         <Menu.Item value="copy" onClick={onCopyTraceId}>
           <HStack gap={2}>
             <Icon as={LuCopy} boxSize={3.5} />
@@ -218,6 +207,15 @@ export function TraceOverflowMenu({
             <HStack gap={2}>
               <Icon as={LuListPlus} boxSize={3.5} />
               <Text>Add to annotation queue</Text>
+            </HStack>
+          </Menu.Item>
+        )}
+
+        {canEditTrace && (
+          <Menu.Item value="edit-trace" onClick={handleEditTrace}>
+            <HStack gap={2}>
+              <Icon as={LuPencil} boxSize={3.5} />
+              <Text>Edit trace</Text>
             </HStack>
           </Menu.Item>
         )}

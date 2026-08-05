@@ -600,6 +600,11 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     // reader, not a preference: the next one opens corrected, the way every
     // trace does until they ask otherwise.
     useTraceEditStore.getState().setOverlayView("edited");
+    // An unsaved correction belongs to the trace it was written against. The
+    // guards ask before leaving a dirty one, so anything still here once the
+    // next trace opens would be saved against the wrong trace. A session on the
+    // trace being opened survives: a link straight into edit mode re-enters it.
+    useTraceEditStore.getState().dropSessionForOtherTrace(traceId);
     set({
       isOpen: true,
       traceId,

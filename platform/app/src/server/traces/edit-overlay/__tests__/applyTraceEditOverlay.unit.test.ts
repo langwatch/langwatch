@@ -14,6 +14,7 @@ import {
   applyOverlayToTrace,
   applyOverlayToTraceHeader,
   changedSpanFields,
+  changedTraceMetadataKeys,
   expandDeletedSpanIds,
   overlayTouchesSpan,
 } from "../applyTraceEditOverlay";
@@ -353,6 +354,97 @@ describe("applying a correction to the drawer views", () => {
           spans,
         }).spanCount,
       ).toBe(3);
+    });
+  });
+
+  describe("given a correction that changes the trace metadata", () => {
+    const captured = () =>
+      trace([], {
+        metadata: {
+          environment: "staging",
+          reviewer: "unassigned",
+          thread_id: "thread-1",
+        },
+      });
+
+    /** @scenario "A metadata correction replaces the keys it names and leaves the rest" */
+    it("replaces the keys it names and leaves the rest as captured", () => {
+      const corrected = applyOverlayToTrace({
+        trace: captured(),
+        patch: patchOf({ trace: { metadata: { environment: "production" } } }),
+      });
+
+      expect(corrected.metadata).toEqual({
+        environment: "production",
+        reviewer: "unassigned",
+        thread_id: "thread-1",
+      });
+    });
+
+    /** @scenario "A metadata correction removes a key by naming it null" */
+    it("removes a key the correction names null", () => {
+      const corrected = applyOverlayToTrace({
+        trace: captured(),
+        patch: patchOf({ trace: { metadata: { reviewer: null } } }),
+      });
+
+      expect(corrected.metadata).toEqual({
+        environment: "staging",
+        thread_id: "thread-1",
+      });
+    });
+
+    /** @scenario "A correction can clear the whole metadata map" */
+    it("clears the metadata when the correction names no map at all", () => {
+      const corrected = applyOverlayToTrace({
+        trace: captured(),
+        patch: patchOf({ trace: { metadata: null } }),
+      });
+
+      expect(corrected.metadata).toEqual({});
+    });
+
+    /** @scenario "Corrected metadata reads on the drawer header" */
+    it("reads on the header row the metadata was ingested on", () => {
+      const corrected = applyOverlayToTraceHeader({
+        header: {
+          traceId: "trace-1",
+          attributes: {
+            "metadata.environment": "staging",
+            "metadata.reviewer": "unassigned",
+            "langwatch.labels": '["nightly"]',
+          },
+        } as unknown as Parameters<
+          typeof applyOverlayToTraceHeader
+        >[0]["header"],
+        patch: patchOf({
+          trace: {
+            metadata: {
+              environment: "production",
+              reviewer: null,
+              labels: ["nightly", "reviewed"],
+            },
+          },
+        }),
+      });
+
+      expect(corrected.attributes).toEqual({
+        "metadata.environment": "production",
+        "langwatch.labels": '["nightly","reviewed"]',
+      });
+    });
+
+    /** @scenario "Corrected metadata reads on the drawer header" */
+    it("names the metadata keys the correction changed", () => {
+      expect(
+        changedTraceMetadataKeys(
+          patchOf({
+            trace: { metadata: { environment: "production", reviewer: null } },
+          }),
+        ),
+      ).toEqual(["environment", "reviewer"]);
+      expect(changedTraceMetadataKeys(patchOf({}))).toEqual([]);
+      expect(changedTraceMetadataKeys(null)).toEqual([]);
     });
   });
 
