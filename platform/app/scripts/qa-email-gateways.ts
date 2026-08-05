@@ -51,7 +51,7 @@ const check = (label: string, condition: boolean, detail?: string) => {
     console.log(`  PASS  ${label}`);
   } else {
     failures++;
-    console.log(`  FAIL  ${label}${detail ? ` — ${detail}` : ""}`);
+    console.log(`  FAIL  ${label}${detail ? `: ${detail}` : ""}`);
   }
 };
 

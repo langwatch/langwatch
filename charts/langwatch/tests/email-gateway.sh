@@ -16,7 +16,7 @@
 # and nothing about the app's own successful sends reveals that.
 #
 # Scenario bindings use the same `@scenario` token as the bats suites,
-# expressed as a hash-comment above the test function it verifies — the next
+# expressed as a hash-comment above the test function it verifies. The next
 # line that is neither blank nor a comment must be that function.
 #
 # Usage (from charts/langwatch):
@@ -83,9 +83,18 @@ render_error() {
 
 # @scenario "Background jobs can send email as well as the web application"
 test_workers_receive_the_same_gateway_as_the_app() {
-  local label flags app workers
-  while IFS='|' read -r label flags; do
-    [ -z "$label" ] && continue
+  local entry label flags app workers
+  local cases=(
+    "sendgrid|--set app.email.provider=sendgrid --set app.email.providers.sendgrid.apiKey.value=SG.example"
+    "ses|--set app.email.provider=ses --set app.email.providers.ses.region=eu-central-1 --set app.email.providers.ses.endpoint=https://vpce.example.internal"
+    "smtp-url|--set app.email.provider=smtp --set app.email.providers.smtp.url.value=smtp://relay.internal:587"
+    "smtp-host|--set app.email.provider=smtp --set app.email.providers.smtp.host=relay.internal --set app.email.providers.smtp.port=2525 --set app.email.providers.smtp.user=mailer --set app.email.providers.smtp.password.value=hunter2"
+    "resend|--set app.email.provider=resend --set app.email.providers.resend.apiKey.value=re_example"
+    "secret-refs|--set app.email.provider=resend --set app.email.providers.resend.apiKey.secretKeyRef.name=mail --set app.email.providers.resend.apiKey.secretKeyRef.key=resendApiKey"
+  )
+  for entry in "${cases[@]}"; do
+    label="${entry%%|*}"
+    flags="${entry#*|}"
     app=$(email_env_of "$BASE $flags" "app/deployment.yaml")
     workers=$(email_env_of "$BASE $flags" "workers/deployment.yaml")
     if [ -z "$app" ]; then
@@ -97,21 +106,22 @@ test_workers_receive_the_same_gateway_as_the_app() {
       continue
     fi
     echo "ok   [$label] both Deployments received: $(echo "$app" | tr '\n' ' ')"
-  done <<'EOF'
-sendgrid|--set app.email.provider=sendgrid --set app.email.providers.sendgrid.apiKey.value=SG.example
-ses|--set app.email.provider=ses --set app.email.providers.ses.region=eu-central-1 --set app.email.providers.ses.endpoint=https://vpce.example.internal
-smtp-url|--set app.email.provider=smtp --set app.email.providers.smtp.url.value=smtp://relay.internal:587
-smtp-host|--set app.email.provider=smtp --set app.email.providers.smtp.host=relay.internal --set app.email.providers.smtp.port=2525 --set app.email.providers.smtp.user=mailer --set app.email.providers.smtp.password.value=hunter2
-resend|--set app.email.provider=resend --set app.email.providers.resend.apiKey.value=re_example
-secret-refs|--set app.email.provider=resend --set app.email.providers.resend.apiKey.secretKeyRef.name=mail --set app.email.providers.resend.apiKey.secretKeyRef.key=resendApiKey
-EOF
+  done
 }
 
 # @scenario "A gateway named but never configured is caught before install"
 test_an_unconfigured_gateway_stops_the_render() {
-  local label flags err
-  while IFS='|' read -r label flags; do
-    [ -z "$label" ] && continue
+  local entry label flags err
+  local cases=(
+    "sendgrid-without-a-key|--set app.email.provider=sendgrid"
+    "ses-without-a-region|--set app.email.provider=ses"
+    "smtp-without-a-host-or-url|--set app.email.provider=smtp"
+    "resend-without-a-key|--set app.email.provider=resend"
+    "a-gateway-that-does-not-exist|--set app.email.provider=mailgun --set app.email.providers.resend.apiKey.value=re_example"
+  )
+  for entry in "${cases[@]}"; do
+    label="${entry%%|*}"
+    flags="${entry#*|}"
     if [ "$(render_status "$BASE $flags")" = "ok" ]; then
       fail "$label" "rendered successfully; the mistake would surface at the first send instead"
       continue
@@ -121,30 +131,26 @@ test_an_unconfigured_gateway_stops_the_render() {
       *"app.email"*) echo "ok   [$label] render refused" ;;
       *) fail "$label" "render failed without naming the email setting: ${err:-<no Error: line>}" ;;
     esac
-  done <<'EOF'
-sendgrid-without-a-key|--set app.email.provider=sendgrid
-ses-without-a-region|--set app.email.provider=ses
-smtp-without-a-host-or-url|--set app.email.provider=smtp
-resend-without-a-key|--set app.email.provider=resend
-a-gateway-that-does-not-exist|--set app.email.provider=mailgun --set app.email.providers.resend.apiKey.value=re_example
-EOF
+  done
 }
 
 # @scenario "Settings supplied out of band are accepted"
 test_extra_environment_variables_are_an_accepted_source() {
-  local label flags
-  while IFS='|' read -r label flags; do
-    [ -z "$label" ] && continue
+  local entry label flags
+  local cases=(
+    "app-extra-envs|--set app.email.provider=smtp --set app.extraEnvs[0].name=SMTP_URL --set app.extraEnvs[0].value=smtp://relay.internal:587"
+    "app-extra-env-from|--set app.email.provider=ses --set app.extraEnvFrom[0].secretRef.name=aws-mailer"
+    "workers-extra-envs|--set app.email.provider=smtp --set workers.extraEnvs[0].name=SMTP_HOST --set workers.extraEnvs[0].value=relay.internal"
+  )
+  for entry in "${cases[@]}"; do
+    label="${entry%%|*}"
+    flags="${entry#*|}"
     if [ "$(render_status "$BASE $flags")" = "ok" ]; then
       echo "ok   [$label] render allowed"
     else
       fail "$label" "render refused even though the settings can arrive out of band: $(render_error "$BASE $flags")"
     fi
-  done <<'EOF'
-app-extra-envs|--set app.email.provider=smtp --set app.extraEnvs[0].name=SMTP_URL --set app.extraEnvs[0].value=smtp://relay.internal:587
-app-extra-env-from|--set app.email.provider=ses --set app.extraEnvFrom[0].secretRef.name=aws-mailer
-workers-extra-envs|--set app.email.provider=smtp --set workers.extraEnvs[0].name=SMTP_HOST --set workers.extraEnvs[0].value=relay.internal
-EOF
+  done
 }
 
 # @scenario "Forcing an unencrypted starting connection is not silently dropped"

@@ -1,0 +1,167 @@
+---
+title: Email
+description: "Configure the gateway LangWatch sends alerts, invitations and password resets through"
+---
+
+LangWatch sends alert notifications, scheduled reports, team invitations, usage warnings and password reset links. All of it goes through one gateway, which you choose with `EMAIL_PROVIDER`.
+
+Until a gateway is configured, those messages are not sent, and the places that would offer to send one hide the option: an invitation can be shared as a link but not emailed, and an alert configured for email delivers nothing.
+
+## Choosing a Gateway
+
+| Gateway | `EMAIL_PROVIDER` | Choose it when |
+|---------|------------------|----------------|
+| SMTP | `smtp` | Your network only allows mail out through an internal relay, or your vendor gives you an SMTP endpoint. Covers Azure Communication Services, Office 365, Google Workspace, Postmark, Mailgun and Brevo |
+| AWS SES | `ses` | You are already on AWS and want the pod's IAM role to carry the credentials |
+| SendGrid | `sendgrid` | You have a SendGrid account |
+| Resend | `resend` | You have a Resend account |
+
+SMTP is the one to reach for when nothing else fits. Any gateway that speaks it will work.
+
+<Note>
+`EMAIL_PROVIDER` decides which gateway runs, and no other gateway is tried if it fails. Leave it unset and the gateway is inferred from whichever credentials are present, `USE_AWS_SES` first and then `SENDGRID_API_KEY`. `smtp` and `resend` are only ever used when named.
+</Note>
+
+## Sender Address
+
+`EMAIL_DEFAULT_FROM` is the address recipients see, for example `LangWatch <langwatch@yourcompany.com>`. Set it to something your gateway is allowed to send as: a domain you have verified with the provider, or an address your relay accepts. Left unset, LangWatch derives one from `BASE_HOST`, which most providers will reject as unverified.
+
+## Configuration
+
+### SMTP
+
+Either a single connection URL or the discrete settings. The URL wins when both are present.
+
+```yaml
+app:
+  email:
+    enabled: true
+    defaultFrom: "LangWatch <langwatch@yourcompany.com>"
+    provider: smtp
+    providers:
+      smtp:
+        url:
+          secretKeyRef:
+            name: langwatch-email
+            key: smtpUrl
+```
+
+```yaml
+app:
+  email:
+    enabled: true
+    defaultFrom: "LangWatch <langwatch@yourcompany.com>"
+    provider: smtp
+    providers:
+      smtp:
+        host: relay.internal
+        port: "587"
+        user: langwatch
+        password:
+          secretKeyRef:
+            name: langwatch-email
+            key: smtpPassword
+```
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SMTP_URL` | Full connection URL, e.g. `smtps://user:pass@relay.internal:465` | - |
+| `SMTP_HOST` | Relay hostname | - |
+| `SMTP_PORT` | Relay port | `587` |
+| `SMTP_SECURE` | `true` for implicit TLS, `false` to start plaintext and upgrade with STARTTLS | `true` on port 465, otherwise `false` |
+| `SMTP_USER` | Username. Omit for an unauthenticated internal relay | - |
+| `SMTP_PASSWORD` | Password | - |
+
+Omitting `SMTP_USER` sends unauthenticated, which is what most internal relays expect.
+
+### AWS SES
+
+```yaml
+app:
+  email:
+    enabled: true
+    defaultFrom: "LangWatch <langwatch@yourcompany.com>"
+    provider: ses
+    providers:
+      ses:
+        region: eu-central-1
+```
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `USE_AWS_SES` | `true` to send through SES | `false` |
+| `AWS_REGION` | Region the SES identity lives in | - |
+| `AWS_SES_ENDPOINT` | Send to a VPC endpoint or an internal relay instead of the public regional endpoint | public regional endpoint |
+
+Credentials come from the standard AWS chain, so a pod with an IRSA role needs no keys in the chart. Supply `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` through `app.extraEnvs` if you are not using a role.
+
+<Note>
+A SES account still in the sandbox can only send to verified addresses, which includes the address alerts are delivered to. Request production access before relying on it.
+</Note>
+
+### SendGrid
+
+```yaml
+app:
+  email:
+    enabled: true
+    defaultFrom: "LangWatch <langwatch@yourcompany.com>"
+    provider: sendgrid
+    providers:
+      sendgrid:
+        apiKey:
+          secretKeyRef:
+            name: langwatch-email
+            key: sendgridApiKey
+```
+
+| Variable | Description |
+|----------|-------------|
+| `SENDGRID_API_KEY` | SendGrid API key |
+
+### Resend
+
+```yaml
+app:
+  email:
+    enabled: true
+    defaultFrom: "LangWatch <langwatch@yourcompany.com>"
+    provider: resend
+    providers:
+      resend:
+        apiKey:
+          secretKeyRef:
+            name: langwatch-email
+            key: resendApiKey
+```
+
+| Variable | Description |
+|----------|-------------|
+| `RESEND_API_KEY` | Resend API key |
+
+## Sending Through an Outbound Proxy
+
+Deployments whose only egress is a corporate HTTP proxy set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables through `app.extraEnvs`. The `ses`, `resend` and `sendgrid` gateways route their API calls through it, and `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
+
+```yaml
+app:
+  extraEnvs:
+    - name: HTTPS_PROXY
+      value: "http://proxy.internal:3128"
+    - name: NO_PROXY
+      value: ".internal,.cluster.local"
+```
+
+The `smtp` gateway ignores these variables deliberately, because a relay is normally an internal host reached directly. Point it at the relay's real address, or use a vendor's SMTP endpoint if that is what the proxy allows out.
+
+## Troubleshooting
+
+The chart refuses to render when `app.email.provider` names a gateway nothing configures, so a missing setting stops `helm install` rather than surfacing at the first alert. It allows the render when `app.extraEnvs` or `app.extraEnvFrom` are in play, since those can carry the settings and the chart cannot see inside them.
+
+A gateway that is configured but unusable fails at send time with a message naming the setting to fill in. When another gateway is fully configured, the message names it too, which is the usual case for an install that set SES up through `app.extraEnvs` while leaving `app.email.provider` at its default:
+
+```
+EMAIL_PROVIDER is "sendgrid" but it is not configured: set SENDGRID_API_KEY. Settings for "ses" are present, did you mean EMAIL_PROVIDER=ses?
+```
+
+A `read ETIMEDOUT` reaching the provider means egress is being blocked, which is the proxy case above.

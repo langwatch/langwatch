@@ -9,7 +9,7 @@ export type EmailContent = {
   subject: string;
   html: string;
   from?: string;
-  /** When present, these addresses are delivered as BCC — they don't appear
+  /** When present, these addresses are delivered as BCC, so they don't appear
    *  in the rendered message headers. Used by the trigger sender so
    *  recipients can't enumerate each other. */
   bcc?: string | string[];
@@ -50,7 +50,7 @@ export interface EmailProviderPort {
 }
 
 /**
- * Raised when a gateway is selected but cannot be used — an unknown name, or a
+ * Raised when a gateway is selected but cannot be used: an unknown name, or a
  * known one whose credentials are absent. Thrown at send time rather than at
  * import time so a misconfigured mailer never prevents the app from booting.
  */
