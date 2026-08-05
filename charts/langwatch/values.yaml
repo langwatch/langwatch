@@ -225,7 +225,7 @@ app:
 
   # Base URL for content-hashed frontend assets (JS/CSS chunks). Empty (default)
   # serves them same-origin straight from the pod, exactly as before. Set to a
-  # commit-prefixed CDN base — e.g. "https://cdn.langwatch.ai/<commit-sha>/" — so
+  # commit-prefixed CDN base — e.g. "https://cdn.langwatch.ai/git-<short-sha>/" — so
   # a rolling deploy never strands a browser on a 404: every past build's assets
   # remain under their own immutable prefix. The deploy pipeline both uploads
   # dist/client/assets to that prefix and sets this value for the same SHA. See

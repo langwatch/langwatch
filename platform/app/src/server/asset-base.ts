@@ -11,7 +11,7 @@
  *
  * - Unset / "/" (self-host default): assets resolve same-origin, served by the
  *   pod exactly as before; the HTML rewrite is a no-op.
- * - "https://cdn.langwatch.ai/<commit-sha>/" (SaaS): assets resolve to the
+ * - "https://cdn.langwatch.ai/git-<short-sha>/" (SaaS): assets resolve to the
  *   commit-prefixed CDN namespace, where every past build's assets still exist —
  *   so a rolling deploy never strands a tab on a 404. See ADR-086.
  */

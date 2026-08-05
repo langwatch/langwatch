@@ -5,9 +5,9 @@
 # The web app's chunks carry content-hash filenames and, from ADR-086, resolve
 # against a runtime base of the form:
 #
-#     https://<cdn-host>/<commit-sha>/assets/<hash>.js
+#     https://<cdn-host>/git-<short-sha>/assets/<hash>.js
 #
-# This script syncs `dist/client/assets/` into `s3://<bucket>/<commit-sha>/assets/`.
+# This script syncs `dist/client/assets/` into `s3://<bucket>/git-<short-sha>/assets/`.
 # Two invariants make a rolling deploy safe:
 #   1. NEVER `--delete` — a previous build's prefix must survive so a browser
 #      that loaded the old shell can still fetch its (old-hash) chunks.

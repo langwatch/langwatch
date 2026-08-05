@@ -57,11 +57,11 @@ defined before the entry chunk's dynamic imports evaluate.
 - **Unset / `/` (self-host default):** `__lwAssetUrl("assets/x.js")` → `/assets/x.js`,
   served by the pod exactly as before. The HTML rewrite is a no-op. Behaviour is
   unchanged for self-host.
-- **`https://cdn.langwatch.ai/<commit-sha>/` (SaaS):** assets resolve to the
+- **`https://cdn.langwatch.ai/git-<short-sha>/` (SaaS):** assets resolve to the
   commit-prefixed CDN namespace.
 
 **Immutability model.** Each deploy `aws s3 sync`s `dist/client/assets/` into
-`s3://<bucket>/<commit-sha>/assets/` and **never** `--delete`s. Double
+`s3://<bucket>/git-<short-sha>/assets/` and **never** `--delete`s. Double
 immutability — the content hash freezes each file's bytes; the commit prefix
 freezes each build's namespace. Old tabs keep resolving because their build's
 prefix still exists. Cleanup is an S3 lifecycle rule expiring prefixes after a

@@ -11,7 +11,7 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
   # pod that lacks that hash — a 404. The fix moves asset hosting off the pods:
   # Vite emits every asset URL as `window.__lwAssetUrl(<relative path>)`, and the
   # server injects that resolver into the served HTML shell from LANGWATCH_ASSET_BASE.
-  # SaaS points it at https://cdn.langwatch.ai/<commit-sha>/ where every past
+  # SaaS points it at https://cdn.langwatch.ai/git-<short-sha>/ where every past
   # build's commit-prefixed namespace still exists in S3, so both builds' assets
   # resolve regardless of which pod serves the shell. Self-host leaves it unset
   # and assets resolve same-origin exactly as before. Companion to spa-fallback.feature.
