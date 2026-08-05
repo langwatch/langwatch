@@ -43,15 +43,25 @@ export function AdjacentScenariosReviewDrawerFromUrl(props: Props) {
   );
 }
 
-export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
-  const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer } = useDrawer();
+/**
+ * The review queue's state: what is selected, and the two mutations that act
+ * on it. Returns state and callbacks only, never JSX.
+ */
+function useReviewQueue({
+  projectId,
+  batchId,
+  onDispatched,
+}: {
+  projectId: string | undefined;
+  batchId: string | undefined;
+  onDispatched: () => void;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
-
   const utils = api.useUtils();
-  const canQuery = !!project?.id && !!batchId;
+  const canQuery = !!projectId && !!batchId;
+
   const batchQuery = api.fanOut.getBatch.useQuery(
-    { projectId: project?.id ?? "", batchId: batchId ?? "" },
+    { projectId: projectId ?? "", batchId: batchId ?? "" },
     { enabled: canQuery },
   );
 
@@ -68,7 +78,7 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
   const runBatch = api.fanOut.run.useMutation({
     onSuccess: async () => {
       await utils.fanOut.getBatch.invalidate();
-      if (batchId) openDrawer("adjacentScenariosReport", { batchId });
+      onDispatched();
     },
     onError: (error) => {
       showErrorToast({ error, fallbackTitle: "Couldn't start the run" });
@@ -79,19 +89,17 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
     () => batchQuery.data?.variants ?? [],
     [batchQuery.data?.variants],
   );
-  const pendingCount = variants.filter((v) => v.status === "PENDING").length;
-  const approvedCount = variants.filter((v) => v.status === "APPROVED").length;
 
   const applyDecision = useCallback(
     (variantIds: string[], decision: "approve" | "reject") => {
-      if (!project?.id || !batchId || variantIds.length === 0) return;
+      if (!projectId || !batchId || variantIds.length === 0) return;
       decide.mutate({
-        projectId: project.id,
+        projectId,
         batchId,
         decisions: variantIds.map((variantId) => ({ variantId, decision })),
       });
     },
-    [project?.id, batchId, decide],
+    [projectId, batchId, decide],
   );
 
   const toggle = useCallback((id: string) => {
@@ -102,6 +110,41 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
       return next;
     });
   }, []);
+
+  const runApproved = useCallback(() => {
+    if (!projectId || !batchId) return;
+    runBatch.mutate({ projectId, batchId });
+  }, [projectId, batchId, runBatch]);
+
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+
+  return {
+    batchQuery,
+    canQuery,
+    variants,
+    selected,
+    clearSelection,
+    toggle,
+    applyDecision,
+    runApproved,
+    deciding: decide.isPending,
+    running: runBatch.isPending,
+    pendingCount: variants.filter((v) => v.status === "PENDING").length,
+    approvedCount: variants.filter((v) => v.status === "APPROVED").length,
+  };
+}
+
+export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
+  const { project } = useOrganizationTeamProject();
+  const { closeDrawer, openDrawer } = useDrawer();
+
+  const queue = useReviewQueue({
+    projectId: project?.id,
+    batchId,
+    onDispatched: () => {
+      if (batchId) openDrawer("adjacentScenariosReport", { batchId });
+    },
+  });
 
   return (
     <Drawer.Root
@@ -123,104 +166,185 @@ export function AdjacentScenariosReviewDrawer({ batchId }: Props) {
         </Drawer.Header>
 
         <Drawer.Body padding={0}>
-          {batchQuery.error ? (
-            <Box padding={6}>
-              <HandledErrorAlert
-                error={batchQuery.error}
-                fallbackTitle="Couldn't load these scenarios"
-              />
-            </Box>
-          ) : !canQuery || batchQuery.isLoading ? (
-            <HStack justify="center" padding={10}>
-              <Spinner size="sm" />
-              <Text textStyle="sm" color="fg.muted">
-                Loading
-              </Text>
-            </HStack>
-          ) : variants.length === 0 ? (
-            <Box padding={10}>
-              <Text textStyle="sm" color="fg.muted">
-                No variants in this batch.
-              </Text>
-            </Box>
-          ) : (
-            <VStack align="stretch" gap={0}>
-              {variants.map((variant) => (
-                <VariantRow
-                  key={variant.id}
-                  variant={variant}
-                  selected={selected.has(variant.id)}
-                  onToggle={() => toggle(variant.id)}
-                  onApprove={() => applyDecision([variant.id], "approve")}
-                  onReject={() => applyDecision([variant.id], "reject")}
-                  onEdit={() =>
-                    openDrawer("scenarioEditor", {
-                      urlParams: { scenarioId: variant.scenarioId },
-                    })
-                  }
-                />
-              ))}
-            </VStack>
-          )}
+          <ReviewBody
+            error={queue.batchQuery.error}
+            loading={!queue.canQuery || queue.batchQuery.isLoading}
+            variants={queue.variants}
+            selected={queue.selected}
+            onToggle={queue.toggle}
+            onDecide={queue.applyDecision}
+            openDrawer={openDrawer}
+          />
         </Drawer.Body>
 
-        <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
-          {/* An inline bar, not the viewport-fixed SelectionActionBar: that one
-              sits at zIndex 20, below the drawer overlay, so inside a drawer it
-              would render behind the surface (selection-action-bar.md). */}
-          {selected.size > 0 ? (
-            <HStack gap={2}>
-              <Text textStyle="sm" fontWeight="medium">
-                {selected.size} selected
-              </Text>
-              <Box width="1px" height="20px" bg="border.muted" />
-              <Button
-                size="xs"
-                variant="outline"
-                loading={decide.isPending}
-                onClick={() => applyDecision([...selected], "approve")}
-              >
-                <Check size={14} /> Approve selected
-              </Button>
-              <Button
-                size="xs"
-                variant="outline"
-                colorPalette="red"
-                loading={decide.isPending}
-                onClick={() => applyDecision([...selected], "reject")}
-              >
-                <X size={14} /> Reject selected
-              </Button>
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => setSelected(new Set())}
-              >
-                Clear
-              </Button>
-            </HStack>
-          ) : (
-            <Text textStyle="sm" color="fg.muted">
-              {pendingCount} awaiting review
-            </Text>
-          )}
-
-          {approvedCount > 0 && (
-            <Button
-              size="sm"
-              colorPalette="orange"
-              loading={runBatch.isPending}
-              onClick={() => {
-                if (!project?.id || !batchId) return;
-                runBatch.mutate({ projectId: project.id, batchId });
-              }}
-            >
-              <Play size={14} /> Run {approvedCount} approved
-            </Button>
-          )}
-        </Drawer.Footer>
+        <ReviewFooter
+          selected={queue.selected}
+          pendingCount={queue.pendingCount}
+          approvedCount={queue.approvedCount}
+          deciding={queue.deciding}
+          running={queue.running}
+          onDecide={queue.applyDecision}
+          onClearSelection={queue.clearSelection}
+          onRun={queue.runApproved}
+        />
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+function ReviewFooter({
+  selected,
+  pendingCount,
+  approvedCount,
+  deciding,
+  running,
+  onDecide,
+  onClearSelection,
+  onRun,
+}: {
+  selected: Set<string>;
+  pendingCount: number;
+  approvedCount: number;
+  deciding: boolean;
+  running: boolean;
+  onDecide: (ids: string[], decision: "approve" | "reject") => void;
+  onClearSelection: () => void;
+  onRun: () => void;
+}) {
+  return (
+    <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
+      {/* An inline bar, not the viewport-fixed SelectionActionBar: that one
+          sits at zIndex 20, below the drawer overlay, so inside a drawer it
+          would render behind the surface (selection-action-bar.md). */}
+      {selected.size > 0 ? (
+        <HStack gap={2}>
+          <Text textStyle="sm" fontWeight="medium">
+            {selected.size} selected
+          </Text>
+          <Box width="1px" height="20px" bg="border.muted" />
+          <Button
+            size="xs"
+            variant="outline"
+            loading={deciding}
+            onClick={() => onDecide([...selected], "approve")}
+          >
+            <Check size={14} /> Approve selected
+          </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            colorPalette="red"
+            loading={deciding}
+            onClick={() => onDecide([...selected], "reject")}
+          >
+            <X size={14} /> Reject selected
+          </Button>
+          <Button size="xs" variant="ghost" onClick={onClearSelection}>
+            Clear
+          </Button>
+        </HStack>
+      ) : (
+        <Text textStyle="sm" color="fg.muted">
+          {pendingCount} awaiting review
+        </Text>
+      )}
+
+      {approvedCount > 0 && (
+        <Button
+          size="sm"
+          colorPalette="orange"
+          loading={running}
+          onClick={onRun}
+        >
+          <Play size={14} /> Run {approvedCount} approved
+        </Button>
+      )}
+    </Drawer.Footer>
+  );
+}
+
+/** A variant as the review queue renders it: the row plus its scenario. */
+type ReviewVariant = {
+  id: string;
+  scenarioId: string;
+  lens: string;
+  rationale: string | null;
+  status: string;
+  scenario: {
+    name: string;
+    situation: string;
+    criteria: string[];
+  } | null;
+};
+
+/** The one place that decides between error, loading, empty and the queue. */
+function ReviewBody({
+  error,
+  loading,
+  variants,
+  selected,
+  onToggle,
+  onDecide,
+  openDrawer,
+}: {
+  error: unknown;
+  loading: boolean;
+  variants: ReviewVariant[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  onDecide: (ids: string[], decision: "approve" | "reject") => void;
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+}) {
+  if (error) {
+    return (
+      <Box padding={6}>
+        <HandledErrorAlert
+          error={error}
+          fallbackTitle="Couldn't load these scenarios"
+        />
+      </Box>
+    );
+  }
+
+  if (loading) {
+    return (
+      <HStack justify="center" padding={10}>
+        <Spinner size="sm" />
+        <Text textStyle="sm" color="fg.muted">
+          Loading
+        </Text>
+      </HStack>
+    );
+  }
+
+  if (variants.length === 0) {
+    return (
+      <Box padding={10}>
+        <Text textStyle="sm" color="fg.muted">
+          No variants in this batch.
+        </Text>
+      </Box>
+    );
+  }
+
+  return (
+    <VStack align="stretch" gap={0}>
+      {variants.map((variant) => (
+        <VariantRow
+          key={variant.id}
+          variant={variant}
+          selected={selected.has(variant.id)}
+          onToggle={() => onToggle(variant.id)}
+          onApprove={() => onDecide([variant.id], "approve")}
+          onReject={() => onDecide([variant.id], "reject")}
+          onEdit={() =>
+            openDrawer("scenarioEditor", {
+              urlParams: { scenarioId: variant.scenarioId },
+            })
+          }
+        />
+      ))}
+    </VStack>
   );
 }
 
@@ -232,18 +356,7 @@ function VariantRow({
   onReject,
   onEdit,
 }: {
-  variant: {
-    id: string;
-    scenarioId: string;
-    lens: string;
-    rationale: string | null;
-    status: string;
-    scenario: {
-      name: string;
-      situation: string;
-      criteria: string[];
-    } | null;
-  };
+  variant: ReviewVariant;
   selected: boolean;
   onToggle: () => void;
   onApprove: () => void;

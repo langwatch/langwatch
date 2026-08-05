@@ -23,6 +23,60 @@ export type CreateFanOutVariantInput = Omit<
   "id" | "status" | "createdAt" | "updatedAt"
 >;
 
+type FanOutTransaction = Parameters<
+  Parameters<PrismaClient["$transaction"]>[0]
+>[0];
+
+/**
+ * Whether every requested id is a distinct variant of this batch.
+ *
+ * A repeated id would pass a set-size membership check and then be updated
+ * twice, with the last decision winning silently. Two conflicting decisions
+ * for one variant is a caller bug, not something to resolve by ordering.
+ */
+async function allVariantsInBatch({
+  tx,
+  batchId,
+  projectId,
+  ids,
+}: {
+  tx: FanOutTransaction;
+  batchId: string;
+  projectId: string;
+  ids: string[];
+}): Promise<boolean> {
+  if (new Set(ids).size !== ids.length) return false;
+
+  const found = await tx.fanOutVariant.findMany({
+    where: { id: { in: ids }, batchId, batch: { projectId } },
+    select: { id: true },
+  });
+  return found.length === ids.length;
+}
+
+/** Archives the scenarios behind the variants that were just rejected. */
+async function archiveRejected({
+  tx,
+  projectId,
+  updated,
+  decidedAt,
+}: {
+  tx: FanOutTransaction;
+  projectId: string;
+  updated: FanOutVariant[];
+  decidedAt: Date;
+}): Promise<void> {
+  const scenarioIds = updated
+    .filter((variant) => variant.status === "REJECTED")
+    .map((variant) => variant.scenarioId);
+  if (scenarioIds.length === 0) return;
+
+  await tx.scenario.updateMany({
+    where: { id: { in: scenarioIds }, projectId, archivedAt: null },
+    data: { archivedAt: decidedAt },
+  });
+}
+
 export class FanOutRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -166,64 +220,38 @@ export class FanOutRepository {
         },
       },
       async (span) => {
-        return this.prisma.$transaction(async (tx) => {
-          const ids = input.decisions.map((decision) => decision.variantId);
-          // A repeated id would pass a set-size membership check and then be
-          // updated twice, with the last decision winning silently. Two
-          // conflicting decisions for one variant is a caller bug, not
-          // something to resolve by ordering.
-          if (new Set(ids).size !== ids.length) {
-            span.setAttribute("result.found", false);
-            return null;
-          }
-
-          const found = await tx.fanOutVariant.findMany({
-            where: {
-              id: { in: ids },
-              batchId: input.batchId,
-              batch: { projectId: input.projectId },
-            },
-            select: { id: true },
+        const result = await this.prisma.$transaction(async (tx) => {
+          const identified = await allVariantsInBatch({
+            tx,
+            batchId: input.batchId,
+            projectId: input.projectId,
+            ids: input.decisions.map((decision) => decision.variantId),
           });
-
-          if (found.length !== ids.length) {
-            span.setAttribute("result.found", false);
-            return null;
-          }
+          if (!identified) return null;
 
           const decidedAt = new Date();
           const updated: FanOutVariant[] = [];
-          const rejectedScenarioIds: string[] = [];
-
           for (const { variantId, status } of input.decisions) {
-            const variant = await tx.fanOutVariant.update({
-              where: { id: variantId, batchId: input.batchId },
-              data: {
-                status,
-                decidedById: input.decidedById,
-                decidedAt,
-              },
-            });
-            updated.push(variant);
-            if (status === "REJECTED") {
-              rejectedScenarioIds.push(variant.scenarioId);
-            }
+            updated.push(
+              await tx.fanOutVariant.update({
+                where: { id: variantId, batchId: input.batchId },
+                data: { status, decidedById: input.decidedById, decidedAt },
+              }),
+            );
           }
 
-          if (rejectedScenarioIds.length > 0) {
-            await tx.scenario.updateMany({
-              where: {
-                id: { in: rejectedScenarioIds },
-                projectId: input.projectId,
-                archivedAt: null,
-              },
-              data: { archivedAt: decidedAt },
-            });
-          }
+          await archiveRejected({
+            tx,
+            projectId: input.projectId,
+            updated,
+            decidedAt,
+          });
 
-          span.setAttribute("result.found", true);
           return updated;
         });
+
+        span.setAttribute("result.found", result !== null);
+        return result;
       },
     );
   }

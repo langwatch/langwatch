@@ -193,13 +193,56 @@ export class FanOutRunService {
       ),
     );
 
+    const settled = await this.queueItems({
+      items,
+      projectId: params.projectId,
+      scenarioSetId: params.scenarioSetId,
+      target: params.target,
+      batchRunId,
+      occurredAt: now,
+    });
+
+    const queuedCount = settled.filter(
+      (outcome) => outcome.status === "fulfilled",
+    ).length;
+
+    return {
+      batchRunId,
+      scenarioSetId: params.scenarioSetId,
+      itemCount: queuedCount,
+      ...(seedItem && settled[0]?.status === "fulfilled"
+        ? { seedScenarioRunId: seedItem.scenarioRunId }
+        : {}),
+    };
+  }
+
+  /**
+   * Queues every item and reports what did not make it.
+   *
+   * One item failing must not abandon the ones that did, which is why this
+   * stays allSettled. But a silently dropped item would sit in totalVariants
+   * and never in finishedVariants, so the blast radius would keep a
+   * denominator it can never reach.
+   */
+  private async queueItems(params: {
+    items: Array<{
+      scenarioId: string;
+      scenarioRunId: string;
+      name: string | undefined;
+    }>;
+    projectId: string;
+    scenarioSetId: string;
+    target: FanOutTarget;
+    batchRunId: string;
+    occurredAt: number;
+  }): Promise<PromiseSettledResult<void>[]> {
     const settled = await Promise.allSettled(
-      items.map((item) =>
+      params.items.map((item) =>
         this.queueSimulationRunCommand({
           tenantId: params.projectId,
           scenarioRunId: item.scenarioRunId,
           scenarioId: item.scenarioId,
-          batchRunId,
+          batchRunId: params.batchRunId,
           scenarioSetId: params.scenarioSetId,
           name: item.name,
           metadata: {
@@ -209,23 +252,19 @@ export class FanOutRunService {
             },
           },
           target: params.target,
-          occurredAt: now,
+          occurredAt: params.occurredAt,
         }),
       ),
     );
 
-    // One item failing to queue must not abandon the ones that did, which is
-    // why this stays allSettled. But a silently dropped item would sit in
-    // totalVariants and never in finishedVariants, so the blast radius would
-    // keep a denominator it can never reach. Report what was actually queued.
     const rejected = settled.filter((outcome) => outcome.status === "rejected");
     if (rejected.length > 0) {
       logger.error(
         {
           projectId: params.projectId,
-          batchRunId,
+          batchRunId: params.batchRunId,
           failedCount: rejected.length,
-          itemCount: items.length,
+          itemCount: params.items.length,
           reasons: rejected.map((outcome) =>
             outcome.reason instanceof Error
               ? outcome.reason.message
@@ -236,15 +275,6 @@ export class FanOutRunService {
       );
     }
 
-    const queuedCount = items.length - rejected.length;
-
-    return {
-      batchRunId,
-      scenarioSetId: params.scenarioSetId,
-      itemCount: queuedCount,
-      ...(seedItem && settled[0]?.status === "fulfilled"
-        ? { seedScenarioRunId: seedItem.scenarioRunId }
-        : {}),
-    };
+    return settled;
   }
 }

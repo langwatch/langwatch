@@ -13,7 +13,7 @@ import { useMemo } from "react";
 import { HandledErrorAlert } from "~/features/errors";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 import { Drawer } from "../../ui/drawer";
 import { FAN_OUT_LENS_LABELS } from "../services/fanOutGeneration";
 
@@ -81,101 +81,13 @@ export function AdjacentScenariosReportDrawer({ batchId }: Props) {
         </Drawer.Header>
 
         <Drawer.Body>
-          {reportQuery.error ? (
-            <HandledErrorAlert
-              error={reportQuery.error}
-              fallbackTitle="Couldn't load the blast radius"
-            />
-          ) : !canQuery || reportQuery.isLoading ? (
-            <HStack justify="center" padding={10}>
-              <Spinner size="sm" />
-              <Text textStyle="sm" color="fg.muted">
-                Loading
-              </Text>
-            </HStack>
-          ) : !report ? (
-            <Text textStyle="sm" color="fg.muted">
-              No results yet.
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={6}>
-              <Headline
-                failed={report.failedVariants}
-                finished={report.finishedVariants}
-                total={report.totalVariants}
-                stillRunning={stillRunning}
-              />
-
-              {report.seedRun && (
-                <Box>
-                  <Text textStyle="sm" fontWeight="medium" marginBottom={1}>
-                    The original failure
-                  </Text>
-                  <StatusBadge status={report.seedRun.status} />
-                </Box>
-              )}
-
-              {lensRows.length > 0 && (
-                <Box>
-                  <Text textStyle="sm" fontWeight="medium" marginBottom={2}>
-                    Where it breaks
-                  </Text>
-                  <VStack align="stretch" gap={2}>
-                    {lensRows.map(([lens, counts]) => (
-                      <HStack key={lens} justify="space-between">
-                        <Text textStyle="sm">
-                          {FAN_OUT_LENS_LABELS[lens] ?? lens}
-                        </Text>
-                        <Text
-                          textStyle="sm"
-                          color={counts.failed > 0 ? "red.500" : "fg.muted"}
-                          fontWeight={counts.failed > 0 ? "medium" : "normal"}
-                        >
-                          {counts.failed} of {counts.total} failed
-                        </Text>
-                      </HStack>
-                    ))}
-                  </VStack>
-                </Box>
-              )}
-
-              <Box>
-                <Text textStyle="sm" fontWeight="medium" marginBottom={2}>
-                  Each scenario
-                </Text>
-                <VStack align="stretch" gap={0}>
-                  {report.variants.map((entry) => (
-                    <HStack
-                      key={entry.variant.id}
-                      justify="space-between"
-                      paddingY={3}
-                      borderBottomWidth="1px"
-                      borderColor="border.muted"
-                    >
-                      <VStack align="start" gap={1} flex={1} minWidth={0}>
-                        <Badge size="sm" variant="subtle">
-                          {FAN_OUT_LENS_LABELS[entry.variant.lens] ??
-                            entry.variant.lens}
-                        </Badge>
-                        {entry.variant.rationale && (
-                          <Text textStyle="xs" color="fg.muted">
-                            {entry.variant.rationale}
-                          </Text>
-                        )}
-                      </VStack>
-                      {entry.run ? (
-                        <StatusBadge status={entry.run.status} />
-                      ) : (
-                        <Badge size="sm" variant="subtle" colorPalette="gray">
-                          Waiting
-                        </Badge>
-                      )}
-                    </HStack>
-                  ))}
-                </VStack>
-              </Box>
-            </VStack>
-          )}
+          <ReportBody
+            error={reportQuery.error}
+            loading={!canQuery || reportQuery.isLoading}
+            report={report}
+            stillRunning={stillRunning}
+            lensRows={lensRows}
+          />
         </Drawer.Body>
 
         <Drawer.Footer borderTopWidth="1px">
@@ -186,6 +98,171 @@ export function AdjacentScenariosReportDrawer({ batchId }: Props) {
       </Drawer.Content>
     </Drawer.Root>
   );
+}
+
+type ReportData = RouterOutputs["fanOut"]["report"];
+
+/** The one place that decides between error, loading, empty and the report. */
+function ReportBody({
+  error,
+  loading,
+  report,
+  stillRunning,
+  lensRows,
+}: {
+  error: unknown;
+  loading: boolean;
+  report: ReportData | undefined;
+  stillRunning: number;
+  lensRows: [string, LensCounts][];
+}) {
+  if (error) {
+    return (
+      <HandledErrorAlert
+        error={error}
+        fallbackTitle="Couldn't load the blast radius"
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <HStack justify="center" padding={10}>
+        <Spinner size="sm" />
+        <Text textStyle="sm" color="fg.muted">
+          Loading
+        </Text>
+      </HStack>
+    );
+  }
+
+  if (!report) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        No results yet.
+      </Text>
+    );
+  }
+
+  return (
+    <VStack align="stretch" gap={6}>
+      <Headline
+        failed={report.failedVariants}
+        finished={report.finishedVariants}
+        total={report.totalVariants}
+        stillRunning={stillRunning}
+      />
+
+      {report.seedRun && (
+        <Box>
+          <Text textStyle="sm" fontWeight="medium" marginBottom={1}>
+            The original failure
+          </Text>
+          <StatusBadge status={report.seedRun.status} />
+        </Box>
+      )}
+
+      <LensBreakdown rows={lensRows} />
+
+      <Box>
+        <Text textStyle="sm" fontWeight="medium" marginBottom={2}>
+          Each scenario
+        </Text>
+        <VStack align="stretch" gap={0}>
+          {report.variants.map((entry) => (
+            <VariantResultRow key={entry.variant.id} entry={entry} />
+          ))}
+        </VStack>
+      </Box>
+    </VStack>
+  );
+}
+
+type LensCounts = { total: number; failed: number; finished: number };
+
+/** Which adjacency lenses the failure reached, and how far into each. */
+function LensBreakdown({ rows }: { rows: [string, LensCounts][] }) {
+  if (rows.length === 0) return null;
+
+  return (
+    <Box>
+      <Text textStyle="sm" fontWeight="medium" marginBottom={2}>
+        Where it breaks
+      </Text>
+      <VStack align="stretch" gap={2}>
+        {rows.map(([lens, counts]) => (
+          <LensRow key={lens} lens={lens} counts={counts} />
+        ))}
+      </VStack>
+    </Box>
+  );
+}
+
+function LensRow({ lens, counts }: { lens: string; counts: LensCounts }) {
+  const anyFailed = counts.failed > 0;
+
+  return (
+    <HStack justify="space-between">
+      <Text textStyle="sm">{FAN_OUT_LENS_LABELS[lens] ?? lens}</Text>
+      <Text
+        textStyle="sm"
+        color={anyFailed ? "red.500" : "fg.muted"}
+        fontWeight={anyFailed ? "medium" : "normal"}
+      >
+        {counts.failed} of {counts.total} failed
+      </Text>
+    </HStack>
+  );
+}
+
+function VariantResultRow({
+  entry,
+}: {
+  entry: {
+    variant: { lens: string; rationale: string | null };
+    run: { status: string } | null;
+  };
+}) {
+  return (
+    <HStack
+      justify="space-between"
+      paddingY={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+    >
+      <VStack align="start" gap={1} flex={1} minWidth={0}>
+        <Badge size="sm" variant="subtle">
+          {FAN_OUT_LENS_LABELS[entry.variant.lens] ?? entry.variant.lens}
+        </Badge>
+        {entry.variant.rationale && (
+          <Text textStyle="xs" color="fg.muted">
+            {entry.variant.rationale}
+          </Text>
+        )}
+      </VStack>
+      {entry.run ? (
+        <StatusBadge status={entry.run.status} />
+      ) : (
+        <Badge size="sm" variant="subtle" colorPalette="gray">
+          Waiting
+        </Badge>
+      )}
+    </HStack>
+  );
+}
+
+/** The sentence under the headline number. */
+function summarize({
+  failed,
+  finished,
+}: {
+  failed: number;
+  finished: number;
+}): string {
+  if (finished === 0) return "Waiting for the first results.";
+  if (failed === 0)
+    return "The problem looks contained to the case you started from.";
+  return "The same problem shows up in scenarios next to the one you reported.";
 }
 
 function Headline({
@@ -199,55 +276,57 @@ function Headline({
   total: number;
   stillRunning: number;
 }) {
-  const percent = finished > 0 ? Math.round((failed / finished) * 100) : 0;
+  const anyFailed = failed > 0;
+  const anyFinished = finished > 0;
+  const percent = anyFinished ? Math.round((failed / finished) * 100) : 0;
 
   return (
     <Box
       borderWidth="1px"
-      borderColor={failed > 0 ? "red.200" : "border.muted"}
+      borderColor={anyFailed ? "red.200" : "border.muted"}
       borderRadius="md"
       padding={4}
-      bg={failed > 0 ? "red.50" : "bg.subtle"}
+      bg={anyFailed ? "red.50" : "bg.subtle"}
       _dark={{
-        bg: failed > 0 ? "red.950" : "bg.subtle",
-        borderColor: failed > 0 ? "red.800" : "border.muted",
+        bg: anyFailed ? "red.950" : "bg.subtle",
+        borderColor: anyFailed ? "red.800" : "border.muted",
       }}
     >
       <VStack align="start" gap={2}>
-        <Heading size="lg" color={failed > 0 ? "red.600" : "fg"}>
-          {finished > 0
+        <Heading size="lg" color={anyFailed ? "red.600" : "fg"}>
+          {anyFinished
             ? `${failed} of ${finished} also failed`
             : `Waiting on ${total} scenarios`}
         </Heading>
         <Text textStyle="sm" color="fg.muted">
-          {failed === 0 && finished > 0
-            ? "The problem looks contained to the case you started from."
-            : failed > 0
-              ? "The same problem shows up in scenarios next to the one you reported."
-              : "Waiting for the first results."}
+          {summarize({ failed, finished })}
         </Text>
-        {finished > 0 && (
+        {anyFinished && (
           <Progress.Root
             value={percent}
             size="sm"
             width="full"
-            colorPalette={failed > 0 ? "red" : "green"}
+            colorPalette={anyFailed ? "red" : "green"}
           >
             <Progress.Track>
               <Progress.Range />
             </Progress.Track>
           </Progress.Root>
         )}
-        {stillRunning > 0 && (
-          <HStack gap={2}>
-            <Spinner size="xs" />
-            <Text textStyle="xs" color="fg.muted">
-              {stillRunning} still running
-            </Text>
-          </HStack>
-        )}
+        {stillRunning > 0 && <StillRunning count={stillRunning} />}
       </VStack>
     </Box>
+  );
+}
+
+function StillRunning({ count }: { count: number }) {
+  return (
+    <HStack gap={2}>
+      <Spinner size="xs" />
+      <Text textStyle="xs" color="fg.muted">
+        {count} still running
+      </Text>
+    </HStack>
   );
 }
 
