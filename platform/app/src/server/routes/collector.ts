@@ -17,6 +17,8 @@ import {
 import { TokenResolver } from "../api-key/token-resolver";
 import { getApp } from "../app-layer/app";
 import { SPAN_MAX_PAST_MS } from "../app-layer/traces/trace-request-collection.service";
+import { PlanLimitExceededError } from "../app-layer/usage/errors";
+import type { UsageLimitResult } from "../app-layer/usage/usage.service";
 import { prisma } from "../db";
 import { evaluationNameAutoslug } from "../tracer/collector/evaluationNameAutoslug";
 import { maybeAddIdsToContextList } from "../tracer/collector/rag";
@@ -139,46 +141,15 @@ secured
         "collector request being processed",
       );
 
+      // The lookup is wrapped in try/catch on its own — on failure we log and
+      // let the request through (same behaviour as before). The thrown limit
+      // error below lives outside that try block so it is never mistaken for
+      // a lookup failure.
+      let limitResult: UsageLimitResult;
       try {
-        const limitResult = await getApp().usage.checkLimit({
+        limitResult = await getApp().usage.checkLimit({
           teamId: project.teamId,
         });
-
-        if (limitResult.exceeded) {
-          try {
-            const activePlan = await getApp().planProvider.getActivePlan({
-              organizationId: project.team.organizationId,
-            });
-            await getApp().usageLimits.notifyPlanLimitReached({
-              organizationId: project.team.organizationId,
-              planName: activePlan.name ?? "free",
-            });
-          } catch (error) {
-            logger.error(
-              { error, projectId: project.id },
-              "Error sending plan limit notification",
-            );
-          }
-          logger.info(
-            {
-              projectId: project.id,
-              currentMonthMessagesCount: limitResult.count,
-              activePlanName: limitResult.planName,
-              maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
-            },
-            "Project has reached plan limit",
-          );
-
-          // 402, not 429: OTel SDKs and most HTTP clients retry a 429, and a
-          // plan limit is terminal for that payload, so a retryable status
-          // turns one rejection into an unbounded loop.
-          return c.json(
-            {
-              message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
-            },
-            402,
-          );
-        }
       } catch (error) {
         logger.error(
           { error, projectId: project.id },
@@ -186,6 +157,42 @@ secured
         );
         captureException(new Error("Error checking trace limit"), {
           extra: { projectId: project.id, error },
+        });
+        limitResult = { exceeded: false };
+      }
+
+      if (limitResult.exceeded) {
+        try {
+          const activePlan = await getApp().planProvider.getActivePlan({
+            organizationId: project.team.organizationId,
+          });
+          await getApp().usageLimits.notifyPlanLimitReached({
+            organizationId: project.team.organizationId,
+            planName: activePlan.name ?? "free",
+          });
+        } catch (error) {
+          logger.error(
+            { error, projectId: project.id },
+            "Error sending plan limit notification",
+          );
+        }
+        logger.info(
+          {
+            projectId: project.id,
+            currentMonthMessagesCount: limitResult.count,
+            activePlanName: limitResult.planName,
+            maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+          },
+          "Project has reached plan limit",
+        );
+
+        // 402, not 429: OTel SDKs and most HTTP clients retry a 429, and a
+        // plan limit is terminal for that payload, so a retryable status
+        // turns one rejection into an unbounded loop.
+        throw new PlanLimitExceededError(limitResult.message, {
+          currentMonthMessagesCount: limitResult.count,
+          maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+          activePlanName: limitResult.planName,
         });
       }
 

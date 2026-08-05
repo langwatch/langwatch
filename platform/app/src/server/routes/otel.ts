@@ -31,6 +31,8 @@ import {
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
+import { PlanLimitExceededError } from "~/server/app-layer/usage/errors";
+import type { UsageLimitResult } from "~/server/app-layer/usage/usage.service";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
@@ -182,65 +184,23 @@ async function authenticate(
 }
 
 /**
- * Checks usage limits for the project and returns a 402 result if exceeded.
- * Logs `Project has reached plan limit` with `customerTraceIds` so a
- * customer-supplied trace_id can be matched to the rejection. The check
+ * Checks usage limits for the project and throws PlanLimitExceededError (402)
+ * if exceeded. Logs `Project has reached plan limit` with `customerTraceIds`
+ * so a customer-supplied trace_id can be matched to the rejection. The lookup
  * itself is wrapped in try/catch — on lookup failure we log and let the
- * request through (same behaviour as before).
+ * request through (same behaviour as before); the thrown limit error lives
+ * outside that try block so it is never mistaken for a lookup failure.
  */
 async function enforcePlanLimit(
   project: { id: string; teamId: string; team: { organizationId: string } },
   customerTraceIds: string[],
   logger: ReturnType<typeof createLogger>,
-) {
+): Promise<void> {
+  let limitResult: UsageLimitResult;
   try {
-    const limitResult = await getApp().usage.checkLimit({
+    limitResult = await getApp().usage.checkLimit({
       teamId: project.teamId,
     });
-
-    if (!limitResult.exceeded) return null;
-
-    try {
-      const activePlan = await getApp().planProvider.getActivePlan({
-        organizationId: project.team.organizationId,
-      });
-      getApp()
-        .usageLimits.notifyPlanLimitReached({
-          organizationId: project.team.organizationId,
-          planName: activePlan.name ?? "free",
-        })
-        .catch((error: unknown) => {
-          logger.error(
-            { error, projectId: project.id },
-            "Error sending plan limit notification",
-          );
-        });
-    } catch (error) {
-      logger.error(
-        { error, projectId: project.id },
-        "Error getting active plan information",
-      );
-    }
-
-    logger.info(
-      {
-        projectId: project.id,
-        currentMonthMessagesCount: limitResult.count,
-        activePlanName: limitResult.planName,
-        maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
-        customerTraceIds,
-      },
-      "Project has reached plan limit",
-    );
-
-    // 402, not 429: the OTel SDKs treat 429 as retryable and will re-post the
-    // same batch until their elapsed-time budget runs out. A plan limit is
-    // terminal for that payload, so a retryable status turns one rejection
-    // into an unbounded loop against a customer who cannot succeed.
-    return {
-      error: `ERR_PLAN_LIMIT: ${limitResult.message}`,
-      status: 402 as const,
-    };
   } catch (error) {
     logger.error(
       { error, projectId: project.id, customerTraceIds },
@@ -249,8 +209,53 @@ async function enforcePlanLimit(
     captureException(error as Error, {
       extra: { projectId: project.id },
     });
-    return null;
+    return;
   }
+
+  if (!limitResult.exceeded) return;
+
+  try {
+    const activePlan = await getApp().planProvider.getActivePlan({
+      organizationId: project.team.organizationId,
+    });
+    getApp()
+      .usageLimits.notifyPlanLimitReached({
+        organizationId: project.team.organizationId,
+        planName: activePlan.name ?? "free",
+      })
+      .catch((error: unknown) => {
+        logger.error(
+          { error, projectId: project.id },
+          "Error sending plan limit notification",
+        );
+      });
+  } catch (error) {
+    logger.error(
+      { error, projectId: project.id },
+      "Error getting active plan information",
+    );
+  }
+
+  logger.info(
+    {
+      projectId: project.id,
+      currentMonthMessagesCount: limitResult.count,
+      activePlanName: limitResult.planName,
+      maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+      customerTraceIds,
+    },
+    "Project has reached plan limit",
+  );
+
+  // 402, not 429: the OTel SDKs treat 429 as retryable and will re-post the
+  // same batch until their elapsed-time budget runs out. A plan limit is
+  // terminal for that payload, so a retryable status turns one rejection
+  // into an unbounded loop against a customer who cannot succeed.
+  throw new PlanLimitExceededError(limitResult.message, {
+    currentMonthMessagesCount: limitResult.count,
+    maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+    activePlanName: limitResult.planName,
+  });
 }
 
 /**
@@ -455,21 +460,7 @@ secured
           );
         }
 
-        const limitFailure = await enforcePlanLimit(
-          project,
-          customerTraceIds,
-          loggerTraces,
-        );
-        if (limitFailure) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: limitFailure.error,
-          });
-          return c.json(
-            { message: limitFailure.error },
-            { status: limitFailure.status },
-          );
-        }
+        await enforcePlanLimit(project, customerTraceIds, loggerTraces);
 
         const emptyPartialSuccess = { rejectedSpans: 0, errorMessage: "" };
 
@@ -561,17 +552,7 @@ secured
         const { project, resolved } = authResult;
         span.setAttribute("langwatch.project.id", project.id);
 
-        const limitFailure = await enforcePlanLimit(project, [], loggerLogs);
-        if (limitFailure) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: limitFailure.error,
-          });
-          return c.json(
-            { message: limitFailure.error },
-            { status: limitFailure.status },
-          );
-        }
+        await enforcePlanLimit(project, [], loggerLogs);
 
         const body = await readOtlpBody(c.req.raw);
         const parsed = parseOtlpLogs(body, c.req.header("content-type"));
@@ -665,17 +646,7 @@ secured
         const { project, resolved } = authResult;
         span.setAttribute("langwatch.project.id", project.id);
 
-        const limitFailure = await enforcePlanLimit(project, [], loggerMetrics);
-        if (limitFailure) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: limitFailure.error,
-          });
-          return c.json(
-            { message: limitFailure.error },
-            { status: limitFailure.status },
-          );
-        }
+        await enforcePlanLimit(project, [], loggerMetrics);
 
         const body = await readOtlpBody(c.req.raw);
         const parsed = parseOtlpMetrics(body, c.req.header("content-type"));

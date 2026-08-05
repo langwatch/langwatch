@@ -291,9 +291,9 @@ RUN_ID=$(echo "$RUN" | jq -r '.runId // .run_id')
 echo "Started run: $RUN_ID"
 
 # 2. Poll until it finishes (completed | failed | stopped | interrupted).
-#    Branch on the HTTP status, not the body: a 404 carries no .status, so
-#    matching the body alone spins forever once a run expires (runs stay
-#    readable for 24h) or was never recorded.
+#    Branch on the HTTP status, not the body: a non-200 response (404, an
+#    auth failure, a 5xx) carries no .status, so matching the body alone
+#    spins on it for the full hour instead of failing fast.
 ATTEMPTS=0
 MAX_ATTEMPTS=1800
 while [ "$ATTEMPTS" -lt "$MAX_ATTEMPTS" ]; do
@@ -302,6 +302,10 @@ while [ "$ATTEMPTS" -lt "$MAX_ATTEMPTS" ]; do
   CODE=$(printf '%s' "$RESPONSE" | tail -n1)
   if [ "$CODE" = "404" ]; then
     echo "run $RUN_ID not found (expired, or never recorded); giving up"
+    exit 1
+  fi
+  if [ "$CODE" != "200" ]; then
+    echo "could not read run $RUN_ID (HTTP $CODE); giving up"
     exit 1
   fi
   STATUS=$(printf '%s' "$RESPONSE" | sed '$d' | jq -r '.status')

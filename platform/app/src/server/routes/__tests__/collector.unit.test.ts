@@ -193,6 +193,36 @@ describe("POST /api/collector", () => {
     });
   });
 
+  describe("given a project over its plan limit", () => {
+    describe("when the payload is dispatched", () => {
+      it("rejects the batch with 402 and the plan-limit metadata", async () => {
+        mockCheckLimit.mockResolvedValue({
+          exceeded: true,
+          message: "monthly limit reached",
+          planName: "free",
+          count: 10,
+          maxMessagesPerMonth: 10,
+        });
+
+        const res = await postCollector({
+          trace_id: "trace-1",
+          spans: [makeSpan(1)],
+        });
+
+        expect(res.status).toBe(402);
+        const body = await res.json();
+        expect(body).toMatchObject({
+          error: "ERR_PLAN_LIMIT",
+          message: "monthly limit reached",
+          currentMonthMessagesCount: 10,
+          maxMessagesPerMonth: 10,
+          activePlanName: "free",
+        });
+        expect(mockIngestNormalizedSpan).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given more than 200 spans", () => {
     describe("when the payload is dispatched", () => {
       it("returns 429 before ingesting anything", async () => {

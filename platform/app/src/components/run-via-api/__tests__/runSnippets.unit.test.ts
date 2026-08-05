@@ -169,6 +169,11 @@ describe("buildRunSnippet", () => {
       expect(snippet).toContain("giving up");
     });
 
+    it("gives up on any other non-200 status instead of parsing it as the run body", () => {
+      const snippet = shell();
+      expect(snippet).toContain('if [ "$CODE" != "200" ]');
+    });
+
     it("breaks on every terminal status the API can report", () => {
       expect(shell()).toContain(
         'case "$STATUS" in completed|failed|stopped|interrupted) break;; esac',
