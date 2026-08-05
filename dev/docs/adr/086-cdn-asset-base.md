@@ -65,7 +65,7 @@ defined before the entry chunk's dynamic imports evaluate.
 immutability — the content hash freezes each file's bytes; the commit prefix
 freezes each build's namespace. Old tabs keep resolving because their build's
 prefix still exists. Cleanup is an S3 lifecycle rule expiring prefixes after a
-window safely longer than any tab's lifetime. `langwatch/scripts/upload-assets-to-cdn.sh`
+window safely longer than any tab's lifetime. `platform/app/scripts/upload-assets-to-cdn.sh`
 performs the sync; the SaaS deploy pipeline invokes it with the build's SHA.
 
 **CSP.** When `LANGWATCH_ASSET_BASE` names an external origin, that origin is
@@ -132,6 +132,7 @@ Rollouts blue-green) are introduced.
 
 - Related ADRs: ADR-032 (datasets S3 JSONL — same S3 client/CSP `connect-src` derivation)
 - Spec: `specs/server/cdn-asset-base.feature`, `specs/server/spa-fallback.feature`
-- Code: `src/server/asset-base.ts`, `src/server/static-handler.ts`,
-  `src/start.ts`, `vite.config.ts`, `langwatch/scripts/upload-assets-to-cdn.sh`
+- Code: `platform/app/src/server/asset-base.ts`, `platform/app/src/server/static-handler.ts`,
+  `platform/app/src/server/securityHeaders.ts`, `platform/app/src/start.ts`,
+  `platform/app/vite.config.ts`, `platform/app/scripts/upload-assets-to-cdn.sh`
 - Vite: `experimental.renderBuiltUrl` (runtime public base path)

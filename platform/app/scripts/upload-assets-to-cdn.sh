@@ -26,7 +26,7 @@
 #
 # Usage:
 #   BUCKET=langwatch-frontend-assets SHA="git-$(git rev-parse --short HEAD)" \
-#     langwatch/scripts/upload-assets-to-cdn.sh [--dry-run]
+#     platform/app/scripts/upload-assets-to-cdn.sh [--dry-run]
 #
 # Env:
 #   BUCKET      (required) S3 bucket name backing the CDN.
