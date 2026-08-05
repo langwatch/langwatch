@@ -23,6 +23,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   CURRENT_ROLLUP_REBUILD_MIGRATION,
+  holdClickHouseSchemaLockForFile,
   replayGooseMigrationUp,
 } from "~/server/clickhouse/__tests__/migrationReplay";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
@@ -74,6 +75,12 @@ function budgetFor(window: GatewayBudgetWindow): GatewayBudget {
 }
 
 describe("given a debit recorded against a budget in ClickHouse", () => {
+  // First statement in the file, so the lock is taken before the first debit
+  // is written and released after the last teardown. The rollup this file
+  // writes to and reads back is database-wide, and a neighbouring suite
+  // rebuilding it drops the materialised view for the length of the rebuild.
+  holdClickHouseSchemaLockForFile();
+
   const budgets = ALL_WINDOWS.map(budgetFor);
   let repo: GatewayBudgetClickHouseRepository;
   let spendByBudgetId: Map<string, string>;

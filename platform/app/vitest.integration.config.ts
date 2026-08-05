@@ -6,12 +6,25 @@ import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
+import { applyWorkerCap } from "./src/test-utils/workerCap";
 import WeightBalancedSequencer from "./vitest.sequencer";
 
 config();
 
 // One switch for the CI-vs-laptop trade-offs below.
 const isCI = !!process.env.CI;
+
+// Whether a shard may run more than one file at a time. See the note on
+// `fileParallelism` below for why nothing turns this on.
+const fileParallelism = process.env.VITEST_INTEGRATION_PARALLEL === "1";
+
+// The workflow sets VITEST_MAX_WORKERS to keep vitest off all four of a
+// runner's vCPUs, and vitest assigns it AFTER resolving `fileParallelism:
+// false` down to one worker. The cap therefore raised the floor: the
+// integration shards ran two files concurrently, and the two gateway budget
+// suites that replay a rollup migration collided on schema neither of them
+// owns. Strip it while files are serial.
+applyWorkerCap({ env: process.env, fileParallelism });
 
 export default defineConfig({
   test: {
@@ -56,7 +69,7 @@ export default defineConfig({
     // again per worker as a setup file. Nothing asserts that two concurrent
     // workers cannot see each other's keys; write that test before setting
     // this again. CI parallelises across shards instead.
-    fileParallelism: process.env.VITEST_INTEGRATION_PARALLEL === "1",
+    fileParallelism,
     // Use forked child processes. We briefly tried pool: "threads" to
     // sidestep the post-test shard 4 wedge, but threads exposes a panic
     // in @prisma/client/query-engine-node-api when the client gets
@@ -68,12 +81,9 @@ export default defineConfig({
     // above is the reason: threads panic inside @prisma/client's query engine,
     // and that is true wherever it runs.
     //
-    // This only takes effect when fileParallelism is on. Vitest documents that
-    // `fileParallelism: false` overrides maxWorkers to 1, so with the flag off
-    // — which is the current state everywhere — the value here is inert, and
-    // an earlier `isCI ? "100%" : 1` read as if CI were running four workers
-    // when it was running one. Keep it honest: ask for two, and let vitest
-    // clamp it to one while files are serial. Two rather than every core
+    // Only reached when fileParallelism is on: vitest clamps maxWorkers to 1
+    // while files are serial, and `applyWorkerCap` above keeps the workflow's
+    // VITEST_MAX_WORKERS from undoing that clamp. Two rather than every core
     // because the runner has 4 vCPUs and is also hosting ClickHouse, Postgres
     // and Redis; handing vitest the whole box starved the datastores and
     // suites failed on vi.waitFor timeouts rather than on their assertions.

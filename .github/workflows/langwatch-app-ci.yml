@@ -298,9 +298,15 @@ jobs:
       # The two below stay set. The Redis isolation is free when files are
       # serial and means the wiring is already in place if the flag above
       # returns; the worker cap keeps vitest from taking all four vCPUs on a
-      # runner that is also hosting ClickHouse, Postgres and Redis — handing
+      # runner that is also hosting ClickHouse, Postgres and Redis. Handing
       # it the whole box starved the datastores and three suites failed on
       # vi.waitFor timeouts rather than on anything they assert.
+      #
+      # The cap only reaches vitest when files run in parallel. Vitest applies
+      # VITEST_MAX_WORKERS after it has resolved serial files down to a single
+      # worker, so left alone the cap raised the floor instead of lowering the
+      # ceiling and the shard ran two files at once. vitest.integration.config
+      # strips it while files are serial.
       VITEST_ISOLATE_WORKER_REDIS: "1"
       VITEST_MAX_WORKERS: "2"
       # Required environment variables for integration tests
