@@ -112,6 +112,22 @@ export async function getClickHouseClientForProject(
 }
 
 /**
+ * Default per-project `ClickHouseClientResolver`: the same
+ * throws-if-unavailable contract every repository resolver already follows,
+ * defined once here instead of hand-copied at every call site that needs a
+ * fallback when no explicit resolver is injected (tests inject their own).
+ */
+export const defaultClickHouseClientResolver: ClickHouseClientResolver = async (
+  tenantId: string,
+): Promise<ClickHouseClient> => {
+  const client = await getClickHouseClientForProject(tenantId);
+  if (!client) {
+    throw new Error(`ClickHouse not available for tenant ${tenantId}`);
+  }
+  return client;
+};
+
+/**
  * Returns the appropriate ClickHouse client for a given organization.
  *
  * Checks env vars for a private ClickHouse URL (zero DB query).

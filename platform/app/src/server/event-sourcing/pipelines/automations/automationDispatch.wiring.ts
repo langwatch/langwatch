@@ -4,7 +4,7 @@ import { env } from "~/env.mjs";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
-import { getAnalyticsService } from "~/server/app-layer/analytics";
+import { getApp } from "~/server/app-layer/app";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
@@ -147,7 +147,8 @@ export function buildAutomationDispatchPorts({
     loadCustomGraph: async ({ customGraphId, projectId }) =>
       customGraphs.getById({ customGraphId, projectId }),
     loadProject: async (projectId) => projects.getById(projectId),
-    getTimeseries: async (input) => getAnalyticsService().getTimeseries(input),
+    getTimeseries: async (input) =>
+      getApp().analytics.service.getTimeseries(input),
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),

@@ -23,7 +23,7 @@ vi.mock("~/server/db", () => ({
 }));
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  defaultClickHouseClientResolver: vi.fn(),
 }));
 
 vi.mock("~/env.mjs", () => ({

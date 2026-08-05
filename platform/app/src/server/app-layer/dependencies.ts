@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
 import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
@@ -101,6 +102,16 @@ export interface AppDependencies {
   };
   dspySteps: {
     steps: DspyStepService;
+  };
+  /**
+   * Agent 4 batch (analytics / automations / evaluations / workers ClickHouse
+   * access migration). The ADR-034 read API, built once in presets.ts and
+   * handed out here instead of each of its ~6 callers (routers, REST apps,
+   * the graph-trigger dispatch closure) constructing — and each resolving a
+   * ClickHouse client — its own.
+   */
+  analytics: {
+    service: AnalyticsService;
   };
   simulations: {
     runs: SimulationRunService;

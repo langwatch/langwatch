@@ -50,7 +50,7 @@ vi.mock("~/server/metrics", () => ({
 }));
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+  defaultClickHouseClientResolver: vi.fn(),
 }));
 
 vi.mock("fetch-h2", () => ({ fetch: vi.fn() }));

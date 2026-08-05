@@ -31,7 +31,7 @@ import {
 } from "~/server/app-layer/analytics/routing/field-availability";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { defaultClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
 import type { GraphTriggerEvaluationReason } from "./graph-trigger-evaluation.service";
@@ -502,13 +502,7 @@ export function defaultGraphTriggerHeartbeatDeps({
   return {
     triggers,
     prisma,
-    resolveClickHouseClient: async (tenantId) => {
-      const client = await getClickHouseClientForProject(tenantId);
-      if (!client) {
-        throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-      }
-      return client;
-    },
+    resolveClickHouseClient: defaultClickHouseClientResolver,
     lookupTriggerSource: async ({ customGraphId, projectId, seriesName }) => {
       // The graph is the only place the metric key lives; the trigger's
       // `actionParams.seriesName` carries the series INDEX. Classify from the

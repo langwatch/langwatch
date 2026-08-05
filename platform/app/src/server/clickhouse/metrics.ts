@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { Counter, Gauge, Histogram, register } from "prom-client";
+import { getSharedClickHouseClient } from "./clickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:metrics");
 
@@ -573,4 +574,19 @@ export function stopStorageStatsCollection(): void {
     clearInterval(storageStatsInterval);
     storageStatsInterval = null;
   }
+}
+
+/**
+ * Starts storage-stats collection off the shared (non-tenant) ClickHouse
+ * client, resolving it here instead of at the worker boot call site — this
+ * module is the one place allowed to reach for a client directly. Returns
+ * `false` without starting anything when ClickHouse isn't configured.
+ */
+export function startStorageStatsCollectionFromSharedClient(
+  intervalMs?: number,
+): boolean {
+  const client = getSharedClickHouseClient();
+  if (!client) return false;
+  startStorageStatsCollection(client, intervalMs);
+  return true;
 }

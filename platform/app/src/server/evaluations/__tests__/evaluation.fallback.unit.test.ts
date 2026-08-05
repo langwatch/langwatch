@@ -1,11 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const getClickHouseClientForProjectMock = vi.hoisted(() => vi.fn());
-
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: getClickHouseClientForProjectMock,
-}));
-
+import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import { EvaluationService } from "../evaluation.service";
 
 /**
@@ -45,6 +39,17 @@ const ROW = {
   CompletedAt: null,
 };
 
+/** Stands in for the resolver the repository is constructed with. */
+const resolveClient = vi.fn();
+
+function serviceOver(client: unknown) {
+  resolveClient.mockResolvedValue(client);
+  return new EvaluationService(
+    undefined,
+    new TraceEvaluationsClickHouseRepository(resolveClient),
+  );
+}
+
 describe("EvaluationService memory-limit fallback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -54,9 +59,8 @@ describe("EvaluationService memory-limit fallback", () => {
     describe("when fetching evaluations for a single trace", () => {
       it("retries without Inputs and still returns the verdicts", async () => {
         const client = clientThatOOMsOnInputs([ROW]);
-        getClickHouseClientForProjectMock.mockResolvedValue(client);
+        const service = serviceOver(client);
 
-        const service = EvaluationService.create();
         const result = await service.getEvaluationsForTrace({
           projectId: "project_test",
           traceId: "trace-1",
@@ -73,9 +77,8 @@ describe("EvaluationService memory-limit fallback", () => {
     describe("when fetching evaluations for multiple traces", () => {
       it("retries without Inputs and groups the verdicts by trace", async () => {
         const client = clientThatOOMsOnInputs([ROW]);
-        getClickHouseClientForProjectMock.mockResolvedValue(client);
+        const service = serviceOver(client);
 
-        const service = EvaluationService.create();
         const result = await service.getEvaluationsMultiple({
           projectId: "project_test",
           traceIds: ["trace-1"],
