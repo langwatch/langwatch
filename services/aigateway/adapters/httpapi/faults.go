@@ -85,25 +85,34 @@ func logRequestError(logger *zap.Logger, ctx context.Context, fault Fault, code 
 	if status > 0 {
 		fields = append(fields, zap.Int("status", status))
 	}
-	virtualKeyID := ""
 	if bundle := BundleFromContext(ctx); bundle != nil {
-		virtualKeyID = bundle.VirtualKeyID
 		fields = append(fields,
 			zap.String("project_id", bundle.ProjectID),
 			zap.String("organization_id", bundle.OrganizationID),
-			zap.String("virtual_key_id", virtualKeyID),
+			zap.String("virtual_key_id", bundle.VirtualKeyID),
 		)
 	}
 	logger.Log(fault.level(), "gateway_request_failed", fields...)
+}
 
-	// Customer faults log at info, which is the right severity and also the
-	// reason they cannot be alerted on: a single key can produce six figures
-	// of rejections in a week without moving anything an operator watches.
-	// Count them here, at the one point that has already decided whose fault
-	// the failure is, so the counter can never drift from the log line.
-	if fault == FaultCustomer {
-		gatewaymetrics.RecorderFromContext(ctx).RecordClientReject(code, virtualKeyID)
+// recordClientReject counts a rejection the GATEWAY issued against the caller.
+//
+// Scoped to faultForCode deliberately. faultForUpstreamStatus also answers
+// FaultCustomer, for any provider 4xx, so counting every customer fault would
+// put every OpenAI 429 and Anthropic 402 on a counter named "client rejects".
+// A provider having a bad hour would then read as clients looping on malformed
+// bodies, for keys doing nothing wrong, and the per-key alert this metric
+// exists for would be muted with the real signal inside it. Provider
+// rejections are already carried by gateway_provider_attempts_total.
+func recordClientReject(ctx context.Context, code herr.Code) {
+	if faultForCode(code) != FaultCustomer {
+		return
 	}
+	virtualKeyID := ""
+	if bundle := BundleFromContext(ctx); bundle != nil {
+		virtualKeyID = bundle.VirtualKeyID
+	}
+	gatewaymetrics.RecorderFromContext(ctx).RecordClientReject(code.String(), virtualKeyID)
 }
 
 // logWriteError classifies err and logs it; the single logging choke point
@@ -125,6 +134,7 @@ func logWriteError(logger *zap.Logger, ctx context.Context, err error) {
 			msg = m
 		}
 		logRequestError(logger, ctx, faultForCode(e.Code), e.Code.String(), 0, msg)
+		recordClientReject(ctx, e.Code)
 		return
 	}
 	logRequestError(logger, ctx, FaultPlatform, "unhandled", 0, err.Error())

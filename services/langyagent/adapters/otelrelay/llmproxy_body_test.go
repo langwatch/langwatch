@@ -1,6 +1,7 @@
 package otelrelay
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -38,6 +39,7 @@ func TestDescribeUpstreamErrorBody(t *testing.T) {
 		contentType string
 		wantKey     string
 		wantValue   string
+		wantBool    bool
 		wantSkipped bool
 	}{
 		// Shapes the dialect probe recognizes. These must not regress: the
@@ -128,10 +130,35 @@ func TestDescribeUpstreamErrorBody(t *testing.T) {
 			wantValue:   "Sign in · example.cloudflareaccess.com",
 		},
 		{
+			// Title-or-nothing here would leave a byte count, which is the
+			// empty-log failure this whole change exists to remove.
 			name:        "an HTML page with no title",
 			body:        []byte("<html><body><h1>502 Bad Gateway</h1></body></html>"),
 			contentType: "text/html",
-			wantSkipped: true,
+			wantKey:     "html_excerpt",
+			wantValue:   "502 Bad Gateway",
+		},
+		{
+			// The regression the content-type sniff would otherwise cause: an
+			// edge answering text/html with a plain sentence. Routed to the
+			// HTML arm, no title matches, and a title-only rule loses the one
+			// readable thing in the response.
+			name:        "an edge that labels a plain sentence as HTML",
+			body:        []byte("upstream connect error or disconnect before headers"),
+			contentType: "text/html",
+			wantKey:     "html_excerpt",
+			wantValue:   "upstream connect error or disconnect before headers",
+		},
+		{
+			// F4: a 4xx can arrive as raw gzip, because Go decompresses
+			// transparently only when it set Accept-Encoding itself. Saying so
+			// is the diagnosis; putting the bytes in the line kills the log
+			// tooling that has to read them back.
+			name:        "a gzip body no one decompressed",
+			body:        []byte{0x1f, 0x8b, 0x08, 0x00, 0xff, 0xfe, 0xfd, 0xfc},
+			contentType: "application/json",
+			wantKey:     "raw_body_binary",
+			wantBool:    true,
 		},
 
 		{
@@ -154,6 +181,12 @@ func TestDescribeUpstreamErrorBody(t *testing.T) {
 			}
 			if field.Key != tt.wantKey {
 				t.Errorf("field key = %q, want %q", field.Key, tt.wantKey)
+			}
+			if tt.wantBool {
+				if field.Type != zapcore.BoolType || field.Integer != 1 {
+					t.Errorf("field %s is not a true bool: type=%v integer=%d", field.Key, field.Type, field.Integer)
+				}
+				return
 			}
 			if field.String != tt.wantValue {
 				t.Errorf("field value = %q, want %q", field.String, tt.wantValue)
@@ -266,10 +299,58 @@ func TestDescribeUpstreamErrorBody_BoundsAnUnrecognizedBody(t *testing.T) {
 	if field.Key != "raw_body_snippet" {
 		t.Fatalf("field key = %q, want raw_body_snippet", field.Key)
 	}
-	if len(field.String) > maxUpstreamMessageBytes+len("…") {
-		t.Errorf("snippet is %d bytes, past the bound", len(field.String))
+	// Bounded tighter than a provider's own sentence: a snippet only has to
+	// identify what kind of body arrived, and every extra byte of an unparsed
+	// third-party response is a byte we did not choose to record.
+	if len(field.String) > maxRawSnippetBytes+len("…") {
+		t.Errorf("snippet is %d bytes, past the %d-byte bound", len(field.String), maxRawSnippetBytes)
 	}
 	if !utf8.ValidString(field.String) {
 		t.Error("snippet was cut mid-rune")
+	}
+}
+
+// @scenario "A body that is not text is named rather than pasted"
+func TestDescribeUpstreamErrorBody_NamesABinaryBodyWithoutPastingIt(t *testing.T) {
+	// A rejected call can answer with raw gzip: Go decompresses transparently
+	// only when it set Accept-Encoding itself. Those bytes must not enter a
+	// log line, because the tooling that reads these logs back dies on invalid
+	// UTF-8 - but the fact that the body was binary is itself the diagnosis.
+	gzipped := append([]byte{0x1f, 0x8b, 0x08, 0x00},
+		[]byte{0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa}...)
+
+	for _, contentType := range []string{"application/json", "text/html", "text/plain", ""} {
+		t.Run("declared as "+contentType, func(t *testing.T) {
+			field := describeUpstreamErrorBody(gzipped, contentType)
+			if field.Key != "raw_body_binary" {
+				t.Fatalf("field key = %q, want raw_body_binary", field.Key)
+			}
+			// Nothing the body contained may ride along in any string field.
+			if field.String != "" {
+				t.Errorf("recorded body bytes: %q", field.String)
+			}
+			if !utf8.ValidString(field.String) {
+				t.Error("recorded an invalid UTF-8 field value")
+			}
+		})
+	}
+}
+
+// @scenario "An HTML answer with no title still yields its visible text"
+func TestDescribeUpstreamErrorBody_ExcerptDropsTheStylesheet(t *testing.T) {
+	// The interstitial without its <title>: the excerpt fallback must reach
+	// the visible text rather than serving up the CSS the title dodged.
+	titleless := bytes.Replace(cloudflareInterstitial(),
+		[]byte("<title>\n  Sign in &middot; example.cloudflareaccess.com\n</title>"), nil, 1)
+
+	field := describeUpstreamErrorBody(titleless, "text/html")
+	if field.Key != "html_excerpt" {
+		t.Fatalf("field key = %q, want html_excerpt", field.Key)
+	}
+	if strings.Contains(field.String, "cf-error-overview") || strings.Contains(field.String, "font-size") {
+		t.Errorf("excerpt carries stylesheet rules: %q", field.String)
+	}
+	if !strings.Contains(field.String, "Sign in") {
+		t.Errorf("excerpt lost the visible text: %q", field.String)
 	}
 }

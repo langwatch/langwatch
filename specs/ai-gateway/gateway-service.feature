@@ -218,7 +218,7 @@ Feature: Gateway service — public HTTP surface and operational basics
       And error.type equals "payload_too_large"
       And no provider dispatch occurs
 
-  Rule: A request with no model says which field is missing and where
+  Rule: A request with no model says where THAT surface expects one
 
     # This is the gateway's largest single source of 400s, and for five days it
     # was one virtual key posting bodies with no top-level `model` round the
@@ -228,15 +228,23 @@ Feature: Gateway service — public HTTP surface and operational basics
     # message is the only place the detail can go: resolution runs before the
     # request is labeled with a model, so the counter records model="unknown".
     #
+    # Model resolution is unconditional, so every surface reaches this
+    # rejection - and the surfaces disagree about where a model comes from.
+    # Three read a top-level JSON field, transcription reads a multipart form
+    # part, and the Gemini passthrough reads the URL path. A single message
+    # naming the JSON endpoints is not merely vague at the other four, it is
+    # wrong: it sends a caller to fix a request shape they are not using.
+    #
     # Bindings: services/aigateway/adapters/modelresolver/resolver_test.go
 
     @unit
-    Scenario: a body with no model is rejected with a message the client can act on
+    Scenario: a request with no model is rejected with a message the client can act on
       Given a valid VK
-      When a request arrives with no top-level "model" field
-      Then the rejection names the field, its type and where it belongs
-      And it names the endpoints that require it
-      And it shows what a correct body looks like
+      When a request arrives naming no model
+      Then the rejection names the endpoint the caller actually used
+      And it says where that endpoint takes its model from
+      And it shows what a correct request looks like
+      And it never names a request shape the caller is not using
       And the failure is attributed to the caller rather than to the platform
 
   Rule: Graceful SIGTERM drain (iter 24, `ea167ca`)

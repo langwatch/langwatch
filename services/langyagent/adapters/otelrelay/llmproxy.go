@@ -421,6 +421,20 @@ func isGatewayEnvelope(body herr.ErrorBody) bool {
 // are machine-generated and pretty-printed.
 var htmlTitlePattern = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
 
+// htmlNoisePattern drops the elements whose CONTENT is not prose. Stripping
+// tags without this leaves a stylesheet's rules behind as text, which is the
+// same 2 KB of CSS the title exists to avoid.
+var htmlNoisePattern = regexp.MustCompile(`(?is)<(script|style|head)[^>]*>.*?</(script|style|head)>`)
+
+// htmlTagPattern strips the remaining markup, including comments.
+var htmlTagPattern = regexp.MustCompile(`(?s)<!--.*?-->|<[^>]*>`)
+
+// maxRawSnippetBytes bounds a body nobody parsed. Smaller than the bound on a
+// provider's own sentence: a snippet only has to identify what kind of body
+// arrived, and every extra byte of an unparsed third-party response is a byte
+// we did not choose to record.
+const maxRawSnippetBytes = 512
+
 // describeUpstreamErrorBody returns the one log field that says most about a
 // failed LLM response body, or zap.Skip() when the body says nothing at all.
 //
@@ -439,17 +453,42 @@ var htmlTitlePattern = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
 // whole diagnosis ("Sign in - example.cloudflareaccess.com" plus a 403), so
 // that is all an HTML body contributes.
 func describeUpstreamErrorBody(body []byte, contentType string) zap.Field {
+	// Nothing else here may run on bytes that are not text. Go decompresses
+	// transparently only when it added Accept-Encoding itself, so a 4xx body
+	// can arrive as raw gzip; without this gate that lands in the log line as
+	// binary, and our own log tooling dies reading invalid UTF-8. Saying the
+	// body was binary is itself the diagnosis, so it is not a silent drop.
+	if !utf8.Valid(body) {
+		return zap.Bool("raw_body_binary", true)
+	}
 	if isHTMLBody(body, contentType) {
-		if title := htmlTitle(body); title != "" {
-			return zap.String("html_title", title)
-		}
-		return zap.Skip()
+		return describeHTMLBody(body)
 	}
 	if message := extractUpstreamErrorMessage(body); message != "" {
 		return zap.String("upstream_message", message)
 	}
 	if raw := strings.TrimSpace(string(body)); raw != "" {
-		return zap.String("raw_body_snippet", boundMessage(raw))
+		return zap.String("raw_body_snippet", bound(raw, maxRawSnippetBytes))
+	}
+	return zap.Skip()
+}
+
+// describeHTMLBody reduces an HTML answer to the part worth logging: its
+// title, or failing that its visible text with the markup stripped.
+//
+// The fallback matters more than it looks. isHTMLBody trusts the declared
+// content type before it looks at the body, precisely because an edge
+// substituting a login page is careless about its headers - but that cuts both
+// ways. An edge answering `Content-Type: text/html` with the plain sentence
+// "upstream connect error or disconnect before headers" would, with a
+// title-or-nothing rule, leave the operator a byte count: the exact
+// empty-log failure this whole change exists to remove.
+func describeHTMLBody(body []byte) zap.Field {
+	if title := htmlTitle(body); title != "" {
+		return zap.String("html_title", title)
+	}
+	if text := htmlText(body); text != "" {
+		return zap.String("html_excerpt", text)
 	}
 	return zap.Skip()
 }
@@ -488,16 +527,35 @@ func htmlTitle(body []byte) string {
 	if match == nil {
 		return ""
 	}
-	return boundMessage(strings.Join(strings.Fields(html.UnescapeString(string(match[1]))), " "))
+	return bound(collapse(string(match[1])), maxRawSnippetBytes)
+}
+
+// htmlText is the visible text of an HTML document with the markup removed:
+// the stylesheet, script and head blocks dropped whole (their content is not
+// prose), then the remaining tags and comments stripped.
+func htmlText(body []byte) string {
+	stripped := htmlTagPattern.ReplaceAll(htmlNoisePattern.ReplaceAll(body, []byte(" ")), []byte(" "))
+	return bound(collapse(string(stripped)), maxRawSnippetBytes)
+}
+
+// collapse entity-decodes a fragment of markup and puts it on one line.
+func collapse(fragment string) string {
+	return strings.Join(strings.Fields(html.UnescapeString(fragment)), " ")
 }
 
 // boundMessage caps a provider message at maxUpstreamMessageBytes, backing off
 // to a rune boundary.
 func boundMessage(message string) string {
-	if len(message) <= maxUpstreamMessageBytes {
-		return message
+	return bound(message, maxUpstreamMessageBytes)
+}
+
+// bound caps text at limit bytes, backing off to a rune boundary so a cut
+// never lands mid-character.
+func bound(text string, limit int) string {
+	if len(text) <= limit {
+		return text
 	}
-	cut := message[:maxUpstreamMessageBytes]
+	cut := text[:limit]
 	for len(cut) > 0 && !utf8.ValidString(cut) {
 		cut = cut[:len(cut)-1]
 	}

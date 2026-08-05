@@ -147,7 +147,7 @@ func TestWriteErrorCountsCustomerRejectionsPerVirtualKey(t *testing.T) {
 	}{
 		{"a body the gateway cannot read", herr.New(context.Background(), domain.ErrBadRequest, herr.M{"message": "no model"}), "bad_request"},
 		{"a model the key may not use", herr.New(context.Background(), domain.ErrModelNotAllowed, herr.M{"message": "nope"}), "model_not_allowed"},
-		{"a provider rejecting the caller", &domain.UpstreamError{StatusCode: 402, Message: "credit balance too low"}, "upstream_error"},
+		{"a payload past the ceiling", herr.New(context.Background(), domain.ErrPayloadTooLarge, herr.M{"message": "too big"}), "payload_too_large"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -174,6 +174,14 @@ func TestWriteErrorDoesNotCountProviderOrPlatformFaults(t *testing.T) {
 		code string
 	}{
 		{"an upstream server error", &domain.UpstreamError{StatusCode: 503, Message: "overloaded"}, "upstream_error"},
+		// A provider 4xx is a customer fault by faultForUpstreamStatus, and
+		// must still stay off this counter. Counting it would put every
+		// OpenAI 429 and Anthropic 402 on a metric named "client rejects", so
+		// a provider having a bad hour would read as clients looping on
+		// malformed bodies and the per-key alert would be muted with the real
+		// signal inside it.
+		{"a provider rejecting the caller", &domain.UpstreamError{StatusCode: 429, Message: "rate limited"}, "upstream_error"},
+		{"a provider refusing the caller's credit", &domain.UpstreamError{StatusCode: 402, Message: "credit balance too low"}, "upstream_error"},
 		{"a gateway timeout on the provider", herr.New(context.Background(), domain.ErrProviderTimeout, herr.M{"message": "slow"}), "provider_timeout"},
 		{"our own bug", errors.New("nil pointer somewhere"), "unhandled"},
 	}
