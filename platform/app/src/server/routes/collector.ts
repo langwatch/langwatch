@@ -169,11 +169,14 @@ secured
             "Project has reached plan limit",
           );
 
+          // 402, not 429: OTel SDKs and most HTTP clients retry a 429, and a
+          // plan limit is terminal for that payload, so a retryable status
+          // turns one rejection into an unbounded loop.
           return c.json(
             {
               message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
             },
-            429,
+            402,
           );
         }
       } catch (error) {
