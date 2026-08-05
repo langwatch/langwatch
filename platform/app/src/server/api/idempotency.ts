@@ -35,15 +35,38 @@
  * database unavailability to the key for 24 hours, so the caller's retry gets
  * the stale failure back rather than the success it would now get.
  *
- * ── THE PENDING WINDOW ─────────────────────────────────────────────────────
+ * ── A CLAIM IS HELD BY A LIVE REQUEST ──────────────────────────────────────
  *
  * The unique index on (scopeId, key) is what serialises two concurrent
  * retries: the second insert loses, finds a pending row, and is told to retry
- * shortly rather than being allowed to create alongside the first. A pending
- * row older than {@link PENDING_TAKEOVER_MS} is treated as a crashed original
- * and superseded. Without that, a process that died between the insert and the
- * update would hold the key locked for the full 24 hour lifetime, and the
- * caller could never complete the create it was trying to make.
+ * shortly rather than being allowed to create alongside the first.
+ *
+ * That leaves the question of when a pending row may be superseded, because a
+ * process that died between the insert and the update would otherwise hold the
+ * key locked for its full 24 hour lifetime and the caller could never complete
+ * the create it was trying to make. A row is superseded only once its claim
+ * stops reporting itself alive: the request holding a claim rewrites
+ * `heartbeatAt` every {@link HEARTBEAT_INTERVAL_MS} for as long as its handler
+ * runs, and another request may take the claim over once that column has been
+ * quiet for {@link TAKEOVER_AFTER_MS}.
+ *
+ * Liveness rather than age, because age says nothing about whether the
+ * original is still running. A request merely slow past whatever horizon was
+ * chosen, waiting on a row lock or a saturated connection pool, is still going
+ * to write its resource, so superseding it mints the second resource the key
+ * was sent to prevent, and does it exactly when the system is least able to
+ * absorb it. A slow request keeps beating and keeps its claim; a dead one
+ * stops beating and its key frees up in seconds rather than in minutes.
+ *
+ * ── FENCING ────────────────────────────────────────────────────────────────
+ *
+ * A takeover rewrites the row's `claimId` rather than deleting the row, so the
+ * request that took over owns the claim and the one it replaced stays
+ * recognisable. Every write the replaced request goes on to make names the
+ * claim it still thinks it holds, so a process that resumes after being
+ * declared dead cannot overwrite the receipt of the request that replaced it.
+ * The attempt is logged, and that log is the signal that one key may have
+ * produced two resources.
  *
  * ── THE STORED BODY IS ENCRYPTED ───────────────────────────────────────────
  *
@@ -66,6 +89,7 @@ import {
   Prisma,
   type PrismaClient,
 } from "@prisma/client";
+import { nanoid } from "nanoid";
 
 import {
   sha256,
@@ -95,8 +119,18 @@ export const MAX_KEY_LENGTH = 255;
 /** How long a receipt answers for. */
 export const RECEIPT_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** How long a pending receipt is believed before it is read as a crash. */
-export const PENDING_TAKEOVER_MS = 60_000;
+/** How often a request reports that the claim it holds is still running. */
+export const HEARTBEAT_INTERVAL_MS = 5_000;
+
+/**
+ * How long a claim may go quiet before another request may take it over.
+ *
+ * Four missed beats rather than one, so an interval a garbage collection pause
+ * or a momentarily busy database swallowed is not read as a death. It stays a
+ * small multiple of the interval all the same: the whole point of measuring
+ * liveness is that a claim nobody is holding is released in seconds.
+ */
+export const TAKEOVER_AFTER_MS = 4 * HEARTBEAT_INTERVAL_MS;
 
 /**
  * How many times the claim will re-attempt after losing its insert.
@@ -270,29 +304,126 @@ export async function withIdempotency<T>({
     };
   }
 
-  let result: IdempotentHandlerResult<T>;
-  try {
-    result = await handler();
-  } catch (error) {
-    await releaseClaim({ prisma, receiptId: claim.receiptId });
-    throw error;
-  }
+  const { receiptId, claimId } = claim;
+  // Started before the handler and stopped in a finally, so the claim is
+  // reported alive for exactly as long as this request is working on it.
+  const heartbeat = startClaimHeartbeat({ prisma, receiptId, claimId });
 
-  if (result.status >= 200 && result.status < 300) {
-    await prisma.idempotencyReceipt.update({
-      where: { id: claim.receiptId },
-      data: {
-        responseStatus: result.status,
+  try {
+    let result: IdempotentHandlerResult<T>;
+    try {
+      result = await handler();
+    } catch (error) {
+      await releaseClaim({ prisma, receiptId, claimId });
+      throw error;
+    }
+
+    if (result.status >= 200 && result.status < 300) {
+      await finalizeClaim({
+        prisma,
+        receiptId,
+        claimId,
+        status: result.status,
         // The bytes the route is about to write, not the object behind them,
         // so a replay reproduces this response rather than re-deriving it.
-        responseBody: encrypt(serializeResponseBody(result.body)),
-      },
-    });
-  } else {
-    await releaseClaim({ prisma, receiptId: claim.receiptId });
-  }
+        serializedBody: serializeResponseBody(result.body),
+      });
+    } else {
+      await releaseClaim({ prisma, receiptId, claimId });
+    }
 
-  return { ...result, isReplayed: false };
+    return { ...result, isReplayed: false };
+  } finally {
+    heartbeat.stop();
+  }
+}
+
+/** A running claim's liveness reporting, for as long as its handler runs. */
+interface ClaimHeartbeat {
+  stop: () => void;
+}
+
+/**
+ * Report the claim as still running, until told to stop.
+ *
+ * On its own timer rather than driven by the handler, because the handler is
+ * an opaque call that can spend minutes inside one database round trip without
+ * emitting anything, and those are precisely the requests a takeover must not
+ * declare dead. Unreferenced so it can never be the reason the process stays
+ * up, and a beat that fails is logged rather than propagated: the create is
+ * what the caller asked for, and losing a beat costs at worst a takeover that
+ * fencing then catches.
+ */
+function startClaimHeartbeat({
+  prisma,
+  receiptId,
+  claimId,
+}: {
+  prisma: PrismaClient;
+  receiptId: string;
+  claimId: string;
+}): ClaimHeartbeat {
+  const timer = setInterval(() => {
+    prisma.idempotencyReceipt
+      .updateMany({
+        where: { id: receiptId, claimId },
+        data: { heartbeatAt: new Date() },
+      })
+      .then(({ count }) => {
+        if (count > 0) return;
+        // The claim is somebody else's now. Warn once and stop, rather than
+        // writing nothing every interval for the rest of the handler.
+        logger.warn(
+          { receiptId, claimId },
+          "Stopped reporting an idempotency claim this request no longer holds",
+        );
+        clearInterval(timer);
+      })
+      .catch((error) => {
+        logger.warn(
+          { receiptId, claimId, error },
+          "Failed to report an idempotency claim as still running",
+        );
+      });
+  }, HEARTBEAT_INTERVAL_MS);
+  timer.unref();
+
+  return { stop: () => clearInterval(timer) };
+}
+
+/**
+ * Store the response this claim produced, if the claim is still ours.
+ *
+ * The `claimId` predicate is the fence. Affecting no rows means this request
+ * was declared dead and replaced while its handler was still running, so the
+ * resource it just created is one the replacing request is about to create a
+ * second copy of. Nothing here can undo that, and overwriting the new claim's
+ * row would only hide it, so it is logged as the loud signal instead.
+ */
+async function finalizeClaim({
+  prisma,
+  receiptId,
+  claimId,
+  status,
+  serializedBody,
+}: {
+  prisma: PrismaClient;
+  receiptId: string;
+  claimId: string;
+  status: number;
+  serializedBody: string;
+}): Promise<void> {
+  const { count } = await prisma.idempotencyReceipt.updateMany({
+    where: { id: receiptId, claimId },
+    data: { responseStatus: status, responseBody: encrypt(serializedBody) },
+  });
+
+  if (count === 0) {
+    logger.error(
+      { receiptId, claimId, status },
+      "An idempotency claim was taken over while its request was still running: the response was not stored and the key may now stand for a second resource",
+    );
+  }
 }
 
 /**
@@ -307,15 +438,19 @@ export function serializeResponseBody(body: unknown): string {
 }
 
 type Claim =
-  | { kind: "claimed"; receiptId: string }
+  | { kind: "claimed"; receiptId: string; claimId: string }
   | { kind: "replay"; status: number; serializedBody: string };
 
 /**
- * What a row already under the key resolves to. Never `claimed`: this side
- * of the race did not take the key, so the only answers are "replay the
- * stored response" and "the row was not authoritative, try again".
+ * What a row already under the key resolves to.
+ *
+ * `claimed` is reachable here as well as from a winning insert, because a row
+ * whose claim stopped reporting itself alive is taken over in place rather
+ * than deleted: the taking request ends up holding the same row under a new
+ * claim id. `retry` means the row was not authoritative, so the key is worth
+ * attempting again.
  */
-type ExistingVerdict = Extract<Claim, { kind: "replay" }> | { kind: "retry" };
+type ExistingVerdict = Claim | { kind: "retry" };
 
 /**
  * Take the key, or read what the row already there says to do.
@@ -339,14 +474,14 @@ async function claimReceipt({
   for (let attempt = 0; attempt < CLAIM_ATTEMPTS; attempt++) {
     const now = new Date();
 
-    const receiptId = await insertPendingReceipt({
+    const claimed = await insertPendingReceipt({
       prisma,
       scopeId,
       key,
       requestFingerprint,
       now,
     });
-    if (receiptId !== null) return { kind: "claimed", receiptId };
+    if (claimed !== null) return claimed;
 
     const existing = await prisma.idempotencyReceipt.findUnique({
       where: { scopeId_key: { scopeId, key } },
@@ -362,7 +497,7 @@ async function claimReceipt({
       requestFingerprint,
       now,
     });
-    if (verdict.kind === "replay") return verdict;
+    if (verdict.kind !== "retry") return verdict;
   }
 
   // Every attempt lost its insert and then found the row gone. Something is
@@ -370,7 +505,7 @@ async function claimReceipt({
   throw new IdempotencyConflictError("in_progress");
 }
 
-/** The pending row's id, or null when the key was already taken. */
+/** The claim on a fresh pending row, or null when the key was already taken. */
 async function insertPendingReceipt({
   prisma,
   scopeId,
@@ -383,22 +518,87 @@ async function insertPendingReceipt({
   key: string;
   requestFingerprint: string;
   now: Date;
-}): Promise<string | null> {
+}): Promise<Extract<Claim, { kind: "claimed" }> | null> {
+  const claimId = nanoid();
+
   try {
     const created = await prisma.idempotencyReceipt.create({
       data: {
         scopeId,
         key,
+        claimId,
         requestFingerprint,
+        // The first beat is the insert itself, so the row is never momentarily
+        // takeable in the interval before the timer's first tick.
+        heartbeatAt: now,
         expiresAt: new Date(now.getTime() + RECEIPT_TTL_MS),
       },
       select: { id: true },
     });
-    return created.id;
+    return { kind: "claimed", receiptId: created.id, claimId };
   } catch (error) {
     if (isUniqueViolation(error)) return null;
     throw error;
   }
+}
+
+/**
+ * Whether a pending claim has gone quiet long enough to be taken over.
+ *
+ * The whole takeover decision, in one place and with no storage behind it, so
+ * what it turns on is a matter of record: the last time the holder said it was
+ * running, never how long ago the claim was made.
+ */
+export function isClaimAbandoned({
+  heartbeatAt,
+  now,
+}: {
+  heartbeatAt: Date;
+  now: Date;
+}): boolean {
+  return now.getTime() - heartbeatAt.getTime() > TAKEOVER_AFTER_MS;
+}
+
+/**
+ * Take a silent claim over, or report that someone else got there first.
+ *
+ * An update rather than a delete and a fresh insert, so the row keeps its
+ * identity and the claim that was displaced can be told apart from the one
+ * that displaced it. The `claimId` in the predicate is what makes two requests
+ * racing to take the same silent claim over resolve to one winner, and the
+ * loser is sent back to re-read a row that is now beating again.
+ */
+async function takeOverClaim({
+  prisma,
+  existing,
+  now,
+}: {
+  prisma: PrismaClient;
+  existing: IdempotencyReceipt;
+  now: Date;
+}): Promise<ExistingVerdict> {
+  const claimId = nanoid();
+  const { count } = await prisma.idempotencyReceipt.updateMany({
+    where: { id: existing.id, claimId: existing.claimId, responseStatus: null },
+    data: {
+      claimId,
+      heartbeatAt: now,
+      expiresAt: new Date(now.getTime() + RECEIPT_TTL_MS),
+    },
+  });
+
+  if (count === 0) return { kind: "retry" };
+
+  logger.warn(
+    {
+      receiptId: existing.id,
+      displacedClaimId: existing.claimId,
+      claimId,
+      quietForMs: now.getTime() - existing.heartbeatAt.getTime(),
+    },
+    "Took over an idempotency claim that stopped reporting itself alive",
+  );
+  return { kind: "claimed", receiptId: existing.id, claimId };
 }
 
 /**
@@ -421,7 +621,7 @@ async function readExistingReceipt({
   // Expiry is read before anything else, so a key past its lifetime is a
   // fresh key regardless of what the stale row happens to say.
   if (existing.expiresAt.getTime() <= now.getTime()) {
-    await releaseClaim({ prisma, receiptId: existing.id });
+    await discardReceipt({ prisma, receiptId: existing.id });
     return { kind: "retry" };
   }
 
@@ -433,12 +633,13 @@ async function readExistingReceipt({
   }
 
   if (existing.responseStatus === null) {
-    if (now.getTime() - existing.createdAt.getTime() < PENDING_TAKEOVER_MS) {
+    // Still reporting itself alive, however long ago it started. However slow
+    // it is being, it is going to write its resource, and taking the key off
+    // it is what would make one key stand for two.
+    if (!isClaimAbandoned({ heartbeatAt: existing.heartbeatAt, now })) {
       throw new IdempotencyConflictError("in_progress");
     }
-    // Older than the window: whoever inserted this is not coming back.
-    await releaseClaim({ prisma, receiptId: existing.id });
-    return { kind: "retry" };
+    return await takeOverClaim({ prisma, existing, now });
   }
 
   const serializedBody = readStoredBody(existing);
@@ -446,7 +647,7 @@ async function readExistingReceipt({
   // handling as expiry: drop it and let the request through as a first use,
   // which is strictly better than refusing a create the caller can never make.
   if (serializedBody === null) {
-    await releaseClaim({ prisma, receiptId: existing.id });
+    await discardReceipt({ prisma, receiptId: existing.id });
     return { kind: "retry" };
   }
 
@@ -481,12 +682,56 @@ export function readStoredBody(receipt: IdempotencyReceipt): string | null {
 }
 
 /**
- * Drop a receipt, by id.
+ * Give up the claim this request holds, so the key is usable again.
+ *
+ * Fenced on `claimId` like every other write a claim holder makes: a request
+ * that was declared dead and replaced must not delete the row the replacing
+ * request is now working under. Affecting no rows is far less serious here
+ * than on the finalize path, since a claim released is a create that failed
+ * and left nothing behind, but it is still worth saying that this request no
+ * longer had the key it thought it had.
  *
  * `deleteMany` rather than `delete` so a row already cleared by a concurrent
  * attempt is not a second error on top of whatever is being handled.
  */
 async function releaseClaim({
+  prisma,
+  receiptId,
+  claimId,
+}: {
+  prisma: PrismaClient;
+  receiptId: string;
+  claimId: string;
+}): Promise<void> {
+  try {
+    const { count } = await prisma.idempotencyReceipt.deleteMany({
+      where: { id: receiptId, claimId },
+    });
+    if (count === 0) {
+      logger.warn(
+        { receiptId, claimId },
+        "An idempotency claim was taken over before its request could release it",
+      );
+    }
+  } catch (error) {
+    // Called on the failure path, where the caller is already propagating
+    // something more informative. A receipt left pending expires on its own.
+    logger.warn(
+      { receiptId, error },
+      "Failed to release a pending idempotency receipt",
+    );
+  }
+}
+
+/**
+ * Drop a receipt nobody holds a claim on, by id.
+ *
+ * Unconditional, unlike {@link releaseClaim}, because the rows this collects
+ * are ones no request is working under: a receipt past its expiry, and one
+ * whose stored body can no longer be decrypted. Both are read on the way past
+ * by whichever request presents the key next.
+ */
+async function discardReceipt({
   prisma,
   receiptId,
 }: {
@@ -496,11 +741,9 @@ async function releaseClaim({
   try {
     await prisma.idempotencyReceipt.deleteMany({ where: { id: receiptId } });
   } catch (error) {
-    // Called on the failure path, where the caller is already propagating
-    // something more informative. A receipt left pending expires on its own.
     logger.warn(
       { receiptId, error },
-      "Failed to release a pending idempotency receipt",
+      "Failed to discard a spent idempotency receipt",
     );
   }
 }

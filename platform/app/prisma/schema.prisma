@@ -3668,10 +3668,12 @@ model IdempotencyReceipt {
   id                 String   @id @default(nanoid())
   scopeId            String
   key                String
+  claimId            String
   requestFingerprint String
   responseStatus     Int?
   responseBody       String?  @db.Text
   createdAt          DateTime @default(now())
+  heartbeatAt        DateTime
   expiresAt          DateTime
 
   @@unique([scopeId, key])

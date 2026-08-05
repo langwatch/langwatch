@@ -212,7 +212,9 @@ describe("the idempotency receipt sweep", () => {
         data: {
           scopeId,
           key: `expired_${ns}`,
+          claimId: `claim_expired_${ns}`,
           requestFingerprint: "fp",
+          heartbeatAt: now,
           expiresAt: new Date(now.getTime() - 1000),
         },
       });
@@ -220,7 +222,9 @@ describe("the idempotency receipt sweep", () => {
         data: {
           scopeId,
           key: `live_${ns}`,
+          claimId: `claim_live_${ns}`,
           requestFingerprint: "fp",
+          heartbeatAt: now,
           expiresAt: new Date(now.getTime() + DAY_MS),
         },
       });

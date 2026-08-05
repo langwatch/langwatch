@@ -1,10 +1,12 @@
 /**
  * The parts of `Idempotency-Key` handling that need no storage: reading the
- * header, deciding whether two bodies are the same body, and deciding whether
- * a receipt can still be read back at all.
+ * header, deciding whether two bodies are the same body, whether a claim has
+ * gone quiet long enough to be taken over, and whether a receipt can still be
+ * read back at all.
  *
- * Everything that turns on a stored receipt (replay, the pending window,
- * expiry, fingerprint conflict) is asserted against real Postgres in
+ * Everything that turns on a stored receipt (replay, expiry, fingerprint
+ * conflict, and a takeover actually happening) is asserted against real
+ * Postgres in
  * `src/app/api/gateway-platform/__tests__/gateway-platform-api.integration.test.ts`,
  * because the unique index is what implements the serialisation and a fake of
  * it would be asserting the fake.
@@ -12,22 +14,41 @@
 
 import crypto from "node:crypto";
 import { HandledError } from "@langwatch/handled-error";
-import type { IdempotencyReceipt } from "@prisma/client";
-import { describe, expect, it } from "vitest";
+import type { IdempotencyReceipt, PrismaClient } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { encrypt } from "~/utils/encryption";
 
 import {
   fingerprintRequestBody,
+  HEARTBEAT_INTERVAL_MS,
+  isClaimAbandoned,
   MAX_KEY_LENGTH,
   MIN_KEY_LENGTH,
-  PENDING_TAKEOVER_MS,
   RECEIPT_TTL_MS,
   readIdempotencyKey,
   readStoredBody,
   serializeResponseBody,
+  TAKEOVER_AFTER_MS,
   withIdempotency,
 } from "../idempotency";
+
+const { logSpy } = vi.hoisted(() => ({
+  logSpy: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => logSpy,
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 /** A prisma that fails loudly if anything reaches for it. */
 const forbiddenPrisma = new Proxy(
@@ -251,11 +272,167 @@ describe("readStoredBody", () => {
   });
 });
 
+describe("isClaimAbandoned", () => {
+  const now = new Date("2026-08-05T12:00:00.000Z");
+  const lastBeat = (agoMs: number) => new Date(now.getTime() - agoMs);
+
+  describe("given a claim that is still reporting itself alive", () => {
+    /** @scenario "A retry sent while the original is still running is refused" */
+    it("holds the claim while the beats keep arriving", () => {
+      expect(isClaimAbandoned({ heartbeatAt: lastBeat(0), now })).toBe(false);
+      expect(
+        isClaimAbandoned({ heartbeatAt: lastBeat(HEARTBEAT_INTERVAL_MS), now }),
+      ).toBe(false);
+      // Silent for the whole tolerance and not a millisecond more: the beat
+      // that would have cleared it may simply be in flight.
+      expect(
+        isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS), now }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given a claim that stopped beating", () => {
+    /** @scenario "A claim that stopped reporting itself alive is taken over" */
+    it("releases the claim once the tolerance is past", () => {
+      expect(
+        isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS + 1), now }),
+      ).toBe(true);
+      expect(
+        isClaimAbandoned({ heartbeatAt: lastBeat(10 * 60_000), now }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given a slow request that claimed the key long ago", () => {
+    /** @scenario "Takeover turns on the last beat, not on the claim's age" */
+    it("holds the claim however old it is, because it is still beating", () => {
+      // An hour into a handler that is waiting on a lock, beating a second
+      // ago. Any rule that reads the claim's age declares this dead and lets a
+      // second request create alongside a first that is still going to write.
+      const claimedAnHourAgo = {
+        heartbeatAt: lastBeat(1_000),
+        now,
+      };
+      expect(isClaimAbandoned(claimedAnHourAgo)).toBe(false);
+    });
+  });
+});
+
 describe("the receipt windows", () => {
-  it("answers for 24 hours and believes a pending row for 60 seconds", () => {
-    // Pinned because both numbers are quoted in the OpenAPI description and
-    // in the copy a caller reads when it is told to retry shortly.
+  it("answers for 24 hours and gives a quiet claim four beats", () => {
+    // The lifetime is pinned because it is quoted in the OpenAPI description.
     expect(RECEIPT_TTL_MS).toBe(24 * 60 * 60 * 1000);
-    expect(PENDING_TAKEOVER_MS).toBe(60_000);
+    expect(HEARTBEAT_INTERVAL_MS).toBe(5_000);
+    expect(TAKEOVER_AFTER_MS).toBe(20_000);
+    // Below two intervals a single swallowed beat reads as a death, which is
+    // the failure this whole mechanism exists to stop being possible.
+    expect(TAKEOVER_AFTER_MS).toBeGreaterThanOrEqual(3 * HEARTBEAT_INTERVAL_MS);
+  });
+});
+
+describe("the writes a claim holder makes", () => {
+  const RECEIPT_ID = "rcpt-1";
+
+  interface PrismaCall {
+    where?: Record<string, unknown>;
+    data?: Record<string, unknown>;
+  }
+
+  /**
+   * A prisma that records what it was asked to write and reports how many rows
+   * each write matched. `matchedRows: 0` is a claim that was taken over while
+   * this request's handler was still running.
+   */
+  function recordingPrisma({ matchedRows }: { matchedRows: number }) {
+    const created: PrismaCall[] = [];
+    const updated: PrismaCall[] = [];
+    const deleted: PrismaCall[] = [];
+
+    const prisma = {
+      idempotencyReceipt: {
+        create: (args: PrismaCall) => {
+          created.push(args);
+          return Promise.resolve({ id: RECEIPT_ID });
+        },
+        updateMany: (args: PrismaCall) => {
+          updated.push(args);
+          return Promise.resolve({ count: matchedRows });
+        },
+        deleteMany: (args: PrismaCall) => {
+          deleted.push(args);
+          return Promise.resolve({ count: matchedRows });
+        },
+      },
+    } as unknown as PrismaClient;
+
+    return { prisma, created, updated, deleted };
+  }
+
+  const run = (prisma: PrismaClient, handler: () => Promise<never> | never) =>
+    withIdempotency({
+      prisma,
+      operation: "gateway.v1.budgets.create",
+      scopeId: "proj-1",
+      key: "order-4711",
+      validatedBody: { name: "monthly" },
+      handler: handler as never,
+    });
+
+  const succeeds = () =>
+    Promise.resolve({ status: 201, body: { budget: { id: "bg-1" } } });
+
+  describe("when the claim is still the one this request took", () => {
+    it("stores the response against the claim it holds", async () => {
+      const { prisma, created, updated } = recordingPrisma({ matchedRows: 1 });
+
+      await run(prisma, succeeds as never);
+
+      const claimId = created[0]?.data?.claimId;
+      expect(typeof claimId).toBe("string");
+      // The fence, spelled on the write itself rather than checked before it,
+      // so no gap exists between reading the claim and writing under it.
+      expect(updated).toHaveLength(1);
+      expect(updated[0]?.where).toEqual({ id: RECEIPT_ID, claimId });
+      expect(logSpy.error).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the claim was taken over while the handler ran", () => {
+    it("leaves the new claim's receipt alone and says so", async () => {
+      const { prisma, updated, deleted } = recordingPrisma({ matchedRows: 0 });
+
+      const outcome = await run(prisma, succeeds as never);
+
+      // The resource was created, so the request answers for it. What it
+      // cannot do is claim the key back.
+      expect(outcome).toMatchObject({ status: 201, isReplayed: false });
+      // One fenced attempt and no unfenced fallback: a second write without
+      // the claimId would overwrite the receipt of the request that replaced
+      // this one, and hide the double create instead of reporting it.
+      expect(updated).toHaveLength(1);
+      expect(deleted).toHaveLength(0);
+      expect(logSpy.error).toHaveBeenCalledTimes(1);
+      expect(logSpy.error.mock.calls[0]?.[1]).toContain(
+        "may now stand for a second resource",
+      );
+    });
+
+    it("releases nothing when its handler failed", async () => {
+      const boom = new Error("service refused");
+      const { prisma, created, deleted } = recordingPrisma({ matchedRows: 0 });
+
+      await expect(
+        run(prisma, () => Promise.reject(boom) as never),
+      ).rejects.toBe(boom);
+
+      // A failed create has nothing to store, but it must still not delete a
+      // row another request is now working under.
+      expect(deleted).toHaveLength(1);
+      expect(deleted[0]?.where).toEqual({
+        id: RECEIPT_ID,
+        claimId: created[0]?.data?.claimId,
+      });
+      expect(logSpy.warn).toHaveBeenCalledTimes(1);
+    });
   });
 });

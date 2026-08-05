@@ -34,6 +34,11 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import {
+  readStoredBody,
+  serializeResponseBody,
+  withIdempotency,
+} from "~/server/api/idempotency";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import {
@@ -1967,6 +1972,22 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         where: { scopeId_key: { scopeId: PROJECT_ID, key } },
       });
 
+    /**
+     * Wait for a row a request in flight is about to write.
+     *
+     * The claim goes in before the handler runs, so a request parked inside
+     * its handler has certainly written it; this only covers the moment
+     * between starting that request and its insert landing.
+     */
+    async function pollFor<T>(read: () => Promise<T | null>): Promise<T> {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const found = await read();
+        if (found) return found;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error("the awaited row never appeared");
+    }
+
     /** Re-encrypt under a key this deployment does not hold. */
     function encryptUnderAnotherKey(text: string): string {
       const key = crypto.randomBytes(32);
@@ -2076,6 +2097,36 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(await budgetsNamed(body.name)).toHaveLength(1);
     });
 
+    /**
+     * Wind a receipt back to the state its first request held between
+     * claiming the key and storing its answer.
+     *
+     * Doctoring a real receipt rather than inserting one keeps the
+     * fingerprint identical to the route's, which is taken over the VALIDATED
+     * body and so cannot be recomputed here.
+     */
+    async function windBackToPending({
+      key,
+      claimedAt,
+      lastBeatAt,
+    }: {
+      key: string;
+      claimedAt: Date;
+      lastBeatAt: Date;
+    }) {
+      const claimed = await receiptFor(key);
+      await prisma.idempotencyReceipt.update({
+        where: { id: claimed!.id },
+        data: {
+          responseStatus: null,
+          responseBody: null,
+          createdAt: claimedAt,
+          heartbeatAt: lastBeatAt,
+        },
+      });
+      return claimed!;
+    }
+
     /** @scenario A retry sent while the original is still running is refused */
     it("refuses a retry against a receipt still marked pending", async () => {
       const key = `idem-pending-key-${suffix}`;
@@ -2085,18 +2136,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
       ).toBe(201);
 
-      // Wound back to the state the first request held between claiming the
-      // key and storing its answer. Doctoring a real receipt rather than
-      // inserting one keeps the fingerprint identical to the route's, which
-      // is taken over the VALIDATED body and so cannot be recomputed here.
-      const claimed = await receiptFor(key);
-      await prisma.idempotencyReceipt.update({
-        where: { id: claimed!.id },
-        data: {
-          responseStatus: null,
-          responseBody: null,
-          createdAt: new Date(),
-        },
+      await windBackToPending({
+        key,
+        claimedAt: new Date(),
+        lastBeatAt: new Date(),
       });
 
       const retry = await post("/api/gateway/v1/budgets", body, keyed(key));
@@ -2109,8 +2152,38 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(await budgetsNamed(body.name)).toHaveLength(1);
     });
 
-    /** @scenario A pending receipt older than the window is treated as a crash */
-    it("supersedes a pending receipt left behind by a dead request", async () => {
+    /** @scenario "A slow original that is still reporting alive keeps its claim" */
+    it("refuses a retry against a long-running claim that is still beating", async () => {
+      const key = `idem-slow-key-${suffix}`;
+      const body = budgetBody("slow");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      // A request five minutes into its handler, waiting on a lock or a
+      // saturated pool, that reported itself alive a moment ago. Any rule
+      // reading the claim's age hands the key to this retry, which then
+      // creates a second budget alongside the one the original is still going
+      // to write. That is the exact failure this refusal exists to stop, and
+      // it lands hardest when the platform is already struggling.
+      await windBackToPending({
+        key,
+        claimedAt: new Date(Date.now() - 5 * 60_000),
+        lastBeatAt: new Date(),
+      });
+
+      const retry = await post("/api/gateway/v1/budgets", body, keyed(key));
+      const error = await expectCanonicalError(retry, {
+        status: 409,
+        code: "idempotency_error",
+      });
+      expect(error.meta?.reason).toBe("in_progress");
+      expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /** @scenario "A claim that stopped reporting itself alive is taken over" */
+    it("takes over a claim that stopped beating and creates exactly one budget", async () => {
       const key = `idem-stale-key-${suffix}`;
       const body = budgetBody("stale");
 
@@ -2118,14 +2191,16 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
       ).toBe(201);
 
-      const claimed = await receiptFor(key);
-      await prisma.idempotencyReceipt.update({
-        where: { id: claimed!.id },
-        data: {
-          responseStatus: null,
-          responseBody: null,
-          createdAt: new Date(Date.now() - 61_000),
-        },
+      // A process that died between claiming the key and writing anything:
+      // the budget its create made is removed, so what is left is the pending
+      // row alone, exactly as a crash in that window leaves it.
+      const claimed = await windBackToPending({
+        key,
+        claimedAt: new Date(Date.now() - 5 * 60_000),
+        lastBeatAt: new Date(Date.now() - 61_000),
+      });
+      await prisma.gatewayBudget.deleteMany({
+        where: { organizationId: ORG_ID, name: body.name },
       });
 
       // Without the takeover this answers 409 for the next 24 hours, and the
@@ -2133,10 +2208,81 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const retry = await post("/api/gateway/v1/budgets", body, keyed(key));
       expect(retry.status).toBe(201);
       expect(retry.headers.get("X-Idempotent-Replay")).toBeNull();
-      expect((await receiptFor(key))?.responseStatus).toBe(201);
-      // Two, because this test faked the crash after a create that really
-      // happened. A genuine crash in that window left nothing behind.
-      expect(await budgetsNamed(body.name)).toHaveLength(2);
+
+      const superseded = await receiptFor(key);
+      expect(superseded?.responseStatus).toBe(201);
+      // The same row under a new claim rather than a fresh row, which is what
+      // lets the request that was replaced be told apart from the one that
+      // replaced it.
+      expect(superseded?.id).toBe(claimed.id);
+      expect(superseded?.claimId).not.toBe(claimed.claimId);
+
+      expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /** @scenario "A replaced request cannot overwrite the receipt that replaced it" */
+    it("fences the replaced request out of the receipt", async () => {
+      const key = `idem-fenced-key-${suffix}`;
+      const validatedBody = { name: `idem-fenced-${suffix}` };
+      const operation = "gateway.v1.budgets.create";
+
+      // The original: parked inside its handler, which is what a request slow
+      // enough to be declared dead looks like from outside.
+      let letOriginalFinish: () => void = () => undefined;
+      const parked = new Promise<void>((resolve) => {
+        letOriginalFinish = resolve;
+      });
+      const original = withIdempotency({
+        prisma,
+        operation,
+        scopeId: PROJECT_ID,
+        key,
+        validatedBody,
+        handler: async () => {
+          await parked;
+          return { status: 201, body: { id: "from-the-original" } };
+        },
+      });
+
+      const claimed = await pollFor(() => receiptFor(key));
+      // Silence it without stopping it, so the request is genuinely still
+      // running when its claim is taken away.
+      await prisma.idempotencyReceipt.update({
+        where: { id: claimed.id },
+        data: { heartbeatAt: new Date(Date.now() - 61_000) },
+      });
+
+      const replacement = await withIdempotency({
+        prisma,
+        operation,
+        scopeId: PROJECT_ID,
+        key,
+        validatedBody,
+        handler: () =>
+          Promise.resolve({
+            status: 201,
+            body: { id: "from-the-replacement" },
+          }),
+      });
+      expect(replacement.isReplayed).toBe(false);
+
+      const takenOver = await receiptFor(key);
+      expect(takenOver?.claimId).not.toBe(claimed.claimId);
+
+      // The original comes back from the dead and stores its answer.
+      letOriginalFinish();
+      await original;
+
+      const settled = await receiptFor(key);
+      expect(settled?.claimId).toBe(takenOver?.claimId);
+      // The key answers for the request that owns it, not for the one that was
+      // replaced. Without the fence this row now replays a response whose
+      // resource the replacement never made.
+      expect(readStoredBody(settled!)).toBe(
+        serializeResponseBody({ id: "from-the-replacement" }),
+      );
+
+      await prisma.idempotencyReceipt.deleteMany({ where: { id: claimed.id } });
     });
 
     /** @scenario An expired receipt lets the key be used again */

@@ -30,12 +30,55 @@ interface EndpointGroup {
 
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
 
-// Legacy paths that have modern equivalents - skip these
-const SKIP_PATHS = new Set([
-  "/api/trace/search", // use /api/traces/search
-  "/api/trace/{id}", // use /api/traces/{traceId}
-  "/", // root endpoints from prompts app (not real API routes)
-]);
+/**
+ * Reasons per family, shared by the paths that belong to the same surface.
+ * A reason states which kind of exclusion this is: a retired surface that is
+ * intentionally undocumented, or a live surface that is not yet documented in
+ * the API reference.
+ */
+const RETIRED_GATEWAY_PROVIDER_BINDINGS =
+  "Retired surface, intentionally undocumented: the gateway provider binding routes answer 410 Gone, and the credentials they wrapped are managed under /api/model-providers.";
+
+const UNDOCUMENTED_EXPERIMENT_RUNS =
+  "Not yet documented in the API reference: the Evaluations v3 experiment run routes have no reference pages yet.";
+
+const UNDOCUMENTED_INGESTION_TEMPLATES =
+  "Not yet documented in the API reference: the governance ingestion template routes have no reference pages yet.";
+
+const UNDOCUMENTED_CALLER_IDENTITY =
+  "Not yet documented in the API reference: the calling key's own project and usage routes have no reference pages yet.";
+
+const UNDOCUMENTED_MODEL_DEFAULTS =
+  "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
+
+/**
+ * Spec paths that deliberately get no reference page, each with the reason it
+ * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
+ * entry, and the generator fails when one is owned by neither.
+ */
+const SKIP_PATHS: Record<string, string> = {
+  "/": "Not an API route: the prompts app serves the spec's root path, so there is nothing to document.",
+  "/api/trace/search":
+    "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
+  "/api/trace/{id}":
+    "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
+  "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
+  "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
+  "/api/events/track":
+    "Not yet documented in the API reference: the trace event tracking route has no reference page yet.",
+  "/api/experiments/runs/{runId}": UNDOCUMENTED_EXPERIMENT_RUNS,
+  "/api/experiments/{slug}/run": UNDOCUMENTED_EXPERIMENT_RUNS,
+  "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/{id}": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/{id}/ottl-rules":
+    UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/me/project": UNDOCUMENTED_CALLER_IDENTITY,
+  "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
+  "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
+  "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
+};
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
@@ -343,7 +386,7 @@ function matchStrength(apiPath: string, group: EndpointGroup): number {
 function resolveOwners(specPaths: string[]): Map<string, EndpointGroup> {
   const owners = new Map<string, EndpointGroup>();
   for (const apiPath of specPaths) {
-    if (SKIP_PATHS.has(apiPath)) continue;
+    if (Object.hasOwn(SKIP_PATHS, apiPath)) continue;
     let winner: EndpointGroup | undefined;
     let winningStrength = 0;
     for (const group of ENDPOINT_GROUPS) {
@@ -401,13 +444,24 @@ function main() {
   const owners = resolveOwners(Object.keys(spec.paths));
 
   const unowned = Object.keys(spec.paths).filter(
-    (apiPath) => !SKIP_PATHS.has(apiPath) && !owners.has(apiPath)
+    (apiPath) => !Object.hasOwn(SKIP_PATHS, apiPath) && !owners.has(apiPath)
   );
   if (unowned.length > 0) {
-    console.log(
-      `${unowned.length} spec paths have no ENDPOINT_GROUPS entry and are not documented:`
+    const noun = unowned.length === 1 ? "spec path has" : "spec paths have";
+    console.error(
+      `ERROR: ${unowned.length} ${noun} no ENDPOINT_GROUPS entry and no SKIP_PATHS reason:`
     );
-    for (const apiPath of unowned.sort()) console.log(`  ${apiPath}`);
+    for (const apiPath of unowned.sort()) console.error(`  ${apiPath}`);
+    console.error(
+      "\nEvery path above needs one of two resolutions in docs/scripts/generate-api-reference-pages.ts:"
+    );
+    console.error(
+      "  1. add an ENDPOINT_GROUPS entry covering it, so the path gets a reference page, or"
+    );
+    console.error(
+      "  2. add a SKIP_PATHS entry whose reason says why it is deliberately undocumented, either a retired surface or a live surface not yet documented in the API reference."
+    );
+    process.exit(1);
   }
 
   for (const group of ENDPOINT_GROUPS) {

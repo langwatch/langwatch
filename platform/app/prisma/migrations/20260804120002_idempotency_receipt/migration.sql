@@ -19,6 +19,20 @@
 -- the hazard idempotency exists to prevent is double creation, which only
 -- happens on success.
 --
+-- `heartbeatAt` is how a pending row says its request is still running. The
+-- request holding the claim rewrites it every few seconds, and only a row that
+-- has gone quiet for several of those intervals may be taken over by another
+-- request. Age would be the easier test and the wrong one: a request that is
+-- merely slow, waiting on a lock or a cold connection pool, is still going to
+-- write its resource, so superseding it on age alone is how one key comes to
+-- stand for two resources.
+--
+-- `claimId` is the fence. A takeover rewrites this column instead of deleting
+-- the row, so the request that took the claim over owns it and every write the
+-- replaced request makes can be made conditional on the claim it still thinks
+-- it holds. That is what stops a process resuming after being declared dead
+-- from overwriting the receipt of the request that replaced it.
+--
 -- `responseBody` is the original response's exact bytes, AES-256-GCM encrypted
 -- under CREDENTIALS_SECRET, the same treatment the automations webhook gives
 -- its custom headers. It is encrypted because two of the four creates answer
@@ -43,10 +57,12 @@ CREATE TABLE "IdempotencyReceipt" (
     "id" TEXT NOT NULL,
     "scopeId" TEXT NOT NULL,
     "key" TEXT NOT NULL,
+    "claimId" TEXT NOT NULL,
     "requestFingerprint" TEXT NOT NULL,
     "responseStatus" INTEGER,
     "responseBody" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "heartbeatAt" TIMESTAMP(3) NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "IdempotencyReceipt_pkey" PRIMARY KEY ("id")
