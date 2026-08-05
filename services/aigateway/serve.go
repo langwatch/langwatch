@@ -86,12 +86,15 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 // This deliberately does NOT compare against the gateway's absolute
 // upstream ceiling (providers.ProviderRequestTimeoutSeconds, 14 minutes):
 // no sane GracefulSeconds ever approaches that, so that comparison would
-// fire on every deployment everywhere — permanent noise with nothing
+// fire on every deployment everywhere, permanent noise with nothing
 // actionable behind it. HeartbeatInterval is the deliberately chosen
 // boundary between "fast, typical" and "slow but legitimate," which is why
-// it's the comparison that's actually meaningful — and not universally
-// true today: the stock defaults (10s graceful, 45s heartbeat) already
-// fail it.
+// it is the comparison that is actually meaningful.
+//
+// The stock defaults clear the check by design (60s graceful against a 45s
+// heartbeat interval, and the gateway chart matches), so the warning marks
+// a deployment that has narrowed SERVER_GRACEFUL_SECONDS rather than one
+// that simply took what it was given.
 func warnIfGracefulShutdownTooShort(logger *zap.Logger, cfg Config) {
 	graceful := time.Duration(cfg.Server.GracefulSeconds) * time.Second
 	if graceful <= 0 {

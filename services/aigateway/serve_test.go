@@ -32,12 +32,21 @@ func requireWarning(t *testing.T, logs *observer.ObservedLogs) observer.LoggedEn
 	return entries[0]
 }
 
-// @scenario "stock defaults already fail the graceful-vs-heartbeat check"
-func TestServe_WarnIfGracefulShutdownTooShort_StockDefaultsWarn(t *testing.T) {
+// @scenario "stock defaults clear the graceful-vs-heartbeat check"
+func TestServe_WarnIfGracefulShutdownTooShort_StockDefaultsDoNotWarn(t *testing.T) {
 	cfg := defaultConfig()
 	// defaultConfig leaves NonStreamingHeartbeatIntervalSeconds at the
-	// resolved 45s default and GracefulSeconds at 10 — the exact mismatch
-	// this warning exists to catch.
+	// resolved 45s default and GracefulSeconds at 60. A deployment that
+	// takes the defaults must never see this warning, or the warning is
+	// noise rather than a signal that something needs attention.
+	require.Greater(t, cfg.Server.GracefulSeconds, int(config.DefaultNonStreamingHeartbeatInterval/time.Second))
+	requireNoWarning(t, observedWarnIfGracefulShutdownTooShort(t, cfg))
+}
+
+// @scenario "a graceful window narrowed below the heartbeat interval warns"
+func TestServe_WarnIfGracefulShutdownTooShort_NarrowedGracefulWarns(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Server.GracefulSeconds = 10
 	entry := requireWarning(t, observedWarnIfGracefulShutdownTooShort(t, cfg))
 
 	require.Equal(t, zap.WarnLevel, entry.Level)
@@ -49,7 +58,7 @@ func TestServe_WarnIfGracefulShutdownTooShort_StockDefaultsWarn(t *testing.T) {
 // @scenario "graceful window at or above the heartbeat interval does not warn"
 func TestServe_WarnIfGracefulShutdownTooShort_SufficientGracefulNoWarn(t *testing.T) {
 	cfg := defaultConfig()
-	cfg.Server.GracefulSeconds = 45 // exactly equal — not "shorter than"
+	cfg.Server.GracefulSeconds = 45 // exactly equal, which is not "shorter than"
 	requireNoWarning(t, observedWarnIfGracefulShutdownTooShort(t, cfg))
 
 	cfg.Server.GracefulSeconds = 120

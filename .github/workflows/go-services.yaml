@@ -193,23 +193,35 @@ jobs:
             echo "NetworkPolicy should NOT render by default"; exit 1
           fi
 
-      # Regression guard: shutdown.preDrainWaitSeconds / timeoutSeconds
-      # previously looked configurable in values.yaml but never reached the
-      # container (no env var wiring in configmap.yaml, no
-      # lifecycle.WithDrainDelay call in serve.go) — the values were
-      # fiction. This asserts the ConfigMap actually carries them through.
+      # Regression guard: shutdown.preDrainWaitSeconds / timeoutSeconds are
+      # only real if the ConfigMap carries them to the env vars serve.go
+      # reads. Without this, a rename on either side leaves values.yaml
+      # advertising drain timing the container never receives.
       - name: Assert shutdown timing values reach the ConfigMap
         run: |
           if ! grep -q 'SERVER_DRAIN_DELAY_SECONDS: "5"' /tmp/defaults.yaml; then
             echo "SERVER_DRAIN_DELAY_SECONDS missing/wrong in rendered ConfigMap (expected shutdown.preDrainWaitSeconds default of 5)"; exit 1
           fi
-          if ! grep -q 'SERVER_GRACEFUL_SECONDS: "15"' /tmp/defaults.yaml; then
-            echo "SERVER_GRACEFUL_SECONDS missing/wrong in rendered ConfigMap (expected shutdown.timeoutSeconds default of 15)"; exit 1
+          if ! grep -q 'SERVER_GRACEFUL_SECONDS: "60"' /tmp/defaults.yaml; then
+            echo "SERVER_GRACEFUL_SECONDS missing/wrong in rendered ConfigMap (expected shutdown.timeoutSeconds default of 60)"; exit 1
           fi
 
-      # values.yaml's own comment claims terminationGracePeriodSeconds "is
-      # computed from preDrainWaitSeconds + timeoutSeconds + 10s slack" —
-      # it's actually a static literal, so nothing enforced that until now.
+      # The chart's graceful window has to stay above the gateway's 45s
+      # non-streaming heartbeat interval (pkg/config.DefaultNonStreamingHeartbeatInterval),
+      # or a stock install boots straight into the
+      # graceful_shutdown_shorter_than_heartbeat_interval warning and every
+      # slow-but-legitimate request is one a rolling deploy cuts off.
+      - name: Assert the graceful window outlasts the heartbeat interval
+        run: |
+          graceful=$(grep -oP 'SERVER_GRACEFUL_SECONDS: "\K[0-9]+' /tmp/defaults.yaml)
+          heartbeat=$(grep -oP 'DefaultNonStreamingHeartbeatInterval = \K[0-9]+' pkg/config/server.go)
+          if [ "$graceful" -le "$heartbeat" ]; then
+            echo "shutdown.timeoutSeconds ($graceful) must exceed the ${heartbeat}s non-streaming heartbeat interval"; exit 1
+          fi
+
+      # values.yaml's own comment states terminationGracePeriodSeconds "is
+      # computed from preDrainWaitSeconds + timeoutSeconds + 10s slack", but
+      # it is a static literal, so only this step holds the three in step.
       # Violating it means the kubelet force-kills the pod mid-drain.
       - name: Assert terminationGracePeriodSeconds covers drain + timeout + slack
         run: |
@@ -221,6 +233,22 @@ jobs:
           if [ "$grace_period" -lt "$required" ]; then
             echo "terminationGracePeriodSeconds ($grace_period) must be >= preDrainWaitSeconds + timeoutSeconds + ${slack}s slack ($required)"; exit 1
           fi
+
+      # An operator carrying the duration-string keys forward would otherwise
+      # install a release whose drain timing silently ignores their values.
+      # The template refuses the render instead, and this holds it to that.
+      - name: Assert legacy shutdown keys are refused
+        working-directory: charts/gateway
+        run: |
+          for legacy in preDrainWait=5s timeout=15s; do
+            key="${legacy%%=*}"
+            if helm template gateway . --set "shutdown.${legacy}" --dry-run > /dev/null 2>&1; then
+              echo "shutdown.${key} rendered instead of failing; the legacy-key guard is gone"; exit 1
+            fi
+            if ! helm template gateway . --set "shutdown.${legacy}" --dry-run 2>&1 | grep -q "shutdown.${key}Seconds"; then
+              echo "the shutdown.${key} failure message must name shutdown.${key}Seconds"; exit 1
+            fi
+          done
 
       - name: helm dependency update (umbrella)
         working-directory: charts/langwatch

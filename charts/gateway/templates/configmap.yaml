@@ -1,3 +1,4 @@
+{{- include "gateway.validateShutdownValues" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -31,9 +32,8 @@ data:
        carried into the pod env rather than silently dropped. */}}
   LW_GATEWAY_SPEND_ENABLED: {{ .Values.spend.enabled | quote }}
   SERVER_MAX_REQUEST_BODY_BYTES: {{ printf "%d" (int64 .Values.security.maxRequestBodyBytes) | quote }}
-  # Previously declared in values.yaml but never reached the container —
-  # shutdown.preDrainWaitSeconds/timeoutSeconds looked configurable but did
-  # nothing. Now actually wired to the fields serve.go reads.
+  # The drain timing from values.yaml, carried to the two fields serve.go
+  # reads (pkg/config.Server.DrainDelaySeconds / GracefulSeconds).
   SERVER_DRAIN_DELAY_SECONDS: {{ .Values.shutdown.preDrainWaitSeconds | quote }}
   SERVER_GRACEFUL_SECONDS: {{ .Values.shutdown.timeoutSeconds | quote }}
   BLOCK_LOCAL_HTTP_CALLS: {{ .Values.security.blockLocalHTTPCalls | quote }}

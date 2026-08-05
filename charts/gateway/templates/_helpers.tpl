@@ -27,3 +27,17 @@ app.kubernetes.io/component: ai-gateway
 app.kubernetes.io/name: {{ include "gateway.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/* Refuses a values file that still carries the duration-string shutdown keys.
+     Helm merges unknown keys in silently, so an operator who kept them would
+     get a release that renders and installs while their drain timing quietly
+     falls back to the chart defaults. Failing the render is the only way they
+     find out at the moment they can still act on it. */}}
+{{- define "gateway.validateShutdownValues" -}}
+{{- if hasKey .Values.shutdown "preDrainWait" }}
+{{- fail (printf "shutdown.preDrainWait is not a chart value. Use shutdown.preDrainWaitSeconds, a plain integer count of seconds (found: %v)." .Values.shutdown.preDrainWait) }}
+{{- end }}
+{{- if hasKey .Values.shutdown "timeout" }}
+{{- fail (printf "shutdown.timeout is not a chart value. Use shutdown.timeoutSeconds, a plain integer count of seconds (found: %v)." .Values.shutdown.timeout) }}
+{{- end }}
+{{- end }}

@@ -30,9 +30,9 @@ type Config struct {
 	// non-streaming response writes a keep-alive byte while dispatch is
 	// still in flight. 0 falls back to config.DefaultNonStreamingHeartbeatInterval;
 	// negative disables heartbeating entirely. Plain seconds, not a Go
-	// duration string ("45s") — config.Hydrate parses time.Duration fields
-	// as raw nanosecond integers, not via time.ParseDuration, so "45s"
-	// would fail to parse. Plain seconds sidesteps that trap entirely.
+	// duration string ("45s"), per the repo-wide convention config.Hydrate
+	// enforces: env-configurable time spans are int64 seconds on a
+	// _SECONDS-suffixed variable, never a time.Duration field.
 	//
 	// Lives on Config directly rather than the shared config.Server (unlike
 	// MaxRequestBodyBytes, which every config.Server-embedding service
@@ -64,7 +64,7 @@ type SpendEmitterConfig struct {
 	SpoolMaxBytes int64 `env:"SPOOL_MAX_BYTES"`
 	// FlushIntervalSeconds bounds how long a record can sit unsealed (and
 	// therefore unshippable). 0 defaults to 1 second. Plain seconds, same
-	// parsing trap as NonStreamingHeartbeatIntervalSeconds above.
+	// convention as NonStreamingHeartbeatIntervalSeconds above.
 	FlushIntervalSeconds int64 `env:"FLUSH_INTERVAL_SECONDS"`
 	// IngestBaseURL overrides where batches ship. Empty defaults to
 	// ControlPlane.BaseURL.
@@ -85,12 +85,17 @@ type ControlPlaneConfig struct {
 // cached entry crosses its JWT exp AND the refresh fails for transport
 // reasons (network/timeout/5xx/parse error), the entry's soft expiry is
 // extended by SoftBump and the cached bundle continues to serve, up to a
-// hard cap of (JWT exp + HardGrace). Any auth-class rejection from the
-// control plane (401/403/404) evicts immediately — no grace window for
-// known-bad credentials. Setting HardGrace=0 disables stale-while-error
-// entirely (legacy behavior).
+// hard cap of (JWT exp + HardGraceSeconds). Any auth-class rejection from
+// the control plane (401/403/404) evicts immediately, with no grace window
+// for known-bad credentials.
 type AuthCacheConfig struct {
-	SoftBumpSeconds  int64 `env:"SOFT_BUMP_SECONDS"`
+	// SoftBumpSeconds extends a stale entry's soft expiry once per
+	// transport-class refresh failure. 0 selects the 5 minute default.
+	SoftBumpSeconds int64 `env:"SOFT_BUMP_SECONDS"`
+	// HardGraceSeconds caps how far past the JWT exp a stale entry can be
+	// served. 0 selects the 6 hour default; a negative value puts the hard
+	// cap before the JWT exp, which disables stale-while-error and restores
+	// the hard-fail-at-exp behavior wanted by strict revocation regimes.
 	HardGraceSeconds int64 `env:"HARD_GRACE_SECONDS"`
 	// ConfigTTLSeconds bounds how stale a cached virtual key's config
 	// (credentials, base URLs, routing chain) can get before a background
@@ -102,8 +107,8 @@ type AuthCacheConfig struct {
 // CircuitConfig tunes the per-credential circuit breaker that preempts
 // dispatch to a provider which has been failing, so a known-down
 // credential costs one probe per cooldown instead of a dead round-trip on
-// every request. Plain seconds rather than Go duration strings, because
-// config.Hydrate parses time.Duration fields as raw nanosecond integers.
+// every request. Plain seconds rather than Go duration strings, per the
+// convention config.Hydrate enforces.
 type CircuitConfig struct {
 	// WindowS is the failure-counting window. 0 uses the breaker default.
 	WindowS int64 `env:"WINDOW_S"`
@@ -138,13 +143,16 @@ func defaultConfig() Config {
 	return Config{
 		Environment: "local",
 		Server: config.Server{
-			Addr:            ":5563",
-			GracefulSeconds: 10,
-			// Matches pkg/lifecycle's own defaultDrainDelay so boot behavior
-			// is unchanged for anyone not overriding it — this field exists
-			// so the gateway chart can actually configure it (previously
-			// impossible: nothing wired shutdown.preDrainWait to an env var,
-			// and serve.go never called lifecycle.WithDrainDelay at all).
+			Addr: ":5563",
+			// Sits above DefaultNonStreamingHeartbeatInterval so a stock
+			// deployment can finish the slow-but-legitimate non-streaming
+			// requests the heartbeat mechanism exists to keep alive, instead
+			// of cutting them off mid-flight on every rolling deploy. See
+			// warnIfGracefulShutdownTooShort in serve.go.
+			GracefulSeconds: 60,
+			// Matches pkg/lifecycle's own defaultDrainDelay, so a deployment
+			// that does not set SERVER_DRAIN_DELAY_SECONDS drains exactly as
+			// the lifecycle package would on its own.
 			DrainDelaySeconds:   3,
 			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
 		},
@@ -189,6 +197,9 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := validateHostedEgressSecurity(cfg); err != nil {
 		return Config{}, err
 	}
+	if err := validateSecondsFields(cfg); err != nil {
+		return Config{}, err
+	}
 	if cfg.CustomerTraceBridge.BaseURL == "" {
 		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL
 	}
@@ -199,6 +210,41 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// MaxConfigurableSeconds bounds every seconds-valued time span in the
+// gateway's configuration. Each one is turned into a time.Duration by
+// multiplying by time.Second, i.e. by a billion, so a value near int64's
+// range silently wraps to a negative duration: a typo of a nanosecond count
+// into a seconds field would land as an instant timeout or a disabled cache
+// rather than as a startup failure. Ten years is orders of magnitude past
+// any legitimate setting and leaves the multiplication nowhere near
+// overflow.
+const MaxConfigurableSeconds = 10 * 365 * 24 * 60 * 60
+
+// validateSecondsFields rejects out-of-range time spans before anything
+// converts them to a time.Duration. Negative values stay legal: several of
+// these fields use a negative number as an explicit "disabled" signal.
+func validateSecondsFields(cfg Config) error {
+	for _, f := range []struct {
+		env   string
+		value int64
+	}{
+		{"SERVER_GRACEFUL_SECONDS", int64(cfg.Server.GracefulSeconds)},
+		{"SERVER_DRAIN_DELAY_SECONDS", int64(cfg.Server.DrainDelaySeconds)},
+		{"NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS", cfg.NonStreamingHeartbeatIntervalSeconds},
+		{"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS", cfg.AuthCache.SoftBumpSeconds},
+		{"LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", cfg.AuthCache.HardGraceSeconds},
+		{"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS", cfg.AuthCache.ConfigTTLSeconds},
+		{"LW_GATEWAY_CIRCUIT_WINDOW_S", cfg.Circuit.WindowS},
+		{"LW_GATEWAY_CIRCUIT_COOLDOWN_S", cfg.Circuit.CooldownS},
+		{"LW_GATEWAY_SPEND_FLUSH_INTERVAL_SECONDS", cfg.SpendEmitter.FlushIntervalSeconds},
+	} {
+		if f.value > MaxConfigurableSeconds || f.value < -MaxConfigurableSeconds {
+			return fmt.Errorf("%s is %d seconds, which is outside the supported range of +/-%d seconds (10 years); values are seconds, not milliseconds or nanoseconds", f.env, f.value, int64(MaxConfigurableSeconds))
+		}
+	}
+	return nil
 }
 
 // validateHostedEgressSecurity makes the SSRF controls a startup invariant for

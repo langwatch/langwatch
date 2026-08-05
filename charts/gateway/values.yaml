@@ -234,25 +234,31 @@ containerSecurityContext:
 # the LB / Service endpoint controller stops routing new traffic, waits
 # preDrainWaitSeconds for that removal to propagate, then calls
 # server.Shutdown, which blocks up to `timeoutSeconds` for in-flight
-# handlers to finish (pkg/lifecycle.Group.Run — see configmap.yaml for how
+# handlers to finish (pkg/lifecycle.Group.Run, see configmap.yaml for how
 # these two reach the container as SERVER_DRAIN_DELAY_SECONDS /
 # SERVER_GRACEFUL_SECONDS).
 #
-# Plain integer seconds, not duration strings ("5s"/"15s") — the Go side
+# Plain integer seconds, not duration strings ("5s"/"60s"): the Go side
 # (pkg/config.Server.DrainDelaySeconds / GracefulSeconds) is a plain int,
-# parsed as a raw number; there's no unit suffix to strip.
+# parsed as a raw number, with no unit suffix to strip.
+#
+# timeoutSeconds sits above the gateway's 45s non-streaming heartbeat
+# interval, which is the boundary between a request that is merely slow and
+# one that is stuck. Below it, every request the heartbeat exists to keep
+# alive is one a rolling deploy cuts off, and the gateway says so at boot
+# with a graceful_shutdown_shorter_than_heartbeat_interval warning.
 #
 # terminationGracePeriodSeconds (pod spec) MUST exceed preDrainWaitSeconds +
 # timeoutSeconds + a few seconds of slack, or the kubelet force-kills the
 # pod mid-drain.
 shutdown:
   preDrainWaitSeconds: 5
-  timeoutSeconds: 15
+  timeoutSeconds: 60
 # terminationGracePeriodSeconds is computed from preDrainWaitSeconds +
-# timeoutSeconds + 10s slack (5 + 15 + 10 = 30). Operators with slow LB
+# timeoutSeconds + 10s slack (5 + 60 + 10 = 75). Operators with slow LB
 # propagation can override this directly AND bump preDrainWaitSeconds
 # accordingly.
-terminationGracePeriodSeconds: 30
+terminationGracePeriodSeconds: 75
 
 # Edge protection. Caps request body size so a misconfigured (or
 # hostile) caller can't OOM the pod with a multi-GB body. 10 MiB fits

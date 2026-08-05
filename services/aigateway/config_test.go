@@ -3,6 +3,9 @@ package aigateway
 import (
 	"context"
 	"testing"
+	"time"
+
+	"github.com/langwatch/langwatch/pkg/config"
 )
 
 // LoadConfig with only the two required secrets set should yield in-process defaults.
@@ -253,6 +256,61 @@ func TestLoadConfig_AuthCacheSecondsFields(t *testing.T) {
 	}
 }
 
+// @scenario "the default graceful window outlasts the heartbeat interval"
+func TestLoadConfig_DefaultGracefulWindowOutlastsHeartbeat(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	heartbeat := int(config.DefaultNonStreamingHeartbeatInterval / time.Second)
+	if cfg.Server.GracefulSeconds <= heartbeat {
+		t.Errorf("Server.GracefulSeconds = %d, want more than the %ds heartbeat interval so stock deployments never warn", cfg.Server.GracefulSeconds, heartbeat)
+	}
+}
+
+// @scenario "an absurd seconds value is refused instead of overflowing a duration"
+func TestLoadConfig_RefusesOutOfRangeSecondsValues(t *testing.T) {
+	for _, envVar := range []string{
+		"SERVER_GRACEFUL_SECONDS",
+		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS",
+		"NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS",
+	} {
+		t.Run(envVar, func(t *testing.T) {
+			clearGatewayEnv(t)
+			t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+			t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+			// A nanosecond count pasted into a seconds field: large enough
+			// that multiplying by time.Second wraps int64 into a negative
+			// duration, which every consumer would read as "disabled".
+			t.Setenv(envVar, "21600000000000")
+
+			if _, err := LoadConfig(context.Background()); err == nil {
+				t.Fatalf("expected %s=21600000000000 to be refused", envVar)
+			}
+		})
+	}
+}
+
+// @scenario "a legitimate large seconds value is still accepted"
+func TestLoadConfig_AcceptsLargeButSaneSecondsValues(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+	t.Setenv("LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", "31536000") // one year
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.AuthCache.HardGraceSeconds != 31536000 {
+		t.Errorf("AuthCache.HardGraceSeconds = %d, want 31536000", cfg.AuthCache.HardGraceSeconds)
+	}
+}
+
 // @scenario "SERVER_DRAIN_DELAY_SECONDS reaches Server.DrainDelaySeconds"
 func TestLoadConfig_DrainDelaySeconds(t *testing.T) {
 	clearGatewayEnv(t)
@@ -279,6 +337,9 @@ func clearGatewayEnv(t *testing.T) {
 		"SERVER_GRACEFUL_SECONDS",
 		"SERVER_DRAIN_DELAY_SECONDS",
 		"SERVER_MAX_REQUEST_BODY_BYTES",
+		"NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS",
+		"LW_GATEWAY_CIRCUIT_WINDOW_S",
+		"LW_GATEWAY_CIRCUIT_COOLDOWN_S",
 		"LOG_LEVEL",
 		"LW_GATEWAY_BASE_URL",
 		"LW_GATEWAY_INTERNAL_SECRET",

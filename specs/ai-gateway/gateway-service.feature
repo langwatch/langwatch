@@ -126,31 +126,40 @@ Feature: Gateway service — public HTTP surface and operational basics
 
   Rule: Graceful shutdown window is actually configurable, and checked against the heartbeat interval
 
-    # Found during review of #4806's heartbeat fix: charts/gateway/values.yaml
-    # documented shutdown.preDrainWait/timeout with a whole invariant-with-
-    # terminationGracePeriodSeconds comment block, but neither value ever
-    # reached the container (configmap.yaml never set the env vars,
-    # serve.go never called lifecycle.WithDrainDelay at all) — the chart
-    # values were fiction. Distinct from the "Graceful SIGTERM drain (iter
-    # 24)" rule above, which describes a fuller 4-phase mechanism this does
-    # not claim to fully verify.
+    # shutdown.preDrainWaitSeconds and shutdown.timeoutSeconds reach the
+    # container as SERVER_DRAIN_DELAY_SECONDS / SERVER_GRACEFUL_SECONDS,
+    # and serve.go passes both to pkg/lifecycle. Distinct from the "Graceful
+    # SIGTERM drain (iter 24)" rule below, which describes a fuller 4-phase
+    # mechanism this does not claim to fully verify.
     #
-    # shutdown.preDrainWaitSeconds/timeoutSeconds actually reaching the
-    # container (ConfigMap SERVER_DRAIN_DELAY_SECONDS / SERVER_GRACEFUL_SECONDS)
-    # is verified in .github/workflows/go-services.yaml's `helm` job — a
-    # rendered-template grep assertion, the same pattern this file already
-    # uses for NetworkPolicy. Not written as a Scenario here because the
-    # feature-parity checker only scans Go/TS/Python/Bats test files, not
-    # CI YAML steps — there'd be no way to bind it, and @unimplemented would
+    # That the two values actually reach the rendered ConfigMap is verified
+    # in .github/workflows/go-services.yaml's `helm` job, a rendered-template
+    # grep assertion, the same pattern this file already uses for
+    # NetworkPolicy. Not written as a Scenario here because the
+    # feature-parity checker only scans Go/TS/Python/Bats test files, not CI
+    # YAML steps: there would be no way to bind it, and @unimplemented would
     # falsely claim it isn't tested when it is, just not in a format the
     # checker recognizes.
+    #
+    # The warning marks a deployment that has narrowed its graceful window,
+    # never one that took the defaults. Both the Go default and the chart's
+    # timeoutSeconds sit above the 45s heartbeat interval for exactly that
+    # reason: a warning every stock install emits is noise, not a signal.
 
     @unit @regression
-    Scenario: stock defaults already fail the graceful-vs-heartbeat check
-      Given GracefulSeconds is 10 (the stock default)
+    Scenario: stock defaults clear the graceful-vs-heartbeat check
+      Given GracefulSeconds is left at the stock default
+      And the effective non-streaming heartbeat interval is 45s (the stock default)
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+
+    @unit @regression
+    Scenario: a graceful window narrowed below the heartbeat interval warns
+      Given GracefulSeconds is set to 10
       And the effective non-streaming heartbeat interval is 45s (the stock default)
       When the gateway starts
       Then a WARN log "graceful_shutdown_shorter_than_heartbeat_interval" is emitted
+      And it reports the 10s graceful window and the 45s heartbeat interval
 
     @unit @regression
     Scenario: graceful window at or above the heartbeat interval does not warn
@@ -183,6 +192,33 @@ Feature: Gateway service — public HTTP surface and operational basics
       Given env SERVER_DRAIN_DELAY_SECONDS=7
       When the gateway loads its configuration
       Then Server.DrainDelaySeconds is 7
+
+    @unit @regression
+    Scenario: the default graceful window outlasts the heartbeat interval
+      Given no shutdown environment variables are set
+      When the gateway loads its configuration
+      Then Server.GracefulSeconds exceeds the 45s non-streaming heartbeat interval
+
+  Rule: Seconds-valued configuration is range-checked before it becomes a duration
+
+    # Every seconds field is turned into a time.Duration by multiplying by a
+    # billion, so a nanosecond count pasted into a seconds field wraps int64
+    # into a negative duration, which consumers read as "disabled" or as an
+    # instant timeout. A ten-year ceiling is orders of magnitude past any
+    # legitimate setting and keeps the multiplication far from overflow.
+    # Bindings: services/aigateway/config_test.go
+
+    @unit @regression
+    Scenario: an absurd seconds value is refused instead of overflowing a duration
+      Given a seconds-valued env var is set to a nanosecond-scale number
+      When the gateway loads its configuration
+      Then it refuses to start and names the offending variable
+
+    @unit @regression
+    Scenario: a legitimate large seconds value is still accepted
+      Given LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS is one year in seconds
+      When the gateway loads its configuration
+      Then AuthCache.HardGraceSeconds is 31536000
 
   Rule: Request body size cap (iter 23, `79b46bf`)
 
@@ -300,8 +336,9 @@ Feature: Gateway service — public HTTP surface and operational basics
     # Four-phase shutdown guarantees in-flight requests complete before pod exit.
     # Preserves streaming connections (no mid-stream 5xx from drain).
     # Bindings: .github/workflows/go-services.yaml's `helm` job ("Assert shutdown
-    # timing values reach the ConfigMap", "Assert terminationGracePeriodSeconds
-    # covers drain + timeout + slack")
+    # timing values reach the ConfigMap", "Assert the graceful window outlasts
+    # the heartbeat interval", "Assert terminationGracePeriodSeconds covers
+    # drain + timeout + slack", "Assert legacy shutdown keys are refused")
 
     Scenario: SIGTERM phase 1 — readiness probe flips to 503 draining
       When the gateway receives SIGTERM
@@ -318,7 +355,7 @@ Feature: Gateway service — public HTTP surface and operational basics
       And each new request is still served correctly (no rejection)
 
     Scenario: SIGTERM phase 3 — server.Shutdown(timeoutSeconds) drains in-flight handlers
-      Given Helm values.shutdown.timeoutSeconds = 15
+      Given Helm values.shutdown.timeoutSeconds = 60
       When the gateway has 20 in-flight streaming requests at SIGTERM
       Then the server stops accepting new connections
       And in-flight requests complete naturally (up to 15s)
@@ -327,9 +364,14 @@ Feature: Gateway service — public HTTP surface and operational basics
       And structured log "gateway_stopped" is emitted when drain completes
 
     Scenario: preDrainWaitSeconds + timeoutSeconds MUST be within terminationGracePeriodSeconds
-      Given Helm values.shutdown.preDrainWaitSeconds = 5 + timeoutSeconds = 15 + slack = 10
-      Then terminationGracePeriodSeconds must be ≥ 30 (5+15+10)
+      Given Helm values.shutdown.preDrainWaitSeconds = 5 + timeoutSeconds = 60 + slack = 10
+      Then terminationGracePeriodSeconds must be ≥ 75 (5+60+10)
       And chart helm-template validation asserts this invariant
+
+    Scenario: the duration-string shutdown keys are refused by the chart
+      Given a values file sets shutdown.preDrainWait or shutdown.timeout
+      Then helm template fails and names the Seconds-suffixed key to use instead
+      And no release installs with drain timing that silently ignores those values
 
     Scenario: stuck handler beyond timeout is force-killed
       Given a handler that blocks past the shutdown timeout
