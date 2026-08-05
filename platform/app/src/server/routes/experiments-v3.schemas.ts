@@ -31,6 +31,30 @@ const paginationSchema = z.object({
   hasMore: z.boolean(),
 });
 
+/**
+ * A failure we could name, serialised for a client to branch on (ADR-045).
+ *
+ * `code` is the stable discriminant and the only field to key logic off.
+ * Nothing here is sensitive — that is what makes an error handled — but the
+ * copy a customer reads is still yours to write from the code, not `message`.
+ */
+const handledErrorSchema = z.object({
+  code: z.string().describe("Stable failure code; branch on this"),
+  kind: z.string().describe("Deprecated alias of code, for older clients"),
+  message: z.string().optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
+  httpStatus: z.number().optional(),
+  fault: z
+    .string()
+    .optional()
+    .describe(
+      "Who the failure is attributable to: customer, platform, provider",
+    ),
+  traceId: z.string().optional(),
+  tips: z.array(z.string()).optional(),
+  docsUrl: z.string().optional(),
+});
+
 export const startRunResponseSchema = z.object({
   runId: z.string().describe("Identifier to poll this run with"),
   status: z.literal("running"),
@@ -179,6 +203,9 @@ export const runStatusResponseSchema = z.object({
     .describe(
       "Stable failure code, present when failed. Not display copy: render your own wording keyed on it.",
     ),
+  domainError: handledErrorSchema
+    .optional()
+    .describe("The full failure envelope, when the failure carried one"),
   traceId: z
     .string()
     .optional()
@@ -192,7 +219,14 @@ const datasetEntrySchema = z.object({
   predicted: z.record(z.string(), z.unknown()).optional(),
   cost: z.number().nullable().optional(),
   duration: z.number().nullable().optional(),
-  error: z.string().nullable().optional(),
+  error: z
+    .string()
+    .nullable()
+    .optional()
+    .describe("The engine's own string. Prefer domainError.code to branch on"),
+  domainError: handledErrorSchema
+    .optional()
+    .describe("Set on rows written since failures started carrying codes"),
   traceId: z.string().nullable().optional(),
 });
 

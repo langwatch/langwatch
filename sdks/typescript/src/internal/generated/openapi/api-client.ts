@@ -6196,6 +6196,23 @@ export interface operations {
                         };
                         /** @description Stable failure code, present when failed. Not display copy: render your own wording keyed on it. */
                         error?: string;
+                        /** @description The full failure envelope, when the failure carried one */
+                        domainError?: {
+                            /** @description Stable failure code; branch on this */
+                            code: string;
+                            /** @description Deprecated alias of code, for older clients */
+                            kind: string;
+                            message?: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            httpStatus?: number;
+                            /** @description Who the failure is attributable to: customer, platform, provider */
+                            fault?: string;
+                            traceId?: string;
+                            tips?: string[];
+                            docsUrl?: string;
+                        };
                         /** @description Trace id for failures that carry no code, to quote in support */
                         traceId?: string;
                     };
@@ -6278,7 +6295,25 @@ export interface operations {
                             };
                             cost?: number | null;
                             duration?: number | null;
+                            /** @description The engine's own string. Prefer domainError.code to branch on */
                             error?: string | null;
+                            /** @description Set on rows written since failures started carrying codes */
+                            domainError?: {
+                                /** @description Stable failure code; branch on this */
+                                code: string;
+                                /** @description Deprecated alias of code, for older clients */
+                                kind: string;
+                                message?: string;
+                                meta?: {
+                                    [key: string]: unknown;
+                                };
+                                httpStatus?: number;
+                                /** @description Who the failure is attributable to: customer, platform, provider */
+                                fault?: string;
+                                traceId?: string;
+                                tips?: string[];
+                                docsUrl?: string;
+                            };
                             traceId?: string | null;
                         }[];
                         /** @description One row per evaluator per dataset entry */

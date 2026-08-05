@@ -8101,6 +8101,50 @@
                       "type": "string",
                       "description": "Stable failure code, present when failed. Not display copy: render your own wording keyed on it."
                     },
+                    "domainError": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable failure code; branch on this"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "description": "Deprecated alias of code, for older clients"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "httpStatus": {
+                          "type": "number"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "description": "Who the failure is attributable to: customer, platform, provider"
+                        },
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docsUrl": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "kind"
+                      ],
+                      "description": "The full failure envelope, when the failure carried one"
+                    },
                     "traceId": {
                       "type": "string",
                       "description": "Trace id for failures that carry no code, to quote in support"
@@ -8321,7 +8365,52 @@
                             "type": [
                               "string",
                               "null"
-                            ]
+                            ],
+                            "description": "The engine's own string. Prefer domainError.code to branch on"
+                          },
+                          "domainError": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "description": "Stable failure code; branch on this"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "description": "Deprecated alias of code, for older clients"
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "meta": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "httpStatus": {
+                                "type": "number"
+                              },
+                              "fault": {
+                                "type": "string",
+                                "description": "Who the failure is attributable to: customer, platform, provider"
+                              },
+                              "traceId": {
+                                "type": "string"
+                              },
+                              "tips": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "docsUrl": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "kind"
+                            ],
+                            "description": "Set on rows written since failures started carrying codes"
                           },
                           "traceId": {
                             "type": [
