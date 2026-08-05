@@ -56,6 +56,7 @@ describe("withStatementLimit", () => {
 
   describe("given more statements than the bound allows", () => {
     describe("when the surplus is issued", () => {
+      /** @scenario statements are bounded, and the bound is the one that binds */
       it("starts only as many statements as the bound", async () => {
         const driver = deferrableClient();
         const limited = withStatementLimit({
@@ -105,8 +106,73 @@ describe("withStatementLimit", () => {
     });
   });
 
+  describe("given a statement that fails transiently and is retried", () => {
+    describe("when the retry runs", () => {
+      /**
+       * The composition order made concrete. `managedClient.ts` wraps the
+       * resilient client - which retries internally - so one call through the
+       * limiter covers every attempt. Composed the other way, a retrying
+       * statement would release its slot between attempts and rejoin the queue
+       * behind work that arrived later, which is how a brief overload turns
+       * into a lasting one.
+       */
+      /** @scenario a slot is held across retries, not taken per attempt */
+      it("holds its slot for the whole statement, not per attempt", async () => {
+        let attempts = 0;
+        let statementsStarted = 0;
+        let releaseAttempt: (() => void) | null = null;
+
+        // Stands in for the resilient client: the FIRST statement retries
+        // inside one call, every later one answers at once. Only the first
+        // needs to be slow - the question is whether the second can start
+        // while the first is between attempts.
+        const retryingClient = {
+          query: async () => {
+            statementsStarted += 1;
+            if (statementsStarted > 1) return { ok: true };
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+              attempts += 1;
+              await new Promise<void>((resolve) => {
+                releaseAttempt = resolve;
+              });
+            }
+            return { ok: true };
+          },
+        } as unknown as ClickHouseClient;
+
+        const limited = withStatementLimit({
+          client: retryingClient,
+          maxConcurrent: 1,
+          instance,
+        });
+
+        const retried = limited.query({ query: "SELECT 1" });
+        const behind = limited.query({ query: "SELECT 2" });
+        await settleMicrotasks();
+
+        // Walk the retrying statement through its attempts. The statement
+        // queued behind it must not start at any point in between.
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          expect(attempts).toBe(attempt);
+          expect(statementsStarted).toBe(1);
+          releaseAttempt?.();
+          await settleMicrotasks();
+        }
+
+        await retried;
+        await behind;
+
+        // Three attempts, but only ever one slot: the second statement waited
+        // for the first to finish rather than interleaving with its retries.
+        expect(attempts).toBe(3);
+        expect(statementsStarted).toBe(2);
+      });
+    });
+  });
+
   describe("given a full wait queue", () => {
     describe("when another statement is issued", () => {
+      /** @scenario an overloaded process refuses rather than queueing without limit */
       it("refuses it as overload rather than queueing further", async () => {
         const driver = deferrableClient();
         const limited = withStatementLimit({
@@ -168,6 +234,7 @@ describe("withStatementLimit", () => {
 
   describe("given a statement waiting for a slot", () => {
     describe("when the caller abandons the request", () => {
+      /** @scenario a caller that gives up stops waiting */
       it("stops waiting instead of holding its place", async () => {
         const driver = deferrableClient();
         const limited = withStatementLimit({
