@@ -11,7 +11,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -82,13 +82,24 @@ function renderPane(state: GovernedSqlRequestState, chartSlot?: ReactNode) {
  * "still visible in the other mode" assertion downstream would then be true
  * because nothing had moved, which is the quietest way this suite could stop
  * testing anything.
+ *
+ * It throws instead of asserting because the guard runs outside any one case:
+ * a thrown error fails the case that asked for the switch and says which mode
+ * never arrived, while an assertion out here is credited to whichever case
+ * vitest happens to be inside.
  */
 async function selectResultMode(mode: "Table" | "Chart") {
   await userEvent.click(screen.getByRole("tab", { name: mode }));
-  expect(screen.getByRole("tab", { name: mode })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  await waitFor(() => {
+    const selected = screen
+      .getByRole("tab", { name: mode })
+      .getAttribute("aria-selected");
+    if (selected !== "true") {
+      throw new Error(
+        `The ${mode} tab is aria-selected="${selected}" after the click, so the result mode never changed.`,
+      );
+    }
+  });
 }
 
 /** What the registry says for this exact payload. */
@@ -351,7 +362,9 @@ describe("the governed SQL result pane", () => {
       /** @scenario "The first successful result opens in Table mode" */
       it("opens in Table mode with Chart offered beside it", () => {
         renderPane(
-          stateWith({ answer: { kind: "result", result: governedSqlResult() } }),
+          stateWith({
+            answer: { kind: "result", result: governedSqlResult() },
+          }),
         );
 
         expect(screen.getByRole("tab", { name: "Table" })).toHaveAttribute(
@@ -378,7 +391,9 @@ describe("the governed SQL result pane", () => {
           .mockRejectedValue(new Error("the result pane must not fetch"));
 
         renderPane(
-          stateWith({ answer: { kind: "result", result: governedSqlResult() } }),
+          stateWith({
+            answer: { kind: "result", result: governedSqlResult() },
+          }),
           <div data-testid="chart-slot">chart</div>,
         );
 

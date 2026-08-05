@@ -17,9 +17,10 @@
  * very `new Function` call the generated module exists to keep out of a browser,
  * and node has no Content-Security-Policy to violate.
  */
-import Ajv, { type ErrorObject } from "ajv";
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import Ajv, { type ErrorObject } from "ajv";
 
 import { describe, expect, it } from "vitest";
 
@@ -29,11 +30,10 @@ import {
   readBundledVegaLiteSchema,
   VEGA_LITE_AJV_OPTIONS,
 } from "../../../../../scripts/generate-vega-lite-validator";
-import { getVegaLiteSchemaValidator } from "../vegaLiteSchema";
-
 import { ADVERSARIAL_VEGA_FIXTURES } from "../../__tests__/fixtures/adversarial";
 import { INVALID_VEGA_FIXTURES } from "../../__tests__/fixtures/invalid";
 import { VALID_VEGA_FIXTURES } from "../../__tests__/fixtures/valid";
+import { getVegaLiteSchemaValidator } from "../vegaLiteSchema";
 
 /** `…/visualization/__tests__` → `platform/app/` */
 const APP_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));

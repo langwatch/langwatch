@@ -22,7 +22,10 @@ import { describe, expect, it } from "vitest";
 /** `…/analytics-query/__tests__` → `…/analytics-query` */
 const FEATURE_DIR = fileURLToPath(new URL("../", import.meta.url));
 
-const LAZY_BOUNDARY = join(FEATURE_DIR, "components/LazyGovernedSqlChartMode.tsx");
+const LAZY_BOUNDARY = join(
+  FEATURE_DIR,
+  "components/LazyGovernedSqlChartMode.tsx",
+);
 const CHART_MODE = join(FEATURE_DIR, "components/GovernedSqlChartMode.tsx");
 
 /** Packages whose presence in a chunk means the Vega runtime is in it. */

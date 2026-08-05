@@ -19,8 +19,8 @@
  */
 
 import {
-  joinPointer,
   JSON_POINTER_ROOT,
+  joinPointer,
   visitJsonObjects,
 } from "./vegaLiteStructure";
 import type {
@@ -49,9 +49,7 @@ export function encodedFieldsByDataset({
 }: {
   spec: unknown;
   datasetNames: readonly string[];
-  columnsByDataset: Readonly<
-    Record<string, readonly GovernedDatasetColumn[]>
-  >;
+  columnsByDataset: Readonly<Record<string, readonly GovernedDatasetColumn[]>>;
 }): Record<string, string[]> {
   const referenced = new Set<string>();
   for (const { node } of visitJsonObjects(spec)) {
@@ -131,6 +129,37 @@ function isWide(type: string | undefined): boolean {
   return type !== undefined && WIDE_NUMERIC_TYPE.test(type);
 }
 
+/**
+ * What one value is worth to a chart.
+ *
+ * `empty` is nothing to draw; `plottable` is a value an axis can carry as it
+ * stands; the other two are the ways a value reaches Vega changed.
+ */
+type ValueVerdict = "empty" | "plottable" | "non-finite" | "wide-integer";
+
+function classify({
+  value,
+  wide,
+}: {
+  value: unknown;
+  wide: boolean;
+}): ValueVerdict {
+  if (value === null || value === undefined || value === "") return "empty";
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? "plottable" : "non-finite";
+  }
+  if (typeof value === "bigint") {
+    return Number.isSafeInteger(Number(value)) ? "plottable" : "wide-integer";
+  }
+  // ClickHouse returns 64-bit and decimal columns as strings so no digits are
+  // lost on the wire. Vega parses them to doubles, which is where they are.
+  if (wide && typeof value === "string" && exceedsSafeInteger(value)) {
+    return "wide-integer";
+  }
+  return "plottable";
+}
+
 function tallyField({
   rows,
   field,
@@ -143,23 +172,12 @@ function tallyField({
   const tally: FieldTally = { nonEmpty: 0, nonFinite: 0, wideInteger: 0 };
 
   for (const row of rows) {
-    const value = row[field];
-    if (value === null || value === undefined || value === "") continue;
-    tally.nonEmpty += 1;
+    const verdict = classify({ value: row[field], wide });
+    if (verdict === "empty") continue;
 
-    if (typeof value === "number" && !Number.isFinite(value)) {
-      tally.nonFinite += 1;
-      continue;
-    }
-    if (typeof value === "bigint") {
-      if (!Number.isSafeInteger(Number(value))) tally.wideInteger += 1;
-      continue;
-    }
-    // ClickHouse returns 64-bit and decimal columns as strings so no digits are
-    // lost on the wire. Vega parses them to doubles, which is where they are.
-    if (wide && typeof value === "string" && exceedsSafeInteger(value)) {
-      tally.wideInteger += 1;
-    }
+    tally.nonEmpty += 1;
+    if (verdict === "non-finite") tally.nonFinite += 1;
+    if (verdict === "wide-integer") tally.wideInteger += 1;
   }
 
   return tally;

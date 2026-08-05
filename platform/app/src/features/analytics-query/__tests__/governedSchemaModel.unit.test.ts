@@ -104,8 +104,7 @@ describe("mapping the governed schema response", () => {
         ).toEqual({
           title: "analytics.traces_daily.latency_ms",
           detail: "Float64",
-          documentation:
-            "End to end latency of the trace. Measured in ms.",
+          documentation: "End to end latency of the trace. Measured in ms.",
         });
         expect(
           governedSqlHoverFor({ model, identifier: "total_cost" }),

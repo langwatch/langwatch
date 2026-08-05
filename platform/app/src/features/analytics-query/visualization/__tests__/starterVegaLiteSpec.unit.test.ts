@@ -9,17 +9,16 @@
  * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
  */
 import { describe, expect, it } from "vitest";
-
-import type {
-  DatasetRowCounts,
-  GovernedDatasetColumn,
-} from "../visualization.types";
 import {
   starterEncodingType,
   starterVegaLiteSpec,
   starterVegaLiteSpecText,
 } from "../starterVegaLiteSpec";
 import { validateVegaLiteSpec } from "../validateVegaLiteSpec";
+import type {
+  DatasetRowCounts,
+  GovernedDatasetColumn,
+} from "../visualization.types";
 
 const DATASET = "query_result";
 const ROWS: DatasetRowCounts = { [DATASET]: 12 };

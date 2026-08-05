@@ -41,7 +41,9 @@ describe("a governed SQL result value", () => {
           null: governedSqlCellText(
             readGovernedSqlCell({ row, column: "nullValue" }),
           ),
-          zero: governedSqlCellText(readGovernedSqlCell({ row, column: "zero" })),
+          zero: governedSqlCellText(
+            readGovernedSqlCell({ row, column: "zero" }),
+          ),
           emptyString: governedSqlCellText(
             readGovernedSqlCell({ row, column: "emptyString" }),
           ),

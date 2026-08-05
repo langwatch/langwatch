@@ -71,6 +71,9 @@ export interface UseGovernedVegaViewResult {
   readonly state: GovernedVegaViewState;
 }
 
+/** Rows by registered dataset name, as the view holds them. */
+type GovernedVegaDatasets = UseGovernedVegaViewInput["datasets"];
+
 const IDLE: GovernedVegaViewState = { status: "idle", failure: null };
 const EMBEDDING: GovernedVegaViewState = { status: "embedding", failure: null };
 const READY: GovernedVegaViewState = { status: "ready", failure: null };
@@ -121,9 +124,7 @@ export function useGovernedVegaView({
    * The datasets the running view already holds. Compared by identity, so the
    * push that would immediately follow an embed is skipped rather than run.
    */
-  const loadedDatasetsRef = useRef<UseGovernedVegaViewInput["datasets"] | null>(
-    null,
-  );
+  const loadedDatasetsRef = useRef<GovernedVegaDatasets | null>(null);
   /** Latest rows, for the embed effect, which must not re-run when they move. */
   const datasetsRef = useRef(datasets);
   datasetsRef.current = datasets;
@@ -137,43 +138,15 @@ export function useGovernedVegaView({
       return;
     }
 
-    let abandoned = false;
-    setState(EMBEDDING);
-
-    const build = buildGovernedVegaSpec({
-      spec,
-      datasets: datasetsRef.current,
-      pinnedConfig,
-    });
-    buildRef.current = build;
-    const embedded = datasetsRef.current;
-
-    void embed(
+    return embedGovernedVegaView({
       container,
-      build.spec as Parameters<typeof embed>[1],
-      governedVegaEmbedOptions({ themeConfig, colorMode }),
-    )
-      .then((result) => {
-        if (abandoned) {
-          result.finalize();
-          return;
-        }
-        resultRef.current = result;
-        loadedDatasetsRef.current = embedded;
-        setState(READY);
-      })
-      .catch((error: unknown) => {
-        if (abandoned) return;
-        resultRef.current = null;
-        setState({ status: "failed", failure: governedRenderFailure(error) });
-      });
-
-    return () => {
-      abandoned = true;
-      resultRef.current?.finalize();
-      resultRef.current = null;
-      loadedDatasetsRef.current = null;
-    };
+      spec,
+      themeConfig,
+      pinnedConfig,
+      colorMode,
+      setState,
+      refs: { resultRef, buildRef, loadedDatasetsRef, datasetsRef },
+    });
   }, [spec, themeConfig, pinnedConfig, colorMode, enabled]);
 
   useEffect(() => {
@@ -183,16 +156,7 @@ export function useGovernedVegaView({
     if (loadedDatasetsRef.current === datasets) return;
     loadedDatasetsRef.current = datasets;
 
-    try {
-      for (const name of build.datasetNames) {
-        result.view.data(name, [...(datasets[name] ?? [])]);
-      }
-      void result.view.runAsync().catch((error: unknown) => {
-        finalizeInto({ result, resultRef, setState, error });
-      });
-    } catch (error: unknown) {
-      finalizeInto({ result, resultRef, setState, error });
-    }
+    pushDatasetsIntoView({ result, build, datasets, resultRef, setState });
   }, [datasets, state.status]);
 
   useEffect(() => {
@@ -210,6 +174,109 @@ export function useGovernedVegaView({
   }, [state.status]);
 
   return { containerRef, state };
+}
+
+/** The mutable handles the effects share: one running view, and what it holds. */
+interface GovernedVegaViewRefs {
+  readonly resultRef: RefObject<Result | null>;
+  readonly buildRef: RefObject<GovernedVegaSpecBuild | null>;
+  readonly loadedDatasetsRef: RefObject<GovernedVegaDatasets | null>;
+  readonly datasetsRef: RefObject<GovernedVegaDatasets>;
+}
+
+/**
+ * Puts a view in the container and hands back the teardown for it.
+ *
+ * The abandoned flag is what makes a teardown that lands mid-embed safe: the
+ * promise still settles, and the view it settles with is finalized on the spot
+ * rather than left running with nothing pointing at it.
+ */
+function embedGovernedVegaView({
+  container,
+  spec,
+  themeConfig,
+  pinnedConfig,
+  colorMode,
+  setState,
+  refs,
+}: {
+  container: HTMLDivElement;
+  spec: unknown;
+  themeConfig: GovernedVegaConfig;
+  pinnedConfig: GovernedVegaConfig;
+  colorMode: GovernedVegaColorMode;
+  setState: (state: GovernedVegaViewState) => void;
+  refs: GovernedVegaViewRefs;
+}): () => void {
+  const { resultRef, buildRef, loadedDatasetsRef, datasetsRef } = refs;
+  let abandoned = false;
+  setState(EMBEDDING);
+
+  const build = buildGovernedVegaSpec({
+    spec,
+    datasets: datasetsRef.current,
+    pinnedConfig,
+  });
+  buildRef.current = build;
+  const embedded = datasetsRef.current;
+
+  void embed(
+    container,
+    build.spec as Parameters<typeof embed>[1],
+    governedVegaEmbedOptions({ themeConfig, colorMode }),
+  )
+    .then((result) => {
+      if (abandoned) {
+        result.finalize();
+        return;
+      }
+      resultRef.current = result;
+      loadedDatasetsRef.current = embedded;
+      setState(READY);
+    })
+    .catch((error: unknown) => {
+      if (abandoned) return;
+      resultRef.current = null;
+      setState({ status: "failed", failure: governedRenderFailure(error) });
+    });
+
+  return () => {
+    abandoned = true;
+    resultRef.current?.finalize();
+    resultRef.current = null;
+    loadedDatasetsRef.current = null;
+  };
+}
+
+/**
+ * Feeds new rows to a view that is already running.
+ *
+ * A throw from the update and a rejected run end the same way, because a view
+ * that failed part-way through new data is in an unknown state either way.
+ */
+function pushDatasetsIntoView({
+  result,
+  build,
+  datasets,
+  resultRef,
+  setState,
+}: {
+  result: Result;
+  build: GovernedVegaSpecBuild;
+  datasets: GovernedVegaDatasets;
+  resultRef: RefObject<Result | null>;
+  setState: (state: GovernedVegaViewState) => void;
+}): void {
+  try {
+    for (const name of build.datasetNames) {
+      result.view.data(name, [...(datasets[name] ?? [])]);
+    }
+    void result.view.runAsync().catch((error: unknown) => {
+      finalizeInto({ result, resultRef, setState, error });
+    });
+  } catch (error: unknown) {
+    finalizeInto({ result, resultRef, setState, error });
+  }
 }
 
 /**

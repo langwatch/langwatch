@@ -17,7 +17,13 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernedSqlQueryResult } from "~/server/analytics/governed-sql";
@@ -208,9 +214,7 @@ describe("the governed SQL result table", () => {
       it("shows a bounded readable representation in the cell", () => {
         renderTable(structured());
 
-        expect(
-          screen.getByText(JSON.stringify(nested)),
-        ).toBeInTheDocument();
+        expect(screen.getByText(JSON.stringify(nested))).toBeInTheDocument();
       });
 
       /** @scenario "Structured values render bounded, readable, and copyable" */

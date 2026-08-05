@@ -11,7 +11,7 @@
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 
 import { useGovernedSqlQuery } from "../hooks/useGovernedSqlQuery";
 import { useGovernedSqlSchema } from "../hooks/useGovernedSqlSchema";
@@ -213,19 +213,30 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
 
         <GovernedSqlResultPane
           state={query.state}
-          // The lazy boundary, not `GovernedSqlChartMode`: importing that here
-          // would put the whole Vega runtime in the entry chunk, and nothing
-          // would look wrong (vegaLazyBoundary.unit.test.ts is what would).
-          chartSlot={
-            query.state.outcome?.kind === "result" ? (
-              <LazyGovernedSqlChartMode
-                result={query.state.outcome.result}
-                submittedLabel={chartResultLabel(query.state.outcome.snapshot.sql)}
-              />
-            ) : undefined
-          }
+          chartSlot={chartSlot(query.state)}
         />
       </VStack>
     </HStack>
+  );
+}
+
+/**
+ * What Chart mode is given: the result on screen, or nothing to chart at all.
+ *
+ * A refusal and a query that has not run yet both hand back `undefined`, which
+ * is Chart mode offered and empty rather than hidden — the pane decides how
+ * that reads.
+ */
+function chartSlot(state: GovernedSqlRequestState): ReactNode {
+  if (state.outcome?.kind !== "result") return undefined;
+
+  return (
+    // The lazy boundary, not `GovernedSqlChartMode`: importing that here
+    // would put the whole Vega runtime in the entry chunk, and nothing
+    // would look wrong (vegaLazyBoundary.unit.test.ts is what would).
+    <LazyGovernedSqlChartMode
+      result={state.outcome.result}
+      submittedLabel={chartResultLabel(state.outcome.snapshot.sql)}
+    />
   );
 }

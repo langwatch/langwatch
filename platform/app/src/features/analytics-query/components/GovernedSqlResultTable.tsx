@@ -25,9 +25,15 @@ import {
   type ColumnDef,
   flexRender,
   getCoreRowModel,
+  type Header,
+  type Row,
   useReactTable,
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  useVirtualizer,
+  type VirtualItem,
+  type Virtualizer,
+} from "@tanstack/react-virtual";
 import { useMemo, useState } from "react";
 
 import type { GovernedSqlQueryResult } from "~/server/analytics/governed-sql";
@@ -53,7 +59,9 @@ export interface GovernedSqlResultTableProps {
   result: GovernedSqlQueryResult;
 }
 
-export function GovernedSqlResultTable({ result }: GovernedSqlResultTableProps) {
+export function GovernedSqlResultTable({
+  result,
+}: GovernedSqlResultTableProps) {
   // Held in state rather than a ref so that attaching the element re-renders
   // once and the virtualizer gets a scroll element to measure. A bare ref is
   // still `null` on the render that would have set the count.
@@ -66,43 +74,14 @@ export function GovernedSqlResultTable({ result }: GovernedSqlResultTableProps) 
     [result.columns],
   );
 
-  const columns = useMemo<ColumnDef<GovernedSqlRow>[]>(
-    () =>
-      result.columns.map((column, index) => ({
-        // Position-qualified: two columns can share a name, and react-table
-        // requires distinct ids. The header still shows the name as it came.
-        id: `${column.name}#${index}`,
-        header: column.name,
-        cell: ({ row }) => (
-          <GovernedSqlValueCell
-            columnName={column.name}
-            cell={readGovernedSqlCell({
-              row: row.original,
-              column: column.name,
-            })}
-          />
-        ),
-      })),
-    [result.columns],
-  );
+  const columns = useMemo(() => columnDefs(result.columns), [result.columns]);
 
-  // Keyed by column id rather than read positionally, so the type under a
-  // header can never end up belonging to a different column.
   const typeByColumnId = useMemo(
-    () =>
-      new Map(
-        result.columns.map((column, index) => [
-          `${column.name}#${index}`,
-          column.type,
-        ]),
-      ),
+    () => typesByColumnId(result.columns),
     [result.columns],
   );
 
-  const data = useMemo(
-    () => result.rows as GovernedSqlRow[],
-    [result.rows],
-  );
+  const data = useMemo(() => result.rows as GovernedSqlRow[], [result.rows]);
 
   const table = useReactTable({
     data,
@@ -119,18 +98,9 @@ export function GovernedSqlResultTable({ result }: GovernedSqlResultTableProps) 
     overscan: OVERSCAN,
   });
 
-  const virtualRows = virtualizer.getVirtualItems();
-  const paddingTop = virtualRows[0]?.start ?? 0;
-  const paddingBottom =
-    virtualRows.length > 0
-      ? virtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0)
-      : 0;
-
   return (
     <VStack align="stretch" gap={2} width="full">
-      {duplicates.length > 0 && (
-        <DuplicateColumnWarning names={duplicates} />
-      )}
+      {duplicates.length > 0 && <DuplicateColumnWarning names={duplicates} />}
 
       <Box
         ref={setScrollContainer}
@@ -152,109 +122,209 @@ export function GovernedSqlResultTable({ result }: GovernedSqlResultTableProps) 
         aria-label="Query result rows"
       >
         <Table.Root size="sm" variant="line" width="full">
-          <Table.Header>
-            <Table.Row>
-              {table.getHeaderGroups()[0]?.headers.map((header) => {
-                return (
-                  <Table.ColumnHeader
-                    key={header.id}
-                    // Inline for the same reason as the scroll container: the
-                    // header staying put while the rows move is behaviour the
-                    // spec pins, not decoration.
-                    style={{ position: "sticky", top: 0 }}
-                    zIndex={1}
-                    backgroundColor="bg.subtle"
-                    whiteSpace="nowrap"
-                  >
-                    <VStack align="start" gap={0}>
-                      <Text fontSize="12.5px" fontWeight="semibold">
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                      </Text>
-                      {/* The database's own type, on screen rather than behind
-                          a hover: it is what tells a member whether a column
-                          can be charted or compared. */}
-                      <Text
-                        fontSize="11px"
-                        color="fg.muted"
-                        fontWeight="normal"
-                        data-testid="governed-sql-column-type"
-                      >
-                        {typeByColumnId.get(header.column.id)}
-                      </Text>
-                    </VStack>
-                  </Table.ColumnHeader>
-                );
-              })}
-            </Table.Row>
-          </Table.Header>
+          <ResultTableHeader
+            headers={table.getHeaderGroups()[0]?.headers ?? []}
+            typeByColumnId={typeByColumnId}
+          />
 
-          <Table.Body>
-            {rows.length === 0 ? (
-              <Table.Row>
-                <Table.Cell colSpan={Math.max(columns.length, 1)}>
-                  <Text
-                    fontSize="13px"
-                    color="fg.muted"
-                    data-testid="governed-sql-result-empty"
-                  >
-                    The query ran and matched no rows.
-                  </Text>
-                </Table.Cell>
-              </Table.Row>
-            ) : (
-              <>
-                {paddingTop > 0 && (
-                  <Table.Row aria-hidden="true">
-                    <Table.Cell
-                      colSpan={columns.length}
-                      style={{ height: `${paddingTop}px`, padding: 0 }}
-                    />
-                  </Table.Row>
-                )}
-
-                {virtualRows.map((virtualRow) => {
-                  const row = rows[virtualRow.index];
-                  if (!row) return null;
-                  return (
-                    <Table.Row
-                      key={row.id}
-                      data-index={virtualRow.index}
-                      data-testid="governed-sql-result-row"
-                      style={{ height: `${ROW_HEIGHT}px` }}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <Table.Cell
-                          key={cell.id}
-                          maxWidth="360px"
-                          overflow="hidden"
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </Table.Cell>
-                      ))}
-                    </Table.Row>
-                  );
-                })}
-
-                {paddingBottom > 0 && (
-                  <Table.Row aria-hidden="true">
-                    <Table.Cell
-                      colSpan={columns.length}
-                      style={{ height: `${paddingBottom}px`, padding: 0 }}
-                    />
-                  </Table.Row>
-                )}
-              </>
-            )}
-          </Table.Body>
+          <ResultTableBody
+            rows={rows}
+            columnCount={columns.length}
+            rowWindow={virtualRowWindow(virtualizer)}
+          />
         </Table.Root>
       </Box>
     </VStack>
+  );
+}
+
+/** One id per column position, so a repeated name still names one column. */
+function columnId({ name, index }: { name: string; index: number }): string {
+  return `${name}#${index}`;
+}
+
+/**
+ * A column definition per column of the result.
+ *
+ * The id is position-qualified because two columns can share a name and
+ * react-table requires distinct ids. The header still shows the name as it
+ * came.
+ */
+function columnDefs(
+  columns: GovernedSqlQueryResult["columns"],
+): ColumnDef<GovernedSqlRow>[] {
+  return columns.map((column, index) => ({
+    id: columnId({ name: column.name, index }),
+    header: column.name,
+    cell: ({ row }) => (
+      <GovernedSqlValueCell
+        columnName={column.name}
+        cell={readGovernedSqlCell({ row: row.original, column: column.name })}
+      />
+    ),
+  }));
+}
+
+/**
+ * Keyed by column id rather than read positionally, so the type under a header
+ * can never end up belonging to a different column.
+ */
+function typesByColumnId(
+  columns: GovernedSqlQueryResult["columns"],
+): Map<string, string> {
+  return new Map(
+    columns.map((column, index) => [
+      columnId({ name: column.name, index }),
+      column.type,
+    ]),
+  );
+}
+
+/** The rows mounted right now, and the height standing in for the rest. */
+interface VirtualRowWindow {
+  readonly items: readonly VirtualItem[];
+  readonly paddingTop: number;
+  readonly paddingBottom: number;
+}
+
+function virtualRowWindow(
+  virtualizer: Virtualizer<HTMLDivElement, Element>,
+): VirtualRowWindow {
+  const items = virtualizer.getVirtualItems();
+  return {
+    items,
+    paddingTop: items[0]?.start ?? 0,
+    paddingBottom:
+      items.length > 0
+        ? virtualizer.getTotalSize() - (items[items.length - 1]?.end ?? 0)
+        : 0,
+  };
+}
+
+function ResultTableHeader({
+  headers,
+  typeByColumnId,
+}: {
+  headers: readonly Header<GovernedSqlRow, unknown>[];
+  typeByColumnId: Map<string, string>;
+}) {
+  return (
+    <Table.Header>
+      <Table.Row>
+        {headers.map((header) => (
+          <Table.ColumnHeader
+            key={header.id}
+            // Inline for the same reason as the scroll container: the header
+            // staying put while the rows move is behaviour the spec pins, not
+            // decoration.
+            style={{ position: "sticky", top: 0 }}
+            zIndex={1}
+            backgroundColor="bg.subtle"
+            whiteSpace="nowrap"
+          >
+            <VStack align="start" gap={0}>
+              <Text fontSize="12.5px" fontWeight="semibold">
+                {flexRender(
+                  header.column.columnDef.header,
+                  header.getContext(),
+                )}
+              </Text>
+              {/* The database's own type, on screen rather than behind a
+                  hover: it is what tells a member whether a column can be
+                  charted or compared. */}
+              <Text
+                fontSize="11px"
+                color="fg.muted"
+                fontWeight="normal"
+                data-testid="governed-sql-column-type"
+              >
+                {typeByColumnId.get(header.column.id)}
+              </Text>
+            </VStack>
+          </Table.ColumnHeader>
+        ))}
+      </Table.Row>
+    </Table.Header>
+  );
+}
+
+function ResultTableBody({
+  rows,
+  columnCount,
+  rowWindow,
+}: {
+  rows: readonly Row<GovernedSqlRow>[];
+  columnCount: number;
+  rowWindow: VirtualRowWindow;
+}) {
+  if (rows.length === 0) {
+    return (
+      <Table.Body>
+        <Table.Row>
+          <Table.Cell colSpan={Math.max(columnCount, 1)}>
+            <Text
+              fontSize="13px"
+              color="fg.muted"
+              data-testid="governed-sql-result-empty"
+            >
+              The query ran and matched no rows.
+            </Text>
+          </Table.Cell>
+        </Table.Row>
+      </Table.Body>
+    );
+  }
+
+  return (
+    <Table.Body>
+      {rowWindow.paddingTop > 0 && (
+        <SpacerRow height={rowWindow.paddingTop} columnCount={columnCount} />
+      )}
+
+      {rowWindow.items.map((virtualRow) => {
+        const row = rows[virtualRow.index];
+        if (!row) return null;
+        return (
+          <Table.Row
+            key={row.id}
+            data-index={virtualRow.index}
+            data-testid="governed-sql-result-row"
+            style={{ height: `${ROW_HEIGHT}px` }}
+          >
+            {row.getVisibleCells().map((cell) => (
+              <Table.Cell key={cell.id} maxWidth="360px" overflow="hidden">
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </Table.Cell>
+            ))}
+          </Table.Row>
+        );
+      })}
+
+      {rowWindow.paddingBottom > 0 && (
+        <SpacerRow height={rowWindow.paddingBottom} columnCount={columnCount} />
+      )}
+    </Table.Body>
+  );
+}
+
+/**
+ * The height of the rows that are not mounted, carried by a row of its own so
+ * the scrollbar spans the whole result rather than the window of it on screen.
+ */
+function SpacerRow({
+  height,
+  columnCount,
+}: {
+  height: number;
+  columnCount: number;
+}) {
+  return (
+    <Table.Row aria-hidden="true">
+      <Table.Cell
+        colSpan={columnCount}
+        style={{ height: `${height}px`, padding: 0 }}
+      />
+    </Table.Row>
   );
 }
 

@@ -14,9 +14,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   type GovernedVegaColorMode,
+  type LangwatchVegaTokens,
   langwatchVegaConfig,
   langwatchVegaPinnedConfig,
-  type LangwatchVegaTokens,
 } from "../langwatchVegaConfig";
 
 const LIGHT_TOKENS: LangwatchVegaTokens = {
@@ -84,9 +84,7 @@ describe("the LangWatch Vega configuration", () => {
           expect(config.range.ordinal, colorMode).toEqual([
             ...tokens.categoricalRange,
           ]);
-          expect(config.mark.color, colorMode).toBe(
-            tokens.categoricalRange[0],
-          );
+          expect(config.mark.color, colorMode).toBe(tokens.categoricalRange[0]);
         }
       });
 

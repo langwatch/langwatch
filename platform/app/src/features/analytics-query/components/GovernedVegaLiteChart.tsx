@@ -11,11 +11,14 @@
  */
 
 import { Box, Stack, Text, VStack } from "@chakra-ui/react";
-import { useId, useMemo } from "react";
+import { type RefObject, useId, useMemo } from "react";
 
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 
-import { useGovernedVegaView } from "../hooks/useGovernedVegaView";
+import {
+  type GovernedVegaViewStatus,
+  useGovernedVegaView,
+} from "../hooks/useGovernedVegaView";
 import { useLangwatchVegaTokens } from "../hooks/useLangwatchVegaTokens";
 import { referencedDatasetNames } from "../visualization/buildGovernedVegaSpec";
 import { governedEmptyEncodingFailure } from "../visualization/governedChartFailures";
@@ -88,7 +91,8 @@ export function GovernedVegaLiteChart({
     };
   }, [validation, datasets, columnsByDataset]);
 
-  const drawable = validation.ok && scan !== null && !scan.allEncodedValuesEmpty;
+  const drawable =
+    validation.ok && scan !== null && !scan.allEncodedValuesEmpty;
 
   const { containerRef, state } = useGovernedVegaView({
     spec: validation.ok ? validation.normalized : null,
@@ -99,7 +103,11 @@ export function GovernedVegaLiteChart({
     enabled: drawable,
   });
 
-  const failures = collectFailures({ validation, scan, viewFailure: state.failure });
+  const failures = collectFailures({
+    validation,
+    scan,
+    viewFailure: state.failure,
+  });
   const warnings: readonly VegaValidationWarning[] = [
     ...validation.warnings,
     ...(scan?.warnings ?? []),
@@ -112,38 +120,73 @@ export function GovernedVegaLiteChart({
       {refused && <GovernedChartFailure errors={failures} />}
       <GovernedChartWarnings warnings={warnings} />
       <IsolatedErrorBoundary scope="This chart could not be drawn">
-        {/*
-          The mount point stays in the tree while a refusal is shown, so a
-          corrected specification has somewhere to draw into. Removing it was a
-          deadlock: the refusal outlives the render that clears it, so the
-          effect that re-embeds would find no container and give up, and the
-          chart would never come back.
-
-          Hidden, it is out of the layout and out of the accessibility tree, so
-          nothing renders an empty plotting area.
-        */}
-        <Box hidden={refused} display={refused ? "none" : undefined}>
-          <Box
-            // The chart is a picture of the result. Its accessible name is the
-            // whole of what a reader who cannot see it gets from this element —
-            // the same rows are in the table, which is the real fallback.
-            role="img"
-            aria-label={ariaLabel ?? "Chart of the query result"}
-            aria-describedby={descriptionId}
-            aria-busy={state.status === "embedding"}
-            data-testid="governed-vega-chart-view"
-            data-chart-status={state.status}
-            ref={containerRef}
-            width="full"
-            minHeight={CHART_MIN_HEIGHT}
-          />
-          <Text id={descriptionId} fontSize="12px" color="fg.muted">
-            Drawn from the result of the query you ran. Switch to the table to
-            read every returned row.
-          </Text>
-        </Box>
+        <GovernedChartCanvas
+          containerRef={containerRef}
+          ariaLabel={ariaLabel}
+          descriptionId={descriptionId}
+          status={state.status}
+          refused={refused}
+        />
       </IsolatedErrorBoundary>
     </VStack>
+  );
+}
+
+/**
+ * Where Vega draws, and the sentence that says what it drew.
+ *
+ * @param refused Whether a refusal is on screen above this.
+ */
+function GovernedChartCanvas({
+  containerRef,
+  ariaLabel,
+  descriptionId,
+  status,
+  refused,
+}: {
+  containerRef: RefObject<HTMLDivElement | null>;
+  ariaLabel: string | undefined;
+  descriptionId: string;
+  status: GovernedVegaViewStatus;
+  refused: boolean;
+}) {
+  /*
+    The mount point stays in the tree while a refusal is shown, so a
+    corrected specification has somewhere to draw into. Removing it was a
+    deadlock: the refusal outlives the render that clears it, so the
+    effect that re-embeds would find no container and give up, and the
+    chart would never come back.
+
+    Hidden, it is out of the layout and out of the accessibility tree, so
+    nothing renders an empty plotting area.
+  */
+  return (
+    <Box hidden={refused} display={refused ? "none" : undefined}>
+      <Box
+        // The chart is a picture of the result. Its accessible name is the
+        // whole of what a reader who cannot see it gets from this element —
+        // the same rows are in the table, which is the real fallback.
+        //
+        // The name lives HERE, on a wrapper, and never on the mount point:
+        // Vega writes its own `role="graphics-document"` and
+        // `aria-label="Vega visualization"` onto the element it embeds
+        // into, so a label on the mount point does not survive a real
+        // embed. `role="img"` also makes everything inside this element
+        // presentational, so Vega's own labelling is not read twice.
+        role="img"
+        aria-label={ariaLabel ?? "Chart of the query result"}
+        aria-describedby={descriptionId}
+        aria-busy={status === "embedding"}
+        data-testid="governed-vega-chart-view"
+        data-chart-status={status}
+      >
+        <Box ref={containerRef} width="full" minHeight={CHART_MIN_HEIGHT} />
+      </Box>
+      <Text id={descriptionId} fontSize="12px" color="fg.muted">
+        Drawn from the result of the query you ran. Switch to the table to read
+        every returned row.
+      </Text>
+    </Box>
   );
 }
 

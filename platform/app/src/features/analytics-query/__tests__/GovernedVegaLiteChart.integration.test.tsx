@@ -86,7 +86,9 @@ const vega = vi.hoisted(() => {
 
 vi.mock("vega-embed", () => ({ default: vega.embed }));
 
-const colorModeHarness = vi.hoisted(() => ({ mode: "light" as "light" | "dark" }));
+const colorModeHarness = vi.hoisted(() => ({
+  mode: "light" as "light" | "dark",
+}));
 
 vi.mock("~/components/ui/color-mode", async (importOriginal) => {
   const original =
@@ -137,7 +139,9 @@ const chart = ({
 );
 
 const failureCode = () =>
-  screen.getByTestId("governed-chart-failure").getAttribute("data-failure-code");
+  screen
+    .getByTestId("governed-chart-failure")
+    .getAttribute("data-failure-code");
 
 beforeEach(() => {
   vega.state.calls = [];
@@ -263,7 +267,9 @@ describe("the governed Vega-Lite chart", () => {
 
         rerender(
           <ChakraProvider value={defaultSystem}>
-            {chart({ spec: { ...(barOverQueryResult as object), height: 300 } })}
+            {chart({
+              spec: { ...(barOverQueryResult as object), height: 300 },
+            })}
           </ChakraProvider>,
         );
 
@@ -343,9 +349,11 @@ describe("the governed Vega-Lite chart", () => {
       const warnings = await screen.findByTestId("governed-chart-warnings");
 
       expect(warnings.textContent).toContain("total");
-      expect(warnings.querySelector('[data-warning-code]')?.getAttribute(
-        "data-warning-code",
-      )).toBe("unrepresentable-value");
+      expect(
+        warnings
+          .querySelector("[data-warning-code]")
+          ?.getAttribute("data-warning-code"),
+      ).toBe("unrepresentable-value");
       // Nothing was coerced on the way in: the zero is still a zero and the
       // value that cannot be placed is still itself, warned about rather than
       // rewritten into one that would draw as a real measurement.
@@ -426,9 +434,9 @@ describe("the governed Vega-Lite chart", () => {
 
       await screen.findByTestId("governed-chart-failure");
       expect(failureCode()).toBe("render-failure");
-      expect(screen.getByTestId("governed-chart-failure").textContent).toContain(
-        "Unrecognized signal name",
-      );
+      expect(
+        screen.getByTestId("governed-chart-failure").textContent,
+      ).toContain("Unrecognized signal name");
     });
 
     /** @scenario "Chart failures are distinct intentional states, never a blank chart" */

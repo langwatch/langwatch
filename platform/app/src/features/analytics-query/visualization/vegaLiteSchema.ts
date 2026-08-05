@@ -18,10 +18,10 @@
 import type { ErrorObject } from "ajv";
 
 import { governedVegaError } from "./vegaLitePolicy";
-import { JSON_POINTER_ROOT } from "./vegaLiteStructure";
 import vegaLiteSchemaValidator, {
   type VegaLiteSchemaValidator,
 } from "./vegaLiteSchemaValidator.generated.js";
+import { JSON_POINTER_ROOT } from "./vegaLiteStructure";
 import type { VegaValidationError } from "./visualization.types";
 
 /** The canonical `$schema` for the supported version. */

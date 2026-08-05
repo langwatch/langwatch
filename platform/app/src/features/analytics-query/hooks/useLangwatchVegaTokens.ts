@@ -12,9 +12,8 @@
  * series that is third anywhere else already has.
  */
 
-import { useMemo } from "react";
-
 import { useToken } from "@chakra-ui/react";
+import { useMemo } from "react";
 
 import { getRawColorValue, useColorMode } from "~/components/ui/color-mode";
 import { rotatingColors } from "~/utils/rotatingColors";

@@ -41,23 +41,23 @@ export function GovernedSqlDiagnostics({
         const severity =
           diagnostic.code === TRUNCATION_CODE ? "warning" : "info";
         return (
-        <Alert.Root
-          key={`${diagnostic.code}-${index}`}
-          status={severity}
-          data-testid="governed-sql-diagnostic"
-          data-diagnostic-code={diagnostic.code}
-          // Chakra carries the status in React context rather than in the
-          // document, so the same value is published here — one expression
-          // feeding both, so the attribute cannot drift from the styling.
-          data-severity={severity}
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            {/* Unchanged: each message already names the fact that made it
+          <Alert.Root
+            key={`${diagnostic.code}-${index}`}
+            status={severity}
+            data-testid="governed-sql-diagnostic"
+            data-diagnostic-code={diagnostic.code}
+            // Chakra carries the status in React context rather than in the
+            // document, so the same value is published here — one expression
+            // feeding both, so the attribute cannot drift from the styling.
+            data-severity={severity}
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              {/* Unchanged: each message already names the fact that made it
                 fire, and that is the part a shortened version would drop. */}
-            <Text fontSize="12.5px">{diagnostic.message}</Text>
-          </Alert.Content>
-        </Alert.Root>
+              <Text fontSize="12.5px">{diagnostic.message}</Text>
+            </Alert.Content>
+          </Alert.Root>
         );
       })}
     </Stack>
