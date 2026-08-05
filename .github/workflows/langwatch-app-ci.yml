@@ -837,15 +837,25 @@ jobs:
           path: platform/app/node_modules/.prisma
           key: ${{ runner.os }}-prisma-${{ hashFiles('platform/app/prisma/schema.prisma') }}
 
-      # Cache Vite build artifacts
+      # Cache Vite build artifacts.
+      #
+      # The key deliberately does NOT hash platform/app/src/**. It used to,
+      # which made the primary key change on every commit: the cache was
+      # therefore never a hit, and every run still wrote a fresh multi-MB
+      # entry, churning the repository's 10GB cache quota for a cache that
+      # could not be read. Hashing that tree also costs real time on its own.
+      #
+      # What is cached here is Vite's dependency pre-bundle, which is keyed by
+      # the dependency set, not by app source — and Vite re-optimizes on its
+      # own when its internal hash moves. So the key tracks the lockfile and
+      # the Vite config, and nothing else.
       - name: Cache Vite
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             platform/app/node_modules/.vite
-          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('platform/app/src/**/*', 'platform/app/vite.config.ts') }}
+          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml', 'platform/app/vite.config.ts') }}
           restore-keys: |
-            ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-vite-
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
