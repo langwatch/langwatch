@@ -51,6 +51,97 @@ const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
  */
 const SEEKS_PER_QUERY = 64;
 
+/**
+ * The successor read's whole statement, emitted once at module load rather than
+ * rebuilt per chunk, because nothing in it varies with the chunk any more.
+ *
+ * Every per-point value now travels as an array parameter, so the request a
+ * chunk produces is a fixed ~1 KB of SQL plus nine `param_*` entries whatever
+ * the chunk holds. The shape this replaced grew four parameters and a full
+ * branch per point: at {@link SEEKS_PER_QUERY} that is 256 parameters and tens
+ * of kilobytes, and `@clickhouse/client` carries its own 4096-character ceiling
+ * on the encoded `param_*` search string (`MAX_URL_BIND_PARAM_LENGTH`) which
+ * the old shape cleared many times over. Keeping the request under that ceiling
+ * by construction is the point; a smaller-but-still-unbounded statement would
+ * only move the day it is crossed again.
+ *
+ * Two branches, and the split is what keeps the reads bounded. Every point in
+ * the chunk is already stored when this runs, so within one series the
+ * successor of every chunk point except the newest must land at or before the
+ * next chunk point - it cannot be further away than a row we know is there.
+ * Only the newest chunk point in a series needs an open-ended look forward.
+ * So the first branch reads the chunk's own span, and the second is a single
+ * `LIMIT 1 BY SeriesId` seek past the end of it. `affectedBucketsBySeries`
+ * takes the minimum of the union, so returning the whole span rather than one
+ * row per point cannot change which successor a point resolves to.
+ *
+ * SEEK_SELECT appears exactly once, in the `series_points` CTE, and that CTE
+ * carries the tenant, series and lower-bound predicates itself - the branches
+ * add only the comparisons that need the joined span. The index seek therefore
+ * does not depend on predicate pushdown; the CTE is already the seek.
+ */
+const SUCCESSOR_SEEK_QUERY = `
+  WITH spans AS (
+    SELECT
+      span.1 AS SpanSeriesId,
+      fromUnixTimestamp64Milli(span.2) AS SpanFromTime,
+      toUInt64(span.3) AS SpanFromNano,
+      span.4 AS SpanFromPoint,
+      fromUnixTimestamp64Milli(span.5) AS SpanToTime,
+      toUInt64(span.6) AS SpanToNano,
+      span.7 AS SpanToPoint
+    FROM (
+      SELECT arrayJoin(arrayZip(
+        {seriesIds:Array(String)},
+        {fromTimes:Array(Int64)}, {fromNanos:Array(String)}, {fromPoints:Array(String)},
+        {toTimes:Array(Int64)}, {toNanos:Array(String)}, {toPoints:Array(String)}
+      )) AS span
+    )
+  ),
+  series_points AS (
+    SELECT ${SEEK_SELECT}, metric_data_points.TimeUnixMs AS SeekTime
+    FROM metric_data_points FINAL
+    WHERE TenantId = {tenantId:String}
+      AND SeriesId IN {seriesIds:Array(String)}
+      AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({scanFrom:Int64})
+  )
+  SELECT * FROM (
+    (SELECT series_points.*
+     FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
+     WHERE ${orderedAfter("From")} AND ${orderedBefore("To")})
+    UNION ALL
+    (SELECT series_points.*
+     FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
+     WHERE ${orderedAfter("To")}
+     ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC,
+       series_points.TimeUnixNano ASC, series_points.PointId ASC
+     LIMIT 1 BY SeriesId)
+  )
+`;
+
+/**
+ * The table's own row order, (TimeUnixMs, TimeUnixNano, PointId), compared
+ * against one end of a joined span. Written out rather than as a tuple
+ * comparison so the emitted predicate is the one the per-branch seeks already
+ * proved in production, and table-qualified for the reason SEEK_SELECT
+ * documents: a bare `TimeUnixMs` resolves to its epoch-milli alias.
+ */
+function orderedAfter(bound: "From" | "To"): string {
+  return `(series_points.SeekTime > spans.Span${bound}Time
+     OR (series_points.SeekTime = spans.Span${bound}Time
+       AND (series_points.TimeUnixNano > spans.Span${bound}Nano
+         OR (series_points.TimeUnixNano = spans.Span${bound}Nano
+           AND series_points.PointId > spans.Span${bound}Point))))`;
+}
+
+function orderedBefore(bound: "From" | "To"): string {
+  return `(series_points.SeekTime < spans.Span${bound}Time
+     OR (series_points.SeekTime = spans.Span${bound}Time
+       AND (series_points.TimeUnixNano < spans.Span${bound}Nano
+         OR (series_points.TimeUnixNano = spans.Span${bound}Nano
+           AND series_points.PointId < spans.Span${bound}Point))))`;
+}
+
 function chunked<T>(items: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
@@ -123,6 +214,60 @@ function affectedBucketsForSeries({
     }
   }
   return affected;
+}
+
+/**
+ * A series' chunk points reduced to the two that bound them. The successor read
+ * needs nothing else: everything between them it reads wholesale, and only the
+ * newest needs a look past the end of the chunk.
+ */
+interface SeriesSpan {
+  seriesId: string;
+  first: CanonicalMetricDataPoint;
+  last: CanonicalMetricDataPoint;
+}
+
+function seriesSpans(
+  points: readonly CanonicalMetricDataPoint[],
+): SeriesSpan[] {
+  return [...groupBySeries(points)].map(([seriesId, seriesPoints]) => {
+    const sorted = [...seriesPoints].sort(comparePoints);
+    return {
+      seriesId,
+      first: sorted[0]!,
+      last: sorted[sorted.length - 1]!,
+    };
+  });
+}
+
+/**
+ * Nine parameters, whatever the chunk holds - eight of them arrays the server
+ * zips back into one row per series.
+ *
+ * `scanFrom` is the earliest span start and exists purely so the read prunes
+ * partitions: `metric_data_points` partitions by `toYearWeek(TimeUnixMs)`, and
+ * a predicate that only reaches the column through the join cannot prune.
+ * Nanosecond values travel as strings because they exceed what a JSON number
+ * carries exactly; the statement casts them back with `toUInt64`.
+ */
+function successorSeekParams({
+  tenantId,
+  spans,
+}: {
+  tenantId: string;
+  spans: readonly SeriesSpan[];
+}): Record<string, unknown> {
+  return {
+    tenantId,
+    seriesIds: spans.map((span) => span.seriesId),
+    fromTimes: spans.map((span) => span.first.timeUnixMs),
+    fromNanos: spans.map((span) => span.first.timeUnixNano),
+    fromPoints: spans.map((span) => span.first.pointId),
+    toTimes: spans.map((span) => span.last.timeUnixMs),
+    toNanos: spans.map((span) => span.last.timeUnixNano),
+    toPoints: spans.map((span) => span.last.pointId),
+    scanFrom: Math.min(...spans.map((span) => span.first.timeUnixMs)),
+  };
 }
 
 /** The first point ordering strictly after `point`, from a sorted array. */
@@ -411,21 +556,20 @@ export class MetricDataPointClickHouseRepository
   }
 
   /**
-   * The stored point immediately after each of `points` within its own series.
-   * That successor is the only neighbour able to pull a second bucket into the
+   * The stored points that can succeed any of `points` within their own series.
+   * A successor is the only neighbour able to pull a second bucket into the
    * affected set, so it is the only one worth a read — an earlier revision also
    * fetched each point's predecessor and then discarded it.
    *
-   * ORDER BY leads with TimeUnixMs to match the table's sort key
-   * (TenantId, SeriesId, TimeUnixMs, TimeUnixNano, PointId). TimeUnixMs is
-   * derived from TimeUnixNano, so the row order is unchanged — but
-   * optimize_read_in_order is syntactic and cannot infer that, so ordering on
-   * TimeUnixNano alone made ClickHouse materialise and sort every point in
-   * the series (each carrying a ZSTD CanonicalPayload) to return one row.
-   * TimeUnixMs is table-qualified throughout: SEEK_SELECT aliases
-   * toUnixTimestamp64Milli(...) AS TimeUnixMs, and a bare TimeUnixMs
-   * resolves to that alias (epoch millis), never matching a DateTime64
-   * bound — the same pitfall log-record-storage documents.
+   * The statement is {@link SUCCESSOR_SEEK_QUERY}, which does not vary with the
+   * chunk; chunking here bounds how many series one set of array parameters
+   * describes, not how large the statement grows.
+   *
+   * The read stays payload-free (SEEK_SELECT, never the full row): running
+   * FINAL over a series while materialising the megabyte-scale payload column
+   * is what pushed one query past the server's per-query memory cap
+   * (MEMORY_LIMIT_EXCEEDED in ReplacingSorted). The seek only exists to order
+   * points and locate buckets.
    */
   private async successorsOf(
     points: CanonicalMetricDataPoint[],
@@ -434,27 +578,10 @@ export class MetricDataPointClickHouseRepository
     const client = await this.resolveClient(tenantId);
     const found: MetricSequencePoint[] = [];
 
-    for (const chunk of chunked(points, SEEKS_PER_QUERY)) {
-      const params: Record<string, unknown> = { tenantId };
-      const selects = chunk.map((point, index) => {
-        params[`series${index}`] = point.seriesId;
-        params[`time${index}`] = new Date(point.timeUnixMs);
-        params[`nano${index}`] = point.timeUnixNano;
-        params[`point${index}`] = point.pointId;
-        // SEEK_SELECT, never the full row: each branch runs FINAL over its
-        // series, and materialising the megabyte-scale payload column across
-        // SEEKS_PER_QUERY branches is what pushed one query past the server's
-        // per-query memory cap (MEMORY_LIMIT_EXCEEDED in ReplacingSorted).
-        // The seek only exists to order points and locate buckets.
-        return `(SELECT ${SEEK_SELECT}
-          FROM metric_data_points FINAL
-          WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
-            AND (metric_data_points.TimeUnixMs > {time${index}:DateTime64(3)} OR (metric_data_points.TimeUnixMs = {time${index}:DateTime64(3)} AND (TimeUnixNano > {nano${index}:UInt64} OR (TimeUnixNano = {nano${index}:UInt64} AND PointId > {point${index}:String}))))
-          ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC LIMIT 1)`;
-      });
+    for (const spans of chunked(seriesSpans(points), SEEKS_PER_QUERY)) {
       const result = await client.query({
-        query: selects.join("\n UNION ALL\n"),
-        query_params: params,
+        query: SUCCESSOR_SEEK_QUERY,
+        query_params: successorSeekParams({ tenantId, spans }),
         format: "JSONEachRow",
       });
       for (const row of await result.json<SeekMetricRow>()) {
@@ -505,29 +632,39 @@ export class MetricDataPointClickHouseRepository
     // Each seek contributes two statements, so half the budget keeps a single
     // query's statement count at the same ceiling the successor seeks use.
     for (const chunk of chunked(seeks, Math.floor(SEEKS_PER_QUERY / 2))) {
-      const params: Record<string, unknown> = { tenantId };
+      // Two shared scalars replace the per-seek end and cutoff bounds: both
+      // were derived from the bucket start, so the server can derive them too
+      // and the parameter fan-out halves without the statement changing shape.
+      const params: Record<string, unknown> = {
+        tenantId,
+        bucketMs: METRIC_ROLLUP_INTERVAL_MS,
+        retentionMs: retentionDays * 24 * 60 * 60 * 1000,
+      };
       const selects = chunk.flatMap(({ seriesId, start }, index) => {
         params[`series${index}`] = seriesId;
-        params[`from${index}`] = new Date(start);
-        params[`to${index}`] = new Date(start + METRIC_ROLLUP_INTERVAL_MS);
-        params[`cutoff${index}`] = new Date(
-          start - retentionDays * 24 * 60 * 60 * 1000,
-        );
-        // AUTHORITATIVE_SELECT: everything the fold reads, without the
-        // payload column — the fold never touches it, and it is the column
-        // that made these FINAL reads memory-heavy.
+        params[`from${index}`] = start;
+        // Both branches keep a seek per bucket rather than folding into one
+        // joined statement the way the successor read does. The predecessor
+        // branch is why: its lower bound is the retention window, and a join
+        // can only apply a per-seek bound after the rows are read, so the
+        // single-row reverse index seek would become a read of every point in
+        // the series across that whole window — the memory class #6493 fixed.
+        // The successor read folds safely because every bound there is the
+        // chunk's own span. AUTHORITATIVE_SELECT is everything the fold reads
+        // without the payload column, which is what made these FINAL reads
+        // memory-heavy.
         return [
           `(SELECT ${AUTHORITATIVE_SELECT}
             FROM metric_data_points FINAL
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
-              AND metric_data_points.TimeUnixMs < {from${index}:DateTime64(3)}
-              AND metric_data_points.TimeUnixMs >= {cutoff${index}:DateTime64(3)}
+              AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64})
+              AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {retentionMs:Int64})
             ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`,
           `(SELECT ${AUTHORITATIVE_SELECT}
             FROM metric_data_points FINAL
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
-              AND metric_data_points.TimeUnixMs >= {from${index}:DateTime64(3)}
-              AND metric_data_points.TimeUnixMs < {to${index}:DateTime64(3)}
+              AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64})
+              AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64} + {bucketMs:Int64})
             ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC)`,
         ];
       });

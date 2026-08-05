@@ -365,3 +365,82 @@ describe("given a cumulative series long enough to span several rollup buckets",
     });
   });
 });
+
+/**
+ * The folded successor read does not seek once per point: within a series it
+ * reads the chunk's own span in one branch and looks past the end of it in
+ * another. Its results are only identical to a seek per point because every
+ * chunk point is already stored, so no chunk point's successor can be further
+ * away than the next chunk point. That argument is what this block exercises
+ * against real ClickHouse - a series where the rows between the chunk's points
+ * are rows the chunk itself does not carry.
+ */
+describe("given a series whose chunk points have stored points between them", () => {
+  const foldedSeriesId = "0".repeat(64);
+  const perPointSeriesId = "1".repeat(64);
+  // Sixteen cumulative samples every five seconds cover three 30s buckets, and
+  // the drop to 4 is a counter reset, so every sample's dependency on its
+  // predecessor is live rather than incidental.
+  const values = [10, 15, 18, 26, 31, 4, 9, 14, 22, 27, 33, 40, 44, 51, 55, 60];
+  const preStored = values.map((_, index) => index).filter((i) => i % 2 === 1);
+  const folded = values.map((_, index) => index).filter((i) => i % 2 === 0);
+
+  function sample({
+    seriesId,
+    index,
+  }: {
+    seriesId: string;
+    index: number;
+  }): CanonicalMetricDataPoint {
+    return point({
+      tenantId,
+      organizationId,
+      seriesId,
+      timeUnixMs: bucket0 + index * 5_000,
+      metricKind: "sum",
+      aggregationTemporality: "cumulative",
+      isMonotonic: true,
+      valueDouble: values[index]!,
+      acceptedAt,
+    });
+  }
+
+  beforeAll(async () => {
+    // Both series start from the same stored half, so the only difference is
+    // how the other half arrives.
+    for (const seriesId of [foldedSeriesId, perPointSeriesId]) {
+      await repo.recomputeAffectedRollupsMany({
+        points: preStored.map((index) => sample({ seriesId, index })),
+      });
+    }
+    await repo.recomputeAffectedRollupsMany({
+      points: folded.map((index) =>
+        sample({ seriesId: foldedSeriesId, index }),
+      ),
+    });
+    // Reverse order on purpose: every sample is late relative to the one
+    // before it, which is the arrival pattern a chunk collapses.
+    for (const index of [...folded].reverse()) {
+      await repo.recomputeAffectedRollups({
+        point: sample({ seriesId: perPointSeriesId, index }),
+      });
+    }
+  }, 60_000);
+
+  /** @scenario "A batch folds to the summaries a point-at-a-time rebuild produces" */
+  it("folds to exactly the rollups a point-at-a-time path produces", async () => {
+    const chunked = await readRollups(foldedSeriesId);
+
+    expect(chunked).toEqual(await readRollups(perPointSeriesId));
+    expect(chunked).toHaveLength(3);
+  });
+
+  /** @scenario "A batch folds to the summaries a point-at-a-time rebuild produces" */
+  it("counts every sample exactly once across the buckets", async () => {
+    const chunked = await readRollups(foldedSeriesId);
+
+    expect(
+      chunked.reduce((total, row) => total + row.sourcePointCount, 0),
+    ).toBe(values.length);
+  });
+});

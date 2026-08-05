@@ -274,18 +274,19 @@ describe("MetricDataPointClickHouseRepository", () => {
       expect(query).toHaveBeenCalledTimes(2);
     });
 
-    it("splits the successor seeks once the chunk outgrows the budget", async () => {
+    it("reads one series' successors in a single request however long the chunk", async () => {
       const { query, client } = reader();
       const repository = new MetricDataPointClickHouseRepository({
         resolveClient: async () => client,
         resolveOrganizationClient: async () => client,
       });
 
-      // 130 points need three statements of successor seeks; the single
-      // affected bucket still needs one. Reading per point would be 131.
+      // 130 points used to need three statements of successor seeks because
+      // the statement grew a branch per point. It is now one request per
+      // batch of series, and these 130 points are all one series.
       await repository.recomputeAffectedRollupsMany({ points: chunkOf(130) });
 
-      expect(query).toHaveBeenCalledTimes(4);
+      expect(query).toHaveBeenCalledTimes(2);
     });
 
     it("asks for each point's own successor rather than its predecessor", async () => {
@@ -299,13 +300,15 @@ describe("MetricDataPointClickHouseRepository", () => {
 
       const successorSeeks = query.mock.calls[0]![0].query;
       // The bound is what encodes "successor" — an ascending order with a `<`
-      // bound would still read backwards, so pin the direction of both.
+      // bound would still read backwards, so pin the direction of both. The
+      // open-ended look forward is the branch bounded by the span's far end.
       expect(successorSeeks).toContain(
-        "metric_data_points.TimeUnixMs > {time0:DateTime64(3)}",
+        "series_points.SeekTime > spans.SpanToTime",
       );
       expect(successorSeeks).toContain(
-        "ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC",
+        "ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC",
       );
+      expect(successorSeeks).toContain("LIMIT 1 BY SeriesId");
     });
 
     it("never fetches the payload column on either read", async () => {
@@ -415,6 +418,484 @@ describe("MetricDataPointClickHouseRepository", () => {
       );
       expect(rollupInsert).toBeDefined();
       expect(rollupInsert![0].values.length).toBeGreaterThan(0);
+    });
+  });
+
+  /**
+   * The rollup lane once emitted four `param_*` entries and a whole SELECT
+   * branch per point. A chunk therefore built a request that grew with the
+   * chunk — tens of kilobytes of SQL and hundreds of parameters — and
+   * production saw ClickHouse parse one such request's URL-encoded search
+   * string as SQL and reject it with a syntax error at the first `&`. That
+   * stopped when a later change happened to make the request smaller, not
+   * because anything bounded it. These are the tests that bound it: the
+   * request a chunk produces must not move at all as the chunk grows.
+   */
+  describe("when the successor read is built for a chunk", () => {
+    const base =
+      Math.floor(1_700_000_000_000 / METRIC_ROLLUP_INTERVAL_MS) *
+      METRIC_ROLLUP_INTERVAL_MS;
+
+    function hex(value: number): string {
+      return value.toString(16).padStart(64, "0");
+    }
+
+    function pointAt({
+      series,
+      offsetMs,
+    }: {
+      series: number;
+      offsetMs: number;
+    }): CanonicalMetricDataPoint {
+      const timeUnixMs = base + offsetMs;
+      return {
+        ...dataPoint(),
+        seriesId: hex(series),
+        pointId: hex(series * 1_000_000 + offsetMs),
+        timeUnixMs,
+        timeUnixNano: String(BigInt(timeUnixMs) * 1_000_000n),
+      };
+    }
+
+    /** One point per series, so the arrays grow while the chunk stays flat. */
+    function acrossSeries(count: number): CanonicalMetricDataPoint[] {
+      return Array.from({ length: count }, (_, index) =>
+        pointAt({ series: index + 1, offsetMs: index }),
+      );
+    }
+
+    /** Many points in one series, so the chunk grows while the arrays stay flat. */
+    function withinOneSeries(count: number): CanonicalMetricDataPoint[] {
+      return Array.from({ length: count }, (_, index) =>
+        pointAt({ series: 1, offsetMs: index }),
+      );
+    }
+
+    async function successorRequests(points: CanonicalMetricDataPoint[]) {
+      const calls: { query: string; params: Record<string, unknown> }[] = [];
+      const query = vi.fn(
+        async ({
+          query: sql,
+          query_params: params,
+        }: {
+          query: string;
+          query_params: Record<string, unknown>;
+        }) => {
+          if (sql.includes("spans")) calls.push({ query: sql, params });
+          return { json: async () => [] };
+        },
+      );
+      const client = { query, insert: vi.fn(async () => {}) } as never;
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+      await repository.recomputeAffectedRollupsMany({ points });
+      return calls;
+    }
+
+    /** @scenario "A folded rollup read sends a fixed-size request" */
+    it("sends byte-for-byte the same statement as the chunk grows", async () => {
+      const statements = await Promise.all(
+        [1, 12, 64, 130, 260].map(async (count) => {
+          const [request] = await successorRequests(withinOneSeries(count));
+          return request!.query;
+        }),
+      );
+
+      // Not "smaller than before" — identical. A statement that still grows,
+      // however slowly, only moves the size at which this breaks again.
+      expect(new Set(statements).size).toBe(1);
+      expect(new Set(statements.map((sql) => sql.length)).size).toBe(1);
+    });
+
+    /** @scenario "A folded rollup read sends a fixed-size request" */
+    it("sends the same statement however many series the chunk touches", async () => {
+      const statements = await Promise.all(
+        [1, 8, 64].map(async (count) => {
+          const [request] = await successorRequests(acrossSeries(count));
+          return request!.query;
+        }),
+      );
+
+      expect(new Set(statements).size).toBe(1);
+    });
+
+    /** @scenario "A folded rollup read binds a fixed number of parameters" */
+    it("binds the same parameters as the chunk grows", async () => {
+      const parameterNames = await Promise.all(
+        [1, 12, 64, 130, 260].map(async (count) => {
+          const [request] = await successorRequests(withinOneSeries(count));
+          return Object.keys(request!.params).sort().join(",");
+        }),
+      );
+
+      expect(new Set(parameterNames).size).toBe(1);
+      // Every per-point value rides inside an array, so the count is the
+      // whole contract: nine, whatever the chunk holds.
+      expect(parameterNames[0]!.split(",")).toEqual(
+        [
+          "fromNanos",
+          "fromPoints",
+          "fromTimes",
+          "scanFrom",
+          "seriesIds",
+          "tenantId",
+          "toNanos",
+          "toPoints",
+          "toTimes",
+        ].sort(),
+      );
+    });
+
+    /** @scenario "A folded rollup read binds a fixed number of parameters" */
+    it("binds the same parameters however many series the chunk touches", async () => {
+      const parameterNames = await Promise.all(
+        [1, 8, 64].map(async (count) => {
+          const [request] = await successorRequests(acrossSeries(count));
+          return Object.keys(request!.params).sort().join(",");
+        }),
+      );
+
+      expect(new Set(parameterNames).size).toBe(1);
+    });
+
+    /** @scenario "A folded rollup read names its columns once" */
+    it("names the sequence columns once rather than once per branch", async () => {
+      const [request] = await successorRequests(withinOneSeries(64));
+
+      const columnList = request!.query.split(
+        "toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs",
+      ).length;
+      expect(columnList - 1).toBe(1);
+      // The payload column is what pushed this read past the per-query memory
+      // cap in #6493; hoisting the select list must not quietly restore it.
+      expect(request!.query).not.toContain("CanonicalPayload");
+      expect(request!.query).not.toContain("ResourceAttributesJson");
+    });
+
+    /** @scenario "A folded rollup read binds a fixed number of parameters" */
+    it("splits the request once the series outgrow the seek budget", async () => {
+      expect(await successorRequests(acrossSeries(64))).toHaveLength(1);
+      expect(await successorRequests(acrossSeries(65))).toHaveLength(2);
+    });
+  });
+
+  /**
+   * Result equivalence for the folded read. The statement no longer seeks once
+   * per point: it reads the chunk's own span in one branch and looks past the
+   * end of it in another. Those rows differ from the per-point seek's rows, so
+   * what has to be proven is that the rollup lane resolves the same successors
+   * from them — observable as the buckets it then goes on to read.
+   */
+  describe("when the folded read replaces a seek per point", () => {
+    const base =
+      Math.floor(1_700_000_000_000 / METRIC_ROLLUP_INTERVAL_MS) *
+      METRIC_ROLLUP_INTERVAL_MS;
+
+    interface StoredRow {
+      seriesId: string;
+      pointId: string;
+      timeUnixMs: number;
+      timeUnixNano: string;
+    }
+
+    function hex(value: number): string {
+      return value.toString(16).padStart(64, "0");
+    }
+
+    function stored({
+      series,
+      offsetMs,
+    }: {
+      series: number;
+      offsetMs: number;
+    }): StoredRow {
+      const timeUnixMs = base + offsetMs;
+      return {
+        seriesId: hex(series),
+        pointId: hex(series * 1_000_000 + offsetMs),
+        timeUnixMs,
+        timeUnixNano: String(BigInt(timeUnixMs) * 1_000_000n),
+      };
+    }
+
+    function chunkPoint(row: StoredRow): CanonicalMetricDataPoint {
+      return { ...dataPoint(), ...row };
+    }
+
+    function compare<T>(left: T, right: T): number {
+      if (left === right) return 0;
+      return left < right ? -1 : 1;
+    }
+
+    /** The table's ORDER BY, which collates PointId by bytes. */
+    function order(left: StoredRow, right: StoredRow): number {
+      return (
+        compare(BigInt(left.timeUnixNano), BigInt(right.timeUnixNano)) ||
+        compare(left.pointId, right.pointId)
+      );
+    }
+
+    /** What the folded statement returns, read off its array parameters. */
+    function foldedRows({
+      params,
+      table,
+    }: {
+      params: Record<string, unknown>;
+      table: readonly StoredRow[];
+    }): StoredRow[] {
+      const seriesIds = params.seriesIds as string[];
+      const bound = (prefix: "from" | "to", index: number, seriesId: string) =>
+        ({
+          seriesId,
+          pointId: (params[`${prefix}Points`] as string[])[index]!,
+          timeUnixMs: (params[`${prefix}Times`] as number[])[index]!,
+          timeUnixNano: (params[`${prefix}Nanos`] as string[])[index]!,
+        }) satisfies StoredRow;
+
+      return seriesIds.flatMap((seriesId, index) => {
+        const from = bound("from", index, seriesId);
+        const to = bound("to", index, seriesId);
+        const inSeries = table
+          .filter(
+            (row) =>
+              row.seriesId === seriesId &&
+              row.timeUnixMs >= (params.scanFrom as number),
+          )
+          .sort(order);
+        const withinSpan = inSeries.filter(
+          (row) => order(row, from) > 0 && order(row, to) < 0,
+        );
+        const pastSpan = inSeries.find((row) => order(row, to) > 0);
+        return pastSpan ? [...withinSpan, pastSpan] : withinSpan;
+      });
+    }
+
+    /** What the seek-per-point statement it replaced returned. */
+    function perPointRows({
+      points,
+      table,
+    }: {
+      points: readonly CanonicalMetricDataPoint[];
+      table: readonly StoredRow[];
+    }): StoredRow[] {
+      return points.flatMap((point) => {
+        const successor = table
+          .filter((row) => row.seriesId === point.seriesId)
+          .sort(order)
+          .find((row) => order(row, point) > 0);
+        return successor ? [successor] : [];
+      });
+    }
+
+    /**
+     * The buckets the lane goes on to read, which is where a wrong successor
+     * would surface: `(series, bucket start)` pairs, sorted so the comparison
+     * does not depend on the order the seeks were emitted in.
+     */
+    async function bucketsReadFor({
+      points,
+      successors,
+    }: {
+      points: CanonicalMetricDataPoint[];
+      successors: (params: Record<string, unknown>) => StoredRow[];
+    }): Promise<string[]> {
+      const buckets: string[] = [];
+      const seekRows = (params: Record<string, unknown>) =>
+        successors(params).map((row) => ({
+          SeriesId: row.seriesId,
+          PointId: row.pointId,
+          TimeUnixMs: row.timeUnixMs,
+          TimeUnixNano: row.timeUnixNano,
+          MetricKind: "gauge",
+          AggregationTemporality: "unspecified",
+        }));
+      const recordBuckets = (params: Record<string, unknown>) => {
+        for (const [name, value] of Object.entries(params)) {
+          const seek = /^from(\d+)$/.exec(name);
+          if (!seek) continue;
+          buckets.push(
+            `${String(params[`series${seek[1]!}`])}@${String(value)}`,
+          );
+        }
+      };
+      const query = vi.fn(
+        async ({
+          query: sql,
+          query_params: params,
+        }: {
+          query: string;
+          query_params: Record<string, unknown>;
+        }) => {
+          if (sql.includes("spans")) {
+            return { json: async () => seekRows(params) };
+          }
+          recordBuckets(params);
+          return { json: async () => [] };
+        },
+      );
+      const client = { query, insert: vi.fn(async () => {}) } as never;
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+      await repository.recomputeAffectedRollupsMany({ points });
+      return buckets.sort();
+    }
+
+    /** Both shapes' recomputed windows, for the caller to compare. */
+    async function bothShapes({
+      points,
+      table,
+    }: {
+      points: CanonicalMetricDataPoint[];
+      table: StoredRow[];
+    }): Promise<{ folded: string[]; perPoint: string[] }> {
+      return {
+        folded: await bucketsReadFor({
+          points,
+          successors: (params) => foldedRows({ params, table }),
+        }),
+        perPoint: await bucketsReadFor({
+          points,
+          successors: () => perPointRows({ points, table }),
+        }),
+      };
+    }
+
+    /** @scenario "A folded rollup read resolves the successors a per-point read did" */
+    it("resolves the same successor for a single seek", async () => {
+      const point = stored({ series: 1, offsetMs: 0 });
+      const table = [
+        point,
+        stored({ series: 1, offsetMs: METRIC_ROLLUP_INTERVAL_MS * 3 }),
+      ];
+
+      const { folded, perPoint } = await bothShapes({
+        points: [chunkPoint(point)],
+        table,
+      });
+
+      expect(folded).toEqual(perPoint);
+      expect(folded.length).toBeGreaterThan(0);
+    });
+
+    /** @scenario "A folded rollup read resolves the successors a per-point read did" */
+    it("resolves the same successors for a chunk that fills the seek budget", async () => {
+      // 64 points in one series with points stored between them, so the span
+      // branch is what has to supply the interior successors.
+      const chunk = Array.from({ length: 64 }, (_, index) =>
+        stored({ series: 1, offsetMs: index * 1_000 }),
+      );
+      const interleaved = Array.from({ length: 63 }, (_, index) =>
+        stored({ series: 1, offsetMs: index * 1_000 + 500 }),
+      );
+      const table = [
+        ...chunk,
+        ...interleaved,
+        stored({ series: 1, offsetMs: 200_000 }),
+      ];
+
+      const { folded, perPoint } = await bothShapes({
+        points: chunk.map(chunkPoint),
+        table,
+      });
+
+      expect(folded).toEqual(perPoint);
+      expect(folded.length).toBeGreaterThan(0);
+    });
+
+    /** @scenario "A folded rollup read resolves the successors a per-point read did" */
+    it("resolves the same successors across a chunk boundary", async () => {
+      // 65 series is one more than a single request carries, so the lane
+      // splits — the successors must not depend on where the split fell.
+      const chunk = Array.from({ length: 65 }, (_, index) =>
+        stored({ series: index + 1, offsetMs: index }),
+      );
+      const table = [
+        ...chunk,
+        ...chunk.map((row, index) =>
+          stored({
+            series: index + 1,
+            offsetMs: index + METRIC_ROLLUP_INTERVAL_MS * 2,
+          }),
+        ),
+      ];
+
+      const { folded, perPoint } = await bothShapes({
+        points: chunk.map(chunkPoint),
+        table,
+      });
+
+      expect(folded).toEqual(perPoint);
+      expect(folded.length).toBeGreaterThan(0);
+    });
+
+    /** @scenario "A folded rollup read resolves the successors a per-point read did" */
+    it("resolves no successor for the newest point in a series", async () => {
+      const first = stored({ series: 1, offsetMs: 0 });
+      const last = stored({ series: 1, offsetMs: 500 });
+
+      const { folded, perPoint } = await bothShapes({
+        points: [first, last].map(chunkPoint),
+        table: [first, last],
+      });
+
+      expect(folded).toEqual(perPoint);
+      expect(folded.length).toBeGreaterThan(0);
+    });
+  });
+
+  /**
+   * The bucket reads keep a seek per affected bucket on purpose: the
+   * predecessor branch is bounded below by the retention window, and a joined
+   * form can only apply that bound after the rows are read, turning a
+   * single-row reverse index seek into a read of the series across the whole
+   * window. What they can shed is the parameter fan-out for values the server
+   * can derive itself.
+   */
+  describe("when the affected buckets are read", () => {
+    const base =
+      Math.floor(1_700_000_000_000 / METRIC_ROLLUP_INTERVAL_MS) *
+      METRIC_ROLLUP_INTERVAL_MS;
+
+    /** @scenario "A rollup bucket read derives its bounds on the server" */
+    it("binds two parameters per bucket rather than four", async () => {
+      let bucketRead: Record<string, unknown> | undefined;
+      const query = vi.fn(
+        async ({
+          query: sql,
+          query_params: params,
+        }: {
+          query: string;
+          query_params: Record<string, unknown>;
+        }) => {
+          if (!sql.includes("spans")) bucketRead = params;
+          return { json: async () => [] };
+        },
+      );
+      const client = { query, insert: vi.fn(async () => {}) } as never;
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      await repository.recomputeAffectedRollupsMany({
+        points: [{ ...dataPoint(), timeUnixMs: base + 1 }],
+        retentionDays: 49,
+      });
+
+      const names = Object.keys(bucketRead!).sort();
+      expect(names).toEqual(
+        ["tenantId", "bucketMs", "retentionMs", "series0", "from0"].sort(),
+      );
+      // The bucket end and the retention floor are the same arithmetic on
+      // either side of the wire, so they travel once as shared scalars.
+      expect(bucketRead!.bucketMs).toBe(METRIC_ROLLUP_INTERVAL_MS);
+      expect(bucketRead!.retentionMs).toBe(49 * 24 * 60 * 60 * 1000);
+      expect(names).not.toContain("to0");
+      expect(names).not.toContain("cutoff0");
     });
   });
 

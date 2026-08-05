@@ -82,3 +82,57 @@ Feature: Canonical OTLP metric ingestion
       Given a data point has already been processed
       When the same point is processed again
       Then the stored point and its summaries are unchanged
+
+  # A batch of points once produced a storage request that grew with the batch:
+  # a parameter set and a whole query branch per point. Storage rejected one
+  # such request outright, having read the request's own encoding as part of
+  # the query. It stopped happening when an unrelated change made the requests
+  # smaller, which is not the same as bounding them - a larger batch would have
+  # crossed the same line again. These scenarios bound it.
+  Rule: Rebuilding summaries costs the same request whatever the batch holds
+
+    @unit
+    Scenario: A folded rollup read sends a fixed-size request
+      Given a batch of points for one series
+      When the platform looks up what follows each of them
+      Then the request it sends is the same whether the batch holds one point
+        or hundreds
+
+    @unit
+    Scenario: A folded rollup read binds a fixed number of parameters
+      Given a batch of points
+      When the platform looks up what follows each of them
+      Then the number of values bound into the request does not grow with the
+        batch
+      And a batch too large for one request is split rather than sent whole
+
+    @unit
+    Scenario: A folded rollup read names its columns once
+      Given a batch of points
+      When the platform looks up what follows each of them
+      Then the request names the fields it reads once rather than once per
+        point
+      And it does not ask for the stored payload it never reads
+
+    @unit
+    Scenario: A folded rollup read resolves the successors a per-point read did
+      Given a batch of points whose series already holds points between them
+      When the platform looks up what follows each of them in one request
+      Then it resolves the same following point for each as it would asking
+        one at a time
+      And it recomputes exactly the same summary windows
+
+    @unit
+    Scenario: A rollup bucket read derives its bounds on the server
+      Given a summary window has to be recomputed
+      When the platform reads the points that window covers
+      Then the window's end and its retention floor are derived rather than
+        sent for every window
+
+    @integration
+    Scenario: A batch folds to the summaries a point-at-a-time rebuild produces
+      Given a series already holds points between the points of a batch
+      When the batch is folded in one pass
+      Then its summaries match those of an identical series rebuilt one point
+        at a time
+      And every sample is counted exactly once across the windows

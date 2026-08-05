@@ -517,7 +517,6 @@ const LEGACY_INERT: string[] = [
   "specs/ops/local-observability-stack.feature",
   "specs/ops/production-bundle-integrity.feature",
   "specs/otlp/canonical-log-ingestion.feature",
-  "specs/otlp/canonical-metric-ingestion.feature",
   "specs/projects/create-project-drawer.feature",
   "specs/projects/project-list-refresh.feature",
   "specs/prompts/custom-prompt-tags.feature",
