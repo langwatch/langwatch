@@ -53,10 +53,10 @@ Feature: Copilot CLI OTLP spans canonicalize on the unified substrate
       Then the canonical span records the premium-request consumption
 
     @unit
-    Scenario: Captured content payloads are lifted as span input and output
+    Scenario: Captured content payloads survive canonicalisation as span input and output
       Given a copilot span whose attributes carry captured prompt and response content
       When the canonicalisation chain runs
-      Then the canonical span's input and output carry the captured content
+      Then the canonical span's input and output carry the captured content unmodified
 
     @unit
     Scenario: A span without gen_ai attributes is left untouched by the copilot extractor

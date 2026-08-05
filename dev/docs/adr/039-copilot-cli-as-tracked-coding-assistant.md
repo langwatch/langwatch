@@ -23,7 +23,7 @@ Forcing function: governance program expansion — Copilot is the biggest gap in
 
 ## Decision
 
-1. **Full tool integration, both paths.** `langwatch copilot` registers alongside the other four in `typescript-sdk/src/cli/index.ts` → `wrap.ts` → `runWrapped("copilot")`. Rejects the Path-B-only scope: both paths are cheap given the research, and a half-integration (cursor's hidden gateway-only command) demonstrably rots.
+1. **Full tool integration, both paths.** `langwatch copilot` registers alongside the other four in `sdks/typescript/src/cli/program.ts` → `wrap.ts` → `runWrapped("copilot")`. Rejects the Path-B-only scope: both paths are cheap given the research, and a half-integration (cursor's hidden gateway-only command) demonstrably rots.
 
 2. **sourceType is `copilot_cli`.** `copilot_studio` already exists (ADR-018, Microsoft Copilot Studio S3 audit feeds); a bare `copilot` slug would be confusable in the API-keys page and analytics filters, and `github_copilot` would collide again if Copilot IDE telemetry is ever ingested. The command name stays `copilot`; slug ≠ command follows the `claude` → `claude_code` precedent. The mint endpoint takes free-form `source_type` (`auth-cli.ts:1300`) — no server enum migration.
 
@@ -77,9 +77,9 @@ No Prisma migration. `IngestionSource.sourceType` and the mint endpoint accept f
 
 Touched surfaces (implementation map, not schema):
 
-```
-typescript-sdk/src/cli/index.ts                     — register `copilot` command
-typescript-sdk/src/cli/commands/wrap.ts             — wrapCopilot shim
+```text
+sdks/typescript/src/cli/program.ts                  — register `copilot` command
+sdks/typescript/src/cli/commands/wrap.ts            — wrapCopilot shim
 utils/governance/wrapper.ts                         — envForTool copilot case (Path A), TOOL_PROVIDER_FAMILIES,
                                                       copilot pre-spawn step (managed-settings + version warnings,
                                                       mode-independent — preflightWrapper only runs on gateway),
@@ -95,10 +95,10 @@ utils/governance/wrapper-mode.ts                    — SOURCE_TYPE_BY_TOOL.copi
 utils/governance/platform-tool-policy.ts            — PlatformToolSlug union + copilot defaults (both true)
 utils/governance/telemetry-targets.ts               — SHELL_FUNCTION_TOOLS += copilot (+ config write target if needed)
                                                       NOTE: shell-rc.ts TOOLS must NOT gain copilot (Decision 7)
-langwatch/src/server/.../PlatformToolPolicyService  — server-side copilot slug + defaults (admin UI toggle)
-langwatch/src/.../canonicalisation/extractors/copilot.ts — thin specifics-only extractor, registered after
+platform/app/ee/governance/services/platformToolPolicy.service.ts — server-side copilot slug + defaults (admin UI toggle)
+platform/app/src/server/.../canonicalisation/extractors/copilot.ts — thin specifics-only extractor, registered after
                                                       GenAIExtractor, primitives from _extraction.ts/_messages.ts
-langwatch/src/components/me/tiles/                  — copilot assistant tile/icon
+platform/app/src/components/me/tiles/               — copilot assistant tile/icon
 specs/ai-governance/cli-wrappers/*.feature          — scenarios for the new tool
 ```
 

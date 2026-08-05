@@ -74,7 +74,6 @@ export interface TelemetryTarget {
 
 const SHELLS: DetectedShell[] = ["zsh", "bash", "fish"];
 
-
 /**
  * Enumerate every telemetry-persist target with a present flag and a
  * remover. Callers filter to `present` targets for display + removal.

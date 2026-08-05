@@ -243,7 +243,6 @@ describe("buildShellReapply", () => {
 		it("prepends unset -f for copilot so the rc function cannot re-inject OTel", () => {
 			const reapply = buildShellReapply({
 				tool: "copilot",
-				mode: "gateway",
 				clears: [],
 				vars: { COPILOT_PROVIDER_TYPE: "openai" },
 			});
@@ -254,7 +253,6 @@ describe("buildShellReapply", () => {
 		it("prepends unset -f for opencode (pre-existing double-trace hole, fixed generically)", () => {
 			const reapply = buildShellReapply({
 				tool: "opencode",
-				mode: "gateway",
 				clears: [],
 				vars: {},
 			});
@@ -265,7 +263,6 @@ describe("buildShellReapply", () => {
 		it("prepends unset -f for gemini", () => {
 			const reapply = buildShellReapply({
 				tool: "gemini",
-				mode: "gateway",
 				clears: [],
 				vars: {},
 			});
@@ -276,7 +273,6 @@ describe("buildShellReapply", () => {
 		it("removes only the function, never aliases (no unalias in the prefix)", () => {
 			const reapply = buildShellReapply({
 				tool: "copilot",
-				mode: "gateway",
 				clears: [],
 				vars: {},
 			});
@@ -293,7 +289,6 @@ describe("buildShellReapply", () => {
 			// Unset it in the session; the rc block itself stays for bare runs.
 			const reapply = buildShellReapply({
 				tool: "copilot",
-				mode: "ingestion",
 				clears: [],
 				vars: { COPILOT_OTEL_ENABLED: "true" },
 			});
@@ -306,7 +301,6 @@ describe("buildShellReapply", () => {
 		it("lets this run's freshly-resolved env win over a stale persisted function", () => {
 			const reapply = buildShellReapply({
 				tool: "copilot",
-				mode: "ingestion",
 				clears: [],
 				vars: { OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer fresh" },
 			});
@@ -321,7 +315,6 @@ describe("buildShellReapply", () => {
 		it("emits only clears + exports", () => {
 			const reapply = buildShellReapply({
 				tool: "claude",
-				mode: "gateway",
 				clears: ["ANTHROPIC_API_KEY"],
 				vars: { ANTHROPIC_BASE_URL: "http://gw" },
 			});

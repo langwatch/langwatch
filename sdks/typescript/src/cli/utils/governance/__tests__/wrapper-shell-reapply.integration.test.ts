@@ -83,8 +83,10 @@ describe("buildShellReapply real-shell execution", () => {
   }
 
   if (combos.length === 0) {
-    it("skips: no POSIX shell on PATH", () => {
-      expect(true).toBe(true);
+    // Reported as skipped, not passed — a green "pass" here would claim
+    // real-shell coverage that never ran.
+    it.skip("no POSIX shell on PATH — real-shell coverage unavailable", () => {
+      throw new Error("unreachable: this suite requires bash or zsh on PATH");
     });
   }
 
@@ -101,7 +103,6 @@ describe("buildShellReapply real-shell execution", () => {
 
       const reapply = buildShellReapply({
         tool,
-        mode: "ingestion",
         clears: [],
         vars: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://lw.example/api/otel" },
       });
