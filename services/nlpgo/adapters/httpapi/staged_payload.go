@@ -1,7 +1,7 @@
 package httpapi
 
 // Staged payload offload — the counterpart to the TS `stagePayload` helper
-// (langwatch/src/server/s3/stagePayload.ts) used by `invokeLambda`.
+// (platform/app/src/server/s3/stagePayload.ts) used by `invokeLambda`.
 //
 // Why this exists
 // ---------------

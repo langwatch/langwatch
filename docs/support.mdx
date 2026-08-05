@@ -59,7 +59,7 @@ It works with no login and no API key, and comes in two shapes:
      --summary "langwatch scenario create returned HTTP 500 with ..."
    ```
 
-**Privacy**: everything is redacted locally before upload. API keys and tokens, private-key blocks, passwords inside connection URLs, values of secret-named environment variables, email addresses, phone numbers, credit card numbers, and public IP addresses are all replaced with typed markers. The redaction rules are [open source and auditable](https://github.com/langwatch/langwatch/blob/main/langwatch/packages/redaction/src/sessionReport.ts), and `--dry-run` previews exactly what would be sent without sending it.
+**Privacy**: everything is redacted locally before upload. API keys and tokens, private-key blocks, passwords inside connection URLs, values of secret-named environment variables, email addresses, phone numbers, credit card numbers, and public IP addresses are all replaced with typed markers. The redaction rules are [open source and auditable](https://github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts), and `--dry-run` previews exactly what would be sent without sending it.
 
 **Consent**: agents must ask the user for permission before sending, then pass `--user-approved`.
 

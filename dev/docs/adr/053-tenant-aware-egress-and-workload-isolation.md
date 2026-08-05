@@ -485,7 +485,7 @@ special-case outbound path appears.
 - Application: add a dedicated egress domain package beside services/aigateway
   dispatcher code; migrate services/aigateway/adapters/providers/bifrost.go to
   the client interface; reuse, but do not duplicate, the resolution semantics
-  in langwatch/src/utils/ssrfProtection.ts.
+  in platform/app/src/utils/ssrfProtection.ts.
 - Infrastructure: introduce a dedicated egress namespace, service account,
   workload security group, KMS key, queue identities, dashboards, alerts, and
   VPC flow logs. Keep these resources outside the general worker identity.

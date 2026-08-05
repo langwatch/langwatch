@@ -46,7 +46,7 @@ class LangWatchEvaluator(Evaluator):
 
 The Python SDK's `langwatch.evaluations.evaluate(evaluator, ...)` POSTs to the
 **LangWatch evaluator endpoint** (which is in this same repo at
-`langwatch/src/app/api/evaluators/[[...route]]/app.ts`). For `evaluator =
+`platform/app/src/app/api/evaluators/[[...route]]/app.ts`). For `evaluator =
 "ragas/answer_correctness"`, the wire path is something like
 `POST /api/evaluators/ragas/answer_correctness/evaluate`.
 
@@ -73,7 +73,7 @@ the unsupported-kind rejection is at execution time, not parse time).
   - `POST {LANGWATCH_BASE_URL}/api/evaluators/{evaluator_slug}/evaluate`
   - Body: `{ data: kwargs, settings: nodeSettings, name: nodeName }`
   - Auth: project apiKey passed in `X-Auth-Token` header (existing pattern, see
-    `langwatch/src/server/api/middleware/auth.ts`)
+    `platform/app/src/server/api/middleware/auth.ts`)
 - `result.go` — parse response into a result struct exposing
   `Status / Score / Passed / Details / Label / Cost / Duration`.
 
@@ -108,7 +108,7 @@ These errors propagate through the SSE stream so the Studio UI surfaces them.
 ### Step 5 — E2E tests
 
 Per rchaves, **mandatory**:
-1. New TS integration test in `langwatch/src/server/workflows/__tests__/`:
+1. New TS integration test in `platform/app/src/server/workflows/__tests__/`:
    - Creates a project + workflow with `entry → signature → evaluator → end` shape.
    - Forces FF=on.
    - Calls `runWorkflow` (and the new SSE post_event path Sarah's adding).

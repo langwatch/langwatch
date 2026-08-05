@@ -20,9 +20,9 @@ Feature: Auto S3 staging for large nlpgo Lambda invoke payloads
     when the header is present, and the S3 bucket/credentials are already wired,
     but the sender never staged, so oversized bodies were inlined and rejected.
 
-    # Bindings: langwatch/src/utils/__tests__/lambdaFetch.unit.test.ts
-    # Sender: langwatch/src/utils/lambdaFetch.ts (ARN branch)
-    # Caller: langwatch/src/server/nlpgo/nlpgoFetch.ts (passes projectId)
+    # Bindings: platform/app/src/utils/__tests__/lambdaFetch.unit.test.ts
+    # Sender: platform/app/src/utils/lambdaFetch.ts (ARN branch)
+    # Caller: platform/app/src/server/nlpgo/nlpgoFetch.ts (passes projectId)
     # Receiver (already wired): services/nlpgo/adapters/httpapi/staged_payload.go
     #   (readStudioRequestBody), called by executeSyncHandler in handlers.go
 

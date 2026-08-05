@@ -1,0 +1,126 @@
+.PHONY: test test-tracing test-notebooks install install-adk-examples example
+
+test-unit:
+	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration and not e2e" -k "not test_example and not test_prompt_service_tracing and not test_prompt_tracing and not test_context and not test_tracing" $(filter-out $@,$(MAKECMDGOALS))
+
+test-e2e:
+	PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "e2e"
+
+# Run tracing tests in isolation to avoid global OpenTelemetry state conflicts
+test-tracing:
+	@echo "Running prompt service tracing tests..."
+	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/prompts/test_prompt_service_tracing.py
+	@echo "Running prompt tracing tests..."
+	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/prompts/test_prompt_tracing.py
+	@echo "Running telemetry context tests..."
+	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/telemetry/test_context.py
+	@echo "Running telemetry tracing tests..."
+	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/telemetry/test_tracing.py
+
+test: install
+	$(MAKE) test-unit
+	$(MAKE) test-tracing
+	$(MAKE) test-e2e
+
+# Test bot/chatbot examples (excludes CLI examples)
+# Call it with `make test-examples -- -k examples/openai_bot.py` to run a specific example
+test-examples:
+	PYTHONPATH=$$PYTHONPATH:. uv run pytest tests/test_examples.py -p no:warnings -s -x $(filter-out $@,$(MAKECMDGOALS))
+
+# Test CLI examples separately (they don't need mock messages)
+cli-examples:
+	@echo "Running CLI examples..."
+	@for file in examples/cli/*.py; do \
+		if [ -f "$$file" ]; then \
+			echo "Running $$file..."; \
+			PYTHONPATH=$$PYTHONPATH:. uv run python "$$file" || exit 1; \
+		fi; \
+	done
+	@echo "All CLI examples completed successfully."
+
+install:
+	@if ! command -v uv &> /dev/null; then \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	fi
+	uv sync --all-groups --all-extras
+
+# ADK needs pydantic>=2.11 (clashes with the chainlit pin in `examples`) and
+# a newer opentelemetry-semantic-conventions that carries GEN_AI_INPUT_MESSAGES.
+# Install on top of a normal sync via `uv pip install` (bypasses the lockfile
+# resolver) — accepts that pydantic + otel upgrade and may break other
+# examples in this same env. Typical usage: a dedicated virtualenv for the
+# async-ADK notebook.
+install-adk-examples: install
+	uv pip install -U \
+		'google-adk>=1.20.0,<2.0.0' \
+		'openinference-instrumentation-google-adk>=0.1.4,<0.2.0'
+
+build:
+	uv pip install build
+	uv run python -m build
+
+example:
+	@args="$(filter-out $@,$(MAKECMDGOALS))"; \
+	if [[ $$args =~ \.ipynb$$ ]]; then \
+		PYTHONPATH=$$PYTHONPATH:. uv run jupyter nbconvert \
+			--to notebook --execute --inplace \
+			--ExecutePreprocessor.timeout=600 \
+			"$$args"; \
+	elif [[ $$args =~ "fastapi" ]]; then \
+		uv run python $$args; \
+	elif [[ $$args =~ "streamlit" ]]; then \
+		uv run streamlit run $$args; \
+	elif [[ $$args =~ "fetch_policies" ]]; then \
+		PYTHONPATH=$$PYTHONPATH:. uv run python $$args; \
+	else \
+		uv run chainlit run -w --port 9000 $$args; \
+	fi
+
+# Execute every example notebook end-to-end. Requires LANGWATCH_API_KEY
+# (and any notebook-specific keys like GOOGLE_API_KEY) to be set in the
+# environment. Notebooks are executed in-place so their outputs update.
+test-notebooks:
+	@for notebook in examples/*.ipynb; do \
+		echo "Executing $$notebook..."; \
+		PYTHONPATH=$$PYTHONPATH:. uv run jupyter nbconvert \
+			--to notebook --execute --inplace \
+			--ExecutePreprocessor.timeout=600 \
+			"$$notebook" || exit 1; \
+	done
+	@echo "All notebooks executed successfully."
+
+batch-evaluation-example:
+	uv run python $(filter-out $@,$(MAKECMDGOALS))
+
+# Pinned to the upstream version that openapi-templates/ was forked from.
+# When bumping, re-diff openapi-templates/*.jinja against the new upstream
+# and drop the override if upstream PR #1407 has landed.
+OPENAPI_PYTHON_CLIENT_VERSION := 0.28.4
+
+ensure-openapi-python-client:
+	@uv pip install --quiet "openapi-python-client==$(OPENAPI_PYTHON_CLIENT_VERSION)"
+
+generate/api-client: ensure-openapi-python-client
+	@echo "Generating OpenAPI spec..."
+	@cd ../../platform/app && pnpm run task generateOpenAPISpec
+	@echo "Deleting old API client..."
+	@rm -rf src/langwatch/generated/langwatch_rest_api_client
+	@echo "Building API client..."
+	@mkdir -p .tmp/api-client
+	@python3 scripts/spec-for-python-generator.py \
+		../../platform/app/src/app/api/openapiLangWatch.json \
+		.tmp/openapiLangWatch.python.json
+	uv run openapi-python-client generate \
+		--path .tmp/openapiLangWatch.python.json \
+		--output-path .tmp/api-client \
+		--custom-template-path openapi-templates \
+		--overwrite
+	@echo "Copying necessary files to SDK..."
+	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
+	@cp -r .tmp/api-client/lang_watch_api_client/ src/langwatch/generated/langwatch_rest_api_client/
+	@echo "Cleaning up..."
+	@rm -rf .tmp/api-client .tmp/openapiLangWatch.python.json
+	@echo "Done! API client has been integrated into the SDK."
+
+%:
+	@:

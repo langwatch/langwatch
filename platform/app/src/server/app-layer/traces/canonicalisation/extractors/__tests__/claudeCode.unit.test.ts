@@ -1,0 +1,562 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  buildInputMessagesFromRequestBody,
+  ClaudeCodeExtractor,
+  extractAssistantOutputFromResponseBody,
+  extractAssistantTextFromResponseBody,
+  isConversationalQuerySource,
+} from "../claudeCode";
+import {
+  createExtractorContext,
+  createLogExtractorContext,
+} from "./_testHelpers";
+
+const SCOPE = "com.anthropic.claude_code.events";
+
+describe("ClaudeCodeExtractor.applyLog", () => {
+  // The model-call events (api_request / api_request_body / api_response_body)
+  // are folded downstream from the log path itself, not lifted onto canonical
+  // attributes here. The only claude_code event this extractor lifts is
+  // user_prompt.
+
+  it("lifts the user-typed prompt onto langwatch.input from a user_prompt event", () => {
+    // claude-code 2.x only emits the `prompt` attribute when
+    // OTEL_LOG_USER_PROMPTS=1 is in the env. The langwatch wrapper
+    // sets that by default for claude, so this is the standard path.
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "user_prompt",
+      prompt: "Reply EXACTLY this token and nothing else: PONG-X",
+      "session.id": "sess_user_prompt",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({
+      "langwatch.input": "Reply EXACTLY this token and nothing else: PONG-X",
+      "langwatch.thread.id": "sess_user_prompt",
+    });
+    expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/user_prompt");
+  });
+
+  it("does NOT overwrite a thread.id already set by an earlier event", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "user_prompt",
+      prompt: "hi",
+      "session.id": "sess_new",
+    });
+    ctx.out["langwatch.thread.id"] = "sess_earlier";
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out["langwatch.thread.id"]).toBe("sess_earlier");
+    expect(ctx.out["langwatch.input"]).toBe("hi");
+  });
+
+  it("returns no-op for a non-claude_code scope", () => {
+    const ctx = createLogExtractorContext("com.openai.codex.events", {
+      "event.name": "user_prompt",
+      prompt: "ignored",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({});
+    expect(ctx.recordRule).not.toHaveBeenCalled();
+  });
+
+  it("does NOT lift the model-call events on the log path", () => {
+    // api_request is folded downstream; this extractor must NOT re-lift
+    // cost/tokens onto the fold (that would double-count). It ignores it.
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "api_request",
+      model: "claude-opus-4-7",
+      cost_usd: "0.0875",
+      input_tokens: "120",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({});
+    expect(ctx.recordRule).not.toHaveBeenCalled();
+  });
+
+  it("returns no-op for an unknown event in claude_code scope", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "tool_decision",
+      tool_name: "Bash",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({});
+    expect(ctx.recordRule).not.toHaveBeenCalled();
+  });
+});
+
+describe("ClaudeCodeExtractor.apply (span side)", () => {
+  it("lifts the CLI's bare-named token + model attrs onto canonical gen_ai.usage.* on the native llm_request span", () => {
+    const ctx = createExtractorContext(
+      {
+        model: "claude-opus-4-7",
+        input_tokens: 120,
+        output_tokens: 45,
+        cache_read_tokens: 900,
+        cache_creation_tokens: 30,
+      },
+      { name: "claude_code.llm_request" },
+    );
+
+    new ClaudeCodeExtractor().apply(ctx);
+
+    expect(ctx.out).toEqual({
+      "gen_ai.request.model": "claude-opus-4-7",
+      "gen_ai.usage.input_tokens": 120,
+      "gen_ai.usage.output_tokens": 45,
+      "gen_ai.usage.cache_read.input_tokens": 900,
+      "gen_ai.usage.cache_creation.input_tokens": 30,
+    });
+    expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/llm_request");
+  });
+
+  it("does nothing for a span that isn't claude_code.llm_request", () => {
+    // Gateway-proxied traffic (and every other claude_code span, like the
+    // tool span) must not be touched here — this method exists ONLY for the
+    // CLI's own native model-call span.
+    const ctx = createExtractorContext(
+      { model: "claude-opus-4-7", input_tokens: 120 },
+      { name: "claude_code.tool" },
+    );
+
+    new ClaudeCodeExtractor().apply(ctx);
+
+    expect(ctx.out).toEqual({});
+    expect(ctx.recordRule).not.toHaveBeenCalled();
+  });
+
+  it("never overwrites a canonical attribute a gateway-proxied gen_ai.* span already set", () => {
+    // setAttrIfAbsent semantics: if GenAIExtractor (or an earlier rule) already
+    // claimed the canonical key, this extractor must not clobber it.
+    const ctx = createExtractorContext(
+      { input_tokens: 999 },
+      { name: "claude_code.llm_request" },
+    );
+    ctx.out["gen_ai.usage.input_tokens"] = 10;
+
+    new ClaudeCodeExtractor().apply(ctx);
+
+    expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(10);
+  });
+
+  it("does not fire for a zero-valued token count", () => {
+    const ctx = createExtractorContext(
+      { input_tokens: 0, output_tokens: 0 },
+      { name: "claude_code.llm_request" },
+    );
+
+    new ClaudeCodeExtractor().apply(ctx);
+
+    expect(ctx.out).toEqual({});
+    expect(ctx.recordRule).not.toHaveBeenCalled();
+  });
+});
+
+describe("isConversationalQuerySource", () => {
+  it("treats repl_main_thread + an absent source as conversational", () => {
+    expect(isConversationalQuerySource("repl_main_thread")).toBe(true);
+    expect(isConversationalQuerySource(null)).toBe(true);
+  });
+
+  it("treats utility sources as non-conversational", () => {
+    expect(isConversationalQuerySource("generate_session_title")).toBe(false);
+    expect(isConversationalQuerySource("prompt_suggestion")).toBe(false);
+  });
+});
+
+describe("extractAssistantTextFromResponseBody (exported helper)", () => {
+  it("lifts concatenated assistant text from content[]", () => {
+    const body = JSON.stringify({
+      model: "claude-opus-4-7",
+      content: [
+        {
+          type: "text",
+          text: "0 files (directory exists but is empty).\n\nUNLOCK-KNOBS-TEST-PROOF-7777",
+        },
+      ],
+    });
+    expect(extractAssistantTextFromResponseBody(body)).toBe(
+      "0 files (directory exists but is empty).\n\nUNLOCK-KNOBS-TEST-PROOF-7777",
+    );
+  });
+
+  it("ignores tool_use + thinking blocks, only lifts text blocks", () => {
+    const body = JSON.stringify({
+      content: [
+        { type: "thinking", thinking: "<REDACTED>", signature: "Ev4DCmM..." },
+        { type: "text", text: "Let me run that." },
+        {
+          type: "tool_use",
+          id: "toolu_1",
+          name: "Bash",
+          input: { command: "ls" },
+        },
+      ],
+    });
+    expect(extractAssistantTextFromResponseBody(body)).toBe("Let me run that.");
+  });
+
+  it("joins multiple text blocks with a blank line", () => {
+    const body = JSON.stringify({
+      content: [
+        { type: "text", text: "First paragraph." },
+        { type: "text", text: "Second paragraph." },
+      ],
+    });
+    expect(extractAssistantTextFromResponseBody(body)).toBe(
+      "First paragraph.\n\nSecond paragraph.",
+    );
+  });
+
+  it("returns null for non-string / empty / malformed / non-array content", () => {
+    expect(extractAssistantTextFromResponseBody(undefined)).toBeNull();
+    expect(extractAssistantTextFromResponseBody(null)).toBeNull();
+    expect(extractAssistantTextFromResponseBody(42)).toBeNull();
+    expect(extractAssistantTextFromResponseBody("")).toBeNull();
+    expect(extractAssistantTextFromResponseBody("{not valid json")).toBeNull();
+    expect(extractAssistantTextFromResponseBody(JSON.stringify({}))).toBeNull();
+    expect(
+      extractAssistantTextFromResponseBody(
+        JSON.stringify({ content: "string-not-array" }),
+      ),
+    ).toBeNull();
+    expect(
+      extractAssistantTextFromResponseBody(
+        JSON.stringify({
+          content: [{ type: "tool_use", id: "t", name: "Bash", input: {} }],
+        }),
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("buildInputMessagesFromRequestBody (exported helper)", () => {
+  it("parses system + every turn into a role/content conversation", () => {
+    const body = JSON.stringify({
+      model: "claude-opus-4-8",
+      system: "You are a coding assistant.",
+      messages: [
+        { role: "user", content: "Hi" },
+        { role: "assistant", content: [{ type: "text", text: "Hello" }] },
+      ],
+    });
+    expect(buildInputMessagesFromRequestBody(body)).toEqual([
+      { role: "system", content: "You are a coding assistant." },
+      { role: "user", content: "Hi" },
+      { role: "assistant", content: "Hello" },
+    ]);
+  });
+
+  it("flattens text + tool_result + tool_use blocks; drops thinking/images", () => {
+    const body = JSON.stringify({
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "look at this" },
+            {
+              type: "tool_result",
+              content: [{ type: "text", text: "result" }],
+            },
+            { type: "tool_use", name: "Read", input: { path: "x" } },
+            { type: "thinking", thinking: "<redacted>" },
+            { type: "image", source: {} },
+          ],
+        },
+      ],
+    });
+    expect(buildInputMessagesFromRequestBody(body)).toEqual([
+      { role: "user", content: "look at this\n\nresult\n\n[tool_use: Read]" },
+    ]);
+  });
+
+  it("flattens a system array of content blocks", () => {
+    const body = JSON.stringify({
+      system: [
+        { type: "text", text: "line one" },
+        { type: "text", text: "line two" },
+      ],
+      messages: [{ role: "user", content: "go" }],
+    });
+    expect(buildInputMessagesFromRequestBody(body)).toEqual([
+      { role: "system", content: "line one\n\nline two" },
+      { role: "user", content: "go" },
+    ]);
+  });
+
+  it("returns null for truncated / malformed / message-less bodies", () => {
+    expect(buildInputMessagesFromRequestBody(undefined)).toBeNull();
+    expect(buildInputMessagesFromRequestBody("")).toBeNull();
+    // claude truncates large request bodies inline -> invalid JSON tail.
+    expect(
+      buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
+    ).toBeNull();
+    expect(buildInputMessagesFromRequestBody(JSON.stringify({}))).toBeNull();
+    // messages present but every turn flattens to empty -> null.
+    expect(
+      buildInputMessagesFromRequestBody(
+        JSON.stringify({ messages: [{ role: "user", content: [] }] }),
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("extractAssistantOutputFromResponseBody", () => {
+  it("renders a tool_use reply as the output so a tool-deciding call is not empty", () => {
+    const body = JSON.stringify({
+      content: [
+        { type: "text", text: "Let me check." },
+        {
+          type: "tool_use",
+          id: "toolu_1",
+          name: "Bash",
+          input: { command: "ls /tmp" },
+        },
+      ],
+    });
+    const out = extractAssistantOutputFromResponseBody(body) ?? "";
+    expect(out).toContain("Let me check.");
+    expect(out).toContain("[tool_use: Bash]");
+    expect(out).toContain("ls /tmp");
+  });
+
+  it("matches the text-only extractor for a plain text reply", () => {
+    const body = JSON.stringify({
+      content: [{ type: "text", text: "PONG-Z" }],
+    });
+    expect(extractAssistantOutputFromResponseBody(body)).toBe("PONG-Z");
+    expect(extractAssistantTextFromResponseBody(body)).toBe("PONG-Z");
+  });
+
+  it("returns null for an empty or unparseable body", () => {
+    expect(extractAssistantOutputFromResponseBody("")).toBeNull();
+    expect(extractAssistantOutputFromResponseBody("{not json")).toBeNull();
+    expect(extractAssistantOutputFromResponseBody(null)).toBeNull();
+  });
+});
+
+describe("ClaudeCodeExtractor.applyLog api_request reasoning effort", () => {
+  /** @scenario "Claude Code reasoning effort is lifted from the model call log event" */
+  it("lifts the effort setting onto the canonical reasoning-effort key for a conversational turn", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "api_request",
+      query_source: "repl_main_thread",
+      effort: "high",
+      model: "claude-opus-5",
+      cost_usd: "0.02",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({ "gen_ai.request.reasoning_effort": "high" });
+    expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/api_request");
+  });
+
+  it("lifts effort for sdk-driven turns (claude -p sessions)", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "api_request",
+      query_source: "sdk",
+      effort: "low",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("low");
+  });
+
+  it("does NOT lift effort from a utility call, whose setting is not the session's", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "api_request",
+      query_source: "generate_session_title",
+      effort: "low",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({});
+    expect(ctx.recordRule).not.toHaveBeenCalled();
+  });
+
+  it("stays a no-op when the api_request carries no effort attribute", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "api_request",
+      query_source: "repl_main_thread",
+      cost_usd: "0.01",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({});
+  });
+});
+
+describe("ClaudeCodeExtractor.applyLog api_response_body cache TTL split", () => {
+  /** @scenario "Claude Code cache TTL split is lifted from the response body log event" */
+  it("lifts the per-TTL cache creation counts from the response body usage", () => {
+    const body = JSON.stringify({
+      content: [{ type: "text", text: "ok" }],
+      usage: {
+        input_tokens: 2,
+        cache_creation_input_tokens: 36610,
+        cache_creation: {
+          ephemeral_5m_input_tokens: 1200,
+          ephemeral_1h_input_tokens: 35410,
+        },
+      },
+    });
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "api_response_body",
+      body,
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({
+      "gen_ai.usage.cache_creation_5m.input_tokens": 1200,
+      "gen_ai.usage.cache_creation_1h.input_tokens": 35410,
+    });
+  });
+
+  it("lifts only the non-zero side of the split", () => {
+    const body = JSON.stringify({
+      usage: {
+        cache_creation: {
+          ephemeral_5m_input_tokens: 0,
+          ephemeral_1h_input_tokens: 36610,
+        },
+      },
+    });
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "api_response_body",
+      body,
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({
+      "gen_ai.usage.cache_creation_1h.input_tokens": 36610,
+    });
+  });
+
+  it("stays a no-op when the usage has no TTL split or the body is unparseable", () => {
+    for (const body of [
+      JSON.stringify({ usage: { cache_creation_input_tokens: 100 } }),
+      "{not json",
+      "",
+    ]) {
+      const ctx = createLogExtractorContext(SCOPE, {
+        "event.name": "api_response_body",
+        body,
+      });
+      new ClaudeCodeExtractor().applyLog(ctx);
+      expect(ctx.out).toEqual({});
+    }
+  });
+});
+
+describe("isConversationalQuerySource sdk turns", () => {
+  it("treats sdk-driven turns as conversational so -p sessions keep their reply", () => {
+    expect(isConversationalQuerySource("sdk")).toBe(true);
+    expect(isConversationalQuerySource("repl_main_thread")).toBe(true);
+    expect(isConversationalQuerySource(null)).toBe(true);
+    expect(isConversationalQuerySource("generate_session_title")).toBe(false);
+    expect(isConversationalQuerySource("prompt_suggestion")).toBe(false);
+  });
+});
+
+describe("buildInputMessagesFromRequestBody tool definitions", () => {
+  /** @scenario "Tool definitions are surfaced from the request body" */
+  it("surfaces the tools array as a compact system-side message", () => {
+    const body = JSON.stringify({
+      system: "You are a coding assistant.",
+      tools: [
+        { name: "Bash", description: "Run shell commands.\nLong details." },
+        { name: "mcp__grafana__query_loki", description: "Query Loki logs." },
+      ],
+      messages: [{ role: "user", content: "go" }],
+    });
+    const out = buildInputMessagesFromRequestBody(body)!;
+    expect(out[0]).toEqual({
+      role: "system",
+      content: "You are a coding assistant.",
+    });
+    expect(out[1]!.role).toBe("system");
+    expect(out[1]!.content).toContain("[tools available: 2]");
+    expect(out[1]!.content).toContain("Bash: Run shell commands.");
+    expect(out[1]!.content).toContain("mcp__grafana__query_loki");
+    expect(out[1]!.content).not.toContain("Long details");
+    expect(out[2]).toEqual({ role: "user", content: "go" });
+  });
+});
+
+describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
+  /** @scenario "A truncated request body still yields its leading messages" */
+  it("recovers every complete leading message when the cut lands mid-history", () => {
+    const intact = JSON.stringify({
+      model: "claude-opus-5",
+      messages: [
+        { role: "user", content: "first turn" },
+        { role: "assistant", content: "first reply" },
+        { role: "user", content: "second turn with a long tail" },
+      ],
+    });
+    // Cut inside the THIRD message's content string, the way claude cuts.
+    const cut =
+      intact.slice(0, intact.indexOf("long tail")) +
+      "long ta\n\n[TRUNCATED - Content exceeds 60KB limit]";
+    const out = buildInputMessagesFromRequestBody(cut)!;
+    expect(out[0]).toEqual({ role: "user", content: "first turn" });
+    expect(out[1]).toEqual({ role: "assistant", content: "first reply" });
+    const note = out[out.length - 1]!;
+    expect(note.role).toBe("system");
+    expect(note.content).toContain("truncated");
+  });
+
+  /** @scenario "A truncated request body still yields the system prompt when the cut lands inside it" */
+  it("recovers the partial system prompt when the cut lands inside it", () => {
+    const raw =
+      '{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}],' +
+      '"system":[{"type":"text","text":"You are Claude Code, working in the acme repo. Follow CLAU';
+    const out = buildInputMessagesFromRequestBody(raw)!;
+    const system = out.find(
+      (m) => m.role === "system" && m.content.includes("You are Claude Code"),
+    )!;
+    expect(system.content).toContain("working in the acme repo");
+    expect(system.content).toContain("[system prompt truncated");
+    expect(out.some((m) => m.content === "hi")).toBe(true);
+  });
+
+  it("recovers a partial STRING system value cut mid-escape", () => {
+    const raw =
+      '{"messages":[{"role":"user","content":"q"}],"system":"Line one\\nLine two\\';
+    const out = buildInputMessagesFromRequestBody(raw)!;
+    const system = out.find((m) => m.role === "system")!;
+    expect(system.content).toContain("Line one\nLine two");
+    expect(system.content).toContain("[system prompt truncated");
+  });
+
+  it("recovers complete tool definitions before the cut", () => {
+    const raw =
+      '{"messages":[{"role":"user","content":"q"}],' +
+      '"tools":[{"name":"Bash","description":"Run commands"},{"name":"Cut","descrip';
+    const out = buildInputMessagesFromRequestBody(raw)!;
+    const tools = out.find((m) => m.content.includes("[tools available"))!;
+    expect(tools.content).toContain("Bash: Run commands");
+    expect(tools.content).not.toContain("Cut");
+  });
+
+  it("still returns null when nothing complete precedes the cut", () => {
+    expect(
+      buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
+    ).toBeNull();
+  });
+});
