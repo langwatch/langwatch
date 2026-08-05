@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -14,22 +20,29 @@ import "@testing-library/jest-dom/vitest";
 // fns must exist before the hoisted mock factories run.
 const {
   mockMutate,
-  mockOpenDrawer,
   mockToastCreate,
   mockPendingInvalidate,
   mockAssignedInvalidate,
   mockQueueCountsInvalidate,
 } = vi.hoisted(() => ({
   mockMutate: vi.fn(),
-  mockOpenDrawer: vi.fn(),
   mockToastCreate: vi.fn(),
   mockPendingInvalidate: vi.fn(),
   mockAssignedInvalidate: vi.fn(),
   mockQueueCountsInvalidate: vi.fn(),
 }));
 
-vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({ openDrawer: mockOpenDrawer, drawerOpen: () => false }),
+// The real drawer drags in the whole queue-management form; the seam under
+// test is that it mounts inline (never via the drawer registry) and hands
+// control back on close.
+vi.mock("~/components/AddAnnotationQueueDrawer", () => ({
+  AddAnnotationQueueDrawer: ({ onClose }: { onClose?: () => void }) => (
+    <div data-testid="inline-queue-drawer">
+      <button type="button" onClick={onClose}>
+        close queue drawer
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -194,7 +207,7 @@ describe("AddToAnnotationQueueDialog", () => {
   });
 
   describe("when the user chooses to add a new queue", () => {
-    it("opens the new-queue drawer without closing the dialog", async () => {
+    it("mounts the new-queue drawer inline without closing the dialog", async () => {
       const user = userEvent.setup();
       renderDialog();
 
@@ -203,11 +216,123 @@ describe("AddToAnnotationQueueDialog", () => {
         await screen.findByRole("button", { name: /Add New Queue/ }),
       );
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith(
-        "addAnnotationQueue",
-        undefined,
+      expect(screen.getByTestId("inline-queue-drawer")).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("keeps the picks made before the sub-flow", async () => {
+      const user = userEvent.setup();
+      renderDialog();
+
+      // The picker stays open after a pick, so Add New Queue is in reach.
+      await pickParticipant(/Dana Scully/);
+      await user.click(
+        await screen.findByRole("button", { name: /Add New Queue/ }),
+      );
+      await user.click(
+        screen.getByRole("button", { name: "close queue drawer" }),
+      );
+
+      expect(
+        screen.queryByTestId("inline-queue-drawer"),
+      ).not.toBeInTheDocument();
+      // The dialog remounts with the earlier pick intact.
+      expect(
+        (await screen.findAllByText("Dana Scully")).length,
+      ).toBeGreaterThan(0);
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the send fails", () => {
+    it("says so and keeps the dialog open for a retry", async () => {
+      const user = userEvent.setup();
+      mockMutate.mockImplementation(
+        (
+          _input: unknown,
+          opts: { onError: (error: { message: string }) => void },
+        ) => opts.onError({ message: "boom" }),
+      );
+      renderDialog(["t1"]);
+
+      await pickParticipant(/Dana Scully/);
+      await user.click(screen.getByRole("button", { name: "Send" }));
+
+      await waitFor(() =>
+        expect(mockToastCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: "Failed to add to annotation queue",
+            type: "error",
+          }),
+        ),
       );
       expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when several traces are sent", () => {
+    it("confirms with a plural headline", async () => {
+      const user = userEvent.setup();
+      mockMutate.mockImplementation(
+        (_input: unknown, opts: { onSuccess: () => void }) => opts.onSuccess(),
+      );
+      renderDialog(["t1", "t2", "t3"]);
+
+      await pickParticipant(/Dana Scully/);
+      await user.click(screen.getByRole("button", { name: "Send" }));
+
+      await waitFor(() =>
+        expect(mockToastCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: "3 traces added to annotation queue",
+            type: "success",
+          }),
+        ),
+      );
+    });
+  });
+
+  describe("when the dialog is closed without sending", () => {
+    it("forgets the picks", async () => {
+      const user = userEvent.setup();
+      const view = renderDialog(["t1"]);
+
+      await pickParticipant(/Dana Scully/);
+      // Two "Close" buttons exist (dialog trigger + the pick chip's remove);
+      // the dialog's carries the dialog data-scope.
+      const dialogClose = document.querySelector(
+        '[data-scope="dialog"][data-part="close-trigger"]',
+      );
+      await user.click(dialogClose as HTMLElement);
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+
+      view.rerender(
+        <ChakraProvider value={defaultSystem}>
+          <AddToAnnotationQueueDialog
+            open={false}
+            onClose={onClose}
+            traceIds={["t1"]}
+          />
+        </ChakraProvider>,
+      );
+      view.rerender(
+        <ChakraProvider value={defaultSystem}>
+          <AddToAnnotationQueueDialog
+            open={true}
+            onClose={onClose}
+            traceIds={["t1"]}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(
+        await screen.findByRole("button", { name: "Send" }),
+      ).toBeDisabled();
+      // The hidden native <option> mirror always lists every candidate; the
+      // pick chip would live inside the combobox trigger.
+      expect(
+        within(screen.getByRole("combobox")).queryByText("Dana Scully"),
+      ).not.toBeInTheDocument();
     });
   });
 });

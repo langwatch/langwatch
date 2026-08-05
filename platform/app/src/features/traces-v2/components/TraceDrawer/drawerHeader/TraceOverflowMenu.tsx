@@ -4,17 +4,14 @@ import { useCallback } from "react";
 import {
   LuBraces,
   LuCopy,
-  LuDatabase,
   LuExternalLink,
   LuKeyboard,
   LuLock,
   LuLockOpen,
   LuMessagesSquare,
-  LuPenLine,
   LuPin,
   LuPinOff,
   LuScanSearch,
-  LuShare2,
 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -32,23 +29,15 @@ interface TraceOverflowMenuProps {
   dejaViewHref: string | null;
   onOpenRawJson: () => void;
   onShowShortcuts: () => void;
-  /** Opens the share dialog. Rendered by the header so the menu returns no JSX. */
-  onShare: () => void;
-  /**
-   * Opens the annotation-queue dialog, also rendered by the header. Null when
-   * the user cannot manage annotations, which hides the item.
-   */
-  onAddToAnnotationQueue: (() => void) | null;
   /** Current dock state. When true the drawer stays open on outside clicks. */
   pinned: boolean;
   onTogglePinned: () => void;
 }
 
 /**
- * Single overflow menu that absorbs every secondary drawer action so the
- * top-right action cluster stays at four buttons (Refresh / Maximize /
- * More / Close). High-frequency shortcuts (R, M, Esc) keep their dedicated
- * buttons; the rest hide here behind one click.
+ * Overflow menu for the drawer's low-frequency actions. Share, annotate and
+ * add-to-dataset live as dedicated icon buttons in the header cluster
+ * (TraceHeaderActions); everything else hides here behind one click.
  */
 export function TraceOverflowMenu({
   traceId,
@@ -58,14 +47,11 @@ export function TraceOverflowMenu({
   dejaViewHref,
   onOpenRawJson,
   onShowShortcuts,
-  onShare,
-  onAddToAnnotationQueue,
   pinned,
   onTogglePinned,
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
-  const { project, hasPermission } = useOrganizationTeamProject();
-  const canShare = hasPermission("traces:share");
+  const { project } = useOrganizationTeamProject();
 
   const utils = api.useUtils();
   const pinQuery = api.pinnedTrace.getPin.useQuery(
@@ -116,10 +102,6 @@ export function TraceOverflowMenu({
     conversationTurns.data?.items.map((t) => t.traceId) ?? [];
   const hasConversation = !!conversationId && conversationTraceIds.length > 1;
 
-  const handleAddTrace = useCallback(() => {
-    openDrawer("addDatasetRecord", { traceId });
-  }, [openDrawer, traceId]);
-
   const handleAddConversation = useCallback(() => {
     openDrawer("addDatasetRecord", { selectedTraceIds: conversationTraceIds });
   }, [openDrawer, conversationTraceIds]);
@@ -154,15 +136,6 @@ export function TraceOverflowMenu({
           </Menu.Item>
         )}
 
-        <Menu.Separator />
-
-        <Menu.Item value="add-trace" onClick={handleAddTrace}>
-          <HStack gap={2}>
-            <Icon as={LuDatabase} boxSize={3.5} />
-            <Text>Add trace to dataset</Text>
-          </HStack>
-        </Menu.Item>
-
         {hasConversation && (
           <Menu.Item value="add-conversation" onClick={handleAddConversation}>
             <HStack gap={2}>
@@ -172,18 +145,6 @@ export function TraceOverflowMenu({
             <Menu.ItemCommand>
               {conversationTraceIds.length} turns
             </Menu.ItemCommand>
-          </Menu.Item>
-        )}
-
-        {onAddToAnnotationQueue && (
-          <Menu.Item
-            value="add-annotation-queue"
-            onClick={onAddToAnnotationQueue}
-          >
-            <HStack gap={2}>
-              <Icon as={LuPenLine} boxSize={3.5} />
-              <Text>Add to annotation queue</Text>
-            </HStack>
           </Menu.Item>
         )}
 
@@ -202,15 +163,6 @@ export function TraceOverflowMenu({
             <HStack gap={2}>
               <Icon as={LuExternalLink} boxSize={3.5} />
               <Text>Open in DejaView</Text>
-            </HStack>
-          </Menu.Item>
-        )}
-
-        {canShare && (
-          <Menu.Item value="share" onClick={onShare}>
-            <HStack gap={2}>
-              <Icon as={LuShare2} boxSize={3.5} />
-              <Text>Share</Text>
             </HStack>
           </Menu.Item>
         )}

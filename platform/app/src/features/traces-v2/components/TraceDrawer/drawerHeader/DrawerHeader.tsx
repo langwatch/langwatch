@@ -71,6 +71,7 @@ import {
 } from "./PinStrip";
 import { ShareTraceDialog } from "./ShareTraceDialog";
 import { SyntheticTraceBadge } from "./SyntheticTraceBadge";
+import { TraceHeaderActions } from "./TraceHeaderActions";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
 import { useRetainedTraceHeader } from "./useRetainedTraceHeader";
 import {
@@ -1007,6 +1008,18 @@ export const DrawerHeader = memo(function DrawerHeader({
             queries. */}
         {!readOnly && (
           <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
+            <TraceHeaderActions
+              traceId={trace.traceId}
+              onShare={() => setShareOpen(true)}
+              onOpenQueueDialog={() => setQueueDialogOpen(true)}
+            />
+            <Box
+              width="1px"
+              height="16px"
+              bg="border.muted"
+              marginX={0.5}
+              flexShrink={0}
+            />
             <Tooltip
               content={
                 <HStack gap={1}>
@@ -1069,10 +1082,6 @@ export const DrawerHeader = memo(function DrawerHeader({
               dejaViewHref={dejaView.href ?? null}
               onOpenRawJson={() => setRawOpen(true)}
               onShowShortcuts={() => setShortcutsOpen(true)}
-              onShare={() => setShareOpen(true)}
-              onAddToAnnotationQueue={
-                canQueueForAnnotation ? () => setQueueDialogOpen(true) : null
-              }
               pinned={pinned}
               onTogglePinned={togglePinned}
             />

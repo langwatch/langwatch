@@ -76,9 +76,16 @@ export const AddAnnotationQueueDrawer = ({
 
   const { closeDrawer } = useDrawer();
 
+  // Inline hosts (onOverlayClick set) own this drawer's lifecycle; touching
+  // the registry from them would strip the host's own `drawer.*` URL params.
   const closeAll = () => {
-    closeDrawer();
-    onClose?.();
+    if (onOverlayClick) {
+      onClose?.();
+      onOverlayClick();
+    } else {
+      closeDrawer();
+      onClose?.();
+    }
   };
 
   const users =
@@ -171,6 +178,7 @@ export const AddAnnotationQueueDrawer = ({
         onSuccess: (data) => {
           void queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
           void queryClient.annotation.getQueueBySlugOrId.invalidate();
+          void queryClient.annotation.getQueues.invalidate();
           toaster.create({
             title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
             description: `Successfully ${queueId ? "updated" : "created"} ${

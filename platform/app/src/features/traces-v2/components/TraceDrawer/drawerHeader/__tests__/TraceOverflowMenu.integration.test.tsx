@@ -2,11 +2,12 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 /**
- * The drawer's single-trace route into an annotation queue.
+ * The overflow menu keeps only low-frequency actions. Share, annotate and
+ * add-trace-to-dataset are icon buttons in the header (TraceHeaderActions).
  * Spec: specs/traces-v2/annotation-queue-actions.feature
  */
 
@@ -38,9 +39,7 @@ vi.mock("~/utils/api", () => ({
 
 import { TraceOverflowMenu } from "../TraceOverflowMenu";
 
-const onAddToAnnotationQueue = vi.fn();
-
-const renderMenu = (queueCallback: (() => void) | null) =>
+const renderMenu = () =>
   render(
     <ChakraProvider value={defaultSystem}>
       <TraceOverflowMenu
@@ -51,8 +50,6 @@ const renderMenu = (queueCallback: (() => void) | null) =>
         dejaViewHref={null}
         onOpenRawJson={vi.fn()}
         onShowShortcuts={vi.fn()}
-        onShare={vi.fn()}
-        onAddToAnnotationQueue={queueCallback}
         pinned={false}
         onTogglePinned={vi.fn()}
       />
@@ -65,47 +62,40 @@ const openMenu = async () => {
   return user;
 };
 
-beforeEach(() => {
-  onAddToAnnotationQueue.mockClear();
-});
 afterEach(cleanup);
 
-describe("TraceOverflowMenu annotation queue item", () => {
-  describe("given the user can manage annotations", () => {
-    describe("when the menu is opened", () => {
-      it("lists the action alongside the add-to-dataset item", async () => {
-        renderMenu(onAddToAnnotationQueue);
-        await openMenu();
-
-        expect(
-          await screen.findByText("Add to annotation queue"),
-        ).toBeInTheDocument();
-        expect(screen.getByText("Add trace to dataset")).toBeInTheDocument();
-      });
-    });
-
-    describe("when the action is picked", () => {
-      it("hands off to the header, which owns the dialog", async () => {
-        renderMenu(onAddToAnnotationQueue);
-        const user = await openMenu();
-
-        await user.click(await screen.findByText("Add to annotation queue"));
-
-        expect(onAddToAnnotationQueue).toHaveBeenCalledTimes(1);
-      });
-    });
-  });
-
-  describe("given the user cannot manage annotations", () => {
-    it("does not list the action", async () => {
-      renderMenu(null);
+describe("TraceOverflowMenu", () => {
+  describe("when the menu is opened", () => {
+    it("keeps its low-frequency actions", async () => {
+      renderMenu();
       await openMenu();
 
-      expect(
-        await screen.findByText("Add trace to dataset"),
-      ).toBeInTheDocument();
+      expect(await screen.findByText("Copy trace ID")).toBeInTheDocument();
+      expect(screen.getByText("View raw JSON")).toBeInTheDocument();
+      expect(screen.getByText("Pin trace")).toBeInTheDocument();
+    });
+
+    it("no longer lists the actions promoted to header buttons", async () => {
+      renderMenu();
+      await openMenu();
+
+      await screen.findByText("Copy trace ID");
       expect(
         screen.queryByText("Add to annotation queue"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Add trace to dataset"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Share")).not.toBeInTheDocument();
+    });
+
+    it("keeps the conversation-to-dataset item out without a conversation", async () => {
+      renderMenu();
+      await openMenu();
+
+      await screen.findByText("Copy trace ID");
+      expect(
+        screen.queryByText("Add conversation to dataset"),
       ).not.toBeInTheDocument();
     });
   });

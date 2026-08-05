@@ -2,12 +2,16 @@
 # Brings the v1 "add to annotation queue" action to the new Trace Explorer.
 #
 # Two entry points, one dialog. The selection bar sends every checked trace at
-# once; the trace drawer's overflow menu sends the one trace it is showing.
-# Both mount the same AddToAnnotationQueueDialog, which embeds the existing
-# AddParticipants picker (teammates and queues, plus "Add New Queue") and calls
-# the same `annotation.createQueueItem` mutation the old table called. Nothing
-# is added server-side — the mutation, its permission check and the queue model
-# are all unchanged.
+# once; the trace drawer's header sends the one trace it is showing (annotate
+# sits with share and add-to-dataset as icon buttons, promoted out of the
+# overflow menu so they are findable at a glance). Both mount the same
+# AddToAnnotationQueueDialog, which embeds the existing AddParticipants picker
+# (teammates and queues, plus "Add New Queue") and calls the same
+# `annotation.createQueueItem` mutation the old table called. Nothing is added
+# server-side — the mutation, its permission check and the queue model are all
+# unchanged. The "Add New Queue" sub-flow renders its drawer inline, never via
+# the drawer registry: the registry is one-drawer-at-a-time through the URL,
+# so routing through it from inside the trace drawer would close the trace.
 
 Feature: Add traces to an annotation queue
 
@@ -68,18 +72,24 @@ Feature: Add traces to an annotation queue
 
   Rule: Adding the open trace to a queue
 
-    Scenario: The action lives in the drawer's overflow menu
+    Scenario: The action is an icon button in the drawer header
       Given the user has a trace open in the drawer
-      When the user opens the overflow menu
-      Then "Add to annotation queue" appears with the add-to-dataset actions
+      Then share, add to annotation queue and add to dataset are icon buttons
+      And they sit ahead of the overflow menu, which no longer lists them
 
     Scenario: Sending the open trace to a queue
       Given the user has a trace open in the drawer
-      When the user picks "Add to annotation queue" from the overflow menu
+      When the user picks the annotation-queue button in the header
       And picks a teammate or a queue
       And confirms the send
       Then that one trace is queued
       And a confirmation appears with a way to open the queues
+
+    Scenario: A failed send says so
+      Given the user has confirmed a send
+      When the request fails
+      Then an error notice appears
+      And the dialog stays open so the user can retry
 
   # ─── Permissions ────────────────────────────────────────────────────────
 
@@ -91,11 +101,10 @@ Feature: Add traces to an annotation queue
       Then the selection bar does not offer "Add to annotation queue"
       And the other bulk actions still render
 
-    Scenario: The overflow menu hides the action
+    Scenario: The drawer header hides the action
       Given the user cannot manage annotations
       And the user has a trace open in the drawer
-      When the user opens the overflow menu
-      Then "Add to annotation queue" is not listed
+      Then the annotation-queue button is not shown
 
   # ─── Personal workspaces ────────────────────────────────────────────────
 
@@ -107,6 +116,12 @@ Feature: Add traces to an annotation queue
       When the user picks "Add to annotation queue"
       Then the user is asked to enable the advanced features first
       And accepting takes them straight on to the queue dialog
+
+    Scenario: The drawer path gates the same way
+      Given the user is on their own personal workspace with annotations off
+      And the user has a trace open in the drawer
+      When the user picks the annotation-queue button in the header
+      Then the user is asked to enable the advanced features first
 
     Scenario: Declining leaves the selection untouched
       Given the user has been asked to enable the advanced features
