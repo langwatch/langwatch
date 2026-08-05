@@ -26204,7 +26204,8 @@
                     "default": 1
                   },
                   "evaluatorId": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "level": {
                     "type": "string",
@@ -26813,7 +26814,8 @@
                     "type": [
                       "string",
                       "null"
-                    ]
+                    ],
+                    "minLength": 1
                   },
                   "level": {
                     "type": "string",
@@ -29306,6 +29308,60 @@
                           "type": "string"
                         }
                       },
+                      "redTeamStrategy": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "redTeamTarget": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "redTeamTotalTurns": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "redTeamConfig": {
+                        "type": [
+                          "object",
+                          "null"
+                        ],
+                        "properties": {
+                          "scoreResponses": {
+                            "type": "boolean"
+                          },
+                          "detectRefusals": {
+                            "type": "boolean"
+                          },
+                          "attackPlan": {
+                            "type": "string",
+                            "maxLength": 10000
+                          },
+                          "metapromptTemplate": {
+                            "type": "string",
+                            "maxLength": 10000
+                          },
+                          "successScore": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 10
+                          },
+                          "successConfirmTurns": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "injectionProbability": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        }
+                      },
                       "platformUrl": {
                         "type": "string",
                         "format": "uri"
@@ -29317,6 +29373,10 @@
                       "situation",
                       "criteria",
                       "labels",
+                      "redTeamStrategy",
+                      "redTeamTarget",
+                      "redTeamTotalTurns",
+                      "redTeamConfig",
                       "platformUrl"
                     ]
                   }
@@ -29443,6 +29503,60 @@
                         "type": "string"
                       }
                     },
+                    "redTeamStrategy": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "redTeamTarget": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "redTeamTotalTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "redTeamConfig": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "scoreResponses": {
+                          "type": "boolean"
+                        },
+                        "detectRefusals": {
+                          "type": "boolean"
+                        },
+                        "attackPlan": {
+                          "type": "string",
+                          "maxLength": 10000
+                        },
+                        "metapromptTemplate": {
+                          "type": "string",
+                          "maxLength": 10000
+                        },
+                        "successScore": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 10
+                        },
+                        "successConfirmTurns": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "injectionProbability": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      }
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -29454,6 +29568,10 @@
                     "situation",
                     "criteria",
                     "labels",
+                    "redTeamStrategy",
+                    "redTeamTarget",
+                    "redTeamTotalTurns",
+                    "redTeamConfig",
                     "platformUrl"
                   ]
                 }
@@ -29574,6 +29692,69 @@
                       "type": "string"
                     },
                     "default": []
+                  },
+                  "redTeamStrategy": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "goat",
+                      "crescendo",
+                      null
+                    ]
+                  },
+                  "redTeamTarget": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "redTeamTotalTurns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 50
+                  },
+                  "redTeamConfig": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "scoreResponses": {
+                        "type": "boolean"
+                      },
+                      "detectRefusals": {
+                        "type": "boolean"
+                      },
+                      "attackPlan": {
+                        "type": "string",
+                        "maxLength": 10000
+                      },
+                      "metapromptTemplate": {
+                        "type": "string",
+                        "maxLength": 10000
+                      },
+                      "successScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 10
+                      },
+                      "successConfirmTurns": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "injectionProbability": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    }
                   }
                 },
                 "required": [
@@ -29617,6 +29798,60 @@
                         "type": "string"
                       }
                     },
+                    "redTeamStrategy": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "redTeamTarget": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "redTeamTotalTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "redTeamConfig": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "scoreResponses": {
+                          "type": "boolean"
+                        },
+                        "detectRefusals": {
+                          "type": "boolean"
+                        },
+                        "attackPlan": {
+                          "type": "string",
+                          "maxLength": 10000
+                        },
+                        "metapromptTemplate": {
+                          "type": "string",
+                          "maxLength": 10000
+                        },
+                        "successScore": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 10
+                        },
+                        "successConfirmTurns": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "injectionProbability": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      }
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -29628,6 +29863,10 @@
                     "situation",
                     "criteria",
                     "labels",
+                    "redTeamStrategy",
+                    "redTeamTarget",
+                    "redTeamTotalTurns",
+                    "redTeamConfig",
                     "platformUrl"
                   ]
                 }
@@ -29783,6 +30022,60 @@
                         "type": "string"
                       }
                     },
+                    "redTeamStrategy": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "redTeamTarget": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "redTeamTotalTurns": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "redTeamConfig": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "scoreResponses": {
+                          "type": "boolean"
+                        },
+                        "detectRefusals": {
+                          "type": "boolean"
+                        },
+                        "attackPlan": {
+                          "type": "string",
+                          "maxLength": 10000
+                        },
+                        "metapromptTemplate": {
+                          "type": "string",
+                          "maxLength": 10000
+                        },
+                        "successScore": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 10
+                        },
+                        "successConfirmTurns": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "injectionProbability": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      }
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -29794,6 +30087,10 @@
                     "situation",
                     "criteria",
                     "labels",
+                    "redTeamStrategy",
+                    "redTeamTarget",
+                    "redTeamTotalTurns",
+                    "redTeamConfig",
                     "platformUrl"
                   ]
                 }
@@ -29941,6 +30238,69 @@
                     "type": "array",
                     "items": {
                       "type": "string"
+                    }
+                  },
+                  "redTeamStrategy": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "goat",
+                      "crescendo",
+                      null
+                    ]
+                  },
+                  "redTeamTarget": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "redTeamTotalTurns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 50
+                  },
+                  "redTeamConfig": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "scoreResponses": {
+                        "type": "boolean"
+                      },
+                      "detectRefusals": {
+                        "type": "boolean"
+                      },
+                      "attackPlan": {
+                        "type": "string",
+                        "maxLength": 10000
+                      },
+                      "metapromptTemplate": {
+                        "type": "string",
+                        "maxLength": 10000
+                      },
+                      "successScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 10
+                      },
+                      "successConfirmTurns": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "injectionProbability": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
                     }
                   }
                 }

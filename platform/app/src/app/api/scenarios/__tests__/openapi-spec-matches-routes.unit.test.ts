@@ -6,13 +6,12 @@
  * TypeScript consumer can send a field the API accepts but cannot discover it,
  * or worse, is told a field exists that no longer does.
  *
- * Nothing in CI regenerates it, and the full `generateOpenAPISpec` task is
- * currently broken for an unrelated reason (the prompts app's circular
- * schema), so drift is silent. This is the cheap guard: the spec's scenario
- * request bodies must carry every field the write contract defines.
+ * Nothing in CI regenerates it, so drift is silent. This is the cheap guard:
+ * the spec's scenario request bodies must carry every field the write contract
+ * defines.
  *
- * It is not a substitute for regenerating — it is the alarm that says you
- * need to. Run `pnpm run task generateScenariosOpenAPISpec` when it fires.
+ * It is not a substitute for regenerating, it is the alarm that says you need
+ * to. Run `pnpm task generateOpenAPISpec` when it fires.
  */
 import { describe, expect, it } from "vitest";
 import { redTeamFields } from "~/server/scenarios/red-team-input";
