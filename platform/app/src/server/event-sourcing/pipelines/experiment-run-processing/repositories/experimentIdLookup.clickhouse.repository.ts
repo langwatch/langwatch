@@ -44,7 +44,13 @@ export class ExperimentIdLookupClickHouseRepository
 
 /** No-op lookup for deployments without ClickHouse. */
 export class NullExperimentIdLookupRepository implements ExperimentIdLookup {
-  async findExperimentId(): Promise<string | null> {
+  // Parameters declared though unused: a caller holding this type still passes
+  // them, and a zero-arity signature makes that a type error even though it
+  // satisfies the interface.
+  async findExperimentId(
+    _tenantId: string,
+    _runId: string,
+  ): Promise<string | null> {
     return null;
   }
 }

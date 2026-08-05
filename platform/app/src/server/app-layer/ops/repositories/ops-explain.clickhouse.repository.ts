@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
 import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
 import { getOpsClickHouseClient } from "~/server/ops/explain-core";
 
@@ -45,7 +45,7 @@ export class OpsExplainClickHouseRepository {
   }: {
     client: ClickHouseClient;
     wrappedQuery: string;
-    guardrails?: Record<string, unknown>;
+    guardrails?: ClickHouseSettings;
   }): Promise<unknown[]> {
     const result = await client.query({
       query: wrappedQuery,

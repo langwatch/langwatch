@@ -1403,7 +1403,7 @@ export function initializeDefaultApp(options?: {
       resolveClient: resolveClickHouseClient,
     },
     billing: {
-      events: new BillableEventsClickHouseRepository(
+      events: new BillableEventsMeterClickHouseRepository(
         getClickHouseClientForOrganization,
       ),
     },
@@ -1668,7 +1668,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       },
     },
     billing: {
-      events: new BillableEventsClickHouseRepository(async () => null),
+      events: new BillableEventsMeterClickHouseRepository(async () => null),
     },
     scenarios: {
       orphanReconciliation: { client: null, finder: null },
