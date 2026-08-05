@@ -118,17 +118,9 @@ function mayResolveByLocation(path: string): boolean {
  */
 const RESOLVES_DIRECTLY_BACKLOG = new Set([
   "ee/governance/services/activity-monitor/activityMonitor.service.ts",
-  "src/app/api/gateway-spend/[[...route]]/app.ts",
-  "src/app/api/webhooks/[[...route]]/app.ts",
-  "src/server/api/routers/gatewaySpendEvents.ts",
-  "src/server/api/routers/user.ts",
   "src/server/app-layer/automations/graph-trigger-heartbeat.ts",
   "src/server/app-layer/topic-clustering/clustering.ts",
   "src/server/experiments-v3/services/experiment-run.service.ts",
-  "src/server/routes/gateway-internal.ts",
-  "src/server/routes/ingest/ingestionRoutes.ts",
-  "src/server/routes/ops.ts",
-  "src/server/stored-objects/stored-objects-cross-tenant-lookup.ts",
   "src/server/traces/clickhouse-trace.service.ts",
 ]);
 
@@ -163,10 +155,18 @@ interface ScannedFile {
   resolvesViaApp: boolean;
 }
 
-function scan(): ScannedFile[] {
+interface ScanResult {
+  files: ScannedFile[];
+  /** Every file the walk read, matched or not. The broken-walk canary. */
+  walked: number;
+}
+
+function scan(): ScanResult {
   const files: ScannedFile[] = [];
+  let walked = 0;
   for (const root of ROOTS) {
     for (const absolute of walk(join(PACKAGE_ROOT, root))) {
+      walked += 1;
       const source = readFileSync(absolute, "utf8");
       const constructs =
         DRIVER_MODULE.test(source) && CONSTRUCTS_CLIENT.test(source);
@@ -182,14 +182,17 @@ function scan(): ScannedFile[] {
       });
     }
   }
-  return files;
+  return { files, walked };
 }
 
 describe("the ClickHouse client access boundary", () => {
-  const scanned = scan();
+  const { files: scanned, walked } = scan();
 
-  it("finds server code to check, so a broken walk cannot pass silently", () => {
-    expect(scanned.length).toBeGreaterThan(20);
+  // Counts the files READ, not the files matched. The matched count is the
+  // backlog, and the backlog is meant to reach zero - asserting on it would
+  // turn finishing this work into a failing test.
+  it("reads the server tree, so a broken walk cannot pass silently", () => {
+    expect(walked).toBeGreaterThan(1000);
   });
 
   describe("when a file builds a ClickHouse client", () => {

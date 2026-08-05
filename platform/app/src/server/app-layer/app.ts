@@ -37,6 +37,8 @@ export class App {
   readonly governance: AppDependencies["governance"];
   readonly billableEvents: AppDependencies["billableEvents"];
   readonly commands: AppCommands;
+  readonly storedObjects: AppDependencies["storedObjects"];
+  readonly opsExplain: AppDependencies["opsExplain"];
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
@@ -112,6 +114,8 @@ export class App {
     this.governance = deps.governance;
     this.billableEvents = deps.billableEvents;
     this.commands = deps.commands;
+    this.storedObjects = deps.storedObjects;
+    this.opsExplain = deps.opsExplain;
     this.langy = deps.langy;
     this.ops = deps.ops;
     this.retentionPolicyCache = deps.retentionPolicyCache;
