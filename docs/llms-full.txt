@@ -36745,7 +36745,7 @@ For measuring the quality of your RAG, check for hallucinations with faithfulnes
 
 | Evaluator | Description |
 | --------- | ----------- |
-| [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness-1) | This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations. |
+| [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness) | This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations. |
 | [Context F1](/api-reference/evaluators/context-f1) | Balances between precision and recall for context retrieval, increasing it means a better signal-to-noise ratio. Uses traditional string distance metrics. |
 | [Context Precision](/api-reference/evaluators/context-precision) | Measures how accurate is the retrieval compared to expected contexts, increasing it means less noise in the retrieval. Uses traditional string distance metrics. |
 | [Context Recall](/api-reference/evaluators/context-recall) | Measures how many relevant contexts were retrieved compared to expected contexts, increasing it means more signal in the retrieval. Uses traditional string distance metrics. |
@@ -59891,7 +59891,7 @@ For measuring the quality of your RAG, check for hallucinations with faithfulnes
 
 | Evaluator | Description |
 | --------- | ----------- |
-| [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness-1) | This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations. |
+| [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness) | This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations. |
 | [Context F1](/api-reference/evaluators/context-f1) | Balances between precision and recall for context retrieval, increasing it means a better signal-to-noise ratio. Uses traditional string distance metrics. |
 | [Context Precision](/api-reference/evaluators/context-precision) | Measures how accurate is the retrieval compared to expected contexts, increasing it means less noise in the retrieval. Uses traditional string distance metrics. |
 | [Context Recall](/api-reference/evaluators/context-recall) | Measures how many relevant contexts were retrieved compared to expected contexts, increasing it means more signal in the retrieval. Uses traditional string distance metrics. |
@@ -60055,7 +60055,7 @@ openapi: post /langevals/query_resolution/evaluate
 ---
 ---
 
-# FILE: ./api-reference/evaluators/ragas-faithfulness-1.mdx
+# FILE: ./api-reference/evaluators/ragas-faithfulness.mdx
 
 ---
 openapi: post /ragas/faithfulness/evaluate
