@@ -78,6 +78,83 @@ export class RoleBindingService {
     }
   }
 
+  /**
+   * The display name of every scope these bindings name, and which of those
+   * scopes are somebody's personal workspace.
+   *
+   * A personal workspace is not access an administrator granted or can take
+   * away: it is provisioned with the member, holds only them, and every write
+   * against it is refused (see `assertNoPersonalTeamScope`). So the two lists
+   * an administrator manages access from leave it out, rather than putting a
+   * row on the members page for every member of the organization with a control
+   * behind it that cannot succeed. What a member may do inside their own
+   * workspace follows from their organization role, which those pages already
+   * show. `getMyAccessBreakdown` is a member reading their own access rather
+   * than a management surface, so it keeps listing it.
+   *
+   * Scope lookups stay filtered by organization as defense in depth against a
+   * stray binding whose scopeId points outside it (historical data, failed
+   * migrations), even though the bindings are already filtered by it.
+   */
+  private async resolveScopes(
+    bindings: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>,
+    organizationId: string,
+  ): Promise<{
+    scopeNames: Map<string, string>;
+    personalScopeIds: Set<string>;
+  }> {
+    const idsOfType = (scopeType: RoleBindingScopeType) =>
+      bindings.filter((b) => b.scopeType === scopeType).map((b) => b.scopeId);
+
+    const orgIds = idsOfType(RoleBindingScopeType.ORGANIZATION);
+    const teamIds = idsOfType(RoleBindingScopeType.TEAM);
+    const projectIds = idsOfType(RoleBindingScopeType.PROJECT);
+
+    const [orgs, teams, projects] = await Promise.all([
+      orgIds.length > 0
+        ? this.prisma.organization.findMany({
+            where: { id: { in: orgIds } },
+            select: { id: true, name: true },
+          })
+        : [],
+      teamIds.length > 0
+        ? this.prisma.team.findMany({
+            where: { id: { in: teamIds }, organizationId },
+            select: { id: true, name: true, isPersonal: true },
+          })
+        : [],
+      projectIds.length > 0
+        ? this.prisma.project.findMany({
+            where: { id: { in: projectIds }, team: { organizationId } },
+            select: {
+              id: true,
+              name: true,
+              isPersonal: true,
+              team: { select: { isPersonal: true } },
+            },
+          })
+        : [],
+    ]);
+
+    const scopeNames = new Map<string, string>();
+    for (const o of orgs) scopeNames.set(o.id, o.name);
+    for (const t of teams) scopeNames.set(t.id, t.name);
+    for (const p of projects) scopeNames.set(p.id, p.name);
+
+    // Either flag is enough to hide a project. The two are meant to agree, and
+    // a reader that insisted on both would offer a half-migrated row as
+    // manageable access, which is the one answer that is wrong either way.
+    const personalScopeIds = new Set<string>();
+    for (const t of teams) {
+      if (t.isPersonal) personalScopeIds.add(t.id);
+    }
+    for (const p of projects) {
+      if (p.isPersonal || p.team.isPersonal) personalScopeIds.add(p.id);
+    }
+
+    return { scopeNames, personalScopeIds };
+  }
+
   async listForUser({
     organizationId,
     userId,
@@ -93,53 +170,24 @@ export class RoleBindingService {
       orderBy: { createdAt: "asc" },
     });
 
-    const orgIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
-      .map((b) => b.scopeId);
-    const teamIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
-      .map((b) => b.scopeId);
-    const projectIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
-      .map((b) => b.scopeId);
+    const { scopeNames, personalScopeIds } = await this.resolveScopes(
+      bindings,
+      organizationId,
+    );
 
-    const [orgs, teams, projects] = await Promise.all([
-      orgIds.length > 0
-        ? this.prisma.organization.findMany({
-            where: { id: { in: orgIds } },
-            select: { id: true, name: true },
-          })
-        : [],
-      teamIds.length > 0
-        ? this.prisma.team.findMany({
-            where: { id: { in: teamIds }, organizationId },
-            select: { id: true, name: true },
-          })
-        : [],
-      projectIds.length > 0
-        ? this.prisma.project.findMany({
-            where: { id: { in: projectIds }, team: { organizationId } },
-            select: { id: true, name: true },
-          })
-        : [],
-    ]);
-
-    const scopeNames = new Map<string, string>();
-    for (const o of orgs) scopeNames.set(o.id, o.name);
-    for (const t of teams) scopeNames.set(t.id, t.name);
-    for (const p of projects) scopeNames.set(p.id, p.name);
-
-    return bindings.map((b) => ({
-      id: b.id,
-      userId: b.userId,
-      role: b.role,
-      customRoleId: b.customRoleId,
-      customRoleName: b.customRole?.name ?? null,
-      scopeType: b.scopeType,
-      scopeId: b.scopeId,
-      scopeName: scopeNames.get(b.scopeId) ?? null,
-      createdAt: b.createdAt,
-    }));
+    return bindings
+      .filter((b) => !personalScopeIds.has(b.scopeId))
+      .map((b) => ({
+        id: b.id,
+        userId: b.userId,
+        role: b.role,
+        customRoleId: b.customRoleId,
+        customRoleName: b.customRole?.name ?? null,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+        scopeName: scopeNames.get(b.scopeId) ?? null,
+        createdAt: b.createdAt,
+      }));
   }
 
   async listForOrg({ organizationId }: { organizationId: string }) {
@@ -163,46 +211,13 @@ export class RoleBindingService {
       orderBy: { createdAt: "asc" },
     });
 
-    const orgIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
-      .map((b) => b.scopeId);
-    const teamIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
-      .map((b) => b.scopeId);
-    const projectIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
-      .map((b) => b.scopeId);
+    const { scopeNames, personalScopeIds } = await this.resolveScopes(
+      bindings,
+      organizationId,
+    );
+    const manageable = bindings.filter((b) => !personalScopeIds.has(b.scopeId));
 
-    // Keep scope-name lookups symmetric with listForUser and defense-in-depth
-    // against any stray binding whose scopeId points outside the org (historical
-    // data, failed migrations). Bindings are already filtered by organizationId.
-    const [orgs, teams, projects] = await Promise.all([
-      orgIds.length > 0
-        ? this.prisma.organization.findMany({
-            where: { id: { in: orgIds } },
-            select: { id: true, name: true },
-          })
-        : [],
-      teamIds.length > 0
-        ? this.prisma.team.findMany({
-            where: { id: { in: teamIds }, organizationId },
-            select: { id: true, name: true },
-          })
-        : [],
-      projectIds.length > 0
-        ? this.prisma.project.findMany({
-            where: { id: { in: projectIds }, team: { organizationId } },
-            select: { id: true, name: true },
-          })
-        : [],
-    ]);
-
-    const scopeNames = new Map<string, string>();
-    for (const o of orgs) scopeNames.set(o.id, o.name);
-    for (const t of teams) scopeNames.set(t.id, t.name);
-    for (const p of projects) scopeNames.set(p.id, p.name);
-
-    const groupIds = bindings
+    const groupIds = manageable
       .filter((b) => b.groupId != null)
       .map((b) => b.groupId!);
     const groupMemberships =
@@ -222,7 +237,7 @@ export class RoleBindingService {
       membersByGroup.get(m.groupId)!.push(m.userId);
     }
 
-    return bindings.map((b) => ({
+    return manageable.map((b) => ({
       id: b.id,
       userId: b.userId,
       userName: b.user?.name ?? null,

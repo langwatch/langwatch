@@ -12,6 +12,7 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {
@@ -490,6 +491,23 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
+  /**
+   * Removes a membership, and the personal workspace that came with it.
+   *
+   * `PERSONAL_TEAM_ARCHIVE_REFUSAL` is the sentence an admin gets when they try
+   * to archive a personal workspace directly, and it tells them these
+   * workspaces "disappear with the member's access to the organization". That
+   * was not true: the membership and its role bindings went, and the personal
+   * team and project stayed behind owned by somebody who is no longer a member,
+   * still holding their one slot per (organization, owner). So the refusal
+   * pointed at a cleanup that never happened, and an admin asking how to get
+   * rid of one had no answer at all.
+   *
+   * Archived, not deleted, for the same reason every other project is: the work
+   * is still the work. `PersonalWorkspaceService.ensure()` reactivates this
+   * exact pair if the person is invited back, which is what keeps archiving here
+   * from bricking that slot.
+   */
   async deleteMember(input: DeleteMemberInput): Promise<void> {
     const { organizationId, userId } = input;
 
@@ -504,6 +522,28 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
       await tx.roleBinding.deleteMany({
         where: { organizationId, userId },
+      });
+
+      const archivedAt = new Date();
+      const personalTeams = await tx.team.findMany({
+        where: {
+          organizationId,
+          ownerUserId: userId,
+          isPersonal: true,
+          archivedAt: null,
+        },
+        select: { id: true },
+      });
+      if (personalTeams.length === 0) return;
+
+      const personalTeamIds = personalTeams.map((team) => team.id);
+      await tx.project.updateMany({
+        where: { teamId: { in: personalTeamIds }, archivedAt: null },
+        data: { archivedAt },
+      });
+      await tx.team.updateMany({
+        where: { id: { in: personalTeamIds } },
+        data: { archivedAt },
       });
     });
   }
@@ -634,11 +674,15 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
       }
 
-      const organizationTeams = await tx.team.findMany({
-        where: { organizationId },
-        select: { id: true },
+      // Shared teams only, matching what the router resolved before it computed
+      // the effective updates. The personal workspace each member gets to
+      // themselves has one admin, its owner, so a downgrade that reached it
+      // would trip the last-admin guard below and roll this transaction back,
+      // taking the organization role change with it.
+      const organizationTeamIds = await findSharedTeamIds({
+        client: tx,
+        organizationId,
       });
-      const organizationTeamIds = organizationTeams.map((team) => team.id);
 
       const currentMemberships = await tx.roleBinding.findMany({
         where: {

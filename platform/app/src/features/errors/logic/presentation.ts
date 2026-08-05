@@ -61,6 +61,16 @@ const str = (
 };
 
 /**
+ * The two plan allowances an admin meets while reconciling seats, in words that
+ * read inside a sentence. Not taken from the license-enforcement labels, which
+ * are column headings ("Team Members") and land badly mid-sentence.
+ */
+const SEAT_LIMIT_LABELS: Record<string, string> = {
+  members: "full member seats",
+  membersLite: "Lite Member seats",
+};
+
+/**
  * Whether any code in the error's reason chain (depth-first, nested included)
  * is one of `codes`.
  *
@@ -554,6 +564,20 @@ const presentations = {
     title: "Your account doesn't include this",
     describe: () => "Ask an admin on your team to upgrade your access.",
   },
+  personal_workspace_not_managed_here: {
+    // Whoever reads this was managing somebody's access, so the answer has to
+    // say why there is nothing to manage here rather than restate the rule. An
+    // admin changing a seat needs to know the seat is elsewhere and that they
+    // do not have to touch this to change it.
+    title: "That workspace belongs to one person",
+    describe: (error) => {
+      const ownerName = str(error, "ownerName", "");
+      const workspace = ownerName
+        ? `"${ownerName}" is that member's own workspace`
+        : "A personal workspace belongs to one member";
+      return `${workspace}, so its access isn't managed from here. Their organization role already decides what they can do in it. To work together, use a shared team.`;
+    },
+  },
   already_organization_member: {
     // An invite form takes several addresses at once, so the address has to be
     // in the sentence — "one of these is already a member" is not an answer.
@@ -596,7 +620,17 @@ const presentations = {
   },
   resource_limit_exceeded: {
     title: "You've hit a plan limit",
-    describe: () => "Upgrade your plan to raise it.",
+    // Names the allowance and where it stands, because "a plan limit" leaves
+    // the reader to guess which of several they just met. The seat allowances
+    // get the reversible alternative too: an admin who hits one is usually
+    // working down to their plan, and "upgrade" is the answer they came here to
+    // avoid. Most seat refusals arrive as the upgrade modal rather than a toast,
+    // and it says the same thing.
+    describe: (error) => {
+      const label = SEAT_LIMIT_LABELS[str(error, "limitType", "")];
+      if (!label) return "Upgrade your plan to raise it.";
+      return `Your plan's ${label} are all in use. Upgrade to raise the allowance, or disable a membership from the members page to free one, which is reversible.`;
+    },
   },
   // Browser-telemetry ingest (ADR-058). These answer the RUM endpoint rather
   // than a screen, so the reader is usually an engineer with the network tab

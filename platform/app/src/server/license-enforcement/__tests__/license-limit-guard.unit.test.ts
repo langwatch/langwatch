@@ -1,13 +1,12 @@
-import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EXPIRED_LICENSE_KEY } from "../../../../ee/licensing/__tests__/fixtures/testLicenses";
 import { floorAtOssBaseline } from "../../../../ee/licensing/ossBaselineFloor";
 import { mapToPlanInfo } from "../../../../ee/licensing/planMapping";
 import { parseLicenseKey } from "../../../../ee/licensing/validation";
+import { LimitExceededError } from "../errors";
 import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
 import {
   assertMemberTypeLimitNotExceeded,
-  LICENSE_LIMIT_ERRORS,
   type MemberTypeLimits,
 } from "../license-limit-guard";
 
@@ -165,10 +164,13 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         limits,
       ).catch((e) => e);
 
+      // The allowance travels as `meta` under a stable code, which is what lets
+      // the client name which seats ran out. Asserting the code rather than the
+      // sentence: the sentence is copy.
       expect(error).toMatchObject({
-        code: "FORBIDDEN",
-        message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
-        cause: {
+        code: "resource_limit_exceeded",
+        httpStatus: 403,
+        meta: {
           limitType: "members",
           current: 5,
           max: 5,
@@ -206,7 +208,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           mockRepo,
           limits,
         ),
-      ).rejects.toThrow(TRPCError);
+      ).rejects.toThrow(LimitExceededError);
     });
   });
 
@@ -253,9 +255,9 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       ).catch((e) => e);
 
       expect(error).toMatchObject({
-        code: "FORBIDDEN",
-        message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
-        cause: {
+        code: "resource_limit_exceeded",
+        httpStatus: 403,
+        meta: {
           limitType: "membersLite",
           current: 10,
           max: 10,
@@ -293,7 +295,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           mockRepo,
           limits,
         ),
-      ).rejects.toThrow(TRPCError);
+      ).rejects.toThrow(LimitExceededError);
     });
   });
 
@@ -317,8 +319,8 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           plan,
         ),
       ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
+        code: "resource_limit_exceeded",
+        meta: { limitType: "members" },
       });
     });
 
