@@ -85,6 +85,39 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And the customer reads copy written by LangWatch for that case
     And the provider's own sentence still appears nowhere
 
+  # Keeping the prose out of the customer's card put all of it on the operator
+  # log line, which makes what the log keeps load-bearing. It kept less than it
+  # looked: the probe read three known dialects and, failing those, discarded
+  # any body that started with a brace, so an unrecognised JSON shape left the
+  # line holding a byte count and nothing else. Five turns failed with no
+  # recoverable cause at all.
+  #
+  # Bindings: services/langyagent/adapters/otelrelay/llmproxy_test.go
+
+  @unit
+  Scenario: A failure in a shape nobody parsed still leaves the operator something to read
+    Given a relayed model call is rejected with an error body in no dialect the relay knows
+    When the relay records the failure for operators
+    Then the body itself is recorded, bounded, under a field that says nobody parsed it
+    And it is never confused with a provider message the relay did recognise
+
+  # A proxied call answered by a Cloudflare Access login page was 41 kilobytes
+  # of HTML. Bounding that to the usual couple of thousand characters records
+  # two thousand characters of stylesheet, so an interstitial contributes its
+  # title and nothing more: with the status, that is the whole diagnosis.
+  @unit
+  Scenario: A login page standing in for the API is recorded as a login page
+    Given a relayed model call is answered with an HTML page instead of an API response
+    When the relay records the failure for operators
+    Then the page's title and the status are recorded
+    And none of the page's markup is
+
+  @unit
+  Scenario: A provider message the relay knows is still recorded as one
+    Given a relayed model call is rejected in a dialect the relay knows
+    When the relay records the failure for operators
+    Then the provider's own sentence is recorded as the upstream message, as before
+
   # The flicker had a second cause independent of the worker-stopped loop: for the
   # kinds that DO auto-retry, the red card rendered for a single frame before the
   # retry timer armed. The card must not appear at all when an automatic retry is

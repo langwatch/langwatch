@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -194,12 +196,18 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 				// conversation, and a log line is read by operators rather than
 				// shipped to a customer — which is the whole distinction, since
 				// the same sentence may be quoting the API key we sent.
+				//
+				// Which field it lands in says how much the relay understood:
+				// upstream_message is a recognized dialect, raw_body_snippet is a
+				// shape nobody parsed, html_title is an interstitial standing in
+				// for the API. See describeUpstreamErrorBody.
+				contentType := resp.Header.Get("Content-Type")
 				clog.Get(r.baseCtx).Info("otelrelay llm error body not a typed envelope; captured best-effort",
 					zap.String("conversation", entry.info.ConversationID),
 					zap.Int("status", resp.StatusCode),
 					zap.Int("body_bytes", len(peeked)),
-					zap.String("content_type", resp.Header.Get("Content-Type")),
-					zap.String("upstream_message", extractUpstreamErrorMessage(peeked)))
+					zap.String("content_type", contentType),
+					describeUpstreamErrorBody(peeked, contentType))
 			}
 			if e.Meta == nil {
 				e.Meta = herr.M{}
@@ -408,21 +416,79 @@ func isGatewayEnvelope(body herr.ErrorBody) bool {
 	return body.Code != "" && body.Type == body.Code && body.Message != ""
 }
 
+// htmlTitlePattern picks the <title> out of an HTML document. Non-greedy and
+// case-insensitive across newlines, because the interstitials that land here
+// are machine-generated and pretty-printed.
+var htmlTitlePattern = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+
+// describeUpstreamErrorBody returns the one log field that says most about a
+// failed LLM response body, or zap.Skip() when the body says nothing at all.
+//
+// It replaces a probe that returned "" for every JSON shape it did not
+// recognize, which threw the body away and left the log line holding a byte
+// count. The shapes it missed are ordinary: {"errors":[{"detail":…}]}, a
+// nested error.error.message, a bare {"code":…}. Rather than chase dialects,
+// anything unrecognized now travels as the raw body under its own field name,
+// bounded by boundMessage — a distinct field because a snippet nobody has
+// parsed must not be read as the provider's own sentence.
+//
+// HTML is the exception, and it is the reason the bound alone is not enough.
+// A proxied LLM call answered by a Cloudflare Access login page comes back as
+// tens of kilobytes of interstitial; capping that at two thousand characters
+// yields two thousand characters of CSS. The <title> and the status are the
+// whole diagnosis ("Sign in - example.cloudflareaccess.com" plus a 403), so
+// that is all an HTML body contributes.
+func describeUpstreamErrorBody(body []byte, contentType string) zap.Field {
+	if isHTMLBody(body, contentType) {
+		if title := htmlTitle(body); title != "" {
+			return zap.String("html_title", title)
+		}
+		return zap.Skip()
+	}
+	if message := extractUpstreamErrorMessage(body); message != "" {
+		return zap.String("upstream_message", message)
+	}
+	if raw := strings.TrimSpace(string(body)); raw != "" {
+		return zap.String("raw_body_snippet", boundMessage(raw))
+	}
+	return zap.Skip()
+}
+
 // extractUpstreamErrorMessage pulls the human-readable message out of the known
 // provider error dialects: OpenAI/Anthropic `error.message`, the codex
-// backend's `detail`, a bare `message`. Falls back to the raw body when it is
-// short, printable text. Returns "" when nothing readable is found.
+// backend's `detail`, a bare `message`. Returns "" when none of them matched,
+// which is the caller's cue to fall back to the raw body rather than to drop
+// it.
 func extractUpstreamErrorMessage(body []byte) string {
 	for _, path := range []string{"error.message", "detail", "message"} {
 		if v := gjson.GetBytes(body, path); v.Type == gjson.String && v.Str != "" {
 			return boundMessage(v.Str)
 		}
 	}
-	trimmed := strings.TrimSpace(string(body))
-	if trimmed != "" && !strings.HasPrefix(trimmed, "{") && !strings.HasPrefix(trimmed, "[") {
-		return boundMessage(trimmed)
-	}
 	return ""
+}
+
+// isHTMLBody reports whether a body is an HTML document. The declared content
+// type is the primary signal; the leading markup is checked as well because an
+// edge that returns a login page in place of an API response is not reliably
+// careful about its headers.
+func isHTMLBody(body []byte, contentType string) bool {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "text/html") {
+		return true
+	}
+	leading := strings.ToLower(strings.TrimSpace(string(body)))
+	return strings.HasPrefix(leading, "<!doctype html") || strings.HasPrefix(leading, "<html")
+}
+
+// htmlTitle returns an HTML document's title, entity-decoded and collapsed
+// onto one line. Bounded like everything else here: a title is short by
+// convention, never by guarantee.
+func htmlTitle(body []byte) string {
+	match := htmlTitlePattern.FindSubmatch(body)
+	if match == nil {
+		return ""
+	}
+	return boundMessage(strings.Join(strings.Fields(html.UnescapeString(string(match[1]))), " "))
 }
 
 // boundMessage caps a provider message at maxUpstreamMessageBytes, backing off
