@@ -120,13 +120,16 @@ describe("userRouter.register()", () => {
     it("does not track signed_up", async () => {
       userFindUniqueMock.mockResolvedValue({ id: "user-1" });
 
+      // The refusal is the handled email_already_registered error (the signup
+      // screen keys its recovery flow off this code), surfaced through tRPC
+      // with the CONFLICT transport code its 409 maps to.
       await expect(
         createCaller().register({
           name: "Alice",
           email: "a@x.com",
           password: "supersecret",
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      ).rejects.toMatchObject({ code: "CONFLICT" });
 
       expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });
