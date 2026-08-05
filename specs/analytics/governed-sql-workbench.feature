@@ -37,6 +37,13 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     And the schema browser lists exactly the datasets the schema endpoint returned for them
     And nothing implies access to arbitrary ClickHouse databases or tables
 
+  @integration
+  Scenario: A member without the analytics permission cannot reach the workbench
+    Given a signed-in member whose role lacks the analytics permission
+    When they look for the Custom query surface
+    Then the navigation entry is not offered to them
+    And opening the route directly renders the permission-denied guard, not the workbench
+
   @unit
   Scenario: The workbench ships no polling, persistence, export, or agent surface
     Given the workbench feature's source
@@ -145,12 +152,52 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     Then the request carries the SQL unmodified and the parameters as named scalars
     And only the request shape is validated locally
 
+  @unit
+  Scenario: An aborted request never updates the result pane
+    Given a governed query in flight
+    When the member leaves the workbench or the request is cancelled
+    Then the request is aborted using the existing cancellation pattern
+    And a response arriving after the abort does not change the visible result
+
+  # ---------------------------------------------------------------------------
+  # Backend error paths — each coded failure has its own presentation
+  # ---------------------------------------------------------------------------
+
   @integration
-  Scenario: A backend query error is presented through the handled-error registry
-    Given the backend refuses the submitted SQL with a stable error code
+  Scenario: A statement the validator cannot parse renders registry copy at its location
+    Given the backend refuses the submitted SQL as unparseable with a line and column
     When the result pane renders the failure
-    Then the member reads the registry copy for that code, not a raw wire message
-    And repairable location details the public response provides are preserved
+    Then the member reads the registry copy for that code, not the raw wire message
+    And the editor marks the offending line and column
+    And a refusal that carries no location still renders the full registry copy
+
+  @integration
+  Scenario: A statement the policy refuses names what to change
+    Given the backend refuses the submitted SQL as not permitted, naming the violated rule
+    When the result pane renders the failure
+    Then the member reads registry copy identifying what the policy refused
+    And the named rule details the response provides are preserved
+
+  @integration
+  Scenario: A missing bound parameter is reported against the parameter editor
+    Given the submitted SQL declares a parameter the request left unset
+    When the backend refuses it naming the missing parameters
+    Then the failure is shown at the parameter editor listing the missing names
+    And it is not reduced to a detached generic toast
+
+  @integration
+  Scenario: An unprovisioned deployment renders the unavailable state on query
+    Given governed SQL is not provisioned so the query endpoint refuses as unavailable
+    When the member runs a query
+    Then the workbench renders the backend's unavailable presentation
+    And it does not retry automatically
+
+  @integration
+  Scenario: A query that outruns the database ceiling renders a distinct timeout state
+    Given the submitted query is cancelled by the database's execution-time ceiling
+    When the result pane renders the failure
+    Then the member reads a timeout presentation distinct from the generic error
+    And it suggests narrowing the query rather than blaming the platform
 
   # ---------------------------------------------------------------------------
   # Native result table
@@ -190,6 +237,27 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     When the table formats them
     Then each renders distinguishably from the others
     And no value is silently displayed as another
+
+  @unit
+  Scenario: Wide integers and decimals keep every digit
+    Given a result carrying a 64-bit integer beyond safe float precision and a high-precision decimal
+    When the table renders and the member copies the cells
+    Then the exact digit strings the response carried are shown and copied
+    And no value is rounded through a lossy float
+
+  @unit
+  Scenario: Duplicate result column names are surfaced, not silently merged
+    Given a result whose columns list the same name twice
+    When the table renders
+    Then the member is warned that the duplicated name collapses to one value per row
+    And nothing pretends the two columns were independently preserved
+
+  @integration
+  Scenario: The truncation banner tells the truth about how much arrived
+    Given a wide result the byte ceiling truncated well below the row ceiling
+    When the truncated state renders
+    Then the banner cites the actual number of returned rows
+    And it never claims a fixed row limit that was not the cause
 
   @integration
   Scenario: The table has intentional loading, empty, error, stale, and truncated states
@@ -255,12 +323,19 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     When they are imported outside a browser
     Then no React, DOM, or browser-only Vega runtime module is evaluated
 
+  # The application's production CSP still carries unsafe-eval for unrelated
+  # scripts and dev mode serves no CSP header at all, so "under the real CSP"
+  # would be vacuously green. The test therefore serves the page under a
+  # hardened policy without unsafe-eval — strictly stronger than the deployed
+  # one — and proves it can go red by forcing the Function-constructor
+  # evaluator under the same policy.
   @e2e
-  Scenario: The chart renders under the real application CSP without unsafe-eval
-    Given the application served with its real Content Security Policy
+  Scenario: The chart renders under a CSP that forbids eval
+    Given the workbench served under a Content Security Policy without unsafe-eval
     When a valid spec renders as a chart
     Then rendering succeeds using Vega's expression interpreter
-    And a Function-constructor evaluator would have been blocked by that policy
+    And the same page with the interpreter disabled fails with a policy violation,
+      proving the test observes the evaluator
 
   # ---------------------------------------------------------------------------
   # Vega-Lite validation policy (fail closed, structured errors)
@@ -511,7 +586,7 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 # AC "SSR/server imports do not evaluate DOM-dependent Vega modules"
 #   → Scenario: Policy modules stay pure and server-import-safe
 # AC "no unsafe-eval or weaker CSP required"
-#   → Scenario: The chart renders under the real application CSP without unsafe-eval
+#   → Scenario: The chart renders under a CSP that forbids eval
 #
 # Vega governance:
 # AC "specs validate against the bundled official v6 schema"
@@ -531,7 +606,7 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 # AC "actions disabled, no editor/export/source surface"
 #   → Scenario: No embed actions are exposed
 # AC "Vega expressions use CSP interpreter mode under a browser test with the real policy"
-#   → Scenario: The chart renders under the real application CSP without unsafe-eval
+#   → Scenario: The chart renders under a CSP that forbids eval
 # AC "source and transform-created fields validated against the correct dataset"
 #   → Scenario: Field references are validated against the dataset that feeds them
 # AC "unknown transforms and expression features fail closed"
@@ -584,6 +659,6 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 # AC "browser egress test proves rejected specs cause no network request"
 #   → Scenario: Rejected and adversarial specs cause no network request
 # AC "real-CSP browser test proves the chart works without unsafe-eval"
-#   → Scenario: The chart renders under the real application CSP without unsafe-eval
+#   → Scenario: The chart renders under a CSP that forbids eval
 # AC "existing #6486 suites and application gates remain green" → process AC,
 #    proven by the CI run on the PR.
