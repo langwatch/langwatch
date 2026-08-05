@@ -1,17 +1,15 @@
-Feature: Heavy runs are admitted, narrowed, or refused
+Feature: Heavy runs are admitted, queued, or refused
   As a developer whose laptop runs several worktrees and around ten agents at once
-  I want a short test run to start narrower rather than wait, a long one to queue,
-  and neither to be admitted when the machine cannot take it
-  So that N parallel vitest runs never take the machine down, and no agent is held
-  idle long enough to lose a prompt cache it could have kept
+  I want a heavy run to wait its turn rather than land on top of the others
+  So that N parallel vitest runs never take the machine down, and the rare session
+  whose prompt cache expires quickly is not parked past it
 
   # Extends specs/setup/check-slots.feature, which put `typecheck`, `lint` and
   # `format` behind one machine-wide counter in dev/scripts/check-queue.mjs.
   # That spec and that script arrive with PR #6598, which is OPEN AND UNMERGED
   # at the time of writing — this feature is stacked on it and neither the file
-  # reference above nor the scenarios below resolve until it lands. Three gaps
-  # are closed here. See ADR-087 for the precedence table these scenarios are
-  # rows of.
+  # reference above nor the scenarios below resolve until it lands. See ADR-087
+  # for the precedence table these scenarios are rows of.
   #
   # 1. TESTS WERE NOT ON THE COUNTER, and they are the larger problem. Measured
   # mid-session on an 11-core / 18 GiB machine: 17 node processes, 550-712 MB
@@ -20,27 +18,28 @@ Feature: Heavy runs are admitted, narrowed, or refused
   # "vmForks"`, which platform/app/vitest.config.ts picks deliberately and
   # measures at 573 MB per fork — which is what the observed range is.
   # `maxWorkers: "50%"` is 5 workers PER RUN on 11 cores, so three or four
-  # agents testing at once is 15-20 workers. The guardrail is per-run and does
-  # exactly what it says; there was no machine-wide one.
+  # agents testing at once is 15-20 workers.
   #
   # 2. THE LIMIT WAS DERIVED FROM TOTAL RAM, which the process does not have.
   # One slot per 6 GiB of os.totalmem() counts the 8 GiB inside the colima VM.
   #
-  # 3. A WAIT COULD COST MORE THAN IT SAVED. A blocked tool call issues no API
-  # requests and the prompt cache expires on idle with a 5-minute floor, so a
-  # parked agent re-reads its conversation at the cache-write rate of 1.25x base
-  # input instead of the cache-read rate of 0.1x — a 1.15x premium on the whole
-  # prefix.
+  # WHY QUEUEING AND NOT NARROWING. Earlier drafts made narrowing the primary
+  # lever, on the premise that a queued run parks an agent past its prompt
+  # cache's idle expiry. A probe settled it: Claude Code writes ephemeral_1h
+  # cache entries, with ephemeral_5m at zero. The idle floor is about an hour,
+  # so #6598's existing 30-minute failsafe already sits inside it and a wait
+  # costs nothing in tokens. Queueing also dominates narrowing for the machine
+  # — a queued run holds no RAM, a narrowed one holds some.
   #
-  # BUT A RUNNING TOOL CALL ISSUES NO API REQUESTS EITHER. A narrowed run that
-  # takes ten minutes loses the cache exactly like a six-minute park. So the
-  # cache only decides anything for runs that finish INSIDE the floor; above it
-  # the cache is forfeit either way and queueing is strictly better for the
-  # machine. That is why narrowing below is always conditioned on the projected
-  # duration, and why an unobserved command queues rather than narrows.
+  # The five-minute floor is still real, just not the default: a session in
+  # usage overage falls back to it. So narrowing survives as a fallback for
+  # exactly that regime, which is DETECTED rather than assumed — a session's
+  # transcript reports which of the two lifetimes its cache writes went to.
   #
-  # Duration comes from a rolling observation haven keeps per command. There is
-  # no estimation heuristic and no guess: unobserved means unknown means queue.
+  # The bust is worse than earlier drafts said, though. On the one-hour TTL a
+  # cache write costs 2x base input against a read's 0.1x, so re-caching a
+  # prefix costs a 1.9x premium — about $2.85 on a 300k-token prefix at Opus
+  # 5's input rate, not the $1.73 the five-minute figure gave.
 
   # --- Tests join the existing counter ---
 
@@ -79,30 +78,54 @@ Feature: Heavy runs are admitted, narrowed, or refused
     When it reaches the counter
     Then it takes a slot of its own
 
-  # --- Narrowing, and its one condition ---
+  # --- Queueing is the default answer ---
 
   @unit @unimplemented
-  Scenario: A short run with no slot free is narrowed and started
-    Given pressure is amber and no slot is free
-    And this command has been observed to finish inside the cache floor when narrowed
+  Scenario: A run with no slot free waits
+    Given pressure is green and no slot is free
+    And the session's recent cache writes went to the long-lived cache
+    When a heavy run starts
+    Then it waits for a slot rather than being narrowed
+    Because the wait costs nothing while the cache outlives it
+
+  @unit @unimplemented
+  Scenario: The long failsafe stands unchanged on the long-lived cache
+    Given a session whose cache writes went to the long-lived cache
+    When a run waits for a slot
+    Then the existing thirty-minute failsafe applies
+    And no shorter ceiling is imposed, for an agent or for a person
+
+  # --- Narrowing, only where the short-lived cache makes waiting cost something ---
+
+  @unit @unimplemented
+  Scenario: A short run on the short-lived cache is narrowed instead of queued
+    Given no slot is free
+    And the session's recent cache writes went to the short-lived cache
+    And this command has been observed to finish inside that shorter floor when narrowed
     When a unit test run starts
-    Then it is given a smaller worker count
-    And it starts immediately rather than waiting
+    Then it is given a smaller worker count and starts immediately
 
   @unit @unimplemented
-  Scenario: A long run is queued rather than narrowed
-    Given pressure is amber and no slot is free
-    And this command has been observed to take longer than the cache floor
+  Scenario: A long run is queued even on the short-lived cache
+    Given no slot is free
+    And the session's recent cache writes went to the short-lived cache
+    And this command has been observed to take longer than that floor
     When a unit test run starts
-    Then it waits for a slot instead of being narrowed
-    Because its cache is lost either way, and queueing is better for the machine
+    Then it waits for a slot
+    Because its cache is lost by running, so narrowing buys nothing
 
   @unit @unimplemented
-  Scenario: A command haven has never seen is treated as long
+  Scenario: A command haven has never seen is queued
     Given a command with no recorded duration
     When it finds no free slot
     Then it queues rather than narrowing
-    Because the conservative direction is the one that cannot make the machine worse
+
+  @unit @unimplemented
+  Scenario: A session whose cache lifetime cannot be determined is treated as long-lived
+    Given a session whose recent cache writes cannot be read
+    When a heavy run finds no free slot
+    Then it queues on the ordinary failsafe
+    Because assuming the short-lived cache would narrow every run on a false alarm
 
   @unit @unimplemented
   Scenario: A narrowed run still takes a slot
@@ -117,7 +140,6 @@ Feature: Heavy runs are admitted, narrowed, or refused
     Given a typecheck, which is a single process with nothing to divide
     When it finds no free slot
     Then it queues
-    And the narrowing path never applies to it
 
   @unit @unimplemented
   Scenario: A caller's own worker count is respected but still admitted
@@ -142,32 +164,25 @@ Feature: Heavy runs are admitted, narrowed, or refused
     Then it runs
     Because red throttles admission, it does not stop the machine working
 
-  # --- Waits are bounded for agents, not for people ---
+  # --- A tightened ceiling, only where it is earned ---
 
   @unit @unimplemented
-  Scenario: An agent-driven run is never held past the cache floor
-    Given a run whose caller is an agent
+  Scenario: An agent on the short-lived cache is not held past its floor
+    Given an agent-driven run in a session whose cache writes went to the short-lived cache
     When it waits for a slot
-    Then the wait is capped below the five-minute prompt-cache floor
+    Then the wait is capped below that floor
     And when the cap is reached it proceeds rather than waiting longer
 
   @unit @unimplemented
-  Scenario: An interactive run keeps the long failsafe
+  Scenario: An interactive run keeps the long failsafe in every regime
     Given a run started from a terminal
     When it waits for a slot
-    Then the existing thirty-minute failsafe applies
+    Then the thirty-minute failsafe applies
     Because a human waiting is not an idle API session
 
   @unit @unimplemented
-  Scenario: A run whose caller cannot be identified is treated as an agent
-    Given a run whose provenance is unknown
-    When it waits for a slot
-    Then the agent cap applies
-    Because misreading an agent as a human silently restores the thirty-minute park
-
-  @unit @unimplemented
   Scenario: A run that reached its wait cap says what happened
-    Given an agent-driven run that waited up to its cap
+    Given an agent-driven run that waited up to a tightened cap
     When it proceeds
     Then it reports how long it waited and that the cap was reached
     So a slow run is never mistaken for a hung one

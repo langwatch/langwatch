@@ -8,28 +8,37 @@ Feature: haven answers an agent's tool call before it runs
   # the agent calls haven, haven answers, haven never invokes the agent. It
   # fires inside sub-agents too. See ADR-088.
   #
-  # Properties of the hook contract this relies on:
-  #   - the PreToolUse payload carries the full tool_input, and the hook may
-  #     return `updatedInput` to REPLACE it, so the gate can rewrite a command
-  #     rather than only allowing or denying it;
-  #   - it carries agent_id inside a sub-agent (and NOT in a main session),
-  #     plus session_id and permission_mode;
-  #   - it FAILS OPEN — a timeout, or any non-zero exit other than 2, lets the
-  #     command proceed;
-  #   - EXIT CODE 2 IS THE ONE CODE THAT BLOCKS. An unrecovered Go panic exits
-  #     with status 2, so the language's crash default is a machine-wide
-  #     tool-call blocker. That is why the discipline below is specced.
+  # Properties of the hook contract, MEASURED against a headless session with a
+  # scratch settings file rather than read from docs:
+  #   - the matcher shape works: a hooks.PreToolUse[] entry with matcher "Bash"
+  #     and a hooks[] array of {type: command, command, timeout} fires;
+  #   - the payload carries session_id, transcript_path, cwd, prompt_id,
+  #     permission_mode, effort.level, hook_event_name, tool_name, tool_input
+  #     and tool_use_id — and NO agent_id in a main session;
+  #   - `updatedInput` is honoured with `allow` and SILENTLY IGNORED with
+  #     `defer`. The same hook returning the same replacement rewrote and ran
+  #     the command under allow, and left the original untouched under defer;
+  #   - EXIT CODE 2 IS THE ONE CODE THAT BLOCKS, and a compiled Go panic exits
+  #     with exactly 2, so the language's crash default is a machine-wide
+  #     tool-call blocker. (`go run` masks this — it exits 1 itself.)
+  #   - it otherwise FAILS OPEN: a timeout, or any other non-zero exit, lets
+  #     the command proceed.
   #
-  # THE REWRAP. The hook exits before the command runs, so it cannot hold a slot
-  # for the command's lifetime. Rewriting the command so haven's own process
-  # holds the flock avoids a lease, a TTL and a reaper. But tool_input.command
-  # is a SHELL STRING, not argv, so the original is passed as one escaped
-  # argument rather than spliced after a separator.
+  # THE REWRAP, AND WHY IT REACHES LESS FAR THAN IT LOOKS. The hook exits before
+  # the command runs, so it cannot hold a slot for the command's lifetime;
+  # rewriting the command so haven's own process holds the flock avoids a lease,
+  # a TTL and a reaper. But rewriting needs `allow`, and allow BYPASSES the
+  # permission system — so the gate may only rewrite where permission_mode
+  # already auto-approves. Under `default` or `plan` it observes and may refuse,
+  # but does not rewrite. That is the honest reach: unattended fleets run
+  # auto-approving and are the case this exists for; an interactive session
+  # keeps its prompts.
   #
-  # Three contract details are UNVERIFIED and need one smoke test before any of
-  # this is documented as working: the settings matcher syntax, whether
-  # updatedInput is honoured alongside `defer`, and whether `/model` raises a
-  # hook at all.
+  # tool_input.command is a SHELL STRING, not argv, so the original is passed as
+  # one escaped argument rather than spliced after a separator.
+  #
+  # Two contract details remain UNVERIFIED: whether `/model` raises a hook at
+  # all, and where CLAUDE.md sits in the cached prefix.
 
   # --- The fast path is almost everything ---
 
@@ -91,21 +100,39 @@ Feature: haven answers an agent's tool call before it runs
     When it runs
     Then it holds exactly one slot
 
+  @unit @unimplemented
+  Scenario: A rewritten command explains itself
+    Given a command the gate has rewritten
+    When the replacement is handed back
+    Then it carries a description saying haven queued the command and why
+    # Measured: a model whose command was silently substituted ran it, noticed
+    # the output did not match what it asked for, and reported the environment
+    # as untrustworthy. An unexplained rewrite makes an agent doubt its own
+    # tools, which is worse than a slow test run.
+
   # --- Permission boundaries are not the gate's to move ---
 
   @unit @unimplemented
-  Scenario: The gate never approves a command the user's own rules would ask about
-    Given a heavy command that the user's permission rules would prompt for
-    When the gate rewrites it
-    Then the normal permission flow still evaluates it
-    And the gate does not return an approval of its own
+  Scenario: A session that already auto-approves may be rewritten
+    Given a session whose permission mode already auto-approves tool calls
+    When a heavy command is gated under pressure
+    Then it is rewritten and approved
+    Because the approval grants nothing the session was not already granting
 
   @unit @unimplemented
-  Scenario: When the rewrite cannot survive the permission flow, the rewrite is dropped
-    Given a session where a rewritten command cannot carry its replacement input without being approved
-    When a heavy command is gated
-    Then the command is left untouched
-    Because losing the narrowing is better than granting an approval the user did not give
+  Scenario: A session that still prompts is never rewritten
+    Given a session whose permission mode would prompt for this command
+    When a heavy command is gated under pressure
+    Then the command is left untouched and the permission flow is left alone
+    Because rewriting requires an approval, and a resource governor must not hand one out
+
+  @unit @unimplemented
+  Scenario: A rewrite the gate declines to make is still observed
+    Given a session whose permission mode would prompt for this command
+    And pressure is red with no slot free
+    When the command is gated
+    Then it may still be refused
+    Because refusing takes nothing away from the user, and approving would
 
   # --- The ladder ---
 
@@ -116,19 +143,20 @@ Feature: haven answers an agent's tool call before it runs
     Then it is deferred unchanged
 
   @unit @unimplemented
-  Scenario: A short command with no slot free is narrowed
+  Scenario: A command with no slot free is rewritten to queue
     Given pressure is amber and no slot is free
-    And the command is projected to finish inside the prompt-cache floor
-    When it is gated
-    Then it is rewritten to run under haven's heavy class with a smaller worker count
-
-  @unit @unimplemented
-  Scenario: A long command with no slot free is queued, not narrowed
-    Given pressure is amber and no slot is free
-    And the command is projected to take longer than the prompt-cache floor
+    And the session's cache writes went to the long-lived cache
     When it is gated
     Then it is rewritten to queue at full width
-    Because its cache is lost by running, so narrowing buys nothing
+    Because at that cache lifetime the wait costs nothing, and a queued run holds no memory
+
+  @unit @unimplemented
+  Scenario: A short command in a short-lived-cache session is narrowed instead
+    Given pressure is amber and no slot is free
+    And the session's cache writes went to the short-lived cache
+    And the command is projected to finish inside that floor
+    When it is gated
+    Then it is rewritten to run under haven's heavy class with a smaller worker count
 
   @unit @unimplemented
   Scenario: At critical pressure with no slot free the command is refused
@@ -142,8 +170,8 @@ Feature: haven answers an agent's tool call before it runs
     Given a command rewritten to run under haven's heavy class
     When the replacement input is built
     Then the tool timeout is raised by the admission wait the run may incur
-    And the wait itself stays under the prompt-cache floor
-    But the command's own runtime is not capped by that floor, or a long suite would be killed
+    And the wait itself is bounded by whichever ceiling that session's cache lifetime earns
+    But the command's own runtime is not capped by that ceiling, or a long suite would be killed
 
   # --- The refusal has to be actionable ---
 
@@ -157,7 +185,8 @@ Feature: haven answers an agent's tool call before it runs
   Scenario: A refusal never invites the caller to sleep or poll
     When the gate denies a heavy command
     Then the reason explicitly tells the caller not to sleep, poll or wait for it
-    Because an idle session loses its prompt cache, which is the cost the refusal exists to avoid
+    Because sleeping buys nothing the queue would not have given, and in a session
+    on the short-lived cache it also loses the cache the refusal was protecting
 
   @unit @unimplemented
   Scenario: The same command is not refused indefinitely
