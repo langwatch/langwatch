@@ -1,7 +1,7 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { register } from "prom-client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
@@ -123,21 +123,24 @@ async function readGauge(): Promise<number | undefined> {
 describe("GroupQueueMetricsCollector — oldest pending age", () => {
   beforeEach(() => {
     register.resetMetrics();
+    // Freeze the clock so scores seeded relative to "now" keep their
+    // eligible/deferred classification no matter how slowly the test runs,
+    // and ages assert exactly instead of through tolerance windows.
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("reports the age of the oldest eligible-waiting group", async () => {
-    // Seeded relative to Date.now() at test setup; the collector reads
-    // Date.now() again at call time, so assert with a tolerance window
-    // rather than an exact millisecond match.
     const redis = makeRedis({
       readyZset: [{ member: "group-abc", score: Date.now() - 5_000 }],
     });
 
     await runCollect(redis);
 
-    const age = await readGauge();
-    expect(age).toBeGreaterThanOrEqual(5_000);
-    expect(age).toBeLessThan(15_000);
+    expect(await readGauge()).toBe(5_000);
 
     // The query must exclude the unblock sentinel (score 1) via an exclusive
     // lower bound, cap at "now", and read only the single oldest member.
@@ -146,8 +149,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
     const args = redis.zrangebyscore.mock.calls[0]!;
     expect(args[0]).toBe(`${PREFIX}ready`);
     expect(args[1]).toBe("(1");
-    expect(typeof args[2]).toBe("number");
-    expect(Number(args[2])).toBeGreaterThan(Date.now() - 5_000);
+    expect(args[2]).toBe(Date.now());
     expect(args).toContain("WITHSCORES");
     expect(args.slice(-3)).toEqual(["LIMIT", 0, 1]);
   });
@@ -180,6 +182,14 @@ async function readBacklogGauge(): Promise<number | undefined> {
 describe("GroupQueueMetricsCollector — oldest backlog age", () => {
   beforeEach(() => {
     register.resetMetrics();
+    // Frozen clock: a score of now+5s must stay DEFERRED through the whole
+    // test, however slowly CI runs it — otherwise the group turns eligible,
+    // the deferred sample skips its head job, and the assertion flakes.
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("when a group is pinned in retry backoff (deferred ready score, day-old head job)", () => {
@@ -203,9 +213,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
       await runCollect(redis);
 
       expect(await readGauge()).toBe(0);
-      const backlogAge = await readBacklogGauge();
-      expect(backlogAge).toBeGreaterThanOrEqual(60_000);
-      expect(backlogAge).toBeLessThan(70_000);
+      expect(await readBacklogGauge()).toBe(60_000);
     });
   });
 
@@ -237,9 +245,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
       await runCollect(redis);
 
-      const backlogAge = await readBacklogGauge();
-      expect(backlogAge).toBeGreaterThanOrEqual(5_000);
-      expect(backlogAge).toBeLessThan(15_000);
+      expect(await readBacklogGauge()).toBe(5_000);
     });
   });
 
@@ -276,9 +282,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
         await runCollect(redis);
 
-        const backlogAge = await readBacklogGauge();
-        expect(backlogAge).toBeGreaterThanOrEqual(86_400_000);
-        expect(backlogAge).toBeLessThan(86_400_000 + 60_000);
+        expect(await readBacklogGauge()).toBe(86_400_000);
       });
     });
   });
