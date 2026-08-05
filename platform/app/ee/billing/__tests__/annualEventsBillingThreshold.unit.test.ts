@@ -161,7 +161,7 @@ describe("applyAnnualEventsBillingThreshold", () => {
       const result = await applyAnnualEventsBillingThreshold({
         stripe,
         stripeSubscriptionId: "sub_stripe_1",
-        dryRun: true,
+        isDryRun: true,
       });
 
       expect(result).toBe("applied");

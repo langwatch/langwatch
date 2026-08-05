@@ -535,12 +535,22 @@ export class EEWebhookService implements WebhookService {
       );
     }
 
-    // Annual subscriptions accrue metered events for a full year; the
-    // billing threshold makes Stripe collect that overage in slices as it
-    // accrues instead of one oversized renewal invoice. Checkout cannot set
-    // the field, so it is applied here, right after the subscription exists.
-    // Best-effort: a failure leaves the subscription behaving as before
-    // (single renewal invoice) and must never fail checkout completion.
+    await this.trySetAnnualEventsBillingThreshold(subscriptionId);
+
+    return { earlyReturn: false };
+  }
+
+  /**
+   * Annual subscriptions accrue metered events for a full year; the billing
+   * threshold makes Stripe collect that overage in slices as it accrues
+   * instead of one oversized renewal invoice. Checkout cannot set the field,
+   * so it is applied right after the subscription exists. Best-effort: a
+   * failure leaves the subscription behaving as before (single renewal
+   * invoice) and must never fail checkout completion.
+   */
+  private async trySetAnnualEventsBillingThreshold(
+    subscriptionId: string,
+  ): Promise<void> {
     try {
       const thresholdResult = await applyAnnualEventsBillingThreshold({
         stripe: this.stripe,
@@ -556,8 +566,6 @@ export class EEWebhookService implements WebhookService {
         "[stripeWebhook] Failed to set annual events billing threshold — re-run the backfill script or apply manually",
       );
     }
-
-    return { earlyReturn: false };
   }
 
   async handleInvoicePaymentSucceeded({

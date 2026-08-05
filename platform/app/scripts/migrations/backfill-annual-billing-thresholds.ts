@@ -14,6 +14,15 @@
  * events price (monthly plans, stale DB plan strings) are skipped —
  * the Stripe subscription's items are the authority, not the DB plan.
  *
+ * IRREVERSIBLE: This script mutates billing state in the external Stripe
+ * account, not our database — there is no down step. Once a threshold is
+ * set, Stripe may issue and charge threshold invoices before any
+ * compensating run could unset it, and an issued invoice cannot be
+ * un-issued. Rolling back the *setting* is a manual
+ * `stripe subscriptions update <id> -d "billing_thresholds="` per
+ * subscription; invoices already charged stay charged (refund manually if
+ * ever needed). Preview the blast radius first with DRY_RUN=1.
+ *
  * Usage:
  *   pnpm tsx scripts/migrations/backfill-annual-billing-thresholds.ts
  *   DRY_RUN=1 pnpm tsx scripts/migrations/backfill-annual-billing-thresholds.ts
@@ -23,11 +32,11 @@ import { prisma } from "~/server/db";
 import { applyAnnualEventsBillingThreshold } from "../../ee/billing/stripe/annualEventsBillingThreshold";
 import { createStripeClient } from "../../ee/billing/stripe/stripeClient";
 
-const DRY_RUN = process.env.DRY_RUN === "1";
+const IS_DRY_RUN = process.env.DRY_RUN === "1";
 
 async function main() {
   console.log(
-    `Annual billing threshold backfill ${DRY_RUN ? "[DRY-RUN]" : ""}`,
+    `Annual billing threshold backfill ${IS_DRY_RUN ? "[DRY-RUN]" : ""}`,
   );
   const stripe = createStripeClient();
 
@@ -53,11 +62,11 @@ async function main() {
       const result = await applyAnnualEventsBillingThreshold({
         stripe,
         stripeSubscriptionId: candidate.stripeSubscriptionId!,
-        dryRun: DRY_RUN,
+        isDryRun: IS_DRY_RUN,
       });
       tally[result]++;
       console.log(
-        `subscription=${candidate.id} plan=${candidate.plan} -> ${DRY_RUN && result === "applied" ? "would apply" : result}`,
+        `subscription=${candidate.id} plan=${candidate.plan} -> ${IS_DRY_RUN && result === "applied" ? "would apply" : result}`,
       );
     } catch (err) {
       tally.failed++;

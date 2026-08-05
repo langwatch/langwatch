@@ -26,11 +26,11 @@ export type ThresholdResult = "applied" | "already_set" | "not_annual_events";
 export const applyAnnualEventsBillingThreshold = async ({
   stripe,
   stripeSubscriptionId,
-  dryRun = false,
+  isDryRun = false,
 }: {
   stripe: Stripe;
   stripeSubscriptionId: string;
-  dryRun?: boolean;
+  isDryRun?: boolean;
 }): Promise<ThresholdResult> => {
   const subscription =
     await stripe.subscriptions.retrieve(stripeSubscriptionId);
@@ -49,7 +49,7 @@ export const applyAnnualEventsBillingThreshold = async ({
     return "already_set";
   }
 
-  if (!dryRun) {
+  if (!isDryRun) {
     await stripe.subscriptions.update(stripeSubscriptionId, {
       billing_thresholds: {
         amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
