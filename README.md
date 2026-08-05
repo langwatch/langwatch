@@ -58,14 +58,13 @@ npx @langwatch/server
 
 The CLI installs `uv`, `postgres`, `redis`, `clickhouse`, the AI gateway binary, and the Langy assistant's runtime into `~/.langwatch/`, scaffolds a `.env` with locally-generated secrets, then starts every service in parallel and opens `http://localhost:5560`. Everything lives under `~/.langwatch/`; `rm -rf ~/.langwatch` is a clean reset.
 
-Two pieces are yours to decide on, in `~/.langwatch/.env`:
+Three pieces are yours to decide on, in `~/.langwatch/.env`:
 
 | Variable | Default | What it changes |
 |---|---|---|
 | `LANGWATCH_ENABLE_LANGY` | `true` | The Langy assistant. Adds ~45MB for its runtime; the workers run unsandboxed as you, on your own machine. |
 | `LANGWATCH_ENABLE_PRESIDIO` | `false` | The PII detection evaluator. Adds ~670MB of language model, larger than the rest of the evaluator environment put together. LangWatch's own secret and PII redaction of your traces does not depend on it. |
 | `LANGWATCH_ENABLE_LINGUA` | `false` | The language detection evaluator. Adds ~95MB of language models. |
-| `LANGWATCH_ENABLE_LEGACY_EVALUATORS` | `false` | The deprecated legacy evaluators, kept only for evaluations saved long ago. Hidden from the product entirely while off. |
 
 Every other evaluator is installed either way. Change any of these in `~/.langwatch/.env` and restart the server.
 

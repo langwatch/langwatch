@@ -111,7 +111,6 @@ jobs:
         # intermittently. Ignored pending langwatch/langwatch#3240.
         run: |
           uv run pytest -x -v \
-            --ignore=evaluators/legacy/ \
             --ignore=evaluators/ragas/ \
             --ignore=evaluators/langevals/tests/ \
             --ignore=evaluators/openai/tests/ \

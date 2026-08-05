@@ -14,7 +14,7 @@ import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
  * causes a compile error.
  *
  * Use "ignored" for evaluators that should not appear in the selector
- * (e.g. custom/basic, legacy, internal).
+ * (e.g. custom/basic or internal).
  */
 const evaluatorCategoryMap: Record<
   keyof typeof AVAILABLE_EVALUATORS,
@@ -60,7 +60,7 @@ const evaluatorCategoryMap: Record<
   "langevals/competitor_llm_function_call": "safety",
   "langevals/off_topic": "safety",
 
-  // Ignored — custom templates, legacy, or internal
+  // Ignored — custom templates or internal
   "langevals/basic": "ignored",
   "langevals/similarity": "ignored",
   // Superseded by select_best_compare ("Comparison"), which handles two
@@ -75,13 +75,6 @@ const evaluatorCategoryMap: Record<
   // full form: the Comparison card in TargetTypeSelectorDrawer. Kept
   // resolvable here so saved comparisons still load and re-run.
   "langevals/select_best_compare": "ignored",
-  "legacy/ragas_answer_correctness": "ignored",
-  "legacy/ragas_answer_relevancy": "ignored",
-  "legacy/ragas_context_precision": "ignored",
-  "legacy/ragas_context_recall": "ignored",
-  "legacy/ragas_context_relevancy": "ignored",
-  "legacy/ragas_context_utilization": "ignored",
-  "legacy/ragas_faithfulness": "ignored",
   "ragas/context_precision": "ignored",
   "ragas/context_recall": "ignored",
 };

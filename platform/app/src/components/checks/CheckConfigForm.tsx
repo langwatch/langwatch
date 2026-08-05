@@ -1,6 +1,5 @@
 import {
   Accordion,
-  Alert,
   Button,
   Card,
   Field,
@@ -323,18 +322,6 @@ export default function CheckConfigForm({
                       <Text fontSize="12px" color="fg.muted">
                         {availableEvaluators[checkType].description}
                       </Text>
-                      {checkType.startsWith("legacy/") && (
-                        <Alert.Root status="warning">
-                          <Alert.Indicator />
-                          <Alert.Content>
-                            <Text fontSize="13px">
-                              You are using a legacy evaluator version, please
-                              click the <b>change</b> button above to select a
-                              newer version or a replacement for this evaluator.
-                            </Text>
-                          </Alert.Content>
-                        </Alert.Root>
-                      )}
                     </VStack>
                   </HorizontalFormControl>
                   <HorizontalFormControl

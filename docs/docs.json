@@ -960,13 +960,6 @@
               {
                 "group": "RAG Quality",
                 "pages": [
-                  "api-reference/evaluators/ragas-answer-correctness",
-                  "api-reference/evaluators/ragas-answer-relevancy",
-                  "api-reference/evaluators/ragas-context-precision",
-                  "api-reference/evaluators/ragas-context-recall",
-                  "api-reference/evaluators/ragas-context-relevancy",
-                  "api-reference/evaluators/ragas-context-utilization",
-                  "api-reference/evaluators/ragas-faithfulness",
                   "api-reference/evaluators/ragas-faithfulness-1",
                   "api-reference/evaluators/ragas-response-context-precision",
                   "api-reference/evaluators/ragas-response-context-recall",

@@ -66,8 +66,8 @@ vi.mock("../hooks/useTargetName", () => {
 });
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: (evaluator: { evaluatorType: string }) =>
-    evaluator.evaluatorType === "legacy/ragas_answer_correctness"
-      ? "Ragas Answer Correctness"
+    evaluator.evaluatorType === "ragas/faithfulness"
+      ? "Ragas Faithfulness"
       : "Exact Match",
   useEvaluatorNames: () => new Map(),
   useCodeEvaluatorIds: () => new Set(),
@@ -361,7 +361,7 @@ describe("Evaluator Mappings", () => {
     });
 
     it("hides alert icon when optional fields are missing but all required are mapped", async () => {
-      // legacy/ragas_answer_correctness has requiredFields: ["output", "expected_output"], optionalFields: ["input"]
+      // ragas/faithfulness has requiredFields: ["output", "contexts"], optionalFields: ["input"]
       // Both required fields are mapped, optional "input" is not - should be valid
       useEvaluationsV3Store.setState({
         targets: [createTestTarget()],
@@ -370,10 +370,10 @@ describe("Evaluator Mappings", () => {
         evaluators: [
           {
             id: "evaluator-1",
-            evaluatorType: "legacy/ragas_answer_correctness" as const,
+            evaluatorType: "ragas/faithfulness" as const,
             inputs: [
               { identifier: "output", type: "str" as const },
-              { identifier: "expected_output", type: "str" as const },
+              { identifier: "contexts", type: "str" as const },
               { identifier: "input", type: "str" as const }, // Optional field
             ],
             mappings: {
@@ -386,11 +386,11 @@ describe("Evaluator Mappings", () => {
                     sourceId: "target-1",
                     sourceField: "output",
                   },
-                  expected_output: {
+                  contexts: {
                     type: "source",
                     source: "dataset",
                     sourceId: "test-data",
-                    sourceField: "expected_output",
+                    sourceField: "contexts",
                   },
                   // "input" is optional and not mapped - OK!
                 },
@@ -407,7 +407,7 @@ describe("Evaluator Mappings", () => {
       // Wait for the table to render
       await waitFor(() => {
         expect(
-          screen.getAllByText("Ragas Answer Correctness").length,
+          screen.getAllByText("Ragas Faithfulness").length,
         ).toBeGreaterThan(0);
       });
 

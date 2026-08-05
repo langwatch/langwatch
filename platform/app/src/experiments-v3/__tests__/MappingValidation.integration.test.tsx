@@ -1387,13 +1387,13 @@ describe("Evaluator validation with required/optional fields", () => {
   const targetId = "target-1";
 
   it("marks evaluator as valid when all required fields are mapped", () => {
-    // legacy/ragas_answer_correctness has requiredFields: ["output", "expected_output"], optionalFields: ["input"]
+    // ragas/faithfulness has requiredFields: ["output", "contexts"], optionalFields: ["input"]
     const evaluator = createTestEvaluator(
       "eval-1",
-      "legacy/ragas_answer_correctness",
+      "ragas/faithfulness",
       [
         { identifier: "output", type: "str" },
-        { identifier: "expected_output", type: "str" },
+        { identifier: "contexts", type: "str" },
         { identifier: "input", type: "str" },
       ],
       {
@@ -1405,11 +1405,11 @@ describe("Evaluator validation with required/optional fields", () => {
               sourceId: targetId,
               sourceField: "output",
             },
-            expected_output: {
+            contexts: {
               type: "source",
               source: "dataset",
               sourceId: DEFAULT_TEST_DATA_ID,
-              sourceField: "expected_output",
+              sourceField: "contexts",
             },
             // "input" is optional and not mapped - should still be valid
           },
@@ -1428,13 +1428,13 @@ describe("Evaluator validation with required/optional fields", () => {
   });
 
   it("marks evaluator as invalid when required field is missing", () => {
-    // legacy/ragas_answer_correctness has requiredFields: ["output", "expected_output"]
+    // ragas/faithfulness has requiredFields: ["output", "contexts"]
     const evaluator = createTestEvaluator(
       "eval-1",
-      "legacy/ragas_answer_correctness",
+      "ragas/faithfulness",
       [
         { identifier: "output", type: "str" },
-        { identifier: "expected_output", type: "str" },
+        { identifier: "contexts", type: "str" },
       ],
       {
         [DEFAULT_TEST_DATA_ID]: {
@@ -1445,7 +1445,7 @@ describe("Evaluator validation with required/optional fields", () => {
               sourceId: targetId,
               sourceField: "output",
             },
-            // "expected_output" is required but missing
+            // "contexts" is required but missing
           },
         },
       },
@@ -1459,7 +1459,7 @@ describe("Evaluator validation with required/optional fields", () => {
 
     expect(result.isValid).toBe(false);
     expect(result.missingMappings.length).toBe(1);
-    expect(result.missingMappings[0]?.fieldId).toBe("expected_output");
+    expect(result.missingMappings[0]?.fieldId).toBe("contexts");
     expect(result.missingMappings[0]?.isRequired).toBe(true);
   });
 

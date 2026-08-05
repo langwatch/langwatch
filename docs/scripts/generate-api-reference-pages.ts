@@ -593,13 +593,6 @@ const BUILTIN_EVALUATOR_CATEGORIES: Record<string, string[]> = {
     "summarization-score",
   ],
   "RAG Quality": [
-    "ragas-answer-correctness",
-    "ragas-answer-relevancy",
-    "ragas-context-precision",
-    "ragas-context-recall",
-    "ragas-context-relevancy",
-    "ragas-context-utilization",
-    "ragas-faithfulness",
     "ragas-faithfulness-1",
     "ragas-response-context-precision",
     "ragas-response-context-recall",

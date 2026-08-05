@@ -7,13 +7,11 @@ Feature: A laptop install only pays for what it uses
   See _shared/contract.md §1, the promise is "~3 minutes to the full stack".
 
   # Context. The evaluator environment installs every evaluator LangWatch can
-  # run, and a few dominate everything else: the PII detector ships a
+  # run, and two dominate everything else: the PII detector ships a
   # natural-language model larger than the entire rest of that environment,
-  # and language detection carries its own stack of language models. The
-  # deprecated legacy evaluators are a different case: they exist only so
-  # evaluations saved years ago keep running. Almost nobody installing
-  # LangWatch for the first time needs any of the three, and the people who do
-  # can say so.
+  # and language detection carries its own stack of language models. Almost
+  # nobody installing LangWatch for the first time needs either, and the
+  # people who do can say so.
   #
   # This is not about removing evaluators. It is about when they arrive, and
   # about the difference between "LangWatch cannot do this" and "this install
@@ -29,12 +27,11 @@ Feature: A laptop install only pays for what it uses
     When the evaluator environment is prepared
     Then the PII detector's language model is not downloaded
     And the language detection models are not downloaded
-    And the deprecated legacy evaluators are not downloaded
     And the install finishes materially faster than it would have with them
 
   Scenario: Every other evaluator still works
     Given a default install
-    When they run any evaluator outside those three families
+    When they run any evaluator outside those two families
     Then it runs normally
     # Dropping some evaluators must not disturb the rest of the environment.
 
@@ -84,23 +81,3 @@ Feature: A laptop install only pays for what it uses
     Then the rest of the install keeps working
     And the product goes back to saying the evaluator is not installed here
 
-  # ===========================================================================
-  # Deprecated things vanish instead of nagging
-  # ===========================================================================
-
-  # Language detection gets the same treatment as PII detection: visible,
-  # marked not installed, one line to enable. The legacy evaluators do not:
-  # they are deprecated, nobody should be adopting one today, and a card that
-  # exists only to say "you cannot pick this and should not want to" is
-  # clutter, not guidance.
-  Scenario: Legacy evaluators do not appear anywhere on a default install
-    Given a default install
-    When they browse the evaluators on offer
-    Then the deprecated legacy evaluators are simply not among them
-
-  Scenario: An old evaluation that still uses one fails with directions, not a shrug
-    Given a default install
-    And an evaluation saved long ago that uses a legacy evaluator
-    When it runs
-    Then the failure says legacy evaluators are not installed on this server
-    And names the switch that brings them back for exactly this case

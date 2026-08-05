@@ -21,17 +21,11 @@ describe("the CLI's evaluator-type catalog", () => {
   });
 
   describe("when ranking the closest types for a miss", () => {
-    it("puts the stale ragas slug's live successors first", () => {
+    it("puts the stale ragas slug's live successor first", () => {
       const closest = closestEvaluatorTypes("ragas/answer_relevancy");
 
-      // Both renames of the old metric must surface without special-casing:
-      // the modern name and the legacy-prefixed one.
-      expect(closest.slice(0, 2)).toEqual(
-        expect.arrayContaining([
-          "ragas/response_relevancy",
-          "legacy/ragas_answer_relevancy",
-        ]),
-      );
+      // The rename of the old metric must surface without special-casing.
+      expect(closest[0]).toBe("ragas/response_relevancy");
     });
 
     it("returns only as many suggestions as asked for", () => {

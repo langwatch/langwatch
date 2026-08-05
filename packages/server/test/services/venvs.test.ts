@@ -40,7 +40,6 @@ describe("evaluator environment", () => {
   const TOGGLE_KEYS = [
     "LANGWATCH_ENABLE_PRESIDIO",
     "LANGWATCH_ENABLE_LINGUA",
-    "LANGWATCH_ENABLE_LEGACY_EVALUATORS",
   ];
 
   beforeEach(() => {
@@ -57,13 +56,12 @@ describe("evaluator environment", () => {
   });
 
   describe("when none of the heavyweight evaluators were asked for", () => {
-    it("installs the base set and skips PII, language detection, and legacy", async () => {
+    it("installs the base set and skips PII and language detection", async () => {
       await syncVenvs(ctxWith("ENVIRONMENT=local\n"), bus);
 
       const extras = extrasFrom(execCalls[0]!.args);
       expect(extras).not.toContain("presidio");
       expect(extras).not.toContain("lingua");
-      expect(extras).not.toContain("legacy");
       expect(extras).not.toContain("all");
       // The rest still have to be there — a missing extra means that
       // evaluator's route is never registered and every call 404s.
@@ -79,20 +77,15 @@ describe("evaluator environment", () => {
       const extras = extrasFrom(execCalls[0]!.args);
       expect(extras).toContain("presidio");
       expect(extras).not.toContain("lingua");
-      expect(extras).not.toContain("legacy");
     });
 
-    it("supports all three together", async () => {
+    it("supports both together", async () => {
       await syncVenvs(
-        ctxWith(
-          "LANGWATCH_ENABLE_PRESIDIO=true\nLANGWATCH_ENABLE_LINGUA=true\nLANGWATCH_ENABLE_LEGACY_EVALUATORS=true\n",
-        ),
+        ctxWith("LANGWATCH_ENABLE_PRESIDIO=true\nLANGWATCH_ENABLE_LINGUA=true\n"),
         bus,
       );
       const extras = extrasFrom(execCalls[0]!.args);
-      expect(extras).toEqual(
-        expect.arrayContaining(["presidio", "lingua", "legacy"]),
-      );
+      expect(extras).toEqual(expect.arrayContaining(["presidio", "lingua"]));
     });
   });
 
