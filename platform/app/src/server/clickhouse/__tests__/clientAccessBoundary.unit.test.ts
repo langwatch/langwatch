@@ -116,7 +116,6 @@ const RESOLVES_DIRECTLY_BACKLOG = new Set([
   "src/server/event-sourcing/projections/global/orgBillableEventsMeter.store.ts",
   "src/server/event-sourcing/replay/replayPreset.ts",
   "src/server/experiments-v3/services/experiment-run.service.ts",
-  "src/server/filters/filter.service.ts",
   "src/server/gateway/clickhouseRepos.ts",
   "src/server/gateway/endUserCaps.service.ts",
   "src/server/routes/auth-cli.ts",
