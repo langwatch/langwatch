@@ -117,6 +117,7 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
   // one where the byte bound stopped existing.
   describe("given a burst of jobs whose payloads are all offloaded", () => {
     describe("when a byte budget smaller than the burst is set", () => {
+      /** @scenario an offloaded payload's reference advertises its true cost */
       it("bounds the batch by payload bytes, not by the reference's stored size", async () => {
         const batches: TestPayload[][] = [];
         const singles: TestPayload[] = [];

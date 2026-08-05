@@ -5157,6 +5157,27 @@ describe("GroupStagingScripts.drainGroupReady", () => {
       expect(await inspectTotalPending()).toBe("1");
     });
 
+    // The boundary itself. The drain's condition is `(accumulated + size) >
+    // maxBytes`, so a job landing EXACTLY on the budget is admitted, not
+    // rejected. Nothing else pins that: the overflow test above only proves
+    // 300 > 250 stops, which a `>=` would satisfy too.
+    it("admits a job that lands exactly on the budget", async () => {
+      await stageThreeSizedJobs();
+
+      // 0 + 100 = 100, 100 + 100 = 200 — exactly maxBytes, admitted.
+      // Third would be 300 > 200, so it stays staged.
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 10,
+        maxBytes: 200,
+        initialBytes: 0,
+      });
+
+      expect(drained.map((d) => d.stagedJobId)).toEqual(["j1", "j2"]);
+      expect(await inspectGroupJobs("group-a")).toEqual(["j3", "300"]);
+    });
+
     it("counts initialBytes (the dispatched job's own size) toward the budget", async () => {
       await stageThreeSizedJobs();
 
