@@ -1796,16 +1796,20 @@ clickhouse:
   ## @param clickhouse.chartManaged [default: true] Manage ClickHouse via this chart using the clickhouse-serverless subchart (false = external).
   chartManaged: true
 
-  # The server's max_concurrent_queries, which is what the app and worker pods
-  # divide across the fleet to size their connection pools. This does NOT
-  # configure the server; it tells the clients what the server will accept, so
-  # change it here only when the server itself is tuned away from the ClickHouse
-  # default. Applies to chart-managed and external ClickHouse alike. Each pod
-  # receives its own Deployment's replica count alongside this number, so the
-  # pools stay inside the budget as app.replicaCount and workers.replicaCount
-  # grow.
-  ## @param clickhouse.serverMaxConcurrentQueries [default: 300] The ClickHouse server's max_concurrent_queries. App and worker pods size their connection pools from this, split across their replicas. Set it to match a server tuned away from the ClickHouse default; it does not change the server setting.
-  serverMaxConcurrentQueries: 300
+  # How much of the server's admission limit belongs to LangWatch, which the
+  # app and worker pods divide between them to size their connection pools.
+  #
+  # Not the server's max_concurrent_queries: that limit is shared with whatever
+  # else queries the same cluster, and the default here is the platform's share
+  # of it, with the remainder left for dashboards and ops tooling so a reporting
+  # burst cannot starve live ingest.
+  #
+  # This value DESCRIBES the limit, it does not configure it. The server side is
+  # set on the ClickHouse deployment itself, outside this chart. Change this only
+  # to match a share that was actually granted there; raising it here alone just
+  # tells the clients to open sockets the server will refuse.
+  ## @param clickhouse.platformConcurrentQueryShare [default: 270] LangWatch's share of the ClickHouse server's admission limit. App and worker pods divide it across the whole fleet to size their connection pools. Describes a limit set on the server, does not configure it.
+  platformConcurrentQueryShare: 270
 
   # ---------------------------------------------------------------------------
   # External ClickHouse (when chartManaged: false)

@@ -3,15 +3,19 @@
 # Renders the chart and asserts the ClickHouse pool-sizing inputs that actually
 # reach the app and worker pods.
 #
-# This executes the template pipeline rather than reading it. The client derives
-# its pool size from the server's concurrent-query budget divided across the
-# fleet, and the derivation is skipped entirely when CLICKHOUSE_CLIENT_REPLICAS
-# is absent - the client then keeps a fixed 64 connections per pool, which is
-# the sizing that had ClickHouse reject tens of thousands of queries with
-# TOO_MANY_SIMULTANEOUS_QUERIES on 2026-07-31. An absent variable is exactly
-# what a missing include renders, and it renders green: valid YAML, a healthy
-# pod, and the pre-incident behaviour. Only a render shows whether the number
-# is there at all.
+# This executes the template pipeline rather than reading it. The client divides
+# the platform's concurrent-query share by the fleet, and there are two ways to
+# get that wrong that both render as valid YAML on a healthy pod:
+#
+#   - CLICKHOUSE_CLIENT_REPLICAS absent, which is what a missing include looks
+#     like. The derivation is skipped and the client keeps a fixed 64 per pool,
+#     the sizing that had ClickHouse reject tens of thousands of queries with
+#     TOO_MANY_SIMULTANEOUS_QUERIES on 2026-07-31.
+#   - CLICKHOUSE_CLIENT_REPLICAS counting one Deployment instead of the fleet.
+#     Each Deployment then divides the whole share, and their pools sum past it.
+#
+# Only a render shows which number reached which pod, so the assertions below
+# are on both Deployments at once rather than on either alone.
 #
 # Scenario bindings use the same `@scenario` token as the bats suites,
 # expressed as a hash-comment above the test function it verifies - the next
@@ -77,40 +81,54 @@ expect_env() {
   echo "ok   [$label] $component $name=$got"
 }
 
-# @scenario "Every pod that builds a ClickHouse client is told its own replica count"
-test_both_deployments_receive_their_replica_count() {
-  expect_env "app default" app "$BASE_FLAGS" CLICKHOUSE_CLIENT_REPLICAS 1
-  expect_env "workers default" workers "$BASE_FLAGS" CLICKHOUSE_CLIENT_REPLICAS 1
+# @scenario "Every pod that builds a ClickHouse client counts the whole fleet"
+test_both_deployments_count_the_whole_fleet() {
+  # One app pod plus one worker pod.
+  expect_env "app default" app "$BASE_FLAGS" CLICKHOUSE_CLIENT_REPLICAS 2
+  expect_env "workers default" workers "$BASE_FLAGS" CLICKHOUSE_CLIENT_REPLICAS 2
 
+  # Three app pods plus ten worker pods. Both halves must say 13: the failure
+  # this guards is each Deployment reporting its own 3 and 10, which has them
+  # dividing the same share twice over.
   local scaled="$BASE_FLAGS $MULTI_REPLICA_FLAGS --set app.replicaCount=3 --set workers.replicaCount=10"
-  expect_env "app scaled" app "$scaled" CLICKHOUSE_CLIENT_REPLICAS 3
-  expect_env "workers scaled" workers "$scaled" CLICKHOUSE_CLIENT_REPLICAS 10
+  expect_env "app scaled" app "$scaled" CLICKHOUSE_CLIENT_REPLICAS 13
+  expect_env "workers scaled" workers "$scaled" CLICKHOUSE_CLIENT_REPLICAS 13
 }
 
-# @scenario "Scaling one deployment leaves the other's sizing alone"
-test_scaling_one_deployment_leaves_the_other_alone() {
+# @scenario "Scaling one deployment resizes the pools of both"
+test_scaling_one_deployment_resizes_both() {
   local app_only="$BASE_FLAGS $MULTI_REPLICA_FLAGS --set app.replicaCount=4"
-  expect_env "app scaled alone" app "$app_only" CLICKHOUSE_CLIENT_REPLICAS 4
-  expect_env "workers unscaled" workers "$app_only" CLICKHOUSE_CLIENT_REPLICAS 1
+  expect_env "app scaled alone" app "$app_only" CLICKHOUSE_CLIENT_REPLICAS 5
+  expect_env "workers see app scaling" workers "$app_only" CLICKHOUSE_CLIENT_REPLICAS 5
 }
 
-# @scenario "The server's budget defaults to the ClickHouse default"
-test_server_budget_defaults_to_the_clickhouse_default() {
-  expect_env "app default budget" app "$BASE_FLAGS" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 300
-  expect_env "workers default budget" workers "$BASE_FLAGS" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 300
+# @scenario "A deployment that renders no pods is not counted"
+test_disabled_workers_are_not_counted() {
+  # workers.replicaCount is left at its default on purpose: a disabled
+  # Deployment renders no pods, so counting its replicas would shrink every
+  # app pool to pay for connections nobody opens.
+  local no_workers="--set autogen.enabled=true --set workers.enabled=false --set app.replicaCount=1"
+  expect_env "app without workers" app "$no_workers" CLICKHOUSE_CLIENT_REPLICAS 1
 }
 
-# @scenario "An operator with a tuned server states the budget once"
-test_operator_states_the_budget_once() {
-  local tuned="$BASE_FLAGS --set clickhouse.serverMaxConcurrentQueries=500"
-  expect_env "app tuned budget" app "$tuned" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 500
-  expect_env "workers tuned budget" workers "$tuned" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 500
+# @scenario "The platform's share defaults to less than the whole server"
+test_share_defaults_below_the_server_limit() {
+  expect_env "app default share" app "$BASE_FLAGS" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 270
+  expect_env "workers default share" workers "$BASE_FLAGS" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 270
 }
 
-test_both_deployments_receive_their_replica_count
-test_scaling_one_deployment_leaves_the_other_alone
-test_server_budget_defaults_to_the_clickhouse_default
-test_operator_states_the_budget_once
+# @scenario "An operator granted a different share states it once"
+test_operator_states_the_share_once() {
+  local tuned="$BASE_FLAGS --set clickhouse.platformConcurrentQueryShare=500"
+  expect_env "app tuned share" app "$tuned" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 500
+  expect_env "workers tuned share" workers "$tuned" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 500
+}
+
+test_both_deployments_count_the_whole_fleet
+test_scaling_one_deployment_resizes_both
+test_disabled_workers_are_not_counted
+test_share_defaults_below_the_server_limit
+test_operator_states_the_share_once
 
 if [ "$failures" -ne 0 ]; then
   echo
