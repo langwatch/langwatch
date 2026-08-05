@@ -13,9 +13,16 @@ import {
   buildGenericOAuthConfigs,
   discoveryUrlFor,
   fallbackName,
+  PLAIN_OIDC_PROVIDERS,
 } from "../providers";
 
 const BASE_URL = "https://langwatch.acme.test";
+
+/**
+ * Taken from the provider table rather than listed here, so a provider added
+ * there is covered without anyone remembering to come back.
+ */
+const PLAIN_OIDC_PROVIDER_IDS = PLAIN_OIDC_PROVIDERS.map((p) => p.providerId);
 
 const COGNITO_ISSUER =
   "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123";
@@ -192,7 +199,7 @@ describe("buildGenericOAuthConfigs", () => {
   describe("when the operator registers the callback URL", () => {
     /** @scenario The callback URL follows the same rule as every other provider */
     it("uses the same /api/auth/callback/<provider> shape the docs give for every provider", () => {
-      for (const provider of ["cognito", "onelogin", "oidc"]) {
+      for (const provider of PLAIN_OIDC_PROVIDER_IDS) {
         const configs = buildGenericOAuthConfigs(
           envWith({
             NEXTAUTH_PROVIDER: provider,

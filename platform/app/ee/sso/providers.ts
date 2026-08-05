@@ -354,9 +354,10 @@ export const LEGACY_CALLBACK_PROVIDER_IDS: readonly string[] = [
 /**
  * Builds the BetterAuth genericOAuth `config` array from environment
  * configuration. Only the provider named by `NEXTAUTH_PROVIDER` is added, and
- * only when its credentials are present. Each entry carries a `providerId`
- * (`"auth0"`, `"okta"`, `"cognito"`, `"onelogin"`) so the genericOAuth plugin
- * registers it under that id.
+ * only when its credentials are present. Each entry carries the `providerId`
+ * that `NEXTAUTH_PROVIDER` named, so the genericOAuth plugin registers it
+ * under that id: `auth0` and `okta` below, then every row of
+ * `PLAIN_OIDC_PROVIDERS`.
  *
  * Exported for unit testing, so provider selection can be asserted directly
  * without re-initializing the module under a different `NEXTAUTH_PROVIDER`.
