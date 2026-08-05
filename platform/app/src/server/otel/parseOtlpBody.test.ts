@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
 
 import { OtlpBodyTooLargeError } from "./errors";
 import {
-  OTLP_MAX_DECOMPRESSED_BYTES,
+  OTLP_MAX_BODY_BYTES,
   parseOtlpLogs,
   parseOtlpMetrics,
   parseOtlpTraces,
@@ -189,7 +189,7 @@ describe("readOtlpBody", () => {
     const bomb = (bytes: number) => gzipSync(Buffer.alloc(bytes, 0));
 
     it("refuses it rather than holding the expanded body", async () => {
-      const compressed = bomb(OTLP_MAX_DECOMPRESSED_BYTES + 1024);
+      const compressed = bomb(OTLP_MAX_BODY_BYTES + 1024);
       const req = makeRequest(compressed, { "content-encoding": "gzip" });
 
       await expect(readOtlpBody(req)).rejects.toBeInstanceOf(
@@ -198,7 +198,7 @@ describe("readOtlpBody", () => {
     });
 
     it("asks the sender for smaller batches with a 413", async () => {
-      const compressed = bomb(OTLP_MAX_DECOMPRESSED_BYTES + 1024);
+      const compressed = bomb(OTLP_MAX_BODY_BYTES + 1024);
       const req = makeRequest(compressed, { "content-encoding": "gzip" });
 
       await expect(readOtlpBody(req)).rejects.toMatchObject({
@@ -210,8 +210,8 @@ describe("readOtlpBody", () => {
     it("costs a fraction of the wire budget to send", async () => {
       // Worth stating as a number: this is why the compressed limit alone was
       // never a defence.
-      expect(bomb(OTLP_MAX_DECOMPRESSED_BYTES + 1024).byteLength).toBeLessThan(
-        OTLP_MAX_DECOMPRESSED_BYTES / 100,
+      expect(bomb(OTLP_MAX_BODY_BYTES + 1024).byteLength).toBeLessThan(
+        OTLP_MAX_BODY_BYTES / 100,
       );
     });
 
@@ -220,7 +220,7 @@ describe("readOtlpBody", () => {
       "deflate",
       "br",
     ])("applies the cap to %s as well", async (encoding) => {
-      const payload = Buffer.alloc(OTLP_MAX_DECOMPRESSED_BYTES + 1024, 0);
+      const payload = Buffer.alloc(OTLP_MAX_BODY_BYTES + 1024, 0);
       const compressed =
         encoding === "gzip"
           ? gzipSync(payload)
@@ -235,7 +235,7 @@ describe("readOtlpBody", () => {
     });
 
     it("still accepts a body that sits just under the cap", async () => {
-      const payload = Buffer.alloc(OTLP_MAX_DECOMPRESSED_BYTES - 1024, 0);
+      const payload = Buffer.alloc(OTLP_MAX_BODY_BYTES - 1024, 0);
       const req = makeRequest(gzipSync(payload), {
         "content-encoding": "gzip",
       });
@@ -244,6 +244,52 @@ describe("readOtlpBody", () => {
         "byteLength",
         payload.byteLength,
       );
+    });
+  });
+
+  describe("when an uncompressed body is larger than the cap", () => {
+    // The decompressed cap never sees this one: an identity body skips zlib
+    // altogether. The governance ingest routes carry no `bodyLimit` either, so
+    // without a bound here their only limit is the memory of the process.
+    it("refuses it rather than reading the whole body", async () => {
+      const req = makeRequest(Buffer.alloc(OTLP_MAX_BODY_BYTES + 1024, 0), {
+        "content-type": "application/x-protobuf",
+      });
+
+      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(
+        OtlpBodyTooLargeError,
+      );
+    });
+
+    it("asks the sender for smaller batches with a 413", async () => {
+      const req = makeRequest(Buffer.alloc(OTLP_MAX_BODY_BYTES + 1024, 0), {
+        "content-encoding": "identity",
+      });
+
+      await expect(readOtlpBody(req)).rejects.toMatchObject({
+        code: "ERR_PAYLOAD_TOO_LARGE",
+        httpStatus: 413,
+      });
+    });
+
+    it("still accepts an uncompressed body just under the cap", async () => {
+      const payload = Buffer.alloc(OTLP_MAX_BODY_BYTES - 1024, 0);
+      const req = makeRequest(payload, {
+        "content-type": "application/x-protobuf",
+      });
+
+      await expect(readOtlpBody(req)).resolves.toHaveProperty(
+        "byteLength",
+        payload.byteLength,
+      );
+    });
+  });
+
+  describe("when the request carries no body at all", () => {
+    it("reads as empty rather than throwing", async () => {
+      const req = new Request("http://localhost/test", { method: "POST" });
+
+      await expect(readOtlpBody(req)).resolves.toHaveProperty("byteLength", 0);
     });
   });
 });

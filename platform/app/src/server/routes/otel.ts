@@ -36,6 +36,7 @@ import type { UsageLimitResult } from "~/server/app-layer/usage/usage.service";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
+  OTLP_MAX_BODY_BYTES,
   parseOtlpLogs,
   parseOtlpMetrics,
   parseOtlpTraces,
@@ -50,9 +51,6 @@ const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
 const loggerTraces = createLogger("langwatch:otel:v1:traces");
 const loggerLogs = createLogger("langwatch:otel:v1:logs");
 const loggerMetrics = createLogger("langwatch:otel:v1:metrics");
-
-/** Matches the collector route, which has always been capped. */
-const OTLP_MAX_BODY_BYTES = 10 * 1024 * 1024;
 
 /**
  * A rejected OTLP body is unparsed, so it has not been through PII redaction.
