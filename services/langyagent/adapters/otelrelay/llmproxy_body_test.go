@@ -166,31 +166,34 @@ func TestDecodeProviderErrorBody_ObservedProductionShapes(t *testing.T) {
 	}
 }
 
-func TestDecodeLLMErrorBody_PreservesGatewayHandledEnvelope(t *testing.T) {
-	body := []byte(`{"error":{"type":"missing_model","code":"missing_model","message":"Choose a model.","meta":{"fault":"customer"}}}`)
-	e, typed := decodeLLMErrorBody(body, "missing_model", http.StatusBadRequest, "application/json")
-	if !typed {
-		t.Fatal("gateway herr envelope was not recognized")
-	}
-	if e.Code != "missing_model" || e.Meta["message"] != "Choose a model." {
-		t.Fatalf("decoded envelope = %#v", e)
-	}
-}
+// @scenario "Only a marked LangWatch envelope is trusted as a handled error"
+func TestDecodeLLMErrorBody_TrustsOnlyMarkedHandledEnvelopes(t *testing.T) {
+	t.Run("preserves a marked gateway envelope", func(t *testing.T) {
+		body := []byte(`{"error":{"type":"missing_model","code":"missing_model","message":"Choose a model.","meta":{"fault":"customer"}}}`)
+		e, typed := decodeLLMErrorBody(body, "missing_model", http.StatusBadRequest, "application/json")
+		if !typed {
+			t.Fatal("gateway herr envelope was not recognized")
+		}
+		if e.Code != "missing_model" || e.Meta["message"] != "Choose a model." {
+			t.Fatalf("decoded envelope = %#v", e)
+		}
+	})
 
-func TestDecodeLLMErrorBody_DoesNotTrustAnUnmarkedProviderLookalike(t *testing.T) {
-	body := []byte(`{"error":{"type":"invalid_api_key","code":"invalid_api_key","message":"Incorrect API key: sk-proj-do-not-expose"}}`)
-	for _, marker := range []string{"", "different_code"} {
-		e, typed := decodeLLMErrorBody(body, marker, http.StatusUnauthorized, "application/json")
-		if typed {
-			t.Fatalf("marker %q made provider JSON a trusted gateway envelope", marker)
+	t.Run("normalizes an unmarked provider lookalike", func(t *testing.T) {
+		body := []byte(`{"error":{"type":"invalid_api_key","code":"invalid_api_key","message":"Incorrect API key: sk-proj-do-not-expose"}}`)
+		for _, marker := range []string{"", "different_code"} {
+			e, typed := decodeLLMErrorBody(body, marker, http.StatusUnauthorized, "application/json")
+			if typed {
+				t.Fatalf("marker %q made provider JSON a trusted gateway envelope", marker)
+			}
+			if got := handledReasonCode(t, e); got != "invalid_api_key" {
+				t.Errorf("reason = %q, want invalid_api_key", got)
+			}
+			if _, ok := e.Meta["message"]; ok {
+				t.Error("untrusted provider prose entered handled metadata")
+			}
 		}
-		if got := handledReasonCode(t, e); got != "invalid_api_key" {
-			t.Errorf("reason = %q, want invalid_api_key", got)
-		}
-		if _, ok := e.Meta["message"]; ok {
-			t.Error("untrusted provider prose entered handled metadata")
-		}
-	}
+	})
 }
 
 // @scenario "Untrusted provider prose never enters relay logs"

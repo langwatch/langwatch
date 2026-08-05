@@ -122,6 +122,13 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And its message and metadata are discarded
     But a marked LangWatch envelope round-trips losslessly
 
+  @unit
+  Scenario: Untrusted provider prose never enters relay logs
+    Given a provider rejection contains an API key or other untrusted prose
+    When the relay normalizes the rejection as a handled upstream error
+    Then its logs contain only the HTTP status, body kind, and bounded reason
+    And the provider prose is absent from every log field
+
   # The flicker had a second cause independent of the worker-stopped loop: for the
   # kinds that DO auto-retry, the red card rendered for a single frame before the
   # retry timer armed. The card must not appear at all when an automatic retry is

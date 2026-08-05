@@ -155,9 +155,9 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		// "AI_APICallError" prose the control plane must never trust. A typed
 		// gateway herr envelope decodes losslessly (herr.FromBody — the
 		// cross-process continuation); a provider-native body the gateway
-		// forwarded verbatim (Anthropic's "credit balance too low", the codex
-		// backend's `detail`) is captured best-effort with the provider's
-		// message. The body is restored untouched for the worker's SDK.
+		// forwarded verbatim is reduced to bounded classification (reason code,
+		// status, and body kind), never provider prose. The body is restored
+		// untouched for the worker's SDK.
 		ModifyResponse: func(resp *http.Response) error {
 			if resp.StatusCode < 400 {
 				if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {

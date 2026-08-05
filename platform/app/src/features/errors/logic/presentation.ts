@@ -1390,6 +1390,10 @@ const presentations = {
     // in the registry of a code whose meta must never be rendered.
     describe: () => "We've been notified. Try again in a moment.",
   },
+  missing_model: {
+    title: "Choose a model",
+    describe: () => "Set the model in your request, then try again.",
+  },
 
   // ---- Langy agent ----
   llm_upstream_error: {
