@@ -2,26 +2,31 @@ import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 
-// The langyGithub procedures chain checkOrganizationPermission("langy:manage")
-// -> enforceOrganizationMembership -> enforceLangyAccess. This suite locks that
-// ORDER: authorization must be settled before the org-scoped rollout flag, so a
-// caller who fails it can't leak an arbitrary org's Langy rollout state
-// (a denial-when-enabled that differs from denial-when-disabled would be a
-// cross-tenant probe).
+// The github procedures chain checkOrganizationPermission -> membership. This
+// suite locks BOTH the permission each one demands and that order: reading the
+// connection asks for `organization:view`, which every member holds, so a
+// surface that needs GitHub can name who to ask; changing it asks for
+// `organization:manage`, because an installation grants repository access to
+// the whole organization. Membership runs second so a permitted caller still
+// cannot reach another tenant's connection.
 //
 // The permission middleware is stubbed to a controllable gate — whether the
-// role matrix grants `langy:manage` is pinned separately in
-// `api/__tests__/rbac.langy.unit.test.ts`; what matters here is the sequence.
+// role matrix grants a permission is pinned separately in the rbac suites; what
+// matters here is which permission is demanded, and in what order.
 const {
   isOrganizationMember,
   getAllForOrganization,
-  isEnabled,
+  getByInstallationId,
+  listRepositoriesForOrganization,
   hasOrgPermission,
+  permissionsAsked,
 } = vi.hoisted(() => ({
   isOrganizationMember: vi.fn(),
   getAllForOrganization: vi.fn(),
-  isEnabled: vi.fn(),
+  getByInstallationId: vi.fn(),
+  listRepositoriesForOrganization: vi.fn(),
   hasOrgPermission: vi.fn(),
+  permissionsAsked: [] as string[],
 }));
 
 vi.mock("~/server/api/rbac", async (importOriginal) => {
@@ -29,8 +34,9 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
   return {
     ...actual,
     checkOrganizationPermission:
-      () =>
+      (permission: string) =>
       async ({ ctx, next }: any) => {
+        permissionsAsked.push(permission);
         if (!hasOrgPermission()) {
           // The top-level TRPCError binding is safe here: this closure runs
           // at request time, long after the hoisted factory phase.
@@ -47,26 +53,29 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
 
 vi.mock("~/server/app-layer", () => ({
   getApp: () => ({
-    langy: {
-      githubInstallations: {
+    github: {
+      installations: {
         configured: true,
         isOrganizationMember,
         getAllForOrganization,
+        getByInstallationId,
+        listRepositoriesForOrganization,
       },
     },
   }),
 }));
 vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: { isEnabled },
+  featureFlagService: { isEnabled: vi.fn() },
 }));
 vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: vi.fn() }));
 
-import { langyGithubRouter } from "../langyGithub";
+import { featureFlagService } from "~/server/featureFlag";
+import { githubRouter } from "../github";
 
 const user = { id: "user-1", email: "user@example.com", emailVerified: true };
 
 function caller() {
-  return langyGithubRouter.createCaller(
+  return githubRouter.createCaller(
     createInnerTRPCContext({
       session: { user, expires: "1" } as any,
       permissionChecked: false,
@@ -74,76 +83,133 @@ function caller() {
   );
 }
 
-describe("langyGithubRouter membership-before-rollout gate", () => {
+function installationRow() {
+  return {
+    installationId: "555",
+    organizationId: "org-1",
+    accountLogin: "acme",
+    accountType: "Organization",
+    accountId: "1",
+    repositorySelection: "all",
+    repositories: null,
+    suspendedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
+describe("githubRouter access gates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    permissionsAsked.length = 0;
     getAllForOrganization.mockResolvedValue([]);
+    listRepositoriesForOrganization.mockResolvedValue([]);
     hasOrgPermission.mockReturnValue(true);
   });
 
-  describe("when the caller lacks langy:manage on the organization", () => {
-    /** @scenario "Connecting the organization's GitHub App is admin-only" */
-    it("is refused without ever evaluating the flag", async () => {
-      hasOrgPermission.mockReturnValue(false);
+  describe("when a member without management permission reads the status", () => {
+    /** @scenario "Any member can see whether GitHub is connected" */
+    it("asks only for organization:view and answers whether a connection exists", async () => {
       isOrganizationMember.mockResolvedValue(true);
-      isEnabled.mockResolvedValue(true);
+      getAllForOrganization.mockResolvedValue([installationRow()]);
 
-      await expect(
-        caller().getInstallStatus({ organizationId: "org-1" }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-      expect(isEnabled).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when an authorized non-member probes an org with the rollout enabled", () => {
-    it("throws FORBIDDEN without ever evaluating the flag", async () => {
-      isOrganizationMember.mockResolvedValue(false);
-      isEnabled.mockResolvedValue(true);
-
-      await expect(
-        caller().getInstallStatus({ organizationId: "victim-org" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
-      expect(isEnabled).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when an authorized non-member probes an org with the rollout disabled", () => {
-    it("throws the same FORBIDDEN (response independent of the org's flag)", async () => {
-      isOrganizationMember.mockResolvedValue(false);
-      isEnabled.mockResolvedValue(false);
-
-      await expect(
-        caller().getInstallStatus({ organizationId: "victim-org" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
-      expect(isEnabled).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when an authorized member's org has the rollout enabled", () => {
-    it("passes the gate (evaluated with the org scope) and returns install status", async () => {
-      isOrganizationMember.mockResolvedValue(true);
-      isEnabled.mockResolvedValue(true);
-
-      const result = await caller().getInstallStatus({
+      const result = await caller().getConnectionStatus({
         organizationId: "org-1",
       });
 
-      expect(result).toMatchObject({ configured: true });
-      expect(isEnabled).toHaveBeenCalledWith(
-        "release_langy_enabled",
-        expect.objectContaining({ organizationId: "org-1" }),
-      );
+      expect(permissionsAsked).toEqual(["organization:view"]);
+      expect(result.connected).toBe(true);
+      expect(result.installUrl).toContain("/api/github/install");
+    });
+
+    /** @scenario "Any member can see whether GitHub is connected" */
+    it("does not hand back repository names", async () => {
+      isOrganizationMember.mockResolvedValue(true);
+      getAllForOrganization.mockResolvedValue([
+        {
+          ...installationRow(),
+          repositorySelection: "selected",
+          repositories: [{ id: "77", fullName: "acme/service-x" }],
+        },
+      ]);
+
+      const result = await caller().getConnectionStatus({
+        organizationId: "org-1",
+      });
+
+      // The count is the whole answer a member gets about scope.
+      expect(result.installations[0]?.repositoryCount).toBe(1);
+      expect(JSON.stringify(result)).not.toContain("service-x");
+      expect(listRepositoriesForOrganization).not.toHaveBeenCalled();
     });
   });
 
-  describe("when an authorized member's org has the rollout disabled", () => {
-    it("throws NOT_FOUND from the gate after membership passes", async () => {
+  describe("when the caller lacks organization management", () => {
+    /** @scenario "Changing the organization's GitHub connection is admin-only" */
+    it("refuses to list repositories, without reading any", async () => {
+      hasOrgPermission.mockReturnValue(false);
       isOrganizationMember.mockResolvedValue(true);
-      isEnabled.mockResolvedValue(false);
 
       await expect(
-        caller().getInstallStatus({ organizationId: "org-1" }),
+        caller().listRepos({ organizationId: "org-1" }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      expect(permissionsAsked).toEqual(["organization:manage"]);
+      expect(listRepositoriesForOrganization).not.toHaveBeenCalled();
+    });
+
+    it("refuses to disconnect an installation", async () => {
+      hasOrgPermission.mockReturnValue(false);
+      isOrganizationMember.mockResolvedValue(true);
+
+      await expect(
+        caller().disconnect({
+          organizationId: "org-1",
+          installationId: "555",
+        }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      expect(permissionsAsked).toEqual(["organization:manage"]);
+      expect(getByInstallationId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a permitted caller is not a member of the organization", () => {
+    it("throws FORBIDDEN before any connection state is read", async () => {
+      isOrganizationMember.mockResolvedValue(false);
+
+      await expect(
+        caller().getConnectionStatus({ organizationId: "victim-org" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(getAllForOrganization).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the installation belongs to another organization", () => {
+    it("reports disconnect as a missing connection rather than a refusal", async () => {
+      isOrganizationMember.mockResolvedValue(true);
+      getByInstallationId.mockResolvedValue({
+        ...installationRow(),
+        organizationId: "someone-else",
+      });
+
+      await expect(
+        caller().disconnect({
+          organizationId: "org-1",
+          installationId: "555",
+        }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+  });
+
+  describe("when the Langy rollout is off for the organization", () => {
+    it("still answers the connection status, without evaluating the flag", async () => {
+      isOrganizationMember.mockResolvedValue(true);
+
+      const result = await caller().getConnectionStatus({
+        organizationId: "org-1",
+      });
+
+      expect(result.configured).toBe(true);
+      expect(featureFlagService.isEnabled).not.toHaveBeenCalled();
     });
   });
 });

@@ -1241,6 +1241,28 @@ const presentations = {
     title: "You don't have permission to attach guardrails",
     describe: () => "Ask an admin on your team for access to this project.",
   },
+  github_not_connected: {
+    title: "GitHub is not connected",
+    describe: () =>
+      "Connect GitHub for this organization in Settings, Integrations. An organization admin can do it.",
+  },
+  github_installation_suspended: {
+    // Only a person on github.com can lift a suspension, so there is nothing to
+    // retry and nothing to change in LangWatch.
+    title: "The GitHub connection is suspended",
+    describe: () =>
+      "GitHub has suspended the LangWatch app for this account. Resume it from the app's page on GitHub.",
+  },
+  github_repo_not_accessible: {
+    title: "That repository isn't available to LangWatch",
+    describe: () =>
+      "The GitHub app doesn't have access to that repository. Grant it access from Settings, Integrations, Configure, then try again.",
+  },
+  github_rate_limited: {
+    // fault: provider. Nobody did anything wrong, GitHub is simply throttling.
+    title: "GitHub is rate limiting requests",
+    describe: () => "Try again in a few minutes.",
+  },
   virtual_key_not_found: {
     title: "Virtual key not found",
     describe: () =>

@@ -1,8 +1,8 @@
 /**
- * Data-access layer for Langy GitHub App installations (the
- * `LangyGithubInstallation` rows) plus the `organizationUser` membership read
- * the install/webhook flow gates on. The installations service is the only
- * caller; no transport layer touches Prisma for this feature. Issue #4747.
+ * Data-access layer for the organization's GitHub connection (the
+ * `GithubInstallation` rows) plus the `organizationUser` membership read the
+ * install/webhook flow gates on. The installations service is the only caller;
+ * no transport layer touches Prisma for this feature.
  *
  * Repository methods use findAll / findBy naming; the service exposes getAll /
  * getBy. No secret is stored — the App private key is the only credential and
@@ -11,44 +11,44 @@
 
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-export interface LangyGithubRepositoryRef {
+export interface GithubRepositoryRef {
   id: string;
   fullName: string;
 }
 
-export interface LangyGithubInstallationRow {
+export interface GithubInstallationRow {
   installationId: string;
   organizationId: string;
   accountLogin: string;
   accountType: string;
   accountId: string;
   repositorySelection: string;
-  repositories: LangyGithubRepositoryRef[] | null;
+  repositories: GithubRepositoryRef[] | null;
   suspendedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface UpsertLangyGithubInstallationInput {
+export interface UpsertGithubInstallationInput {
   installationId: string;
   organizationId: string;
   accountLogin: string;
   accountType: string;
   accountId: string;
   repositorySelection: string;
-  repositories: LangyGithubRepositoryRef[] | null;
+  repositories: GithubRepositoryRef[] | null;
 }
 
-export interface LangyGithubInstallationsRepository {
+export interface GithubInstallationsRepository {
   findAllForOrganization(
     organizationId: string,
-  ): Promise<LangyGithubInstallationRow[]>;
+  ): Promise<GithubInstallationRow[]>;
 
   findByInstallationId(
     installationId: string,
-  ): Promise<LangyGithubInstallationRow | null>;
+  ): Promise<GithubInstallationRow | null>;
 
-  upsert(input: UpsertLangyGithubInstallationInput): Promise<void>;
+  upsert(input: UpsertGithubInstallationInput): Promise<void>;
 
   /**
    * Atomically claims `installationId` for `input.organizationId`, or reports
@@ -60,13 +60,13 @@ export interface LangyGithubInstallationsRepository {
    * committed row here, never a stale null.
    */
   insertOrGetExisting(
-    input: UpsertLangyGithubInstallationInput,
-  ): Promise<{ wasInserted: boolean; row: LangyGithubInstallationRow }>;
+    input: UpsertGithubInstallationInput,
+  ): Promise<{ wasInserted: boolean; row: GithubInstallationRow }>;
 
   setRepositories(params: {
     installationId: string;
     repositorySelection: string;
-    repositories: LangyGithubRepositoryRef[] | null;
+    repositories: GithubRepositoryRef[] | null;
   }): Promise<void>;
 
   setSuspended(params: {
@@ -82,19 +82,19 @@ export interface LangyGithubInstallationsRepository {
   }): Promise<boolean>;
 }
 
-export class NullLangyGithubInstallationsRepository
-  implements LangyGithubInstallationsRepository
+export class NullGithubInstallationsRepository
+  implements GithubInstallationsRepository
 {
-  async findAllForOrganization(): Promise<LangyGithubInstallationRow[]> {
+  async findAllForOrganization(): Promise<GithubInstallationRow[]> {
     return [];
   }
-  async findByInstallationId(): Promise<LangyGithubInstallationRow | null> {
+  async findByInstallationId(): Promise<GithubInstallationRow | null> {
     return null;
   }
   async upsert(): Promise<void> {}
   async insertOrGetExisting(
-    input: UpsertLangyGithubInstallationInput,
-  ): Promise<{ wasInserted: boolean; row: LangyGithubInstallationRow }> {
+    input: UpsertGithubInstallationInput,
+  ): Promise<{ wasInserted: boolean; row: GithubInstallationRow }> {
     const now = new Date();
     return {
       wasInserted: true,

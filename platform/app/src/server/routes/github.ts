@@ -1,26 +1,26 @@
 /**
- * Hono routes for the Langy GitHub App INSTALLATION flow (issue #4747).
+ * Hono routes for the organization's GitHub App installation flow.
  *
  * Surfaces:
- *   GET  /api/github-langy/install  — start: session-gated redirect to
+ *   GET  /api/github/install: start, a session-gated redirect to
  *        github.com/apps/<slug>/installations/new with a signed state.
- *   GET  /api/github-langy/setup    — GitHub's post-install redirect. Verify the
+ *   GET  /api/github/setup: GitHub's post-install redirect. Verify the
  *        signed state, record the installation against the organization it was
  *        bound to, then postMessage the opener (popup) or 302 back (redirect).
- *   POST /api/github-langy/webhook  — GitHub installation webhooks. Verifies the
+ *   POST /api/github/webhook: GitHub installation webhooks. Verifies the
  *        X-Hub-Signature-256 HMAC and keeps the installation row + repo
  *        selection fresh (created/deleted/suspend/unsuspend, repositories
  *        added/removed). Idempotent.
  *
  * There is no per-user OAuth: an installation IS the access boundary, PRs are
  * bot-authored, and tokens are minted on demand from the App private key. The
- * public surfaces are protocol-mandated (GitHub's Setup URL + webhook delivery)
- * — every sensitive read is guarded by the signed state or the HMAC.
+ * public surfaces are protocol-mandated (GitHub's Setup URL + webhook delivery),
+ * every sensitive read is guarded by the signed state or the HMAC.
  *
  * The route is just HTTP plumbing. DB writes + GitHub HTTP live in
- * app-layer/langy/langy-github-installations.service.ts.
+ * app-layer/github/github-installations.service.ts.
  *
- * Spec: specs/langy/langy-github-install.feature.
+ * Spec: specs/integrations/github-connection.feature.
  */
 
 import { auditLog } from "@ee/audit-log/auditLog";
@@ -34,28 +34,28 @@ import {
   publicEndpoint,
 } from "~/server/api/security";
 import { getApp } from "~/server/app-layer";
+import { GithubInstallationConflictError } from "~/server/app-layer/github/github-installations.service";
+import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
 import {
   consumeGithubInstallNonce,
   registerGithubInstallNonce,
-} from "~/server/app-layer/langy/githubOauthNonce";
+} from "~/server/app-layer/github/githubInstallNonce";
 import {
   popupErrorHtml,
   popupResponseHtml,
-} from "~/server/app-layer/langy/githubOauthPopupHtml";
+} from "~/server/app-layer/github/githubInstallPopupHtml";
 import {
-  type GithubOauthStatePayload,
+  type GithubInstallStatePayload,
   STATE_TTL_MS,
-  signGithubOauthState,
-  verifyGithubOauthState,
-} from "~/server/app-layer/langy/githubOauthState";
-import { LangyGithubInstallationConflictError } from "~/server/app-layer/langy/langy-github-installations.service";
-import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
+  signGithubInstallState,
+  verifyGithubInstallState,
+} from "~/server/app-layer/github/githubInstallState";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 
 import type { NextRequestShim } from "./types";
 
-const logger = createLogger("langwatch:api:github-langy");
+const logger = createLogger("langwatch:api:github");
 
 // /setup is GitHub's Setup URL — a protocol-mandated public redirect target.
 // All sensitive state is signed and bound to the session that started the flow.
@@ -86,12 +86,12 @@ function signingKey(): string {
   return secret;
 }
 
-function signState(payload: GithubOauthStatePayload): string {
-  return signGithubOauthState(payload, signingKey());
+function signState(payload: GithubInstallStatePayload): string {
+  return signGithubInstallState(payload, signingKey());
 }
 
-function verifyState(token: string | null): GithubOauthStatePayload | null {
-  return verifyGithubOauthState(token, signingKey());
+function verifyState(token: string | null): GithubInstallStatePayload | null {
+  return verifyGithubInstallState(token, signingKey());
 }
 
 // Only allow internal relative paths as returnTo, to prevent open-redirects.
@@ -103,16 +103,6 @@ function safeReturnTo(raw: string | null | undefined): string {
   if (raw.startsWith("//") || raw.startsWith("/\\")) return fallback;
   if (/[\r\n\t\0]/.test(raw)) return fallback;
   return raw;
-}
-
-// The App must have a private key (to mint tokens) + id (JWT issuer) + slug
-// (the install deep-link target) for the install flow to be usable.
-function installConfigured(): boolean {
-  return Boolean(
-    env.GITHUB_LANGY_PRIVATE_KEY &&
-      env.GITHUB_LANGY_APP_ID &&
-      env.GITHUB_LANGY_APP_SLUG,
-  );
 }
 
 function withGithubError(returnTo: string, message: string): string {
@@ -144,7 +134,7 @@ function popupHtml(
 function setupError(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   c: any,
-  state: GithubOauthStatePayload | null,
+  state: GithubInstallStatePayload | null,
   errorMessage: string,
   status: number,
 ): Response {
@@ -159,236 +149,195 @@ function publicGithubErrorMessage(): string {
   return "GitHub installation failed. Please try again.";
 }
 
-secured
-  .access(
-    handlerManagedAuth({
-      reason: INSTALL_HANDLER_AUTH_REASON,
-      permissions: ["langy:manage"],
-      credential: "session",
-    }),
-  )
-  .get("/github-langy/install", async (c) => {
-    if (!installConfigured()) {
-      return c.json(
-        { error: "The GitHub integration is not available on this instance." },
-        { status: 503 },
-      );
-    }
-    const session = await getServerAuthSession({
-      req: c.req.raw as NextRequestShim,
-    });
-    if (!session?.user) {
-      return c.json({ error: "Not authenticated" }, { status: 401 });
-    }
-    const organizationId = c.req.query("organizationId") ?? "";
-    if (!organizationId) {
-      return c.json(
-        { error: "organizationId query param is required" },
-        { status: 400 },
-      );
-    }
-    // Cross-tenant guard FIRST: the user must be a member of the org they
-    // install for. Membership is proven before the org-scoped Langy flag so a
-    // non-member's response can't reveal that org's rollout state (FORBIDDEN
-    // when enabled vs NOT_FOUND when disabled would be a cross-tenant probe).
-    // Same order as the tRPC surface: enforceOrganizationMembership then
-    // enforceLangyAccess.
-    if (
-      !(await getApp().langy.githubInstallations.isOrganizationMember({
-        userId: session.user.id,
-        organizationId,
-      }))
-    ) {
-      return c.json(
-        { error: "Not a member of this organization." },
-        { status: 403 },
-      );
-    }
-    // Same permission the tRPC surface demands: connecting the App grants
-    // Langy repository access for every project underneath, so membership
-    // alone is not enough. Still ahead of the rollout gate, matching the
-    // probe-resistant ordering documented in langyGithub.ts.
-    if (
-      !(await hasOrganizationPermission(
-        { prisma, session },
-        organizationId,
-        "langy:manage",
-      ))
-    ) {
-      return c.json({ error: "Forbidden" }, { status: 403 });
-    }
-    // Same authoritative gate as Langy's tRPC surface so the GitHub install
-    // cannot become a rollout bypass. Forward organizationId so an org-scoped
-    // rollout rule resolves the same way it does on the tRPC surface.
-    if (!(await hasLangyAccess({ user: session.user, organizationId }))) {
-      return c.json(
-        { error: "The GitHub integration is not enabled for this account." },
-        { status: 404 },
-      );
-    }
-
-    const mode = c.req.query("mode") === "popup" ? "popup" : "redirect";
-    const returnTo = safeReturnTo(c.req.query("return"));
-    const nonce = randomBytes(16).toString("base64url");
-    const nonceRegistered = await registerGithubInstallNonce(
-      nonce,
-      Math.ceil(STATE_TTL_MS / 1000),
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleInstall(c: any): Promise<Response> {
+  const config = getGithubAppConfig();
+  if (!config.configured) {
+    return c.json(
+      { error: "The GitHub integration is not available on this instance." },
+      { status: 503 },
     );
-
-    const state = signState({
+  }
+  const session = await getServerAuthSession({
+    req: c.req.raw as NextRequestShim,
+  });
+  if (!session?.user) {
+    return c.json({ error: "Not authenticated" }, { status: 401 });
+  }
+  const organizationId = c.req.query("organizationId") ?? "";
+  if (!organizationId) {
+    return c.json(
+      { error: "organizationId query param is required" },
+      { status: 400 },
+    );
+  }
+  // Cross-tenant guard FIRST: the user must be a member of the org they install
+  // for, so a non-member's response never depends on anything about that org.
+  if (
+    !(await getApp().github.installations.isOrganizationMember({
       userId: session.user.id,
       organizationId,
-      mode,
-      returnTo,
-      issuedAt: Date.now(),
-      nonce,
-      nonceRegistered,
-    });
-
-    // GitHub redirects back to the App's configured Setup URL after install; the
-    // signed `state` round-trips so /setup can bind the installation to the org.
-    const url = new URL(
-      `https://github.com/apps/${encodeURIComponent(
-        env.GITHUB_LANGY_APP_SLUG!,
-      )}/installations/new`,
+    }))
+  ) {
+    return c.json(
+      { error: "Not a member of this organization." },
+      { status: 403 },
     );
-    url.searchParams.set("state", state);
-    return c.redirect(url.toString(), 302);
+  }
+  // Connecting GitHub grants repository access to the whole organization, so it
+  // takes organization management: the same permission the tRPC surface demands
+  // for every write to the connection.
+  if (
+    !(await hasOrganizationPermission(
+      { prisma, session },
+      organizationId,
+      "organization:manage",
+    ))
+  ) {
+    return c.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const mode = c.req.query("mode") === "popup" ? "popup" : "redirect";
+  const returnTo = safeReturnTo(c.req.query("return"));
+  const nonce = randomBytes(16).toString("base64url");
+  const nonceRegistered = await registerGithubInstallNonce(
+    nonce,
+    Math.ceil(STATE_TTL_MS / 1000),
+  );
+
+  const state = signState({
+    userId: session.user.id,
+    organizationId,
+    mode,
+    returnTo,
+    issuedAt: Date.now(),
+    nonce,
+    nonceRegistered,
   });
 
-secured
-  .access(publicEndpoint(SETUP_PUBLIC_REASON))
-  .get("/github-langy/setup", async (c) => {
-    const state = verifyState(c.req.query("state") ?? null);
-    const installationId = c.req.query("installation_id");
-    if (!state || !installationId) {
-      return setupError(c, state, "Invalid state or missing installation", 400);
+  // GitHub redirects back to the App's configured Setup URL after install; the
+  // signed `state` round-trips so /setup can bind the installation to the org.
+  const url = new URL(
+    `https://github.com/apps/${encodeURIComponent(
+      config.appSlug,
+    )}/installations/new`,
+  );
+  url.searchParams.set("state", state);
+  return c.redirect(url.toString(), 302);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleSetup(c: any): Promise<Response> {
+  const state = verifyState(c.req.query("state") ?? null);
+  const installationId = c.req.query("installation_id");
+  if (!state || !installationId) {
+    return setupError(c, state, "Invalid state or missing installation", 400);
+  }
+
+  // Re-bind the session to the state's user.
+  const session = await getServerAuthSession({
+    req: c.req.raw as NextRequestShim,
+  });
+  if (!session?.user || session.user.id !== state.userId) {
+    return setupError(c, state, "Session changed mid-flow", 401);
+  }
+
+  // Burn the single-use nonce (skips when Redis was down at /install).
+  if (state.nonceRegistered) {
+    const consumed = await consumeGithubInstallNonce(state.nonce);
+    if (consumed === false) {
+      return setupError(c, state, "Installation link already used", 401);
     }
+  }
 
-    // Re-bind the session to the state's user.
-    const session = await getServerAuthSession({
-      req: c.req.raw as NextRequestShim,
-    });
-    if (!session?.user || session.user.id !== state.userId) {
-      return setupError(c, state, "Session changed mid-flow", 401);
-    }
+  // Re-check tenant membership (defense in depth against a stale state).
+  if (
+    !(await getApp().github.installations.isOrganizationMember({
+      userId: state.userId,
+      organizationId: state.organizationId,
+    }))
+  ) {
+    return setupError(c, state, "Not a member of this organization", 403);
+  }
 
-    // Burn the single-use nonce (skips when Redis was down at /install).
-    if (state.nonceRegistered) {
-      const consumed = await consumeGithubInstallNonce(state.nonce);
-      if (consumed === false) {
-        return setupError(c, state, "Installation link already used", 401);
-      }
-    }
+  // Re-check the connect permission too: the caller's role may have been
+  // lowered between /install and GitHub's redirect back here, and recording
+  // the installation is the write the permission exists to gate.
+  if (
+    !(await hasOrganizationPermission(
+      { prisma, session },
+      state.organizationId,
+      "organization:manage",
+    ))
+  ) {
+    return setupError(c, state, "Forbidden", 403);
+  }
 
-    // Re-check tenant membership (defense in depth against a stale state).
-    if (
-      !(await getApp().langy.githubInstallations.isOrganizationMember({
-        userId: state.userId,
-        organizationId: state.organizationId,
-      }))
-    ) {
-      return setupError(c, state, "Not a member of this organization", 403);
-    }
+  const returnTo = safeReturnTo(state.returnTo);
 
-    // Re-check the connect permission too: the caller's role may have been
-    // lowered between /install and GitHub's redirect back here, and recording
-    // the installation is the write the permission exists to gate.
-    if (
-      !(await hasOrganizationPermission(
-        { prisma, session },
-        state.organizationId,
-        "langy:manage",
-      ))
-    ) {
-      return setupError(c, state, "Forbidden", 403);
-    }
-
-    // Re-check the Langy gate before persisting anything. The install may have
-    // begun while the flag was on; if the rollout was disabled (or the caller's
-    // access revoked) in between, the internal-only boundary must still hold, so
-    // the kill switch is immediate for this customer-facing path. The nonce was
-    // already burned above, so a denied caller can't retry the signed state.
-    if (
-      !(await hasLangyAccess({
-        user: session.user,
-        organizationId: state.organizationId,
-      }))
-    ) {
-      return setupError(
-        c,
-        state,
-        "The GitHub integration is not enabled for this account.",
-        404,
-      );
-    }
-
-    const returnTo = safeReturnTo(state.returnTo);
-
-    let accountLogin: string;
-    try {
-      ({ accountLogin } =
-        await getApp().langy.githubInstallations.recordInstallation({
-          installationId,
-          organizationId: state.organizationId,
-        }));
-    } catch (err) {
-      // A cross-tenant takeover attempt (installation already owned by another
-      // org) is a security event, not an ordinary failure: audit it against the
-      // acting user/org so it is visible, but still return the generic message
-      // so the caller learns nothing about whether the installation id exists.
-      if (err instanceof LangyGithubInstallationConflictError) {
-        logger.warn(
-          {
-            installationId: err.installationId,
-            attemptedOrganizationId: err.attemptedOrganizationId,
-            userId: state.userId,
-          },
-          "blocked cross-tenant github installation rebind attempt",
-        );
-        try {
-          await auditLog({
-            userId: state.userId,
-            organizationId: state.organizationId,
-            action: "langy.github.install.rejected_cross_tenant",
-            args: { installationId: err.installationId },
-          });
-        } catch (auditErr) {
-          logger.warn(
-            { err: auditErr },
-            "audit log write failed after blocked rebind",
-          );
-        }
-      } else {
-        logger.warn({ err }, "github installation record failed");
-      }
-      const publicMsg = publicGithubErrorMessage();
-      return state.mode === "popup"
-        ? popupHtml(c, popupErrorHtml(publicMsg), 502)
-        : c.redirect(withGithubError(returnTo, publicMsg), 302);
-    }
-
-    try {
-      await auditLog({
-        userId: state.userId,
-        organizationId: state.organizationId,
-        action: "langy.github.install",
-        args: { installationId, accountLogin },
-      });
-    } catch (err) {
-      // The installation is already recorded — honour the success over audit
-      // completeness (operator-visible via this logger).
+  let accountLogin: string;
+  try {
+    ({ accountLogin } = await getApp().github.installations.recordInstallation({
+      installationId,
+      organizationId: state.organizationId,
+    }));
+  } catch (err) {
+    // A cross-tenant takeover attempt (installation already owned by another
+    // org) is a security event, not an ordinary failure: audit it against the
+    // acting user/org so it is visible, but still return the generic message
+    // so the caller learns nothing about whether the installation id exists.
+    if (err instanceof GithubInstallationConflictError) {
       logger.warn(
-        { err, organizationId: state.organizationId },
-        "audit log write failed after github install — installation persisted",
+        {
+          installationId: err.installationId,
+          attemptedOrganizationId: err.attemptedOrganizationId,
+          userId: state.userId,
+        },
+        "blocked cross-tenant github installation rebind attempt",
       );
+      try {
+        await auditLog({
+          userId: state.userId,
+          organizationId: state.organizationId,
+          action: "github.connection.install.rejected_cross_tenant",
+          args: { installationId: err.installationId },
+        });
+      } catch (auditErr) {
+        logger.warn(
+          { err: auditErr },
+          "audit log write failed after blocked rebind",
+        );
+      }
+    } else {
+      logger.warn({ err }, "github installation record failed");
     }
+    const publicMsg = publicGithubErrorMessage();
+    return state.mode === "popup"
+      ? popupHtml(c, popupErrorHtml(publicMsg), 502)
+      : c.redirect(withGithubError(returnTo, publicMsg), 302);
+  }
 
-    if (state.mode === "popup") {
-      return popupHtml(c, popupResponseHtml(accountLogin), 200);
-    }
-    return c.redirect(returnTo, 302);
-  });
+  try {
+    await auditLog({
+      userId: state.userId,
+      organizationId: state.organizationId,
+      action: "github.connection.install",
+      args: { installationId, accountLogin },
+    });
+  } catch (err) {
+    // The installation is already recorded — honour the success over audit
+    // completeness (operator-visible via this logger).
+    logger.warn(
+      { err, organizationId: state.organizationId },
+      "audit log write failed after github install — installation persisted",
+    );
+  }
+
+  if (state.mode === "popup") {
+    return popupHtml(c, popupResponseHtml(accountLogin), 200);
+  }
+  return c.redirect(returnTo, 302);
+}
 
 // GitHub webhook events: installation created/deleted/suspend/unsuspend and
 // installation_repositories added/removed. Verified by HMAC; idempotent.
@@ -404,7 +353,7 @@ function verifyWebhookSignature(
   rawBody: string,
   header: string | undefined,
 ): boolean {
-  const secret = env.GITHUB_LANGY_WEBHOOK_SECRET;
+  const secret = getGithubAppConfig().webhookSecret;
   if (!secret || !header) return false;
   const expected =
     "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
@@ -413,57 +362,87 @@ function verifyWebhookSignature(
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleWebhook(c: any): Promise<Response> {
+  if (!getGithubAppConfig().webhookSecret) {
+    return c.json({ error: "Webhook not configured" }, { status: 404 });
+  }
+  // Read the RAW body — the HMAC is over the exact bytes GitHub sent.
+  const rawBody = await c.req.text();
+  if (!verifyWebhookSignature(rawBody, c.req.header("x-hub-signature-256"))) {
+    return c.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  let payload: {
+    action?: string;
+    installation?: { id?: number };
+  };
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return c.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const eventType = c.req.header("x-github-event");
+  const action = payload.action as WebhookAction | undefined;
+  const installationId =
+    payload.installation?.id != null ? String(payload.installation.id) : null;
+
+  if (
+    (eventType !== "installation" &&
+      eventType !== "installation_repositories") ||
+    !installationId ||
+    !action
+  ) {
+    // Unknown/unrelated event — ack so GitHub doesn't retry.
+    return c.json({ received: true });
+  }
+
+  try {
+    await getApp().github.installations.handleWebhookEvent({
+      action,
+      installationId,
+    });
+  } catch (err) {
+    logger.warn(
+      { err, action, installationId },
+      "github webhook handling failed",
+    );
+    // Still ack — retries won't help a persistent handling error, and the
+    // next event (or the setup callback) reconciles.
+  }
+  return c.json({ received: true });
+}
+
+secured
+  .access(
+    handlerManagedAuth({
+      reason: INSTALL_HANDLER_AUTH_REASON,
+      permissions: ["organization:manage"],
+      credential: "session",
+    }),
+  )
+  .get("/github/install", handleInstall);
+
+secured
+  .access(publicEndpoint(SETUP_PUBLIC_REASON))
+  .get("/github/setup", handleSetup);
+
 secured
   .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
-  .post("/github-langy/webhook", async (c) => {
-    if (!env.GITHUB_LANGY_WEBHOOK_SECRET) {
-      return c.json({ error: "Webhook not configured" }, { status: 404 });
-    }
-    // Read the RAW body — the HMAC is over the exact bytes GitHub sent.
-    const rawBody = await c.req.text();
-    if (!verifyWebhookSignature(rawBody, c.req.header("x-hub-signature-256"))) {
-      return c.json({ error: "Invalid signature" }, { status: 401 });
-    }
+  .post("/github/webhook", handleWebhook);
 
-    let payload: {
-      action?: string;
-      installation?: { id?: number };
-    };
-    try {
-      payload = JSON.parse(rawBody);
-    } catch {
-      return c.json({ error: "Invalid JSON" }, { status: 400 });
-    }
+// The GitHub App configuration on github.com points its Setup URL and its
+// webhook delivery at the legacy paths, so both stay mounted on the same
+// handlers until that configuration is flipped to the canonical paths above.
+// Removing these two mounts is a tracked follow-up. /install needs no alias: it
+// is ours to call, and every caller in this repo uses the canonical path.
+secured
+  .access(publicEndpoint(SETUP_PUBLIC_REASON))
+  .get("/github-langy/setup", handleSetup);
 
-    const eventType = c.req.header("x-github-event");
-    const action = payload.action as WebhookAction | undefined;
-    const installationId =
-      payload.installation?.id != null ? String(payload.installation.id) : null;
-
-    if (
-      (eventType !== "installation" &&
-        eventType !== "installation_repositories") ||
-      !installationId ||
-      !action
-    ) {
-      // Unknown/unrelated event — ack so GitHub doesn't retry.
-      return c.json({ received: true });
-    }
-
-    try {
-      await getApp().langy.githubInstallations.handleWebhookEvent({
-        action,
-        installationId,
-      });
-    } catch (err) {
-      logger.warn(
-        { err, action, installationId },
-        "github webhook handling failed",
-      );
-      // Still ack — retries won't help a persistent handling error, and the
-      // next event (or the setup callback) reconciles.
-    }
-    return c.json({ received: true });
-  });
+secured
+  .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
+  .post("/github-langy/webhook", handleWebhook);
 
 export const app = secured.hono;

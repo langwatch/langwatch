@@ -1,31 +1,38 @@
 /**
- * Langy ↔ GitHub App installations: the install/webhook lifecycle and the
- * per-turn installation-token mint that Langy hands the worker. There is no
- * per-user OAuth and no stored secret — an installation IS the access boundary,
- * and tokens are minted on demand from the App private key (held only in the
- * control plane) and never persisted. Issue #4747.
+ * The organization's GitHub connection: the install/webhook lifecycle, and the
+ * token mints its consumers ask for. There is no per-user OAuth and no stored
+ * secret, an installation IS the access boundary, and tokens are minted on
+ * demand from the App private key (held only in the control plane) and never
+ * persisted.
  *
- * Routes → this service → repository / app-token service. Business rules
- * (which installation, which repository scope) live here, never in the route.
+ * Routes and procedures go through this service, never the repository. Business
+ * rules (which installation, which repository scope) live here.
+ *
+ * Spec: specs/integrations/github-connection.feature.
  */
 import { createLogger } from "@langwatch/observability";
 
 import {
+  GithubApiRateLimitedError,
+  GithubInstallationSuspendedError,
+} from "./errors";
+import {
   computeRepoScopeKey,
+  type GithubAppTokenService,
   GithubInstallationNotFoundError,
+  GithubRateLimitedError,
   type GithubRepository,
-  type LangyGithubAppTokenService,
-} from "./langyGithubAppToken";
+} from "./githubAppToken";
 import type {
-  LangyGithubInstallationRow,
-  LangyGithubInstallationsRepository,
-  LangyGithubRepositoryRef,
-} from "./repositories/langy-github-installations.repository";
+  GithubInstallationRow,
+  GithubInstallationsRepository,
+  GithubRepositoryRef,
+} from "./repositories/github-installations.repository";
 
-const logger = createLogger("langwatch:langy:github-installations");
+const logger = createLogger("langwatch:github:installations");
 
 /** The token + acting identity a turn hands to the worker for a bot-authored PR. */
-export interface LangyGithubTurnToken {
+export interface GithubTurnToken {
   token: string;
   /** Stable key for the token's repository/permission scope — folded into the
    * worker credential signature so a scope change re-warms the worker. */
@@ -34,7 +41,7 @@ export interface LangyGithubTurnToken {
 }
 
 /** A recognised installation webhook action. */
-export type LangyGithubWebhookAction =
+export type GithubWebhookAction =
   | "created"
   | "deleted"
   | "suspend"
@@ -56,7 +63,7 @@ export type LangyGithubWebhookAction =
  * repos. The route maps this to the generic install-failed message so a blocked
  * attacker learns nothing about whether the id exists.
  */
-export class LangyGithubInstallationConflictError extends Error {
+export class GithubInstallationConflictError extends Error {
   public readonly installationId: string;
   public readonly existingOrganizationId: string;
   public readonly attemptedOrganizationId: string;
@@ -73,17 +80,28 @@ export class LangyGithubInstallationConflictError extends Error {
     super(
       `GitHub installation ${installationId} is already connected to a different organization`,
     );
-    this.name = "LangyGithubInstallationConflictError";
+    this.name = "GithubInstallationConflictError";
     this.installationId = installationId;
     this.existingOrganizationId = existingOrganizationId;
     this.attemptedOrganizationId = attemptedOrganizationId;
   }
 }
 
-export class LangyGithubInstallationsService {
+export class GithubInstallationsService {
   constructor(
-    private readonly repo: LangyGithubInstallationsRepository,
-    private readonly appTokens: LangyGithubAppTokenService,
+    private readonly repo: GithubInstallationsRepository,
+    private readonly appTokens: GithubAppTokenService,
+    /**
+     * Called after a fresh installation is recorded, so a consumer can warm
+     * whatever it derives from the connection (pull-request mapping backfills
+     * its repositories this way). Fire-and-forget: the installation is already
+     * committed and the customer is watching a redirect, so a slow or failing
+     * consumer must not hold up, or fail, the install.
+     */
+    private readonly onInstallationRecorded?: (params: {
+      installationId: string;
+      organizationId: string;
+    }) => void | Promise<void>,
   ) {}
 
   /** True when the App private key + id are configured on this instance. */
@@ -101,13 +119,13 @@ export class LangyGithubInstallationsService {
 
   getAllForOrganization(
     organizationId: string,
-  ): Promise<LangyGithubInstallationRow[]> {
+  ): Promise<GithubInstallationRow[]> {
     return this.repo.findAllForOrganization(organizationId);
   }
 
   getByInstallationId(
     installationId: string,
-  ): Promise<LangyGithubInstallationRow | null> {
+  ): Promise<GithubInstallationRow | null> {
     return this.repo.findByInstallationId(installationId);
   }
 
@@ -126,7 +144,7 @@ export class LangyGithubInstallationsService {
   }): Promise<{ accountLogin: string }> {
     const details = await this.appTokens.getInstallation(installationId);
 
-    let repositories: LangyGithubRepositoryRef[] | null = null;
+    let repositories: GithubRepositoryRef[] | null = null;
     if (details.repositorySelection === "selected") {
       // Best-effort: cache the selected repo list so settings can show it
       // without a live call. A failure here must not fail the install.
@@ -160,7 +178,7 @@ export class LangyGithubInstallationsService {
     const { wasInserted, row } = await this.repo.insertOrGetExisting(input);
     if (!wasInserted) {
       if (row.organizationId !== organizationId) {
-        throw new LangyGithubInstallationConflictError({
+        throw new GithubInstallationConflictError({
           installationId: details.installationId,
           existingOrganizationId: row.organizationId,
           attemptedOrganizationId: organizationId,
@@ -171,7 +189,31 @@ export class LangyGithubInstallationsService {
       await this.repo.upsert(input);
     }
 
+    this.notifyInstallationRecorded({
+      installationId: details.installationId,
+      organizationId,
+    });
+
     return { accountLogin: details.accountLogin };
+  }
+
+  private notifyInstallationRecorded(params: {
+    installationId: string;
+    organizationId: string;
+  }): void {
+    if (!this.onInstallationRecorded) return;
+    try {
+      void Promise.resolve(this.onInstallationRecorded(params)).catch(
+        (error: unknown) => {
+          logger.warn(
+            { error, ...params },
+            "installation-recorded hook failed",
+          );
+        },
+      );
+    } catch (error) {
+      logger.warn({ error, ...params }, "installation-recorded hook failed");
+    }
   }
 
   /**
@@ -183,10 +225,10 @@ export class LangyGithubInstallationsService {
    * no-op rather than an error.
    */
   async handleWebhookEvent(params: {
-    action: LangyGithubWebhookAction;
+    action: GithubWebhookAction;
     installationId: string;
     repositorySelection?: string;
-    repositories?: LangyGithubRepositoryRef[] | null;
+    repositories?: GithubRepositoryRef[] | null;
   }): Promise<void> {
     const { action, installationId } = params;
     switch (action) {
@@ -211,7 +253,7 @@ export class LangyGithubInstallationsService {
         // partial repo list.
         try {
           const details = await this.appTokens.getInstallation(installationId);
-          let repositories: LangyGithubRepositoryRef[] | null = null;
+          let repositories: GithubRepositoryRef[] | null = null;
           if (details.repositorySelection === "selected") {
             repositories =
               await this.appTokens.listInstallationRepositories(installationId);
@@ -235,16 +277,27 @@ export class LangyGithubInstallationsService {
   /**
    * List every repository reachable across the organization's installations.
    * Aggregated + de-duplicated by full name. Used by the settings UI.
+   *
+   * Two failures are named rather than swallowed, because an empty list is a
+   * lie the reader can act on wrongly: an organization whose every
+   * installation is suspended, and GitHub refusing on a rate limit (which the
+   * next installation would hit too). A per-installation failure of any other
+   * kind is still logged and skipped.
    */
   async listRepositoriesForOrganization(
     organizationId: string,
   ): Promise<GithubRepository[]> {
     const installations =
       await this.repo.findAllForOrganization(organizationId);
+    const usable = installations.filter((i) => !i.suspendedAt);
+    if (installations.length > 0 && usable.length === 0) {
+      throw new GithubInstallationSuspendedError({
+        accountLogin: installations[0]!.accountLogin,
+      });
+    }
     const seen = new Set<string>();
     const out: GithubRepository[] = [];
-    for (const inst of installations) {
-      if (inst.suspendedAt) continue;
+    for (const inst of usable) {
       try {
         const repos = await this.appTokens.listInstallationRepositories(
           inst.installationId,
@@ -255,6 +308,12 @@ export class LangyGithubInstallationsService {
           out.push(r);
         }
       } catch (error) {
+        if (error instanceof GithubRateLimitedError) {
+          throw new GithubApiRateLimitedError(
+            { retryAfterSec: error.retryAfterSec },
+            { reasons: [error] },
+          );
+        }
         logger.warn(
           { error, installationId: inst.installationId },
           "failed to list repositories for installation",
@@ -278,7 +337,7 @@ export class LangyGithubInstallationsService {
    *
    * Self-heals stale installations: a webhook delivery can be missed (or an
    * installation can predate the webhook being configured at all), leaving a
-   * `LangyGithubInstallation` row for an installation GitHub has already
+   * `GithubInstallation` row for an installation GitHub has already
    * forgotten. Rather than let that dead row block every real installation
    * behind it forever, a confirmed 404 from GitHub — whether it surfaces
    * while minting or while resolving an explicit repo id — removes the row
@@ -294,7 +353,7 @@ export class LangyGithubInstallationsService {
   }: {
     organizationId: string;
     repositoryFullName?: string;
-  }): Promise<LangyGithubTurnToken | null> {
+  }): Promise<GithubTurnToken | null> {
     if (!this.configured) return null;
     const installations =
       await this.repo.findAllForOrganization(organizationId);
@@ -313,9 +372,9 @@ export class LangyGithubInstallationsService {
   // self-healed away in favor of the next one that can reach the same repo,
   // rather than failing the turn outright.
   private async mintForExplicitRepo(
-    usable: LangyGithubInstallationRow[],
+    usable: GithubInstallationRow[],
     repositoryFullName: string,
-  ): Promise<LangyGithubTurnToken | null> {
+  ): Promise<GithubTurnToken | null> {
     for (const inst of usable) {
       const resolved = await this.resolveRepositoryIdOrHeal(
         inst,
@@ -338,7 +397,7 @@ export class LangyGithubInstallationsService {
   // and reported back as "nothing to resolve" rather than thrown, so
   // mintForExplicitRepo stays a flat loop.
   private async resolveRepositoryIdOrHeal(
-    inst: LangyGithubInstallationRow,
+    inst: GithubInstallationRow,
     repositoryFullName: string,
   ): Promise<{ repoId: string | null; wasDeadInstallation: boolean }> {
     try {
@@ -357,8 +416,8 @@ export class LangyGithubInstallationsService {
   // other mint failure stops here — a transient error must not make us skip
   // past a live installation.
   private async mintForAnyInstallation(
-    usable: LangyGithubInstallationRow[],
-  ): Promise<LangyGithubTurnToken | null> {
+    usable: GithubInstallationRow[],
+  ): Promise<GithubTurnToken | null> {
     for (const inst of usable) {
       const outcome = await this.mintScoped({
         installationId: inst.installationId,
@@ -376,7 +435,7 @@ export class LangyGithubInstallationsService {
     installationId: string;
     repositoryIds?: string[];
   }): Promise<{
-    token: LangyGithubTurnToken | null;
+    token: GithubTurnToken | null;
     wasDeadInstallation: boolean;
   }> {
     try {
@@ -405,7 +464,7 @@ export class LangyGithubInstallationsService {
     }
   }
 
-  // Removes a `LangyGithubInstallation` row GitHub has confirmed (404) it no
+  // Removes a `GithubInstallation` row GitHub has confirmed (404) it no
   // longer knows about. Shared by every call site that can hit that error —
   // minting and, via listInstallationRepositories, resolving a repo id too.
   private async markInstallationDead(installationId: string): Promise<void> {
@@ -422,7 +481,7 @@ export class LangyGithubInstallationsService {
   // can self-heal it — every other failure degrades to "can't resolve", same
   // as before.
   private async resolveRepositoryId(
-    inst: LangyGithubInstallationRow,
+    inst: GithubInstallationRow,
     repositoryFullName: string,
   ): Promise<string | null> {
     const wanted = repositoryFullName.toLowerCase();

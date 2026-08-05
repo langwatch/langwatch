@@ -301,6 +301,79 @@ describe("guardOrganizationId — audited real query shapes pass", () => {
   });
 });
 
+describe("guardOrganizationId — the GitHub connection's tables", () => {
+  describe("when looking a pull request up by repository alone", () => {
+    it("THROWS — a repository name is not unique across organizations", async () => {
+      await expect(
+        runGuard({
+          model: "GithubPullRequest",
+          action: "findMany",
+          args: {
+            where: {
+              repositoryHost: "github.com",
+              repositoryFullName: "acme/service-x",
+              headBranch: "feature/thing",
+            },
+          },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when the same lookup names the organization", () => {
+    it("does NOT throw — the query is bounded to one tenant", async () => {
+      await expect(
+        runGuard({
+          model: "GithubPullRequest",
+          action: "findMany",
+          args: {
+            where: {
+              organizationId: "org-1",
+              repositoryHost: "github.com",
+              repositoryFullName: "acme/service-x",
+              headBranch: "feature/thing",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when sweeping branch checks due for a recheck", () => {
+    it("THROWS without an organization, resolves with one", async () => {
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: { where: { notFoundAt: { not: null } } },
+        }),
+      ).rejects.toThrow();
+
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: {
+            where: { organizationId: "org-1", notFoundAt: { not: null } },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when reading the connection by its GitHub installation id", () => {
+    it("does NOT throw — an installation id names exactly one organization", async () => {
+      await expect(
+        runGuard({
+          model: "GithubInstallation",
+          action: "findUnique",
+          args: { where: { installationId: "555" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
+
 describe("guardOrganizationId — unguarded models are ignored", () => {
   describe("when querying a model not in the org-scoped regime", () => {
     it("does NOT throw — Project is governed by guardProjectId, not here", async () => {

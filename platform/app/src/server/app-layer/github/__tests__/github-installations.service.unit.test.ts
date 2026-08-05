@@ -9,22 +9,23 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  LangyGithubInstallationConflictError,
-  LangyGithubInstallationsService,
-} from "../langy-github-installations.service";
+  GithubInstallationConflictError,
+  GithubInstallationsService,
+} from "../github-installations.service";
 import {
   computeRepoScopeKey,
   GithubInstallationNotFoundError,
-} from "../langyGithubAppToken";
+  GithubRateLimitedError,
+} from "../githubAppToken";
 import type {
-  LangyGithubInstallationRow,
-  LangyGithubInstallationsRepository,
-  UpsertLangyGithubInstallationInput,
-} from "../repositories/langy-github-installations.repository";
+  GithubInstallationRow,
+  GithubInstallationsRepository,
+  UpsertGithubInstallationInput,
+} from "../repositories/github-installations.repository";
 
 function makeRepo(
-  rows: LangyGithubInstallationRow[] = [],
-): LangyGithubInstallationsRepository & {
+  rows: GithubInstallationRow[] = [],
+): GithubInstallationsRepository & {
   upsert: ReturnType<typeof vi.fn>;
   insertOrGetExisting: ReturnType<typeof vi.fn>;
   deleteByInstallationId: ReturnType<typeof vi.fn>;
@@ -37,26 +38,24 @@ function makeRepo(
       [...byId.values()].filter((r) => r.organizationId === orgId),
     ),
     findByInstallationId: vi.fn(async (id: string) => byId.get(id) ?? null),
-    upsert: vi.fn(async (_i: UpsertLangyGithubInstallationInput) => {}),
+    upsert: vi.fn(async (_i: UpsertGithubInstallationInput) => {}),
     // Mirrors the real unique-index semantics: the read (`byId.get`) and the
     // write (`byId.set`) below have no `await` between them, so this function
     // body runs to completion in one microtask turn — exactly like a DB
     // unique-constraint `INSERT` — which is what makes the race test below a
     // real regression test rather than a coincidence of mock timing.
-    insertOrGetExisting: vi.fn(
-      async (input: UpsertLangyGithubInstallationInput) => {
-        const existing = byId.get(input.installationId);
-        if (existing) return { wasInserted: false, row: existing };
-        const created: LangyGithubInstallationRow = {
-          ...input,
-          suspendedAt: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        byId.set(input.installationId, created);
-        return { wasInserted: true, row: created };
-      },
-    ),
+    insertOrGetExisting: vi.fn(async (input: UpsertGithubInstallationInput) => {
+      const existing = byId.get(input.installationId);
+      if (existing) return { wasInserted: false, row: existing };
+      const created: GithubInstallationRow = {
+        ...input,
+        suspendedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      byId.set(input.installationId, created);
+      return { wasInserted: true, row: created };
+    }),
     setRepositories: vi.fn(async () => {}),
     setSuspended: vi.fn(async () => {}),
     deleteByInstallationId: vi.fn(async () => 1),
@@ -64,9 +63,7 @@ function makeRepo(
   };
 }
 
-function row(
-  over: Partial<LangyGithubInstallationRow> = {},
-): LangyGithubInstallationRow {
+function row(over: Partial<GithubInstallationRow> = {}): GithubInstallationRow {
   return {
     installationId: "inst-1",
     organizationId: "org-1",
@@ -117,7 +114,7 @@ function makeAppTokens(
 describe("recordInstallation", () => {
   it("maps GitHub's installation metadata onto the atomic insert", async () => {
     const repo = makeRepo();
-    const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+    const svc = new GithubInstallationsService(repo, makeAppTokens());
     const result = await svc.recordInstallation({
       installationId: "inst-1",
       organizationId: "org-1",
@@ -138,20 +135,21 @@ describe("recordInstallation", () => {
   });
 
   describe("when the installation is already owned by a different organization", () => {
+    /** @scenario "An installation cannot be rebound across organizations" */
     it("rejects the rebind and never upserts (cross-tenant takeover guard)", async () => {
       // inst-1 already belongs to org-1; a /setup call bound to org-2 (an
       // attacker's own org, with a valid signed state) must not steal it.
       const repo = makeRepo([
         row({ installationId: "inst-1", organizationId: "org-1" }),
       ]);
-      const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+      const svc = new GithubInstallationsService(repo, makeAppTokens());
 
       await expect(
         svc.recordInstallation({
           installationId: "inst-1",
           organizationId: "org-2",
         }),
-      ).rejects.toBeInstanceOf(LangyGithubInstallationConflictError);
+      ).rejects.toBeInstanceOf(GithubInstallationConflictError);
 
       expect(repo.upsert).not.toHaveBeenCalled();
     });
@@ -166,7 +164,7 @@ describe("recordInstallation", () => {
       // (see its comment above) to exercise that branch — it does NOT prove
       // Postgres actually serializes the concurrent writes; that guarantee is
       // proven against a real database in
-      // langy-github-installations.prisma.repository.integration.test.ts.
+      // github-installations.prisma.repository.integration.test.ts.
       const repo = makeRepo();
       // The stub must echo back the requested id — the default stub returns a
       // fixed "inst-1" regardless of input, which would key both calls' rows
@@ -180,7 +178,7 @@ describe("recordInstallation", () => {
           repositorySelection: "all",
         })),
       });
-      const svc = new LangyGithubInstallationsService(repo, appTokens);
+      const svc = new GithubInstallationsService(repo, appTokens);
 
       const results = await Promise.allSettled([
         svc.recordInstallation({
@@ -198,7 +196,7 @@ describe("recordInstallation", () => {
       expect(fulfilled).toHaveLength(1);
       expect(rejected).toHaveLength(1);
       expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(
-        LangyGithubInstallationConflictError,
+        GithubInstallationConflictError,
       );
 
       // Exactly one org ends up owning the installation — never both, never
@@ -214,7 +212,7 @@ describe("recordInstallation", () => {
       const repo = makeRepo([
         row({ installationId: "inst-1", organizationId: "org-1" }),
       ]);
-      const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+      const svc = new GithubInstallationsService(repo, makeAppTokens());
 
       await svc.recordInstallation({
         installationId: "inst-1",
@@ -231,11 +229,96 @@ describe("recordInstallation", () => {
   });
 });
 
+describe("the installation-recorded hook", () => {
+  describe("when a consumer is wired in", () => {
+    it("is told which installation landed, after the row is committed", async () => {
+      const repo = makeRepo();
+      const onRecorded = vi.fn();
+      const svc = new GithubInstallationsService(
+        repo,
+        makeAppTokens(),
+        onRecorded,
+      );
+
+      await svc.recordInstallation({
+        installationId: "inst-1",
+        organizationId: "org-1",
+      });
+
+      expect(onRecorded).toHaveBeenCalledWith({
+        installationId: "inst-1",
+        organizationId: "org-1",
+      });
+    });
+  });
+
+  describe("when the consumer throws", () => {
+    it("still records the installation", async () => {
+      const repo = makeRepo();
+      const svc = new GithubInstallationsService(repo, makeAppTokens(), () => {
+        throw new Error("consumer exploded");
+      });
+
+      await expect(
+        svc.recordInstallation({
+          installationId: "inst-1",
+          organizationId: "org-1",
+        }),
+      ).resolves.toEqual({ accountLogin: "acme" });
+      expect(repo.insertOrGetExisting).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("listRepositoriesForOrganization", () => {
+  describe("when every installation the org has is suspended", () => {
+    it("names the suspension instead of answering with an empty list", async () => {
+      const repo = makeRepo([row({ suspendedAt: new Date() })]);
+      const svc = new GithubInstallationsService(repo, makeAppTokens());
+
+      await expect(
+        svc.listRepositoriesForOrganization("org-1"),
+      ).rejects.toMatchObject({ code: "github_installation_suspended" });
+    });
+  });
+
+  describe("when GitHub is rate limiting us", () => {
+    it("says so rather than reporting no repositories", async () => {
+      const repo = makeRepo([row()]);
+      const svc = new GithubInstallationsService(
+        repo,
+        makeAppTokens({
+          listInstallationRepositories: vi.fn(async () => {
+            throw new GithubRateLimitedError({
+              retryAfterSec: 30,
+              resetAt: null,
+            });
+          }),
+        }),
+      );
+
+      await expect(
+        svc.listRepositoriesForOrganization("org-1"),
+      ).rejects.toMatchObject({ code: "github_rate_limited" });
+    });
+  });
+
+  describe("when the org has no installation at all", () => {
+    it("answers with an empty list", async () => {
+      const repo = makeRepo([]);
+      const svc = new GithubInstallationsService(repo, makeAppTokens());
+
+      expect(await svc.listRepositoriesForOrganization("org-1")).toEqual([]);
+    });
+  });
+});
+
 describe("handleWebhookEvent", () => {
   describe("when the installation is deleted", () => {
+    /** @scenario "Uninstalling removes the installation" */
     it("removes the row", async () => {
       const repo = makeRepo([row()]);
-      const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+      const svc = new GithubInstallationsService(repo, makeAppTokens());
       await svc.handleWebhookEvent({
         action: "deleted",
         installationId: "inst-1",
@@ -247,7 +330,7 @@ describe("handleWebhookEvent", () => {
   describe("when the installation is suspended", () => {
     it("flags it suspended", async () => {
       const repo = makeRepo([row()]);
-      const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+      const svc = new GithubInstallationsService(repo, makeAppTokens());
       await svc.handleWebhookEvent({
         action: "suspend",
         installationId: "inst-1",
@@ -259,10 +342,47 @@ describe("handleWebhookEvent", () => {
     });
   });
 
+  describe("when repositories are added to a known installation", () => {
+    /** @scenario "Webhook keeps the repository selection fresh" */
+    it("re-reads the authoritative selection from GitHub and stores it", async () => {
+      const repo = makeRepo([row({ repositorySelection: "selected" })]);
+      const svc = new GithubInstallationsService(
+        repo,
+        makeAppTokens({
+          getInstallation: vi.fn(async () => ({
+            installationId: "inst-1",
+            accountLogin: "acme",
+            accountType: "Organization",
+            accountId: "9000",
+            repositorySelection: "selected",
+          })),
+          listInstallationRepositories: vi.fn(async () => [
+            { id: "77", fullName: "acme/service-x" },
+            { id: "78", fullName: "acme/service-y" },
+          ]),
+        }),
+      );
+
+      await svc.handleWebhookEvent({
+        action: "added",
+        installationId: "inst-1",
+      });
+
+      expect(repo.setRepositories).toHaveBeenCalledWith({
+        installationId: "inst-1",
+        repositorySelection: "selected",
+        repositories: [
+          { id: "77", fullName: "acme/service-x" },
+          { id: "78", fullName: "acme/service-y" },
+        ],
+      });
+    });
+  });
+
   describe("when repositories change for an unknown installation", () => {
     it("does nothing (setup callback owns first-time mapping)", async () => {
       const repo = makeRepo();
-      const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+      const svc = new GithubInstallationsService(repo, makeAppTokens());
       await svc.handleWebhookEvent({
         action: "added",
         installationId: "ghost",
@@ -276,7 +396,7 @@ describe("mintTurnToken", () => {
   describe("when the App is not configured", () => {
     it("returns null", async () => {
       const repo = makeRepo([row()]);
-      const svc = new LangyGithubInstallationsService(
+      const svc = new GithubInstallationsService(
         repo,
         makeAppTokens({ configured: false }),
       );
@@ -285,18 +405,21 @@ describe("mintTurnToken", () => {
   });
 
   describe("when the org has no installation", () => {
+    /** @scenario "Without a connection the turn carries no GitHub credentials" */
+    /** @scenario "Uninstalling removes the installation" */
     it("returns null", async () => {
       const repo = makeRepo([]);
-      const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+      const svc = new GithubInstallationsService(repo, makeAppTokens());
       expect(await svc.mintTurnToken({ organizationId: "org-1" })).toBeNull();
     });
   });
 
   describe("when no explicit repo is given", () => {
+    /** @scenario "Langy still mints a turn token through the connection" */
     it("mints a full-installation-scoped token", async () => {
       const repo = makeRepo([row()]);
       const mint = vi.fn(async () => ({ token: "ghs_all", expiresAt: "" }));
-      const svc = new LangyGithubInstallationsService(
+      const svc = new GithubInstallationsService(
         repo,
         makeAppTokens({ mintInstallationToken: mint }),
       );
@@ -309,6 +432,7 @@ describe("mintTurnToken", () => {
   });
 
   describe("when an explicit repo is reachable", () => {
+    /** @scenario "A Langy turn mints repository-bounded credentials from the connection" */
     it("scopes the token to only that repository", async () => {
       const repo = makeRepo([
         row({
@@ -317,7 +441,7 @@ describe("mintTurnToken", () => {
         }),
       ]);
       const mint = vi.fn(async () => ({ token: "ghs_one", expiresAt: "" }));
-      const svc = new LangyGithubInstallationsService(
+      const svc = new GithubInstallationsService(
         repo,
         makeAppTokens({ mintInstallationToken: mint }),
       );
@@ -344,7 +468,7 @@ describe("mintTurnToken", () => {
           repositories: [{ id: "77", fullName: "acme/service-x" }],
         }),
       ]);
-      const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+      const svc = new GithubInstallationsService(repo, makeAppTokens());
       const result = await svc.mintTurnToken({
         organizationId: "org-1",
         repositoryFullName: "acme/other-repo",
@@ -356,7 +480,7 @@ describe("mintTurnToken", () => {
   describe("when the only installation is suspended", () => {
     it("returns null", async () => {
       const repo = makeRepo([row({ suspendedAt: new Date() })]);
-      const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+      const svc = new GithubInstallationsService(repo, makeAppTokens());
       expect(await svc.mintTurnToken({ organizationId: "org-1" })).toBeNull();
     });
   });
@@ -375,7 +499,7 @@ describe("mintTurnToken", () => {
           return { token: "ghs_live", expiresAt: "" };
         },
       );
-      const svc = new LangyGithubInstallationsService(
+      const svc = new GithubInstallationsService(
         repo,
         makeAppTokens({ mintInstallationToken: mint }),
       );
@@ -393,7 +517,7 @@ describe("mintTurnToken", () => {
       const mint = vi.fn(async () => {
         throw new GithubInstallationNotFoundError("inst-dead");
       });
-      const svc = new LangyGithubInstallationsService(
+      const svc = new GithubInstallationsService(
         repo,
         makeAppTokens({ mintInstallationToken: mint }),
       );
@@ -411,7 +535,7 @@ describe("mintTurnToken", () => {
       const mint = vi.fn(async () => {
         throw new Error("GitHub token mint failed: 500");
       });
-      const svc = new LangyGithubInstallationsService(
+      const svc = new GithubInstallationsService(
         repo,
         makeAppTokens({ mintInstallationToken: mint }),
       );
@@ -447,7 +571,7 @@ describe("mintTurnToken", () => {
           return { token: "ghs_live", expiresAt: "" };
         },
       );
-      const svc = new LangyGithubInstallationsService(
+      const svc = new GithubInstallationsService(
         repo,
         makeAppTokens({ mintInstallationToken: mint }),
       );
@@ -490,7 +614,7 @@ describe("mintTurnToken", () => {
         },
       );
       const mint = vi.fn(async () => ({ token: "ghs_live", expiresAt: "" }));
-      const svc = new LangyGithubInstallationsService(
+      const svc = new GithubInstallationsService(
         repo,
         makeAppTokens({
           listInstallationRepositories,

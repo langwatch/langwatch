@@ -1,13 +1,13 @@
 /**
- * Open the LangWatch GitHub App installation in a popup window and resolve with
- * the installed account once the setup shim posts back.
+ * Open the GitHub App installation in a popup window and resolve with the
+ * installed account once the setup shim posts back.
  *
- * Why a popup (not a redirect): the user is mid-conversation with Langy. A
+ * Why a popup (not a redirect): the caller is mid-conversation with Langy. A
  * full-page redirect drops the chat state on the floor. The popup runs the
  * install in a separate window and `postMessage`s the result back so the
  * sidebar can pick the conversation up exactly where it left off.
  *
- * Spec: specs/langy/langy-github-install.feature. Issue: #4747.
+ * Spec: specs/integrations/github-connection.feature.
  */
 import { useCallback, useEffect, useRef } from "react";
 
@@ -49,8 +49,8 @@ export type ConnectResult =
   | { ok: false; error: string; reason: ConnectFailureReason };
 
 type IncomingMessage =
-  | { type: "langy-github-connected"; login: string }
-  | { type: "langy-github-error"; message: string };
+  | { type: "github-connected"; login: string }
+  | { type: "github-error"; message: string };
 
 export function useGitHubConnectPopup() {
   const popupRef = useRef<Window | null>(null);
@@ -71,13 +71,10 @@ export function useGitHubConnectPopup() {
       if (ev.origin !== window.location.origin) return;
       const data = ev.data as IncomingMessage | undefined;
       if (!data || typeof data !== "object") return;
-      if (
-        data.type === "langy-github-connected" &&
-        typeof data.login === "string"
-      ) {
+      if (data.type === "github-connected" && typeof data.login === "string") {
         resolverRef.current?.({ ok: true, login: data.login });
         cleanup();
-      } else if (data.type === "langy-github-error") {
+      } else if (data.type === "github-error") {
         resolverRef.current?.({
           ok: false,
           reason: "failed",
@@ -117,8 +114,8 @@ export function useGitHubConnectPopup() {
         // Settings → Integrations opens (that page uses `mode=redirect`; here we
         // use `mode=popup` so the chat state survives). There is no separate
         // "connect" flow to invent: an App installation IS the access boundary.
-        const url = `/api/github-langy/install?mode=popup&organizationId=${encodeURIComponent(organizationId)}`;
-        const win = window.open(url, "langy-github-install", POPUP_FEATURES);
+        const url = `/api/github/install?mode=popup&organizationId=${encodeURIComponent(organizationId)}`;
+        const win = window.open(url, "github-install", POPUP_FEATURES);
         if (!win) {
           resolve({
             ok: false,

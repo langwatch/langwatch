@@ -15,11 +15,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   computeRepoScopeKey,
+  GITHUB_READ_PULL_PERMISSIONS,
+  GITHUB_WRITE_PERMISSIONS,
+  GithubAppTokenService,
   GithubInstallationNotFoundError,
-  LANGY_INSTALLATION_PERMISSIONS,
-  LangyGithubAppTokenService,
+  GithubRateLimitedError,
   type RedisLike,
-} from "../langyGithubAppToken";
+} from "../githubAppToken";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -75,7 +77,7 @@ describe("computeRepoScopeKey", () => {
 
 describe("signAppJwt", () => {
   it("signs an RS256 JWT issued by the app id, backdated, ≤10 minutes", () => {
-    const svc = new LangyGithubAppTokenService("app-123", privateKey, null);
+    const svc = new GithubAppTokenService("app-123", privateKey, null);
     const now = 1_000_000;
     const token = svc.signAppJwt(now);
     const decoded = jwt.verify(token, publicKey, {
@@ -95,7 +97,7 @@ describe("mintInstallationToken", () => {
   describe("when scoped to a single repository", () => {
     it("POSTs repository_ids + minimal permissions and caches the token", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(
           JSON.stringify({
@@ -121,7 +123,7 @@ describe("mintInstallationToken", () => {
       expect(mintCall).toBeDefined();
       const body = JSON.parse(String(mintCall?.[1]?.body));
       expect(body.repository_ids).toEqual([42]);
-      expect(body.permissions).toEqual(LANGY_INSTALLATION_PERMISSIONS);
+      expect(body.permissions).toEqual(GITHUB_WRITE_PERMISSIONS);
 
       // Cached under (installation, scope).
       const scope = computeRepoScopeKey({ repositoryIds: ["42"] });
@@ -134,7 +136,7 @@ describe("mintInstallationToken", () => {
   describe("when the same scope is requested twice", () => {
     it("serves the second from cache without a second mint", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(
           JSON.stringify({
@@ -159,7 +161,7 @@ describe("mintInstallationToken", () => {
   describe("when a different scope is requested", () => {
     it("mints again because the cache key differs", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(
           JSON.stringify({
@@ -187,7 +189,7 @@ describe("mintInstallationToken", () => {
   describe("when GitHub rejects the mint", () => {
     it("throws without caching", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       vi.stubGlobal(
         "fetch",
         vi.fn<typeof fetch>(async () => new Response("nope", { status: 403 })),
@@ -202,7 +204,7 @@ describe("mintInstallationToken", () => {
   describe("when GitHub confirms the installation no longer exists (404)", () => {
     it("throws GithubInstallationNotFoundError, distinct from other failures", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       vi.stubGlobal(
         "fetch",
         vi.fn<typeof fetch>(
@@ -219,7 +221,7 @@ describe("mintInstallationToken", () => {
   describe("when a token is cached but the installation was uninstalled since it was minted", () => {
     it("rejects with GithubInstallationNotFoundError instead of serving the stale cached token", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       const scope = computeRepoScopeKey({});
       // Simulate an already-warm cache entry from an earlier, successful mint —
       // the exact state a missed deletion webhook leaves behind for up to the
@@ -241,7 +243,7 @@ describe("mintInstallationToken", () => {
   describe("when a token is cached and the liveness probe itself fails transiently", () => {
     it("still serves the cached token (fails open, not closed)", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       const scope = computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       vi.stubGlobal(
@@ -258,7 +260,7 @@ describe("mintInstallationToken", () => {
   describe("when many concurrent calls hit a cached token for the same installation", () => {
     it("probes GitHub liveness only once, not once per caller", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       const scope = computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(async () => {
@@ -286,7 +288,7 @@ describe("mintInstallationToken", () => {
   describe("when the same installation is checked across multiple sequential turns", () => {
     it("probes GitHub once, then trusts the liveness marker for later cached calls", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       const scope = computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(async () => {
@@ -313,7 +315,7 @@ describe("mintInstallationToken", () => {
   describe("when the liveness marker has expired", () => {
     it("probes GitHub again on the next cached call", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       const scope = computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(async () => {
@@ -338,7 +340,7 @@ describe("mintInstallationToken", () => {
   describe("when a liveness probe fails transiently", () => {
     it("backs off instead of probing again on the very next cached call", async () => {
       const redis = fakeRedis();
-      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const svc = new GithubAppTokenService("app-1", privateKey, redis);
       const scope = computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(
@@ -359,13 +361,166 @@ describe("mintInstallationToken", () => {
   });
 });
 
+describe("listPullRequestsForHead", () => {
+  describe("when asking GitHub about a branch", () => {
+    /** @scenario "Pull request reads mint a read-only token" */
+    it("mints a repository-scoped token that can only read pull requests", async () => {
+      const svc = new GithubAppTokenService("app-1", privateKey, fakeRedis());
+      const fetchMock = vi.fn<typeof fetch>(async (url) => {
+        if (String(url).includes("/access_tokens")) {
+          return new Response(
+            JSON.stringify({
+              token: "ghs_read",
+              expires_at: "2030-01-01T00:00:00Z",
+            }),
+            { status: 201, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await svc.listPullRequestsForHead({
+        installationId: "99",
+        repositoryId: "42",
+        owner: "acme",
+        repo: "service-x",
+        branch: "feature/thing",
+      });
+
+      const mintCall = fetchMock.mock.calls.find((c) =>
+        String(c[0]).includes("/access_tokens"),
+      );
+      const body = JSON.parse(String(mintCall?.[1]?.body));
+      expect(body.permissions).toEqual(GITHUB_READ_PULL_PERMISSIONS);
+      expect(body.permissions).not.toHaveProperty("contents");
+      expect(body.repository_ids).toEqual([42]);
+    });
+
+    it("asks for the branch's pull requests in any state", async () => {
+      const svc = new GithubAppTokenService("app-1", privateKey, fakeRedis());
+      const fetchMock = vi.fn<typeof fetch>(async (url) => {
+        if (String(url).includes("/access_tokens")) {
+          return new Response(
+            JSON.stringify({ token: "ghs_read", expires_at: "" }),
+            { status: 201, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(
+          JSON.stringify([
+            {
+              number: 7,
+              html_url: "https://github.com/acme/service-x/pull/7",
+              title: "Add the thing",
+              state: "closed",
+              draft: false,
+              merged_at: "2026-01-02T00:00:00Z",
+              closed_at: "2026-01-02T00:00:00Z",
+              created_at: "2026-01-01T00:00:00Z",
+              user: { login: "octocat" },
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const pulls = await svc.listPullRequestsForHead({
+        installationId: "99",
+        repositoryId: "42",
+        owner: "acme",
+        repo: "service-x",
+        branch: "feature/thing",
+      });
+
+      const readCall = fetchMock.mock.calls.find((c) =>
+        String(c[0]).includes("/pulls"),
+      );
+      expect(String(readCall?.[0])).toContain("head=acme%3Afeature%2Fthing");
+      expect(String(readCall?.[0])).toContain("state=all");
+      expect(pulls).toEqual([
+        {
+          number: 7,
+          htmlUrl: "https://github.com/acme/service-x/pull/7",
+          title: "Add the thing",
+          state: "closed",
+          draft: false,
+          mergedAt: "2026-01-02T00:00:00Z",
+          closedAt: "2026-01-02T00:00:00Z",
+          createdAt: "2026-01-01T00:00:00Z",
+          authorLogin: "octocat",
+        },
+      ]);
+    });
+  });
+
+  describe("when GitHub answers 403 with its rate-limit headers", () => {
+    it("reports a rate limit, not a permission failure", async () => {
+      const svc = new GithubAppTokenService("app-1", privateKey, fakeRedis());
+      const fetchMock = vi.fn<typeof fetch>(async (url) => {
+        if (String(url).includes("/access_tokens")) {
+          return new Response(
+            JSON.stringify({ token: "ghs_read", expires_at: "" }),
+            { status: 201, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response("", {
+          status: 403,
+          headers: {
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": "1900000000",
+          },
+        });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        svc.listPullRequestsForHead({
+          installationId: "99",
+          repositoryId: "42",
+          owner: "acme",
+          repo: "service-x",
+          branch: "main",
+        }),
+      ).rejects.toBeInstanceOf(GithubRateLimitedError);
+    });
+  });
+
+  describe("when the repository is not on the installation", () => {
+    it("reports it as unreachable rather than as an unknown failure", async () => {
+      const svc = new GithubAppTokenService("app-1", privateKey, fakeRedis());
+      const fetchMock = vi.fn<typeof fetch>(async (url) => {
+        if (String(url).includes("/access_tokens")) {
+          return new Response(
+            JSON.stringify({ token: "ghs_read", expires_at: "" }),
+            { status: 201, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response("", { status: 404 });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        svc.listPullRequestsForHead({
+          installationId: "99",
+          repositoryId: "42",
+          owner: "acme",
+          repo: "hidden",
+          branch: "main",
+        }),
+      ).rejects.toMatchObject({ code: "github_repo_not_accessible" });
+    });
+  });
+});
+
 describe("configured", () => {
   it("is false without a private key, true with app id + key", () => {
-    expect(new LangyGithubAppTokenService("app", "", null).configured).toBe(
-      false,
+    expect(new GithubAppTokenService("app", "", null).configured).toBe(false);
+    expect(new GithubAppTokenService("app", privateKey, null).configured).toBe(
+      true,
     );
-    expect(
-      new LangyGithubAppTokenService("app", privateKey, null).configured,
-    ).toBe(true);
   });
 });

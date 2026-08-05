@@ -2,8 +2,8 @@ import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
-import { PrismaLangyGithubInstallationsRepository } from "../langy-github-installations.prisma.repository";
-import type { UpsertLangyGithubInstallationInput } from "../langy-github-installations.repository";
+import { PrismaGithubInstallationsRepository } from "../github-installations.prisma.repository";
+import type { UpsertGithubInstallationInput } from "../github-installations.repository";
 
 /**
  * `insertOrGetExisting`'s whole point is that a real Postgres unique-index
@@ -15,12 +15,12 @@ import type { UpsertLangyGithubInstallationInput } from "../langy-github-install
  * the real Prisma path against the real test database.
  */
 const namespace = `langy-install-${nanoid(10)}`;
-const repository = new PrismaLangyGithubInstallationsRepository(prisma);
+const repository = new PrismaGithubInstallationsRepository(prisma);
 
 function input(
   installationId: string,
   organizationId: string,
-): UpsertLangyGithubInstallationInput {
+): UpsertGithubInstallationInput {
   return {
     installationId,
     organizationId,
@@ -32,7 +32,7 @@ function input(
   };
 }
 
-// The tenancy guard on LangyGithubInstallation only recognises an exact-string
+// The tenancy guard on GithubInstallation only recognises an exact-string
 // `installationId` (or `organizationId`) in a WHERE clause, not a `startsWith`/
 // `in` filter — see dbOrganizationIdProtection.ts's `extraBound` check — so
 // cleanup deletes each known id by exact match rather than by prefix.
@@ -40,17 +40,19 @@ const installationIds = [
   `${namespace}-fresh`,
   `${namespace}-race`,
   `${namespace}-existing`,
+  `${namespace}-first`,
+  `${namespace}-second`,
 ];
 
 afterEach(async () => {
   for (const installationId of installationIds) {
-    await prisma.langyGithubInstallation.deleteMany({
+    await prisma.githubInstallation.deleteMany({
       where: { installationId },
     });
   }
 });
 
-describe("PrismaLangyGithubInstallationsRepository.insertOrGetExisting", () => {
+describe("PrismaGithubInstallationsRepository.insertOrGetExisting", () => {
   describe("when the installation id is fresh", () => {
     it("inserts and reports wasInserted: true", async () => {
       const installationId = `${namespace}-fresh`;
@@ -87,14 +89,30 @@ describe("PrismaLangyGithubInstallationsRepository.insertOrGetExisting", () => {
         inserted[0]!.row.organizationId,
       );
 
-      const stored = await prisma.langyGithubInstallation.findUnique({
+      const stored = await prisma.githubInstallation.findUnique({
         where: { installationId },
       });
       expect(stored?.organizationId).toBe(inserted[0]!.row.organizationId);
     });
   });
 
+  describe("when one organization connects a second GitHub account", () => {
+    /** @scenario "A single installation id is unique but an org may have many" */
+    it("keeps both installations, each id appearing once", async () => {
+      const orgId = `${namespace}-org-a`;
+
+      await repository.insertOrGetExisting(input(`${namespace}-first`, orgId));
+      await repository.insertOrGetExisting(input(`${namespace}-second`, orgId));
+
+      const stored = await repository.findAllForOrganization(orgId);
+      const ids = stored.map((r) => r.installationId);
+      expect(ids).toEqual([`${namespace}-first`, `${namespace}-second`]);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+  });
+
   describe("when the installation id already exists", () => {
+    /** @scenario "A single installation id is unique but an org may have many" */
     it("reports wasInserted: false with the existing row, and never overwrites it", async () => {
       const installationId = `${namespace}-existing`;
       const orgA = `${namespace}-org-a`;
@@ -107,7 +125,7 @@ describe("PrismaLangyGithubInstallationsRepository.insertOrGetExisting", () => {
 
       expect(result.wasInserted).toBe(false);
       expect(result.row.organizationId).toBe(orgA);
-      const stored = await prisma.langyGithubInstallation.findUnique({
+      const stored = await prisma.githubInstallation.findUnique({
         where: { installationId },
       });
       expect(stored?.organizationId).toBe(orgA);

@@ -1,17 +1,17 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
 import type {
-  LangyGithubInstallationRow,
-  LangyGithubInstallationsRepository,
-  LangyGithubRepositoryRef,
-  UpsertLangyGithubInstallationInput,
-} from "./langy-github-installations.repository";
+  GithubInstallationRow,
+  GithubInstallationsRepository,
+  GithubRepositoryRef,
+  UpsertGithubInstallationInput,
+} from "./github-installations.repository";
 
 function parseRepositories(
   value: Prisma.JsonValue | null,
-): LangyGithubRepositoryRef[] | null {
+): GithubRepositoryRef[] | null {
   if (!Array.isArray(value)) return null;
-  const refs: LangyGithubRepositoryRef[] = [];
+  const refs: GithubRepositoryRef[] = [];
   for (const entry of value) {
     if (
       entry &&
@@ -42,7 +42,7 @@ type InstallationRecord = {
   updatedAt: Date;
 };
 
-function toRow(record: InstallationRecord): LangyGithubInstallationRow {
+function toRow(record: InstallationRecord): GithubInstallationRow {
   return {
     installationId: record.installationId,
     organizationId: record.organizationId,
@@ -58,21 +58,21 @@ function toRow(record: InstallationRecord): LangyGithubInstallationRow {
 }
 
 function reposToJson(
-  repositories: LangyGithubRepositoryRef[] | null,
+  repositories: GithubRepositoryRef[] | null,
 ): Prisma.InputJsonValue | typeof Prisma.DbNull {
   if (!repositories) return Prisma.DbNull;
   return repositories as unknown as Prisma.InputJsonValue;
 }
 
-export class PrismaLangyGithubInstallationsRepository
-  implements LangyGithubInstallationsRepository
+export class PrismaGithubInstallationsRepository
+  implements GithubInstallationsRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findAllForOrganization(
     organizationId: string,
-  ): Promise<LangyGithubInstallationRow[]> {
-    const records = await this.prisma.langyGithubInstallation.findMany({
+  ): Promise<GithubInstallationRow[]> {
+    const records = await this.prisma.githubInstallation.findMany({
       where: { organizationId },
       orderBy: { createdAt: "asc" },
     });
@@ -81,16 +81,16 @@ export class PrismaLangyGithubInstallationsRepository
 
   async findByInstallationId(
     installationId: string,
-  ): Promise<LangyGithubInstallationRow | null> {
-    const record = await this.prisma.langyGithubInstallation.findUnique({
+  ): Promise<GithubInstallationRow | null> {
+    const record = await this.prisma.githubInstallation.findUnique({
       where: { installationId },
     });
     return record ? toRow(record) : null;
   }
 
-  async upsert(input: UpsertLangyGithubInstallationInput): Promise<void> {
+  async upsert(input: UpsertGithubInstallationInput): Promise<void> {
     const repositories = reposToJson(input.repositories);
-    await this.prisma.langyGithubInstallation.upsert({
+    await this.prisma.githubInstallation.upsert({
       where: { installationId: input.installationId },
       create: {
         installationId: input.installationId,
@@ -114,10 +114,10 @@ export class PrismaLangyGithubInstallationsRepository
   }
 
   async insertOrGetExisting(
-    input: UpsertLangyGithubInstallationInput,
-  ): Promise<{ wasInserted: boolean; row: LangyGithubInstallationRow }> {
+    input: UpsertGithubInstallationInput,
+  ): Promise<{ wasInserted: boolean; row: GithubInstallationRow }> {
     try {
-      const created = await this.prisma.langyGithubInstallation.create({
+      const created = await this.prisma.githubInstallation.create({
         data: {
           installationId: input.installationId,
           organizationId: input.organizationId,
@@ -138,7 +138,7 @@ export class PrismaLangyGithubInstallationsRepository
         // Another request already committed this installationId first — the
         // unique index is the atomicity guarantee, not a check we ran
         // ourselves, so this read always sees the winner's committed row.
-        const existing = await this.prisma.langyGithubInstallation.findUnique({
+        const existing = await this.prisma.githubInstallation.findUnique({
           where: { installationId: input.installationId },
         });
         if (existing) return { wasInserted: false, row: toRow(existing) };
@@ -154,9 +154,9 @@ export class PrismaLangyGithubInstallationsRepository
   }: {
     installationId: string;
     repositorySelection: string;
-    repositories: LangyGithubRepositoryRef[] | null;
+    repositories: GithubRepositoryRef[] | null;
   }): Promise<void> {
-    await this.prisma.langyGithubInstallation.updateMany({
+    await this.prisma.githubInstallation.updateMany({
       where: { installationId },
       data: {
         repositorySelection,
@@ -172,14 +172,14 @@ export class PrismaLangyGithubInstallationsRepository
     installationId: string;
     suspended: boolean;
   }): Promise<void> {
-    await this.prisma.langyGithubInstallation.updateMany({
+    await this.prisma.githubInstallation.updateMany({
       where: { installationId },
       data: { suspendedAt: suspended ? new Date() : null },
     });
   }
 
   async deleteByInstallationId(installationId: string): Promise<number> {
-    const result = await this.prisma.langyGithubInstallation.deleteMany({
+    const result = await this.prisma.githubInstallation.deleteMany({
       where: { installationId },
     });
     return result.count;

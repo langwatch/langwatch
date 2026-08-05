@@ -231,14 +231,20 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       );
     },
   },
-  // GitHub App installation mapped to a LangWatch org (Langy bot-authored PRs).
-  // Bound by organizationId (admin reads) or the globally-unique installationId
-  // (webhook + mint paths). Issue #4747; spec
-  // specs/langy/langy-github-install.feature.
-  LangyGithubInstallation: {
+  // The organization's GitHub connection. Bound by organizationId (admin reads)
+  // or the globally-unique installationId (webhook + mint paths). Spec:
+  // specs/integrations/github-connection.feature.
+  GithubInstallation: {
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "installationId") === "string",
   },
+  // Pull requests discovered through that connection, and the per-branch
+  // bookkeeping behind the lookup. Both are reached by organizationId, or by
+  // the compound unique key that starts with it, so neither needs an extra
+  // bound: a query that names a repository without naming the organization
+  // would span every tenant that has a repository by that name.
+  GithubPullRequest: {},
+  GithubBranchPullRequestCheck: {},
 };
 
 /**

@@ -1,19 +1,25 @@
 /**
- * GitHub App authentication for Langy: signs the app JWT (RS256, with the App
- * private key) and mints short-lived (1h) INSTALLATION access tokens scoped to a
- * chosen repository set and a minimal permission set. This is the crown-jewel
- * boundary — the private key lives only here, in the control plane, and never
- * goes near a worker. Minted tokens are cached in Redis under (installation,
- * scope) for a hair under their lifetime; tokens are NEVER logged.
+ * GitHub App authentication for the organization's GitHub connection: signs the
+ * app JWT (RS256, with the App private key) and mints short-lived (1h)
+ * INSTALLATION access tokens scoped to a chosen repository set and a minimal
+ * permission set. This is the crown-jewel boundary, the private key lives only
+ * here, in the control plane, and never goes near a worker. Minted tokens are
+ * cached in Redis under (installation, scope) for a hair under their lifetime;
+ * tokens are NEVER logged.
  *
- * Replaces the per-user OAuth/refresh-token machinery (issue #4747). See
- * specs/langy/langy-github-install.feature.
+ * Two permission sets are minted against the same installation: write, for
+ * Langy's bot-authored pull requests, and read-only pull requests, for the
+ * pull-request linkage the coding-agent read path uses. The scope key covers
+ * the permission set as well as the repositories, so the two never share a
+ * cached token. See specs/integrations/github-connection.feature.
  */
 import { createLogger } from "@langwatch/observability";
 import { createHash, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 
-const logger = createLogger("langwatch:langy:github-app-token");
+import { GithubRepositoryNotAccessibleError } from "./errors";
+
+const logger = createLogger("langwatch:github:app-token");
 
 const GITHUB_API = "https://api.github.com";
 const HTTP_TIMEOUT_MS = 10_000;
@@ -46,13 +52,23 @@ const LIVENESS_RECHECK_TTL_SEC = 5 * 60;
 const LIVENESS_FAILURE_BACKOFF_SEC = 60;
 
 /**
- * The least-privilege permission set Langy asks for at mint time. Cannot exceed
- * the installation's own grant (GitHub clamps it). Kept minimal so a leaked
- * token can only touch code + PRs on the scoped repositories.
+ * The least-privilege permission set the write path asks for at mint time, and
+ * the mint default. Cannot exceed the installation's own grant (GitHub clamps
+ * it). Kept minimal so a leaked token can only touch code + PRs on the scoped
+ * repositories.
  */
-export const LANGY_INSTALLATION_PERMISSIONS = {
+export const GITHUB_WRITE_PERMISSIONS = {
   contents: "write",
   pull_requests: "write",
+} as const;
+
+/**
+ * The permission set the read path asks for: enough to look a pull request up,
+ * nothing else. A token minted for pull-request linkage cannot push a commit or
+ * open a pull request even though the installation itself may allow both.
+ */
+export const GITHUB_READ_PULL_PERMISSIONS = {
+  pull_requests: "read",
 } as const;
 
 export interface GithubInstallationToken {
@@ -76,6 +92,23 @@ export interface GithubRepository {
   fullName: string;
 }
 
+/** The pull-request fields the read path stores and renders. */
+export interface GithubPullRequestSummary {
+  number: number;
+  htmlUrl: string;
+  title: string;
+  /** GitHub's own state string: "open" or "closed". */
+  state: string;
+  draft: boolean;
+  /** ISO-8601, or null while the pull request is unmerged. */
+  mergedAt: string | null;
+  /** ISO-8601, or null while the pull request is open. */
+  closedAt: string | null;
+  /** ISO-8601. */
+  createdAt: string;
+  authorLogin: string | null;
+}
+
 /**
  * Thrown when GitHub confirms (HTTP 404, not a timeout/5xx/permission error)
  * that an installation no longer exists — it was uninstalled on GitHub's side
@@ -92,6 +125,88 @@ export class GithubInstallationNotFoundError extends Error {
     this.name = "GithubInstallationNotFoundError";
     this.installationId = installationId;
   }
+}
+
+/**
+ * Thrown when GitHub answers with a rate-limit refusal rather than a failure of
+ * the request itself: a 429, or the 403 GitHub uses for both its primary limit
+ * (`x-ratelimit-remaining: 0`) and its secondary one (`retry-after`). It is an
+ * internal error, not a handled one, because only the caller knows whether the
+ * customer can act on it: a background refresh backs off silently where a
+ * customer-triggered read surfaces `github_rate_limited`.
+ */
+export class GithubRateLimitedError extends Error {
+  /** Seconds GitHub asked us to wait, when it said. */
+  public readonly retryAfterSec: number | null;
+  /** When the limit window resets, when GitHub said. */
+  public readonly resetAt: Date | null;
+
+  constructor({
+    retryAfterSec,
+    resetAt,
+  }: {
+    retryAfterSec: number | null;
+    resetAt: Date | null;
+  }) {
+    super("GitHub rate limit reached");
+    this.name = "GithubRateLimitedError";
+    this.retryAfterSec = retryAfterSec;
+    this.resetAt = resetAt;
+  }
+}
+
+/**
+ * Reads a rate-limit refusal off a response, or null when the status is a
+ * plain authorization/permission failure. A 403 without either header is
+ * exactly that, so it must not be reported as a rate limit the caller can wait
+ * out.
+ */
+function readRateLimit(res: Response): GithubRateLimitedError | null {
+  if (res.status !== 403 && res.status !== 429) return null;
+  const retryAfterHeader = res.headers.get("retry-after");
+  const remaining = res.headers.get("x-ratelimit-remaining");
+  const resetHeader = res.headers.get("x-ratelimit-reset");
+  const retryAfterSec = retryAfterHeader ? Number(retryAfterHeader) : null;
+  const isExhausted = remaining === "0";
+  const hasRetryAfter = retryAfterSec != null && Number.isFinite(retryAfterSec);
+  if (!isExhausted && !hasRetryAfter) return null;
+  const resetSec = resetHeader ? Number(resetHeader) : null;
+  return new GithubRateLimitedError({
+    retryAfterSec: hasRetryAfter ? retryAfterSec : null,
+    resetAt:
+      resetSec != null && Number.isFinite(resetSec)
+        ? new Date(resetSec * 1000)
+        : null,
+  });
+}
+
+/** The subset of GitHub's pull-request JSON the read path reads. */
+interface GithubApiPullRequest {
+  number: number;
+  html_url: string;
+  title: string;
+  state: string;
+  draft?: boolean;
+  merged_at?: string | null;
+  closed_at?: string | null;
+  created_at: string;
+  user?: { login?: string } | null;
+}
+
+function toPullRequestSummary(
+  pull: GithubApiPullRequest,
+): GithubPullRequestSummary {
+  return {
+    number: pull.number,
+    htmlUrl: pull.html_url,
+    title: pull.title,
+    state: pull.state,
+    draft: pull.draft ?? false,
+    mergedAt: pull.merged_at ?? null,
+    closedAt: pull.closed_at ?? null,
+    createdAt: pull.created_at,
+    authorLogin: pull.user?.login ?? null,
+  };
 }
 
 /** The narrow Redis surface this service uses (ioredis-compatible). */
@@ -114,7 +229,7 @@ export interface MintInstallationTokenArgs {
   installationId: string;
   /** Numeric repository ids to scope to (≤500). Omit for the full installation. */
   repositoryIds?: string[];
-  /** Permission subset. Defaults to {@link LANGY_INSTALLATION_PERMISSIONS}. */
+  /** Permission subset. Defaults to {@link GITHUB_WRITE_PERMISSIONS}. */
   permissions?: Record<string, string>;
 }
 
@@ -126,10 +241,7 @@ export interface MintInstallationTokenArgs {
  */
 export function computeRepoScopeKey({
   repositoryIds,
-  permissions = LANGY_INSTALLATION_PERMISSIONS as unknown as Record<
-    string,
-    string
-  >,
+  permissions = GITHUB_WRITE_PERMISSIONS as unknown as Record<string, string>,
 }: {
   repositoryIds?: string[];
   permissions?: Record<string, string>;
@@ -148,7 +260,7 @@ export function computeRepoScopeKey({
     .slice(0, 16);
 }
 
-export class LangyGithubAppTokenService {
+export class GithubAppTokenService {
   constructor(
     private readonly appId: string,
     private readonly privateKeyPem: string,
@@ -229,6 +341,7 @@ export class LangyGithubAppTokenService {
   private async assertInstallationStillExists(
     installationId: string,
   ): Promise<void> {
+    // The `langy:` prefix is kept so tokens cached before the deploy stay valid.
     const markerKey = `langy:gh:insttoken:${installationId}:liveness`;
     if (await this.redisGet(markerKey)) return;
 
@@ -263,6 +376,7 @@ export class LangyGithubAppTokenService {
       repositoryIds: args.repositoryIds,
       permissions: args.permissions,
     });
+    // The `langy:` prefix is kept so tokens cached before the deploy stay valid.
     const cacheKey = `langy:gh:insttoken:${args.installationId}:${scopeKey}`;
 
     const cached = await this.redisGet(cacheKey);
@@ -314,6 +428,8 @@ export class LangyGithubAppTokenService {
         { headers: { Authorization: `Bearer ${minted.token}` } },
       );
       if (!res.ok) {
+        const rateLimited = readRateLimit(res);
+        if (rateLimited) throw rateLimited;
         throw new Error(
           `GitHub GET /installation/repositories failed: ${res.status}`,
         );
@@ -330,12 +446,113 @@ export class LangyGithubAppTokenService {
     return repos;
   }
 
+  /**
+   * List the pull requests opened from `branch` on `owner/repo`, newest first
+   * as GitHub returns them, using a token that can only read pull requests.
+   * Closed and merged ones are included: a session's branch is often already
+   * merged by the time anyone looks at it.
+   */
+  async listPullRequestsForHead({
+    installationId,
+    repositoryId,
+    owner,
+    repo,
+    branch,
+  }: {
+    installationId: string;
+    repositoryId: string;
+    owner: string;
+    repo: string;
+    branch: string;
+  }): Promise<GithubPullRequestSummary[]> {
+    const head = `${owner}:${branch}`;
+    const body = await this.readAsPullReader<GithubApiPullRequest[]>({
+      installationId,
+      repositoryId,
+      owner,
+      repo,
+      path: `/pulls?head=${encodeURIComponent(head)}&state=all&per_page=50`,
+      what: "GET /repos/{owner}/{repo}/pulls",
+    });
+    return Array.isArray(body) ? body.map(toPullRequestSummary) : [];
+  }
+
+  /** Re-read one pull request, for refreshing a mapping that already exists. */
+  async getPullRequest({
+    installationId,
+    repositoryId,
+    owner,
+    repo,
+    number,
+  }: {
+    installationId: string;
+    repositoryId: string;
+    owner: string;
+    repo: string;
+    number: number;
+  }): Promise<GithubPullRequestSummary> {
+    const body = await this.readAsPullReader<GithubApiPullRequest>({
+      installationId,
+      repositoryId,
+      owner,
+      repo,
+      path: `/pulls/${encodeURIComponent(String(number))}`,
+      what: "GET /repos/{owner}/{repo}/pulls/{number}",
+    });
+    return toPullRequestSummary(body);
+  }
+
+  // Both read paths mint the same repository-scoped, read-only token and map
+  // the same failure classes, so they share this.
+  private async readAsPullReader<T>({
+    installationId,
+    repositoryId,
+    owner,
+    repo,
+    path,
+    what,
+  }: {
+    installationId: string;
+    repositoryId: string;
+    owner: string;
+    repo: string;
+    path: string;
+    what: string;
+  }): Promise<T> {
+    const minted = await this.mintInstallationToken({
+      installationId,
+      repositoryIds: [repositoryId],
+      permissions: GITHUB_READ_PULL_PERMISSIONS as unknown as Record<
+        string,
+        string
+      >,
+    });
+    const res = await this.githubFetch(
+      `${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${path}`,
+      { headers: { Authorization: `Bearer ${minted.token}` } },
+    );
+    if (!res.ok) {
+      const rateLimited = readRateLimit(res);
+      if (rateLimited) throw rateLimited;
+      // GitHub answers 404 rather than 403 for a repository the token cannot
+      // see, so a missing repository and an unreachable one are the same fact
+      // to us, and the same remedy: add it to the installation.
+      if (res.status === 404) {
+        throw new GithubRepositoryNotAccessibleError({
+          repositoryFullName: `${owner}/${repo}`,
+        });
+      }
+      throw new Error(`GitHub ${what} failed: ${res.status}`);
+    }
+    return (await res.json()) as T;
+  }
+
   // POST /app/installations/{id}/access_tokens — the actual mint.
   private async mintAtGithub(
     args: MintInstallationTokenArgs,
   ): Promise<GithubInstallationToken> {
     const payload: Record<string, unknown> = {
-      permissions: args.permissions ?? LANGY_INSTALLATION_PERMISSIONS,
+      permissions: args.permissions ?? GITHUB_WRITE_PERMISSIONS,
     };
     if (args.repositoryIds && args.repositoryIds.length > 0) {
       // GitHub takes numeric repository ids here.
@@ -367,6 +584,8 @@ export class LangyGithubAppTokenService {
       if (res.status === 404) {
         throw new GithubInstallationNotFoundError(args.installationId);
       }
+      const rateLimited = readRateLimit(res);
+      if (rateLimited) throw rateLimited;
       throw new Error(`GitHub token mint failed: ${res.status}`);
     }
     const body = (await res.json()) as {
@@ -391,7 +610,7 @@ export class LangyGithubAppTokenService {
       ...init,
       headers: {
         Accept: "application/vnd.github+json",
-        "User-Agent": "langwatch-langy",
+        "User-Agent": "langwatch",
         "X-GitHub-Api-Version": "2022-11-28",
         ...init.headers,
       },

@@ -28,6 +28,7 @@ export class App {
   readonly codingAgents: AppDependencies["codingAgents"] &
     AppCommands["codingAgents"];
   readonly commands: AppCommands;
+  readonly github: AppDependencies["github"];
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
@@ -95,6 +96,7 @@ export class App {
       ...deps.commands.codingAgents,
     };
     this.commands = deps.commands;
+    this.github = deps.github;
     this.langy = deps.langy;
     this.ops = deps.ops;
     this.retentionPolicyCache = deps.retentionPolicyCache;

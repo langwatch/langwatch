@@ -1,9 +1,12 @@
 /**
- * Single-use nonce store for the Langy GitHub App install round-trip. The nonce
- * is signed into the state at /install and burned at /setup so a captured
- * callback URL can't be replayed. Redis-backed; when Redis is unavailable the
- * caller falls back to the signature + session-rebind defenses (the signed
- * `nonceRegistered` flag records which mode applied). Issue #4747.
+ * Single-use nonce store for the GitHub App install round-trip. The nonce is
+ * signed into the state at /install and burned at /setup so a captured callback
+ * URL can't be replayed. Redis-backed; when Redis is unavailable the caller
+ * falls back to the signature + session-rebind defenses (the signed
+ * `nonceRegistered` flag records which mode applied).
+ *
+ * The `langy:` key prefix is kept so a nonce issued before the deploy can still
+ * be burned by the callback that lands after it.
  */
 import { connection } from "~/server/redis";
 

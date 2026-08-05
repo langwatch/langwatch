@@ -298,7 +298,9 @@ model Organization {
   anomalyAlerts            AnomalyAlert[]
   aiToolEntries            AiToolEntry[]
   ingestionTemplates       IngestionTemplate[]
-  langyGithubInstallations LangyGithubInstallation[]
+  githubInstallations      GithubInstallation[]
+  githubPullRequests       GithubPullRequest[]
+  githubBranchPrChecks     GithubBranchPullRequestCheck[]
 
   @@index([ssoProvider])
 }
@@ -1176,17 +1178,18 @@ model ModelDefaultConfigScope {
   @@index([configId])
 }
 
-/// A GitHub App installation mapped to a LangWatch organization. Langy mints
-/// short-lived (1h) installation access tokens against these rows to open
-/// bot-authored pull requests, scoped to the installation's repositories. No
-/// user token and no secret are stored here — the crown jewel is the App
-/// private key, held only in the control-plane env. Issue: #4747. Spec:
-/// specs/langy/langy-github-install.feature.
+/// The organization's GitHub connection: a GitHub App installation mapped to a
+/// LangWatch organization. Short-lived (1h) installation access tokens are
+/// minted against these rows on demand, by Langy for writes (bot-authored pull
+/// requests, scoped to the installation's repositories) and by pull-request
+/// linkage for reads. No user token and no secret are stored here, the crown
+/// jewel is the App private key, held only in the control-plane env.
+/// Spec: specs/integrations/github-connection.feature.
 ///
-/// installationId is globally unique (one GitHub installation → one row); a
+/// installationId is globally unique (one GitHub installation, one row); a
 /// single LangWatch organization may own MANY installations (different GitHub
-/// accounts), so the org↔installation relationship is one-to-many.
-model LangyGithubInstallation {
+/// accounts), so the org to installation relationship is one-to-many.
+model GithubInstallation {
   id                  String       @id @default(nanoid())
   /// GitHub installation id (numeric; stored as string). Globally unique.
   installationId      String       @unique
@@ -1211,6 +1214,80 @@ model LangyGithubInstallation {
   updatedAt           DateTime     @default(now()) @updatedAt
 
   @@index([organizationId])
+}
+
+/// A pull request discovered through the organization's GitHub connection and
+/// mapped to the branch it was opened from, so a coding-agent session that
+/// knows only its branch can name the pull request it produced.
+/// Spec: specs/integrations/github-connection.feature.
+///
+/// The stored title, state, draft and timestamp columns are SNAPSHOTS taken
+/// when the mapping was last refreshed. They are fallback labels only: the
+/// frontend reads live status from GitHub, so a stale row never presents
+/// itself as current truth.
+model GithubPullRequest {
+  id                 String       @id @default(nanoid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// The GitHub host the repository lives on, e.g. "github.com".
+  repositoryHost     String
+  /// "owner/repo", stored LOWERCASED so a lookup matches whatever casing the
+  /// session reported.
+  repositoryFullName String
+  /// The branch the pull request was opened from.
+  headBranch         String
+  prNumber           Int
+  htmlUrl            String
+  title              String
+  /// GitHub's own state string: "open" or "closed".
+  state              String
+  isDraft            Boolean      @default(false)
+  authorLogin        String?
+  prCreatedAt        DateTime
+  prClosedAt         DateTime?
+  prMergedAt         DateTime?
+  /// When this row was first mapped to its branch.
+  mappedAt           DateTime     @default(now())
+  /// When the snapshot columns were last refreshed from GitHub.
+  lastCheckedAt      DateTime     @default(now())
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+
+  @@unique([organizationId, repositoryHost, repositoryFullName, prNumber])
+  @@index([organizationId, repositoryHost, repositoryFullName, headBranch])
+}
+
+/// The per-branch bookkeeping behind pull-request mapping: when a branch was
+/// last looked up on GitHub, how many pull requests it resolved to, and when it
+/// may be asked about again. A branch with no pull request is the common case,
+/// so `notFoundAt` plus `recheckAfter` is what keeps an unmapped branch from
+/// costing a GitHub call on every read.
+/// Spec: specs/integrations/github-connection.feature.
+model GithubBranchPullRequestCheck {
+  id                 String       @id @default(nanoid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repositoryHost     String
+  /// "owner/repo", stored LOWERCASED, matching GithubPullRequest.
+  repositoryFullName String
+  headBranch         String
+  lastCheckedAt      DateTime
+  prCount            Int          @default(0)
+  /// Set while the branch resolves to no pull request; cleared once one is
+  /// found.
+  notFoundAt         DateTime?
+  /// The earliest instant GitHub may be asked about this branch again.
+  recheckAfter       DateTime?
+  /// Consecutive lookups that found nothing, backing off the recheck.
+  attempts           Int          @default(0)
+  /// When a reader last asked about this branch, whether or not GitHub was
+  /// called.
+  lastRequestedAt    DateTime
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+
+  @@unique([organizationId, repositoryHost, repositoryFullName, headBranch])
+  @@index([organizationId, notFoundAt, recheckAfter])
 }
 
 /// Rebuildable operational state folded from Langy's canonical event stream.

@@ -182,7 +182,6 @@ const LEGACY_UNBOUND: string[] = [
   "specs/langy/langy-feedback.feature",
   "specs/langy/langy-followup-suggestions.feature",
   "specs/langy/langy-frontend-realtime.feature",
-  "specs/langy/langy-github-install.feature",
   "specs/langy/langy-github-prs.feature",
   "specs/langy/langy-plan-progress.feature",
   "specs/langy/langy-projection-independent-reactions.feature",

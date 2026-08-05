@@ -169,26 +169,24 @@ import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/ev
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositories/monitor-performance.clickhouse.repository";
 import { NullMonitorPerformanceRepository } from "./evaluations/repositories/monitor-performance.repository";
+import { GithubInstallationsService } from "./github/github-installations.service";
+import { getGithubAppConfig } from "./github/githubAppConfig";
+import { GithubAppTokenService, type RedisLike } from "./github/githubAppToken";
+import { PrismaGithubInstallationsRepository } from "./github/repositories/github-installations.prisma.repository";
+import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
-import { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import {
   createLangyTrustedMessageReader,
   LangyMessageService,
 } from "./langy/langy-message.service";
 import { createLangyConversationTitleGenerator } from "./langy/langy-title-generation.service";
 import { LangyTurnService } from "./langy/langy-turn.service";
-import {
-  LangyGithubAppTokenService,
-  type RedisLike,
-} from "./langy/langyGithubAppToken";
 import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
 import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
 import { PrismaLangyConversationRepository } from "./langy/repositories/langy-conversation.prisma.repository";
 import { NullLangyConversationRepository } from "./langy/repositories/langy-conversation.repository";
 import { PrismaLangyConversationProjectionRepository } from "./langy/repositories/langy-conversation-projection.prisma.repository";
 import { PrismaLangyConversationTurnProjectionRepository } from "./langy/repositories/langy-conversation-turn-projection.prisma.repository";
-import { PrismaLangyGithubInstallationsRepository } from "./langy/repositories/langy-github-installations.prisma.repository";
-import { NullLangyGithubInstallationsRepository } from "./langy/repositories/langy-github-installations.repository";
 import { PrismaLangyMessageRepository } from "./langy/repositories/langy-message.prisma.repository";
 import { NullLangyMessageRepository } from "./langy/repositories/langy-message.repository";
 import { PrismaLangyMessageProjectionRepository } from "./langy/repositories/langy-message-projection.prisma.repository";
@@ -1063,22 +1061,23 @@ export function initializeDefaultApp(options?: {
     langyConversationRepository,
   );
 
-  // Langy GitHub App installations (issue #4747): the install/webhook lifecycle
-  // and the per-turn installation-token mint for bot-authored PRs. The App is
-  // optional per instance; when the private key is unset the service reports
-  // `configured=false` and every read short-circuits to "GitHub unavailable"
-  // without touching GitHub. The App private key is the only credential and it
-  // lives here in the control plane, never near a worker.
-  const langyGithubAppTokens = new LangyGithubAppTokenService(
-    env.GITHUB_LANGY_APP_ID ?? "",
-    env.GITHUB_LANGY_PRIVATE_KEY ?? "",
+  // The organization's GitHub connection: the install/webhook lifecycle, and
+  // the token mints Langy (write) and pull-request linkage (read) ask for. The
+  // App is optional per instance; when the private key is unset the service
+  // reports `configured=false` and every read short-circuits to "GitHub
+  // unavailable" without touching GitHub. The App private key is the only
+  // credential and it lives here in the control plane, never near a worker.
+  const githubAppConfig = getGithubAppConfig();
+  const githubAppTokens = new GithubAppTokenService(
+    githubAppConfig.appId,
+    githubAppConfig.privateKey,
     // ioredis Redis/Cluster satisfy the narrow RedisLike surface at runtime; the
     // client's overloaded `set` signature just isn't structurally assignable.
     (redis ?? null) as unknown as RedisLike | null,
   );
-  const langyGithubInstallations = new LangyGithubInstallationsService(
-    new PrismaLangyGithubInstallationsRepository(prisma),
-    langyGithubAppTokens,
+  const githubInstallations = new GithubInstallationsService(
+    new PrismaGithubInstallationsRepository(prisma),
+    githubAppTokens,
   );
 
   // Langy turn-start orchestration (ADR-046): the pipeline the
@@ -1348,6 +1347,9 @@ export function initializeDefaultApp(options?: {
     codingAgents: {
       sessions: codingAgentSessions,
     },
+    github: {
+      installations: traced(githubInstallations, "GithubInstallationsService"),
+    },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
     // paths (token buffer, relay frames) stay span-free by design.
@@ -1355,10 +1357,6 @@ export function initializeDefaultApp(options?: {
       conversations: traced(langyConversations, "LangyConversationService"),
       turns: traced(langyTurns, "LangyTurnService"),
       messages: traced(langyMessages, "LangyMessageService"),
-      githubInstallations: traced(
-        langyGithubInstallations,
-        "LangyGithubInstallationsService",
-      ),
       credentials: traced(
         LangyCredentialService.create(prisma),
         "LangyCredentialService",
@@ -1570,6 +1568,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     codingAgents: {
       sessions: testCodingAgentSessions,
     },
+    github: {
+      installations: new GithubInstallationsService(
+        new NullGithubInstallationsRepository(),
+        new GithubAppTokenService("", "", null),
+      ),
+    },
     langy: {
       conversations: LangyConversationService.create(
         {
@@ -1619,10 +1623,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       messages: new LangyMessageService(
         new NullLangyMessageRepository(),
         new NullLangyConversationRepository(),
-      ),
-      githubInstallations: new LangyGithubInstallationsService(
-        new NullLangyGithubInstallationsRepository(),
-        new LangyGithubAppTokenService("", "", null),
       ),
       credentials: LangyCredentialService.create(testPrisma),
       feedbackPrompt: new LangyFeedbackPromptService({ redis: null }),

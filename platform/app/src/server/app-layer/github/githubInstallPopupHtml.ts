@@ -1,8 +1,8 @@
 /**
- * HTML shims served back to the popup window at the end of the GitHub OAuth
- * dance. They `postMessage` the result to the opener (same-origin only) and
- * close themselves so the in-chat connect card can pick the conversation back
- * up where it left off. Issue #4747.
+ * HTML shims served back to the popup window at the end of the GitHub App
+ * install round-trip. They `postMessage` the result to the opener (same-origin
+ * only) and close themselves so the in-chat connect card can pick the
+ * conversation back up where it left off.
  *
  * The regexes are the load-bearing escape — `login` flows into HTML text and
  * `message` into both HTML and JSON. Keep them strict.
@@ -18,7 +18,7 @@ export function popupResponseHtml(login: string): string {
   try {
     if (window.opener && !window.opener.closed) {
       window.opener.postMessage(
-        { type: "langy-github-connected", login: ${JSON.stringify(safe)} },
+        { type: "github-connected", login: ${JSON.stringify(safe)} },
         window.location.origin,
       );
     }
@@ -41,7 +41,7 @@ export function popupErrorHtml(message: string): string {
   try {
     if (window.opener && !window.opener.closed) {
       window.opener.postMessage(
-        { type: "langy-github-error", message: ${JSON.stringify(safe)} },
+        { type: "github-error", message: ${JSON.stringify(safe)} },
         window.location.origin,
       );
     }

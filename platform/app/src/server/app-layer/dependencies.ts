@@ -25,10 +25,10 @@ import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
+import type { GithubInstallationsService } from "./github/github-installations.service";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
-import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import type { LangyMessageService } from "./langy/langy-message.service";
 import type { LangyTurnService } from "./langy/langy-turn.service";
 import type { BlobStoreService } from "./ops/blob-store.service";
@@ -128,12 +128,18 @@ export interface AppDependencies {
   codingAgents: {
     sessions: CodingAgentSessionService;
   };
+  /**
+   * The organization's GitHub connection, consumed by Langy for writes and by
+   * pull-request linkage for reads.
+   */
+  github: {
+    installations: GithubInstallationsService;
+  };
   /** ADR-046: Langy conversations as an event-sourced projection. */
   langy: {
     conversations: LangyConversationService;
     turns: LangyTurnService;
     messages: LangyMessageService;
-    githubInstallations: LangyGithubInstallationsService;
     credentials: LangyCredentialService;
     feedbackPrompt: LangyFeedbackPromptService;
   };

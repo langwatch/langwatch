@@ -1,13 +1,15 @@
 /**
- * Signed-state token for the Langy GitHub App OAuth round-trip.
+ * Signed-state token for the GitHub App installation round-trip. There is no
+ * OAuth here: the state is what binds GitHub's callback back to the session and
+ * organization that started the install.
  *
  * State carries (userId, organizationId, mode, returnTo, issuedAt, nonce)
  * signed HMAC-SHA256 with CREDENTIALS_SECRET. Encoded as `body.sig` in
  * base64url so it survives the URL.
  *
  * Pulled out of the route so the security-critical sign/verify pair can be
- * tested without bringing up the Hono app. Spec:
- * specs/langy/langy-github-prs.feature. Issue: #4747.
+ * tested without bringing up the Hono app.
+ * Spec: specs/integrations/github-connection.feature.
  */
 import { createHmac, timingSafeEqual } from "crypto";
 
@@ -18,7 +20,7 @@ export const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 // come from a skewed signer or someone replaying across a clock rollback.
 export const STATE_MAX_FUTURE_SKEW_MS = 60 * 1000;
 
-export type GithubOauthStatePayload = {
+export type GithubInstallStatePayload = {
   userId: string;
   organizationId: string;
   mode: "popup" | "redirect";
@@ -26,15 +28,15 @@ export type GithubOauthStatePayload = {
   issuedAt: number;
   nonce: string;
   /**
-   * Whether /connect successfully stored the nonce in Redis. Signed into the
+   * Whether /install successfully stored the nonce in Redis. Signed into the
    * state so the callback knows to enforce single-use (true) or fall back to
    * the signature + session-rebind defenses (false — Redis was down).
    */
   nonceRegistered: boolean;
 };
 
-export function signGithubOauthState(
-  payload: GithubOauthStatePayload,
+export function signGithubInstallState(
+  payload: GithubInstallStatePayload,
   signingKey: string,
 ): string {
   const body = Buffer.from(JSON.stringify(payload), "utf8").toString(
@@ -44,11 +46,11 @@ export function signGithubOauthState(
   return `${body}.${sig}`;
 }
 
-export function verifyGithubOauthState(
+export function verifyGithubInstallState(
   token: string | null | undefined,
   signingKey: string,
   now: number = Date.now(),
-): GithubOauthStatePayload | null {
+): GithubInstallStatePayload | null {
   if (!token) return null;
   const dot = token.indexOf(".");
   if (dot < 0) return null;
@@ -62,11 +64,11 @@ export function verifyGithubOauthState(
   const a = Buffer.from(sig, "base64url");
   const b = Buffer.from(expected, "base64url");
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  let payload: GithubOauthStatePayload;
+  let payload: GithubInstallStatePayload;
   try {
     payload = JSON.parse(
       Buffer.from(body, "base64url").toString("utf8"),
-    ) as GithubOauthStatePayload;
+    ) as GithubInstallStatePayload;
   } catch {
     return null;
   }
