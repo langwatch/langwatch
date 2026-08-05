@@ -229,9 +229,9 @@ describe("templateReferencesVariable", () => {
   describe("given the word appears only as a quoted literal", () => {
     /** @scenario "A quoted literal is not a reference to the conversation" */
     it("does not report a reference", () => {
-      expect(
-        templateReferencesVariable('{{ "messages" }}', "messages"),
-      ).toBe(false);
+      expect(templateReferencesVariable('{{ "messages" }}', "messages")).toBe(
+        false,
+      );
       expect(
         templateReferencesVariable("{% assign x = 'messages' %}", "messages"),
       ).toBe(false);

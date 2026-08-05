@@ -30,8 +30,8 @@ import { createServer, type Server } from "node:http";
 import type { Logger } from "@langwatch/observability";
 import type { AgentInput } from "@langwatch/scenario";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SerializedPromptConfigAdapter } from "../prompt-config.adapter";
 import type { LiteLLMParams, PromptConfigData } from "../../types";
+import { SerializedPromptConfigAdapter } from "../prompt-config.adapter";
 
 const LITELLM_PARAMS: LiteLLMParams = {
   api_key: "test-key",
@@ -178,14 +178,16 @@ describe("prompt agent over four turns", () => {
         const prompts = model.systemPrompts();
         expect(prompts).toHaveLength(4);
         for (const [index, prompt] of prompts.entries()) {
-          expect(prompt, `turn ${index + 1} carries a JSON message array`).not.toMatch(
-            /"role"\s*:/,
-          );
+          expect(
+            prompt,
+            `turn ${index + 1} carries a JSON message array`,
+          ).not.toMatch(/"role"\s*:/);
           // An escaped quote is the tell of a payload nested inside a payload:
           // it is what the escape depth climbed through on `main`, turn by turn.
-          expect(prompt, `turn ${index + 1} nests an escaped payload`).not.toContain(
-            '\\"',
-          );
+          expect(
+            prompt,
+            `turn ${index + 1} nests an escaped payload`,
+          ).not.toContain('\\"');
         }
       });
 
@@ -287,12 +289,9 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter(
-            config,
-            LITELLM_PARAMS,
-            model.url,
-            { warn } as unknown as Logger,
-          ),
+          new SerializedPromptConfigAdapter(config, LITELLM_PARAMS, model.url, {
+            warn,
+          } as unknown as Logger),
           1,
         );
 

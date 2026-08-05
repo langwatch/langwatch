@@ -289,7 +289,8 @@ export function useSuiteForm({
       }
       return {
         ...candidate,
-        scenarioMappings: Object.keys(mappings).length > 0 ? mappings : undefined,
+        scenarioMappings:
+          Object.keys(mappings).length > 0 ? mappings : undefined,
       };
     });
     form.setValue("selectedTargets", next, { shouldDirty: true });

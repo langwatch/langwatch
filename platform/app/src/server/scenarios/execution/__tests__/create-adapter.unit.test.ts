@@ -28,6 +28,7 @@ describe("createAdapter", () => {
         promptId: "prompt_123",
         systemPrompt: "You are helpful.",
         messages: [],
+        inputs: [],
       };
 
       const adapter = createAdapter({

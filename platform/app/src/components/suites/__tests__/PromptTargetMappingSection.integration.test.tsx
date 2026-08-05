@@ -14,8 +14,8 @@ import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SuiteTarget } from "~/server/suites/types";
 import {
-  PromptTargetMappingSection,
   type MappablePrompt,
+  PromptTargetMappingSection,
 } from "../PromptTargetMappingSection";
 
 vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({

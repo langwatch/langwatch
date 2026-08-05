@@ -57,7 +57,9 @@ interface StubEndpoint {
  */
 async function startEndpoint({
   enforceReasoningRule = false,
-}: { enforceReasoningRule?: boolean } = {}): Promise<StubEndpoint> {
+}: {
+  enforceReasoningRule?: boolean;
+} = {}): Promise<StubEndpoint> {
   const bodies: Array<Record<string, unknown>> = [];
 
   const server: Server = createServer((req, res) => {
@@ -134,8 +136,7 @@ async function startEndpoint({
   return {
     url: `http://127.0.0.1:${port}`,
     bodies: () => bodies,
-    close: () =>
-      new Promise<void>((resolve) => server.close(() => resolve())),
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }
 
@@ -275,7 +276,9 @@ describe("judge transport: function tools and reasoning effort", () => {
             tools: { finishTest },
             toolChoice: "required",
           }),
-        ).rejects.toThrow(/Function tools with reasoning_effort are not supported/);
+        ).rejects.toThrow(
+          /Function tools with reasoning_effort are not supported/,
+        );
       });
     });
   });
