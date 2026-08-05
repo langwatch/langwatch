@@ -80,9 +80,13 @@ describe("<RunRow/> borderless styling", () => {
         { wrapper: Wrapper },
       );
 
-      const header = screen.getByRole("button", { name: /Run from/ });
+      const header = screen.getByTestId("run-row-header");
       expect(header).toBeInTheDocument();
-      expect(header).toHaveAttribute("data-testid", "run-row-header");
+      // The row carries the header styling itself and holds the expand
+      // control, rather than wrapping either in another Box.
+      expect(header).toContainElement(
+        screen.getByRole("button", { name: /Run from/ }),
+      );
     });
 
     /** @scenario "Run row headers are sticky when scrolling" */
@@ -99,8 +103,8 @@ describe("<RunRow/> borderless styling", () => {
         { wrapper: Wrapper },
       );
 
-      const header = screen.getByRole("button", { name: /Run from/ });
-      // The sticky position is on the parent wrapper Box, not the button itself
+      const header = screen.getByTestId("run-row-header");
+      // The sticky position is on the parent wrapper Box, not the row itself
       expect(
         header.closest('[style*="sticky"]') ?? header.parentElement,
       ).toBeTruthy();

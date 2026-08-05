@@ -51,6 +51,23 @@ export class BatchRunNotFoundError extends Error {
 }
 
 /**
+ * The reader answered "nothing has changed since the timestamp you gave me".
+ *
+ * Its own type, because folding it into {@link BatchRunNotFoundError} turns a
+ * conditional read of a perfectly healthy batch into a 404 saying the run does
+ * not exist. Nothing passes a timestamp today, which is exactly why this is
+ * worth naming now: it is a trap armed for whoever adds the first conditional
+ * caller, and it would present as a phantom 404 on a run they can see on
+ * screen.
+ */
+export class BatchRunUnchangedError extends Error {
+  constructor(batchRunId: string) {
+    super(`No changes for batch ${batchRunId} since the given timestamp`);
+    this.name = "BatchRunUnchangedError";
+  }
+}
+
+/**
  * Produces one report for one run.
  *
  * Deliberately HTTP-unaware: it takes a request and returns a model. Nothing
@@ -251,6 +268,7 @@ export class BatchRunReportService {
     const verdicts = draft
       ? await runVerifierPass({
           evidenceBlock,
+          evidence,
           claims: collectClaims(unchecked.sections),
           resolveModel: () =>
             this.resolveModel({
@@ -264,6 +282,14 @@ export class BatchRunReportService {
     return { draft, verdicts, unchecked };
   }
 
+  /**
+   * The batch's runs, with "not modified" told apart from "not there".
+   *
+   * The reader's conditional read answers `changed: false` with an empty run
+   * list, and collapsing that into the empty list means an unchanged batch is
+   * indistinguishable from a batch with nothing in it. One is a 404 and the
+   * other is not.
+   */
   private async readRuns(
     request: BatchRunReportRequest,
   ): Promise<ScenarioRunData[]> {
@@ -272,7 +298,10 @@ export class BatchRunReportService {
       scenarioSetId: request.scenarioSetId,
       batchRunId: request.batchRunId,
     });
-    return result.changed ? result.runs : [];
+    if (!result.changed) {
+      throw new BatchRunUnchangedError(request.batchRunId);
+    }
+    return result.runs;
   }
 
   /**

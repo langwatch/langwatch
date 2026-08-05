@@ -9,8 +9,8 @@
  * @see specs/suites/pass-rate-single-source.feature
  */
 import { describe, expect, it } from "vitest";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { countRunOutcomes, passRateFrom } from "../run-outcome-summary";
-import { ScenarioRunStatus } from "../scenario-event.enums";
 
 /** Pass rate for a list of statuses, the two calls the callers make. */
 function passRateOf(statuses: ScenarioRunStatus[]): number | null {

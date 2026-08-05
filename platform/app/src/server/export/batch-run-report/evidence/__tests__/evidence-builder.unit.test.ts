@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  countRunOutcomes,
-  passRateFrom,
-} from "~/server/scenarios/run-outcome-summary";
-import {
   ScenarioRunStatus,
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import {
+  countRunOutcomes,
+  passRateFrom,
+} from "~/shared/scenario-run-report/run-outcome-summary";
 import type { ReportEvidence } from "../../report.types";
 import { buildEvidence } from "../evidence-builder";
 import { criterionIdFor } from "../fingerprint";

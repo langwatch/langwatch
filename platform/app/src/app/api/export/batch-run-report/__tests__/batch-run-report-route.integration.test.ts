@@ -19,7 +19,7 @@ const generate = vi.fn();
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) => getServerAuthSession(...args),
 }));
-vi.mock("~/server/auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: (...args: unknown[]) => auditLog(...args),
 }));
 vi.mock("~/server/app-layer/app", () => ({
@@ -140,8 +140,10 @@ describe("POST /api/export/batch-run-report/download authorization", () => {
       hasProjectPermission.mockResolvedValue(false);
 
       const response = await post(BODY);
+      const body = (await response.json()) as { error: string };
 
       expect(response.status).toBe(403);
+      expect(body.error).toBe("scenario_run_export_forbidden");
       expect(generate).not.toHaveBeenCalled();
     });
 
@@ -223,8 +225,10 @@ describe("POST /api/export/batch-run-report/download delivery", () => {
       generate.mockRejectedValue(new BatchRunNotFoundError("batch_1"));
 
       const response = await post(BODY);
+      const body = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);
+      expect(body.error).toBe("scenario_batch_run_not_found");
     });
   });
 });
@@ -286,20 +290,23 @@ describe("POST /api/export/batch-run-report/download?stream=1", () => {
 
       const events = await lines(await post(BODY, "?stream=1"));
 
-      expect(events.at(-1)).toEqual({ error: "Run not found." });
+      expect(events.at(-1)).toEqual({ error: "scenario_batch_run_not_found" });
       expect(events.some((it) => it.done)).toBe(false);
     });
   });
 
   describe("when producing the report throws", () => {
-    it("says so without leaking the reason to the caller", async () => {
+    /** @scenario A failure part-way through producing the report still names itself */
+    it("names the failure with a code and leaks nothing of the reason", async () => {
       generate.mockRejectedValue(new Error("ClickHouse said no: dsn=secret"));
 
-      const events = await lines(await post(BODY, "?stream=1"));
+      const response = await post(BODY, "?stream=1");
+      const events = await lines(response);
 
-      expect(events.at(-1)).toEqual({
-        error: "The report could not be produced.",
-      });
+      // Reading to completion returned at all, which is the close: a
+      // controller nobody shut leaves the reader waiting forever.
+      expect(events.at(-1)).toEqual({ error: "export_failed" });
+      expect(events.filter((it) => it.error)).toHaveLength(1);
       expect(JSON.stringify(events)).not.toContain("secret");
     });
   });
@@ -324,7 +331,7 @@ describe("POST /api/export/batch-run-report/download?stream=1", () => {
  */
 describe("POST /api/export/batch-run-report/download rate limiting", () => {
   describe("when the limit is reached and Langy was asked for", () => {
-    it("refuses with Retry-After and produces nothing", async () => {
+    it("refuses and produces nothing", async () => {
       checkReportRateLimit.mockResolvedValue({
         isAllowed: false,
         retryAfterSeconds: 42,
@@ -333,12 +340,12 @@ describe("POST /api/export/batch-run-report/download rate limiting", () => {
       const response = await post({ ...BODY, withAnalysis: true });
 
       expect(response.status).toBe(429);
-      expect(response.headers.get("Retry-After")).toBe("42");
       expect(generate).not.toHaveBeenCalled();
       expect(auditLog).not.toHaveBeenCalled();
     });
 
-    it("points at the export that is not limited", async () => {
+    /** @scenario A refusal names what went wrong rather than describing it */
+    it("carries the code and the wait rather than a sentence", async () => {
       checkReportRateLimit.mockResolvedValue({
         isAllowed: false,
         retryAfterSeconds: 5,
@@ -346,9 +353,12 @@ describe("POST /api/export/batch-run-report/download rate limiting", () => {
 
       const body = (await post({ ...BODY, withAnalysis: true }).then((r) =>
         r.json(),
-      )) as { error: string };
+      )) as { error: string; retryAfterSeconds?: number };
 
-      expect(body.error).toContain("instant export");
+      // The code is what the interface has words for; the wait is the meta
+      // those words read. Neither is prose the caller has to parse.
+      expect(body.error).toBe("scenario_run_report_rate_limited");
+      expect(body.retryAfterSeconds).toBe(5);
     });
   });
 

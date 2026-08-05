@@ -6,23 +6,34 @@
  * This is the API layer: auth, audit, headers. All of the domain logic lives in
  * BatchRunReportService, which knows nothing about HTTP.
  *
- * The response is buffered rather than streamed, because the tier — how much of
- * the report survived being produced — has to be known before the first byte
- * goes out, and a proxy-truncated half report is a worse artifact than a
- * slightly slower whole one.
+ * Two shapes, one handler. `?stream=1` narrates the wait as NDJSON and is what
+ * the browser asks for; without it the whole document comes back at once, for
+ * a caller that just wants the file. Either way the DOCUMENT is delivered
+ * whole on one line rather than progressively, because the tier — how much of
+ * the report survived being produced — has to be known before any of it can be
+ * read, and a half report is a worse artifact than a slower whole one.
+ *
+ * Rejections decided BEFORE the stream opens are HTTP statuses carrying a
+ * handled-error code. Once the first byte is out the status is spent, so a
+ * later failure travels as a line carrying the same kind of code.
  *
  * @see specs/scenarios/scenario-run-report.feature
  */
 
+import { auditLog } from "@ee/audit-log/auditLog";
 import { createLogger } from "@langwatch/observability";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
-import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { BatchRunNotFoundError } from "~/server/export/batch-run-report/batch-run-report.service";
+import {
+  RunReportBatchNotFoundError,
+  RunReportForbiddenError,
+  RunReportRateLimitedError,
+} from "~/server/export/batch-run-report/errors";
 import { renderReportHtml } from "~/server/export/batch-run-report/render/render-report-html";
 import {
   type BatchRunReportRequest,
@@ -65,10 +76,7 @@ secured
         "scenarios:view",
       );
       if (!hasPermission) {
-        return c.json(
-          { error: "You do not have permission to access this endpoint." },
-          { status: 403 },
-        );
+        throw new RunReportForbiddenError(request.projectId);
       }
 
       // Only the analysed path is limited. The instant one is arithmetic and
@@ -81,16 +89,7 @@ secured
           projectId: request.projectId,
         });
         if (!rateLimit.isAllowed) {
-          return c.json(
-            {
-              error:
-                "Too many reports with Langy in the last minute. The instant export is not limited.",
-            },
-            {
-              status: 429,
-              headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
-            },
-          );
+          throw new RunReportRateLimitedError(rateLimit.retryAfterSeconds);
         }
       }
 
@@ -129,7 +128,9 @@ secured
         });
       } catch (error) {
         if (error instanceof BatchRunNotFoundError) {
-          return c.json({ error: "Run not found." }, { status: 404 });
+          throw new RunReportBatchNotFoundError(request.batchRunId, {
+            reasons: [error],
+          });
         }
         throw error;
       }
@@ -170,6 +171,11 @@ secured
  * fetch reader, not an EventSource, and a line is the whole protocol. Stages
  * arrive as they begin and the finished document arrives last, so the wait is
  * narrated without the report ever being half-written on screen.
+ *
+ * A failure AFTER the first byte cannot become an HTTP status, because the
+ * status is long gone. So it arrives as a line carrying an error code, which
+ * the client renders from the same registry it renders a rejected request
+ * from. Only the pre-stream rejections above are statuses.
  */
 function streamReport({
   request,
@@ -181,8 +187,29 @@ function streamReport({
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (payload: unknown) =>
-        controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+      // A reader that navigated away, or hit cancel, leaves the controller
+      // closed while the generation it started is still running. Enqueuing
+      // onto it throws, and the throw escapes `start`, which is how a
+      // cancelled export used to surface as an unhandled rejection instead of
+      // as nothing at all. Every write goes through here, including the last.
+      let isOpen = true;
+      const send = (payload: unknown) => {
+        if (!isOpen) return;
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+        } catch {
+          isOpen = false;
+        }
+      };
+      const close = () => {
+        if (!isOpen) return;
+        isOpen = false;
+        try {
+          controller.close();
+        } catch {
+          // Already closed by the reader going away. Nothing left to do.
+        }
+      };
 
       try {
         const model = await getApp().simulations.report.generate({
@@ -201,18 +228,23 @@ function streamReport({
           html: renderReportHtml({ model }),
         });
       } catch (error) {
-        send({
-          error:
-            error instanceof BatchRunNotFoundError
-              ? "Run not found."
-              : "The report could not be produced.",
-        });
-        logger.error(
-          { error, batchRunId: request.batchRunId },
-          "Run report stream failed",
-        );
+        // The abort is the reader cancelling. It has already stopped
+        // listening, and an error line describing its own cancellation would
+        // read to it as a failure.
+        if (!isAbort(error)) {
+          send({
+            error:
+              error instanceof BatchRunNotFoundError
+                ? "scenario_batch_run_not_found"
+                : "export_failed",
+          });
+          logger.error(
+            { error, batchRunId: request.batchRunId },
+            "Run report stream failed",
+          );
+        }
       } finally {
-        controller.close();
+        close();
       }
     },
   });
@@ -224,6 +256,10 @@ function streamReport({
       "X-Content-Type-Options": "nosniff",
     }),
   });
+}
+
+function isAbort(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 /**

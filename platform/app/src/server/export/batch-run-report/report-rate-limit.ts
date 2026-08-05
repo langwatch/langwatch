@@ -38,16 +38,23 @@ export async function checkReportRateLimit({
   userId,
   projectId,
   limit = REPORTS_WITH_ANALYSIS_PER_MINUTE,
+  now = Date.now(),
 }: {
   userId: string;
   projectId: string;
   limit?: number;
-  /** Passed in by tests; production reads the clock. */
+  /**
+   * Passed in by tests; production reads the clock.
+   *
+   * Read ONCE for both the bucket and the retry hint. Two separate reads could
+   * straddle a minute boundary and answer "wait 0 seconds for a bucket you are
+   * no longer in".
+   */
   now?: number;
 }): Promise<ReportRateLimitResult> {
   if (!connection) return { isAllowed: true, retryAfterSeconds: 0 };
 
-  const bucket = Math.floor(Date.now() / 60_000);
+  const bucket = Math.floor(now / 60_000);
   const key = `report:rl:${projectId}:${userId}:${bucket}`;
 
   try {
@@ -64,10 +71,7 @@ export async function checkReportRateLimit({
     const nextBucket = (bucket + 1) * 60_000;
     return {
       isAllowed: false,
-      retryAfterSeconds: Math.max(
-        1,
-        Math.ceil((nextBucket - Date.now()) / 1000),
-      ),
+      retryAfterSeconds: Math.max(1, Math.ceil((nextBucket - now) / 1000)),
     };
   } catch (error) {
     logger.warn(

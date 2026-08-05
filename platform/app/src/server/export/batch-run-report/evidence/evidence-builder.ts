@@ -1,6 +1,6 @@
-import { countRunOutcomes } from "~/server/scenarios/run-outcome-summary";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
+import { countRunOutcomes } from "~/shared/scenario-run-report/run-outcome-summary";
 import type { CriterionFact, ReportEvidence, RunFact } from "../report.types";
 import { buildPassRateFact } from "./confidence";
 import { criterionIdFor } from "./fingerprint";

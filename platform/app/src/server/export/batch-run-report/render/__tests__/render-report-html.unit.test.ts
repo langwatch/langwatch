@@ -573,3 +573,72 @@ describe("Feature: Run report — a conversation that is not there", () => {
     });
   });
 });
+
+/**
+ * A checked report is badged as checked, and the check has a shape: it ruled on
+ * the statement list, not on the prose around it.
+ */
+describe("what the document claims to have checked", () => {
+  /** @scenario A checked report says what was checked rather than that it is correct */
+  it("says the statements cite the run and a second reading confirmed them", () => {
+    const html = renderReportHtml({ model: makeEveryBlockModel() });
+
+    expect(html).toContain("Statements checked");
+    // The apostrophe in the copy is escaped by the time it reaches the page,
+    // so the assertion stops short of it.
+    expect(html).toContain("Every statement below cites this run");
+    expect(html).toContain("confirmed each one against the evidence it cites");
+  });
+
+  /** @scenario Prose nobody checked is marked as written rather than checked */
+  it("marks the finding, the proposal and the named group as written by Langy", () => {
+    const html = renderReportHtml({ model: makeEveryBlockModel() });
+
+    // One note per surface that carries model prose with no citations of its
+    // own: the finding, the proposal, and the group Langy named.
+    const notes = [...html.matchAll(/class="unchecked-prose"/g)];
+    expect(notes).toHaveLength(3);
+    expect(html).toContain("Langy wrote this.");
+    expect(html).toContain(
+      "Only the statements under it were checked against the run data.",
+    );
+  });
+
+  /** @scenario A finding is only compared against a severity computed for it */
+  it("shows the computed severity beside a finding that disagrees with it", () => {
+    const html = renderReportHtml({ model: makeEveryBlockModel() });
+
+    expect(html).toContain("critical (computed: high)");
+  });
+
+  /** @scenario A finding citing no failure group is shown without a computed severity */
+  it("shows no computed severity for a finding that has no prior", () => {
+    const html = renderReportHtml({
+      model: makeModel({
+        sections: [
+          makeSection({
+            written: [
+              {
+                kind: "findings",
+                findings: [
+                  {
+                    headline: "Something went wrong",
+                    severity: "low",
+                    computedSeverity: null,
+                    consequence: "Not much, as it turns out.",
+                    claims: [
+                      { id: "c9", text: "One run failed.", citations: [] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        ],
+      }),
+    });
+
+    expect(html).toContain("Something went wrong");
+    expect(html).not.toContain("(computed:");
+  });
+});

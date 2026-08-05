@@ -1,9 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
+import type { ClickHouseSimulationRunRow } from "~/server/simulations/simulation-run.mappers";
 import type { WindowFragment } from "../../../clients/clickhouse/windowed-read";
 import {
   buildStartedAtWindowClause,
+  RUN_OUTCOMES_ROW_CAP,
   SimulationClickHouseRepository,
   startedAtBoundsForPage,
 } from "../simulation.clickhouse.repository";
@@ -34,6 +36,47 @@ async function simulationOutcomeCount(outcome: string): Promise<number> {
         v.labels.table === "simulation_runs" && v.labels.outcome === outcome,
     )?.value ?? 0
   );
+}
+
+/** A settled LIST_COLUMNS row, carrying only what the ordering assertions read. */
+function runRow({
+  scenarioRunId,
+  createdAtMs,
+}: {
+  scenarioRunId: string;
+  createdAtMs: number;
+}): ClickHouseSimulationRunRow {
+  return {
+    ScenarioRunId: scenarioRunId,
+    ScenarioId: `scenario-${scenarioRunId}`,
+    BatchRunId: "batch-1",
+    ScenarioSetId: "set-1",
+    Status: "SUCCESS",
+    Name: scenarioRunId,
+    Description: null,
+    Metadata: null,
+    "Messages.Id": [],
+    "Messages.Role": [],
+    "Messages.Content": [],
+    "Messages.TraceId": [],
+    "Messages.Rest": [],
+    TraceIds: [],
+    Verdict: "success",
+    Reasoning: null,
+    MetCriteria: [],
+    UnmetCriteria: [],
+    Error: null,
+    DurationMs: "10",
+    TotalCost: null,
+    RoleCosts: {},
+    RoleLatencies: {},
+    // StartedAt drives ScenarioRunData.timestamp, so it tracks CreatedAt here.
+    StartedAt: String(createdAtMs),
+    CreatedAt: String(createdAtMs),
+    UpdatedAt: String(createdAtMs),
+    FinishedAt: String(createdAtMs),
+    ArchivedAt: null,
+  };
 }
 
 function makeMockClient(rows: unknown[] = []): ClickHouseClient {
@@ -208,6 +251,99 @@ describe("SimulationClickHouseRepository", () => {
         expect(batchQuery?.query).toMatch(
           /any\(IF\(ScenarioSetId[^)]*\)\)\s+AS\s+NormalizedSetId\b/,
         );
+      });
+    });
+  });
+
+  describe("findRunOutcomesForBatchIds()", () => {
+    describe("given more runs across the batches than the cap holds", () => {
+      it("keeps the newest rows by ordering descending under the cap", async () => {
+        const { client, getCapturedQueries } = makeMockClientWithQueryCapture({
+          rowsForQuery: () => [],
+        });
+        const repo = new SimulationClickHouseRepository(
+          vi.fn().mockResolvedValue(client),
+        );
+
+        await repo.findRunOutcomesForBatchIds({
+          projectId: "project-1",
+          batchRunIds: ["batch-1", "batch-2"],
+        });
+
+        const query = getCapturedQueries()[0]?.query ?? "";
+        expect(query).toContain("ORDER BY t.CreatedAt DESC");
+        expect(query).toContain(`LIMIT ${RUN_OUTCOMES_ROW_CAP}`);
+        // Ascending would shed the newest batches, which is the half the run
+        // report's trend section exists to compare against.
+        expect(query).not.toMatch(/ORDER BY\s+t?\.?CreatedAt ASC/);
+      });
+    });
+
+    describe("when ClickHouse returns the capped page newest-first", () => {
+      it("returns the runs oldest-first", async () => {
+        const { client } = makeMockClientWithQueryCapture({
+          rowsForQuery: () => [
+            runRow({ scenarioRunId: "run-c", createdAtMs: 3000 }),
+            runRow({ scenarioRunId: "run-b", createdAtMs: 2000 }),
+            runRow({ scenarioRunId: "run-a", createdAtMs: 1000 }),
+          ],
+        });
+        const repo = new SimulationClickHouseRepository(
+          vi.fn().mockResolvedValue(client),
+        );
+
+        const runs = await repo.findRunOutcomesForBatchIds({
+          projectId: "project-1",
+          batchRunIds: ["batch-1"],
+        });
+
+        expect(runs.map((run) => run.scenarioRunId)).toEqual([
+          "run-a",
+          "run-b",
+          "run-c",
+        ]);
+        expect(runs.map((run) => run.timestamp)).toEqual([1000, 2000, 3000]);
+      });
+    });
+
+    describe("when rows share a CreatedAt millisecond", () => {
+      it("orders the tie by scenario run id rather than arbitrarily", async () => {
+        const { client } = makeMockClientWithQueryCapture({
+          rowsForQuery: () => [
+            runRow({ scenarioRunId: "run-b", createdAtMs: 1000 }),
+            runRow({ scenarioRunId: "run-c", createdAtMs: 1000 }),
+            runRow({ scenarioRunId: "run-a", createdAtMs: 1000 }),
+          ],
+        });
+        const repo = new SimulationClickHouseRepository(
+          vi.fn().mockResolvedValue(client),
+        );
+
+        const runs = await repo.findRunOutcomesForBatchIds({
+          projectId: "project-1",
+          batchRunIds: ["batch-1"],
+        });
+
+        expect(runs.map((run) => run.scenarioRunId)).toEqual([
+          "run-a",
+          "run-b",
+          "run-c",
+        ]);
+      });
+    });
+
+    describe("when no batch ids are given", () => {
+      it("returns empty without querying ClickHouse", async () => {
+        const resolver = vi.fn();
+        const repo = new SimulationClickHouseRepository(resolver);
+
+        const runs = await repo.findRunOutcomesForBatchIds({
+          projectId: "project-1",
+          batchRunIds: [],
+        });
+
+        expect(runs).toEqual([]);
+        expect(resolver).not.toHaveBeenCalled();
       });
     });
   });

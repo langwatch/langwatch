@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import {
   countRunOutcomes,
   passRateFrom,
-} from "~/server/scenarios/run-outcome-summary";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+} from "~/shared/scenario-run-report/run-outcome-summary";
 import { buildPassRateFact, wilsonInterval } from "../confidence";
 
 /**

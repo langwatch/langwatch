@@ -14,8 +14,14 @@ import type { Citation, Claim, ReportEvidence } from "../report.types";
  * partially kept — because a sentence with one invented reference is not
  * trustworthy in its other half either.
  *
- * This is the property that makes the document safe to forward, and it holds
- * without trusting the model at all.
+ * What this file guarantees, exactly: every id a surviving statement cites is
+ * an id that exists in this run's evidence. It does NOT relate the cited item
+ * to what the sentence asserts, and it cannot — a sentence describing one
+ * scenario while citing another is well-formed here. That second half is the
+ * checker's job, which is why `verifier-pass.ts` is handed each statement's
+ * citations together with the evidence line each one points at. The two
+ * together are what the report's checked tier claims, and the badge copy says
+ * no more than the two together provide.
  *
  * @see specs/scenarios/scenario-run-report.feature
  */
@@ -115,7 +121,11 @@ export interface ResolutionResult {
  * where a reader who wants it looks. In the sentence it is the same string
  * twice over, and the half nobody can read.
  *
- * Longest id first, so one id that contains another cannot be half-replaced.
+ * One pass over the sentence, matching the longest id first, so a scenario name
+ * is never itself rescanned. Replacing id by id in sequence let a substituted
+ * name be re-matched by a later id: scenario names are customer-authored, and a
+ * name containing another run's id would corrupt the prose it had just been
+ * written into.
  */
 export function humaniseRunIds({
   text,
@@ -124,17 +134,28 @@ export function humaniseRunIds({
   text: string;
   evidence: ReportEvidence;
 }): string {
-  const byLongestId = [...evidence.runs].sort(
-    (a, b) => b.runId.length - a.runId.length,
+  const nameByRunId = new Map(
+    evidence.runs
+      .filter((run) => run.scenarioName && run.scenarioName !== run.runId)
+      .map((run) => [run.runId, run.scenarioName]),
+  );
+  if (nameByRunId.size === 0) return text;
+
+  // Longest first, so one id that is a prefix of another cannot be
+  // half-replaced by the shorter alternative winning the match.
+  const pattern = new RegExp(
+    [...nameByRunId.keys()]
+      .sort((a, b) => b.length - a.length)
+      .map(escapeForRegExp)
+      .join("|"),
+    "g",
   );
 
-  return byLongestId.reduce(
-    (sentence, run) =>
-      run.scenarioName && run.scenarioName !== run.runId
-        ? sentence.split(run.runId).join(run.scenarioName)
-        : sentence,
-    text,
-  );
+  return text.replace(pattern, (runId) => nameByRunId.get(runId) ?? runId);
+}
+
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**

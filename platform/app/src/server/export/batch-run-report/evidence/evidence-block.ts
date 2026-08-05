@@ -1,4 +1,5 @@
 import type { ReportEvidence, SelectedTranscript } from "../report.types";
+import { inline, quoted } from "./inline-text";
 
 /**
  * Renders the evidence as the exact text both model passes are given.
@@ -32,38 +33,20 @@ export function buildEvidenceBlock({
     .join("\n");
 }
 
-/**
- * A user-authored string flattened onto one line.
- *
- * Every value below reaches this block from the customer's own suite, and the
- * block is what both model passes read as fact. A newline inside one of them
- * starts a line the block never wrote, and a forged line can name a run id
- * that genuinely exists in this batch - so it resolves, the verifier confirms
- * it from the same forged line, and the sentence ships at the verified tier.
- * Forging an id that does not exist is harmless (the citation index is built
- * from the evidence objects, never parsed back out of this text); forging a
- * claim about a real one is not.
- *
- * The marker is deliberately visible rather than a plain space: a reader
- * comparing the block against a transcript should be able to see where the
- * line breaks were.
- */
-function inline(value: string): string {
-  return value.replace(/[\r\n]+/g, " ⏎ ");
-}
-
-function quoted(value: string): string {
-  return `"${value
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/[\r\n]+/g, " ")}"`;
-}
-
 function runSection(evidence: ReportEvidence): string[] {
   return [
     "## RUN",
     "(context only — nothing on this line is a citable id; cite run_id values from ## SCENARIOS instead)",
-    `suite_name: ${evidence.batch.suiteName ?? "(unnamed)"}`,
+    // Quoted like every other caller-supplied value. Unquoted it was the one
+    // string in the block that could carry a line break through, and a line
+    // break here writes a fact line both model passes then read as the
+    // block's own.
+    `suite_name: ${
+      evidence.batch.suiteName === null ||
+      evidence.batch.suiteName === undefined
+        ? "(unnamed)"
+        : quoted(evidence.batch.suiteName)
+    }`,
     `scenarios: ${evidence.counts.totalCount}`,
     `passed: ${evidence.counts.passedCount}  failed: ${evidence.counts.failedCount}  stalled: ${evidence.counts.stalledCount}  cancelled: ${evidence.counts.cancelledCount}`,
     `settled: ${evidence.counts.settledCount}`,

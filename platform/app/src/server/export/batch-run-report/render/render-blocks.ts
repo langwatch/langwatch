@@ -209,7 +209,9 @@ function renderGroups(groups: GroupBlock["groups"]): string {
           group.subtitle,
         )}</span></summary>${renderGroupDetail(
           group.detail,
-        )}${renderTranscripts(group.transcripts ?? [])}</details>`,
+        )}${group.isWrittenByModel ? renderUncheckedProseNote() : ""}${renderTranscripts(
+          group.transcripts ?? [],
+        )}</details>`,
     )
     .join("");
 }
@@ -253,13 +255,42 @@ function renderClaims(claims: Claim[]): string {
 /**
  * The severity line, showing the computed prior whenever the two disagree — a
  * model talking a failure up or down is itself worth seeing.
+ *
+ * Nothing is shown when the finding cites no failure group: there is no prior
+ * for it then, and a comparison against a number that was never about this
+ * finding is worse than no comparison at all.
  */
 function renderSeverity(finding: Finding): string {
-  const agreed = finding.severity === finding.computedSeverity;
-  const suffix = agreed ? "" : ` (computed: ${finding.computedSeverity})`;
+  const suffix =
+    finding.computedSeverity === null ||
+    finding.severity === finding.computedSeverity
+      ? ""
+      : ` (computed: ${finding.computedSeverity})`;
   return `<p class="severity ${toneClass(SEVERITY_TONES[finding.severity])}">${escapeHtml(
     `${finding.severity}${suffix}`,
   )}</p>`;
+}
+
+/**
+ * The line that separates checked statements from the prose around them.
+ *
+ * A finding's headline and consequence, an artifact's title, rationale and
+ * body, and a failure group's mechanism are model prose with no citations of
+ * their own, so the second pass never rules on them. They render inside a
+ * document badged "Langy checked", and a reader has no way to tell them from
+ * the statements that were checked unless the document says so.
+ *
+ * Written on the page rather than solved by routing the prose through the
+ * claims pipeline, because these surfaces have no citations to route: a
+ * proposal's body is new by construction and can never be supported by
+ * evidence about the past. What CAN be checked is the statement list under
+ * each one, and that is exactly what the sentence points the reader at.
+ */
+const UNCHECKED_PROSE_NOTE =
+  "Langy wrote this. Only the statements under it were checked against the run data.";
+
+function renderUncheckedProseNote(): string {
+  return `<p class="unchecked-prose">${escapeHtml(UNCHECKED_PROSE_NOTE)}</p>`;
 }
 
 function renderFindings(findings: Finding[]): string {
@@ -270,7 +301,7 @@ function renderFindings(findings: Finding[]): string {
           finding.headline,
         )}</h4>${renderSeverity(finding)}<p>${escapeHtml(
           finding.consequence,
-        )}</p>${renderClaims(finding.claims)}</article>`,
+        )}</p>${renderUncheckedProseNote()}${renderClaims(finding.claims)}</article>`,
     )
     .join("");
 }
@@ -287,7 +318,9 @@ function renderArtifacts(artifacts: Artifact[]): string {
           artifact.rationale,
         )}</p><details><summary>Show the proposal</summary><pre><code>${escapeHtml(
           artifact.body,
-        )}</code></pre></details>${renderClaims(artifact.claims)}</article>`,
+        )}</code></pre></details>${renderUncheckedProseNote()}${renderClaims(
+          artifact.claims,
+        )}</article>`,
     )
     .join("");
 }

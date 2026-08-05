@@ -1,4 +1,4 @@
-import type { RunOutcomeCounts } from "~/server/scenarios/run-outcome-summary";
+import type { RunOutcomeCounts } from "~/shared/scenario-run-report/run-outcome-summary";
 import type {
   PassRateFact,
   QuestionTier,
@@ -35,20 +35,33 @@ const QUESTION_TIERS: readonly { tier: QuestionTier; heading: string }[] = [
   { tier: "future", heading: "What to do next" },
 ];
 
+/**
+ * The badge each tier carries.
+ *
+ * "Statements checked" rather than "Langy checked", because the check has a
+ * shape and the badge should not read as broader than it is: what a second
+ * pass ruled on is the statement list, one sentence at a time, against the
+ * evidence each one cites. The prose around those statements is Langy's and is
+ * labelled as such where it appears.
+ */
 const TIER_BADGES: Readonly<Record<ReportTier, string>> = {
-  verified: "Langy checked",
-  unchecked: "Langy unchecked",
+  verified: "Statements checked",
+  unchecked: "Statements not checked",
   figures_only: "Figures only",
 };
 
 /**
- * What is missing at each tier, said plainly.
+ * What each tier does and does not vouch for, said plainly.
  *
- * A verified report says nothing extra; the other two owe the reader a sentence
- * about which half of the document did not survive being produced.
+ * The checked tier gets a sentence too. It used to get none, on the reasoning
+ * that a passing check owes the reader nothing, but a badge with no scope
+ * beside it is read as covering the whole document, and it does not: the check
+ * covers the cited statements, not the summaries and proposals written around
+ * them.
  */
 const TIER_NOTES: Readonly<Record<ReportTier, string | null>> = {
-  verified: null,
+  verified:
+    "Every statement below cites this run's own data, and a second pass confirmed each one against the evidence it cites. Langy's summaries and proposals are marked where they were not checked.",
   unchecked:
     "Langy's analysis could not be checked a second time. The figures below are computed directly from the run data.",
   figures_only:

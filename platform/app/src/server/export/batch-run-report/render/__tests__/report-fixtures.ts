@@ -1,4 +1,4 @@
-import type { RunOutcomeCounts } from "~/server/scenarios/run-outcome-summary";
+import type { RunOutcomeCounts } from "~/shared/scenario-run-report/run-outcome-summary";
 import type { Block, ReportModel, ReportSection } from "../../report.types";
 
 /**
@@ -115,6 +115,9 @@ export const EVERY_BLOCK: Block[] = [
         title: "Agent skipped the confirmation step",
         subtitle: "3 scenarios",
         tone: "fail",
+        // Langy names and explains this group; the membership under it is
+        // computed. Only the naming half is unchecked prose.
+        isWrittenByModel: true,
         detail: [{ label: "Judge reasoning", body: "It never confirmed." }],
         // Turn indices jump 0 -> 7, which is how a dropped middle reaches the
         // renderer: selection keeps the opening turn and the tail.

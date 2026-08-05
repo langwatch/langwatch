@@ -8,11 +8,11 @@
  * @see specs/scenarios/scenario-run-report.feature
  */
 
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import {
   countRunOutcomes,
   passRateFrom,
-} from "~/server/scenarios/run-outcome-summary";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+} from "~/shared/scenario-run-report/run-outcome-summary";
 import type {
   CriterionFact,
   CriterionOutcome,

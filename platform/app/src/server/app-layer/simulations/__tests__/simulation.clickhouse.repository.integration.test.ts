@@ -6,7 +6,10 @@ import {
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { createResilientClickHouseClient } from "../../clients/clickhouse";
-import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
+import {
+  RUN_OUTCOMES_ROW_CAP,
+  SimulationClickHouseRepository,
+} from "../repositories/simulation.clickhouse.repository";
 
 const tenantId = `test-sim-repo-${nanoid()}`;
 const now = Date.now();
@@ -1215,6 +1218,87 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(previewQuery!.query).toContain("StartedAt <=");
         expect(previewQuery!.query_params?.minStartedAtMs).toBe(
           String(oldStartedAtMs),
+        );
+      });
+    });
+  });
+
+  describe("findRunOutcomesForBatchIds() row cap", () => {
+    // Its own tenant: this block writes RUN_OUTCOMES_ROW_CAP + 100 runs, and on
+    // the shared tenant they would swamp every other suite's cross-batch read.
+    const capTenantId = `test-sim-cap-${nanoid()}`;
+    const batchRunId = `batch-cap-${nanoid()}`;
+    const scenarioSetId = `set-cap-${nanoid()}`;
+    const overflow = 100;
+    const total = RUN_OUTCOMES_ROW_CAP + overflow;
+    // A fixed anchor inside the current week, so CreatedAt and StartedAt march
+    // forward one millisecond per run without spilling into another partition.
+    const firstCreatedAtMs = now - total;
+    const runIdFor = (index: number) =>
+      `run-cap-${String(index).padStart(5, "0")}`;
+
+    beforeAll(async () => {
+      const rows = Array.from({ length: total }, (_, index) => {
+        const at = new Date(firstCreatedAtMs + index);
+        return makeInsertRow({
+          TenantId: capTenantId,
+          ScenarioRunId: runIdFor(index),
+          BatchRunId: batchRunId,
+          ScenarioSetId: scenarioSetId,
+          StartedAt: at,
+          CreatedAt: at,
+          UpdatedAt: at,
+          FinishedAt: at,
+        });
+      });
+      for (let offset = 0; offset < rows.length; offset += 1000) {
+        await ch.insert({
+          table: "simulation_runs",
+          values: rows.slice(offset, offset + 1000),
+          format: "JSONEachRow",
+          clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+        });
+      }
+    }, 120_000);
+
+    afterAll(async () => {
+      await ch.exec({
+        query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
+        query_params: { tenantId: capTenantId },
+      });
+    });
+
+    describe("given the batches hold more runs than the cap", () => {
+      it("keeps the newest runs and drops the oldest", async () => {
+        const runs = await repo.findRunOutcomesForBatchIds({
+          projectId: capTenantId,
+          batchRunIds: [batchRunId],
+          scenarioSetId,
+        });
+
+        expect(runs).toHaveLength(RUN_OUTCOMES_ROW_CAP);
+
+        const returnedIds = new Set(runs.map((run) => run.scenarioRunId));
+        // The `overflow` oldest runs are the ones the cap sheds...
+        expect(returnedIds.has(runIdFor(0))).toBe(false);
+        expect(returnedIds.has(runIdFor(overflow - 1))).toBe(false);
+        // ...and the newest survive, which is what the trend section reads.
+        expect(returnedIds.has(runIdFor(overflow))).toBe(true);
+        expect(returnedIds.has(runIdFor(total - 1))).toBe(true);
+      });
+
+      it("returns the surviving runs oldest-first", async () => {
+        const runs = await repo.findRunOutcomesForBatchIds({
+          projectId: capTenantId,
+          batchRunIds: [batchRunId],
+          scenarioSetId,
+        });
+
+        const timestamps = runs.map((run) => run.timestamp);
+        expect(timestamps).toEqual([...timestamps].sort((a, b) => a - b));
+        expect(timestamps[0]).toBe(firstCreatedAtMs + overflow);
+        expect(timestamps[timestamps.length - 1]).toBe(
+          firstCreatedAtMs + total - 1,
         );
       });
     });

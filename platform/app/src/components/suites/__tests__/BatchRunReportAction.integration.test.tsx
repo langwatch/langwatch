@@ -86,6 +86,57 @@ function installFetchMock() {
  * actually runs — a blob-shaped fake passes through it without ever
  * downloading anything.
  */
+/** One NDJSON body, read in a single chunk, as the fetch mock returns it. */
+function ndjsonResponse(lines: string[]) {
+  const encoded = new TextEncoder().encode(lines.join("\n"));
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({ "Content-Type": "application/x-ndjson" }),
+    body: {
+      getReader: () => {
+        let sent = false;
+        return {
+          read: () =>
+            Promise.resolve(
+              sent
+                ? { done: true, value: undefined }
+                : ((sent = true), { done: false, value: encoded }),
+            ),
+          cancel: () => Promise.resolve(),
+        };
+      },
+    },
+  };
+}
+
+/**
+ * The document delivered, then the connection cut part-way through whatever
+ * came next. The trailing fragment is not valid JSON, which is the case that
+ * used to throw over a file already on disk.
+ */
+function truncatedAfterDocumentResponse({ filename }: { filename: string }) {
+  return ndjsonResponse([
+    JSON.stringify({ stage: "reading" }),
+    JSON.stringify({
+      done: true,
+      tier: "verified",
+      filename,
+      html: "<html></html>",
+    }),
+    '{"stage":"render',
+  ]);
+}
+
+/** A failure raised after the first byte, so it travels as a line. */
+function streamFailureResponse(code: string) {
+  return ndjsonResponse([
+    JSON.stringify({ stage: "reading" }),
+    JSON.stringify({ error: code }),
+    "",
+  ]);
+}
+
 function reportResponse({
   tier = "verified",
   filename = "checkout-suite-report.html",
@@ -282,19 +333,22 @@ describe("run report action on a run history row", () => {
     });
 
     /** @scenario "Exporting a report leaves the run history alone" */
-    it("keeps the row header the only <button> in its own subtree", () => {
+    it("keeps the actions trigger a sibling of the expand control, not a nested one", () => {
       render(<ReportRows batchRunIds={["batch_a"]} />, { wrapper: Wrapper });
 
-      // A nested <button> is closed early by the HTML parser, which detaches
-      // the trigger from its handler and lets the click reach the header.
+      // A control inside a button is invalid HTML: the parser closes the outer
+      // button early, and assistive technology treats everything inside a
+      // button as part of its label, so the trigger disappears entirely.
       const trigger = screen.getByRole("button", {
         name: "Actions for Suite batch_a",
       });
-      expect(trigger.tagName.toLowerCase()).not.toBe("button");
+      expect(trigger.tagName.toLowerCase()).toBe("button");
 
       const header = screen.getAllByTestId("run-row-header")[0]!;
-      expect(header.tagName.toLowerCase()).toBe("button");
-      expect(header.querySelectorAll("button")).toHaveLength(0);
+      expect(header.tagName.toLowerCase()).not.toBe("button");
+      for (const button of header.querySelectorAll("button")) {
+        expect(button.querySelectorAll("button")).toHaveLength(0);
+      }
     });
 
     /** @scenario "The report covers the run I asked for" */
@@ -381,6 +435,53 @@ describe("run report action results", () => {
           within(rowOf("batch_a")).queryByTestId("cancel-report-button"),
         ).not.toBeInTheDocument(),
       );
+    });
+  });
+
+  /**
+   * The stream is a line protocol over a connection that can be cut at any
+   * point, including between the document and the end of the response.
+   */
+  describe("when the stream does not end cleanly", () => {
+    /** @scenario "A cut connection does not report a failure over a delivered file" */
+    it("keeps the delivered file and says nothing when the last line is truncated", async () => {
+      const user = userEvent.setup();
+      render(<ReportRows batchRunIds={["batch_a"]} />, { wrapper: Wrapper });
+
+      const item = await openReportMenu({ user, batchRunId: "batch_a" });
+      await user.click(item);
+      await waitFor(() => expect(pendingRequests).toHaveLength(1));
+
+      // The document arrives whole; the connection is then cut mid-line.
+      pendingRequests[0]!.resolve(
+        truncatedAfterDocumentResponse({ filename: "delivered.html" }),
+      );
+
+      await waitFor(() =>
+        expect(downloadedFilenames).toEqual(["delivered.html"]),
+      );
+      expect(showErrorToastMock).not.toHaveBeenCalled();
+    });
+
+    it("surfaces a mid-stream failure by its code rather than a sentence", async () => {
+      const user = userEvent.setup();
+      render(<ReportRows batchRunIds={["batch_a"]} />, { wrapper: Wrapper });
+
+      const item = await openReportMenu({ user, batchRunId: "batch_a" });
+      await user.click(item);
+      await waitFor(() => expect(pendingRequests).toHaveLength(1));
+
+      pendingRequests[0]!.resolve(
+        streamFailureResponse("scenario_batch_run_not_found"),
+      );
+
+      await waitFor(() => expect(showErrorToastMock).toHaveBeenCalledOnce());
+      expect(downloadedFilenames).toHaveLength(0);
+      // The code rides on the error so the toast renders the words written for
+      // it rather than the generic fallback.
+      expect(showErrorToastMock.mock.calls[0]![0].error).toMatchObject({
+        error: "scenario_batch_run_not_found",
+      });
     });
   });
 });

@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { RunOutcomeCounts } from "~/server/scenarios/run-outcome-summary";
 import type { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { RunStatusCategory } from "~/server/scenarios/scenario-run-category";
+import type { RunOutcomeCounts } from "~/shared/scenario-run-report/run-outcome-summary";
 
 /**
  * Shapes for the run report: what the deterministic layer computes, what a
@@ -10,10 +10,24 @@ import type { RunStatusCategory } from "~/server/scenarios/scenario-run-category
  * @see specs/scenarios/scenario-run-report.feature
  */
 
+/**
+ * A ceiling on the ids, since every one of them reaches a ClickHouse query
+ * parameter and a Redis bucket key.
+ *
+ * Parameterisation makes those safe, not correct: an empty id is a query that
+ * cannot match, and a megabyte of id is a request that should have been
+ * refused at the edge rather than carried through the read path. Generously
+ * above every id the platform mints, so it can only ever catch input that was
+ * never going to work.
+ */
+const MAX_ID_LENGTH = 200;
+
+const identifier = z.string().min(1).max(MAX_ID_LENGTH);
+
 export const batchRunReportRequestSchema = z.object({
-  projectId: z.string(),
-  scenarioSetId: z.string(),
-  batchRunId: z.string(),
+  projectId: identifier,
+  scenarioSetId: identifier,
+  batchRunId: identifier,
   /**
    * What the run is called on screen.
    *
@@ -278,8 +292,17 @@ export type Severity = "critical" | "high" | "medium" | "low";
 export interface Finding {
   headline: string;
   severity: Severity;
-  /** What the computed prior said, shown alongside when the two disagree. */
-  computedSeverity: Severity;
+  /**
+   * The computed prior for the failure groups THIS finding cites, shown
+   * alongside when the two disagree.
+   *
+   * Null when the finding cites no failure group, because then there is no
+   * prior for it and there is nothing to compare against. A single worst-case
+   * prior stamped onto every finding rendered as a per-finding second opinion,
+   * which put a spurious "(computed: critical)" beside unrelated low-severity
+   * findings.
+   */
+  computedSeverity: Severity | null;
   consequence: string;
   claims: Claim[];
 }
@@ -325,6 +348,16 @@ export type Block =
         subtitle: string;
         tone?: Tone;
         detail: { label: string; body: string }[];
+        /**
+         * True when the title and detail are Langy's wording rather than
+         * computed from the run.
+         *
+         * The same block renders the deterministic failure groups and the ones
+         * Langy names, and only the second kind is prose nothing ruled on. The
+         * renderer says so on the page for those, because a reader of a
+         * document badged as checked has no other way to tell them apart.
+         */
+        isWrittenByModel?: boolean;
         /** Exemplar conversations for this failure group, if any were kept. */
         transcripts?: SelectedTranscript[];
       }[];

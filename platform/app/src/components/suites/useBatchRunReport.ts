@@ -16,6 +16,7 @@ import { toaster } from "~/components/ui/toaster";
 import { readHandledError, showErrorToast } from "~/features/errors";
 import type { ReportTier } from "~/server/export/batch-run-report/report.types";
 import type { ReportStage } from "~/shared/scenario-run-report/report-stages";
+import { triggerBlobDownload } from "~/utils/downloadBlob";
 
 export const BATCH_RUN_REPORT_DOWNLOAD_PATH =
   "/api/export/batch-run-report/download";
@@ -40,7 +41,15 @@ export interface UseBatchRunReportReturn {
   cancelReport: (input: { batchRunId: string }) => void;
 }
 
-/** One line of the report endpoint's NDJSON: a stage, the document, or a failure. */
+/**
+ * One line of the report endpoint's NDJSON: a stage, the document, or a
+ * failure.
+ *
+ * `error` is a handled-error CODE, not a sentence. A failure after the first
+ * byte cannot become an HTTP status, so it travels in band, and it travels as
+ * the same discriminant a rejected request would have carried: the words come
+ * from the presentation registry either way.
+ */
 interface ReportStreamEvent {
   stage?: ReportStage;
   done?: boolean;
@@ -84,7 +93,7 @@ async function consumeReportStream({
     const event = parseStreamEvent(line);
     if (!event) return;
     if (event.stage) return onStage(event.stage);
-    if (event.error) throw new Error(event.error);
+    if (event.error) throw streamFailure(event.error);
     if (!event.done || event.html === undefined) return;
 
     deliverDocument({ event, suiteName, batchRunId });
@@ -106,10 +115,40 @@ async function consumeReportStream({
   }
 }
 
-/** One NDJSON line as an event, or null for the blank lines between them. */
+/**
+ * One NDJSON line as an event, or null when there is nothing to read in it.
+ *
+ * A malformed or truncated line is skipped rather than thrown on. The last
+ * line of a cut stream is the one this matters for: a connection dropped after
+ * the document had already been delivered would otherwise surface as a failure
+ * toast over a file the reader has in their downloads folder. When the
+ * document really did not arrive, the caller's own "ended before the file
+ * arrived" check still fires.
+ */
 function parseStreamEvent(line: string): ReportStreamEvent | null {
   if (line.trim() === "") return null;
-  return JSON.parse(line) as ReportStreamEvent;
+  try {
+    const parsed: unknown = JSON.parse(line);
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as ReportStreamEvent)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A mid-stream failure as something `showErrorToast` can render.
+ *
+ * The line carries a code, so it rides on the error under `error`, which is
+ * the flat shape `readHandledError` reads a REST rejection from. Same reasoning
+ * as `reportRequestError` below: a synthesised sentence here would replace copy
+ * written for this exact failure with a generic one.
+ */
+function streamFailure(code: string): Error {
+  return Object.assign(new Error(`Run report stream failed: ${code}`), {
+    error: code,
+  });
 }
 
 /** Saves the finished document and says so when the analysis is missing. */
@@ -136,24 +175,6 @@ function deliverDocument({
       type: "info",
     });
   }
-}
-
-/** Triggers a browser download from a Blob and a filename. */
-function triggerBlobDownload({
-  blob,
-  filename,
-}: {
-  blob: Blob;
-  filename: string;
-}): void {
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.setAttribute("download", filename);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
 }
 
 /** A name that still says which run it came from when the header does not. */

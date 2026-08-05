@@ -1,8 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import { generateObject } from "ai";
 import { z } from "zod";
-import type { Claim } from "../report.types";
-import { VERIFIER_SYSTEM_PROMPT } from "./prompts";
+import type { Claim, ReportEvidence } from "../report.types";
+import {
+  buildCitationExcerpts,
+  renderClaimForCheck,
+} from "./citation-excerpts";
+import { VERIFIER_SYSTEM_PROMPT, wrapUntrustedData } from "./prompts";
 
 const logger = createLogger("langwatch:batch-run-report:verifier");
 
@@ -14,7 +18,14 @@ const logger = createLogger("langwatch:batch-run-report:verifier");
  * check them.
  *
  * It is given the byte-identical evidence the writer saw, so the two passes
- * provably reasoned over the same facts.
+ * provably reasoned over the same facts, AND each statement's own citations
+ * rendered next to it with the line each one points at. Both halves matter: the
+ * whole block is what lets the checker notice a figure that appears nowhere,
+ * and the per-statement excerpts are what let it notice a sentence describing
+ * one scenario while citing another. Without the excerpts a statement is judged
+ * on wording alone, which is the failure this pass exists to catch — the more
+ * so because the statement's run ids have already been swapped for scenario
+ * names by the time it arrives here, while the evidence is indexed by id.
  *
  * @see specs/scenarios/scenario-run-report.feature
  */
@@ -53,11 +64,14 @@ export interface VerifierOutcome {
 
 export async function runVerifierPass({
   evidenceBlock,
+  evidence,
   claims,
   resolveModel,
   abortSignal,
 }: {
   evidenceBlock: string;
+  /** Read only to render what each citation points at, next to its statement. */
+  evidence: ReportEvidence;
   claims: Claim[];
   resolveModel: () => Promise<Parameters<typeof generateObject>[0]["model"]>;
   abortSignal?: AbortSignal;
@@ -68,6 +82,7 @@ export async function runVerifierPass({
 
   try {
     const model = await resolveModel();
+    const excerpts = buildCitationExcerpts({ evidence });
     const { object } = await generateObject({
       model,
       schemaName: "RunReportCheck",
@@ -75,10 +90,17 @@ export async function runVerifierPass({
       schema: verdictSchema,
       system: VERIFIER_SYSTEM_PROMPT,
       prompt: [
-        `EVIDENCE\n\n${evidenceBlock}`,
+        wrapUntrustedData(evidenceBlock),
         "",
-        "STATEMENTS",
-        ...claims.map((claim) => `${claim.id}: ${claim.text}`),
+        "STATEMENTS, each followed by the evidence it cites",
+        ...claims.map((claim) =>
+          renderClaimForCheck({
+            id: claim.id,
+            text: claim.text,
+            citations: claim.citations,
+            excerpts,
+          }),
+        ),
       ].join("\n"),
       temperature: 0,
       abortSignal,

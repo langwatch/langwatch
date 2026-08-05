@@ -13,16 +13,16 @@ import {
   isOnPlatformSet,
   ON_PLATFORM_DISPLAY_NAME,
 } from "~/server/scenarios/internal-set-id";
-import {
-  countRunOutcomes,
-  passRateFrom,
-} from "~/server/scenarios/run-outcome-summary";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type {
   ScenarioRunData,
   SuiteRunSummary,
 } from "~/server/scenarios/scenario-event.types";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
+import {
+  countRunOutcomes,
+  passRateFrom,
+} from "~/shared/scenario-run-report/run-outcome-summary";
 
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;

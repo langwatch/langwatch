@@ -164,6 +164,12 @@ p { margin: 0 0 0.65rem; max-width: 68ch; }
 .badge-unchecked { border-color: var(--warn); color: var(--warn); }
 .badge-figures_only { border-color: var(--muted); color: var(--ink-soft); }
 .tier-note { color: var(--ink-soft); font-size: 0.9rem; margin: 0.5rem 0 0; }
+.unchecked-prose {
+  color: var(--ink-faint);
+  font-size: 0.82rem;
+  font-style: italic;
+  margin: 0.35rem 0 0.5rem;
+}
 .headline-rate {
   font-family: var(--serif);
   font-size: 1.2rem;

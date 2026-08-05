@@ -201,8 +201,12 @@ function RunRowData({
         top={0}
         zIndex={20}
       >
+        {/* The row itself is a container rather than a button. It carries the
+            Stop chips and the actions menu, which are controls of their own,
+            and a control nested inside a button is invalid HTML that assistive
+            technology flattens away. Expanding has its own button; clicking
+            anywhere else on the row reaches the same handler by bubbling. */}
         <HStack
-          as="button"
           width="full"
           paddingX={4}
           paddingY={3}
@@ -211,8 +215,6 @@ function RunRowData({
           cursor="pointer"
           onClick={onToggle}
           className="group"
-          aria-expanded={isExpanded}
-          aria-label={`Run from ${timeAgo ?? "unknown time"}`}
           bg="color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 70%), transparent)"
           backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(140%))"
           borderWidth="1px"
@@ -223,39 +225,50 @@ function RunRowData({
           borderRadius="lg"
           boxShadow="xs"
         >
-          {isExpanded ? (
-            <ChevronDown size={14} style={{ flexShrink: 0 }} />
-          ) : (
-            <ChevronRight size={14} style={{ flexShrink: 0 }} />
-          )}
-          {suiteName && (
-            <>
-              <Text
-                fontSize="sm"
-                fontWeight="medium"
-                color="fg.default"
-                flexShrink={0}
-              >
-                {suiteName}
-              </Text>
-              <Text fontSize="sm" color="fg.muted" flexShrink={0}>
-                &middot;
-              </Text>
-            </>
-          )}
-          <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
-            {timeAgo}
-          </Text>
-          {expectedJobCount != null &&
-            summary.totalCount < expectedJobCount && (
-              <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-                {summary.totalCount} of {expectedJobCount}
-              </Text>
+          {/* No handler of its own: the click it fires bubbles to the row, so
+              expanding happens in exactly one place however it was asked for. */}
+          <HStack
+            as="button"
+            gap={3}
+            flexShrink={0}
+            cursor="pointer"
+            aria-expanded={isExpanded}
+            aria-label={`Run from ${timeAgo ?? "unknown time"}`}
+            data-testid="run-row-toggle"
+          >
+            {isExpanded ? (
+              <ChevronDown size={14} style={{ flexShrink: 0 }} />
+            ) : (
+              <ChevronRight size={14} style={{ flexShrink: 0 }} />
             )}
+            {suiteName && (
+              <>
+                <Text
+                  fontSize="sm"
+                  fontWeight="medium"
+                  color="fg.default"
+                  flexShrink={0}
+                >
+                  {suiteName}
+                </Text>
+                <Text fontSize="sm" color="fg.muted" flexShrink={0}>
+                  &middot;
+                </Text>
+              </>
+            )}
+            <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
+              {timeAgo}
+            </Text>
+            {expectedJobCount != null &&
+              summary.totalCount < expectedJobCount && (
+                <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+                  {summary.totalCount} of {expectedJobCount}
+                </Text>
+              )}
+          </HStack>
           {onCancelAll && hasCancellableRuns && (
             <HStack
-              as="span"
-              role="button"
+              as="button"
               tabIndex={isCancellingBatch ? -1 : 0}
               gap={1}
               paddingX={2}
@@ -277,16 +290,6 @@ function RunRowData({
                 e.stopPropagation();
                 if (!isCancellingBatch) setIsCancelAllDialogOpen(true);
               }}
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (
-                  !isCancellingBatch &&
-                  (e.key === "Enter" || e.key === " ")
-                ) {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  setIsCancelAllDialogOpen(true);
-                }
-              }}
               aria-label="Stop all remaining runs"
               aria-disabled={isCancellingBatch}
               data-testid="cancel-all-button"
@@ -299,9 +302,7 @@ function RunRowData({
               report is being produced, and it is how that one is stopped. */}
           {isReportRunning && onCancelReport && (
             <HStack
-              as="span"
-              role="button"
-              tabIndex={0}
+              as="button"
               gap={1}
               paddingX={2}
               paddingY={0.5}
@@ -317,13 +318,6 @@ function RunRowData({
                 e.stopPropagation();
                 onCancelReport();
               }}
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onCancelReport();
-                }
-              }}
               aria-label="Cancel report"
               data-testid="cancel-report-button"
             >
@@ -334,16 +328,12 @@ function RunRowData({
           <Box flex={1} />
           <RunMetricsSummary summary={summary} />
           {/* Row actions live in one overflow menu (row-actions-overflow-menu.md).
-              The trigger is a span rather than the doc's Button because this whole
-              header IS a <button>, and browsers flatten a nested one — the click
-              would then land on the header and toggle the row instead. */}
+              Opening it is not expanding the row, so the click stops here. */}
           {onExportReport && (
             <Menu.Root>
               <Menu.Trigger asChild>
                 <Box
-                  as="span"
-                  role="button"
-                  tabIndex={0}
+                  as="button"
                   display="flex"
                   alignItems="center"
                   justifyContent="center"
@@ -354,15 +344,6 @@ function RunRowData({
                   flexShrink={0}
                   _hover={{ bg: "bg.muted", color: "fg" }}
                   onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                  onKeyDown={(e: React.KeyboardEvent) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.stopPropagation();
-                      // A span with role="button" does not get the browser's
-                      // button behaviour, so Space still scrolls the panel out
-                      // from under whoever was trying to open this menu.
-                      e.preventDefault();
-                    }
-                  }}
                   aria-label={`Actions for ${suiteName ?? "this run"}`}
                   data-testid="run-row-actions-button"
                 >

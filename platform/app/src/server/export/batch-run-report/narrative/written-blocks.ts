@@ -23,6 +23,7 @@ import type {
   ReportEvidence,
   Severity,
 } from "../report.types";
+import { humaniseRunIds } from "./citation-resolver";
 import type { DraftAnswer, DraftCitation } from "./narrative-pass";
 
 /**
@@ -95,7 +96,7 @@ export function buildWrittenBlocks({
   offset += countFindingClaims(answer);
   if (findings) blocks.push(findings);
 
-  const artifacts = buildArtifactsBlock({ answer, admit, offset });
+  const artifacts = buildArtifactsBlock({ answer, evidence, admit, offset });
   if (artifacts) blocks.push(artifacts);
 
   return blocks;
@@ -145,11 +146,15 @@ function buildGroupBlock({
       ];
 
       return {
-        title: group.name,
+        title: humaniseRunIds({ text: group.name, evidence }),
         subtitle: `${members.length} ${members.length === 1 ? "scenario" : "scenarios"}`,
         tone: "fail" as const,
+        isWrittenByModel: true,
         detail: [
-          { label: "What went wrong", body: group.mechanism },
+          {
+            label: "What went wrong",
+            body: humaniseRunIds({ text: group.mechanism, evidence }),
+          },
           { label: "Scenarios", body: scenarioNames.join(", ") },
         ],
       };
@@ -169,18 +174,7 @@ function buildFindingsBlock({
   admit: Admit;
   offset: number;
 }): Block | null {
-  const trendByCriterion = new Map(
-    evidence.trend.map((fact) => [fact.criterionId, fact.classification]),
-  );
-  const worstComputed = evidence.signatures
-    .map((signature) =>
-      computeSeverityPrior({
-        signature,
-        trendByCriterion,
-        settledRuns: evidence.counts.settledCount,
-      }),
-    )
-    .sort(bySeverityDescending)[0];
+  const priorBySignature = severityPriors(evidence);
   let cursor = offset;
 
   const findings: Finding[] = (answer.findings ?? [])
@@ -192,10 +186,10 @@ function buildFindingsBlock({
       });
       cursor += finding.statements?.length ?? 0;
       return {
-        headline: finding.headline,
+        headline: humaniseRunIds({ text: finding.headline, evidence }),
         severity: finding.severity as Severity,
-        computedSeverity: worstComputed ?? ("low" as Severity),
-        consequence: finding.consequence,
+        computedSeverity: priorForCitedSignatures({ claims, priorBySignature }),
+        consequence: humaniseRunIds({ text: finding.consequence, evidence }),
         claims,
       };
     })
@@ -205,12 +199,56 @@ function buildFindingsBlock({
   return findings.length > 0 ? { kind: "findings", findings } : null;
 }
 
+/** The computed prior for each failure group, ready to look up by id. */
+function severityPriors(evidence: ReportEvidence): Map<string, Severity> {
+  const trendByCriterion = new Map(
+    evidence.trend.map((fact) => [fact.criterionId, fact.classification]),
+  );
+  return new Map(
+    evidence.signatures.map((signature) => [
+      signature.signatureId,
+      computeSeverityPrior({
+        signature,
+        trendByCriterion,
+        settledRuns: evidence.counts.settledCount,
+      }),
+    ]),
+  );
+}
+
+/**
+ * The worst prior among the failure groups this finding's own statements cite.
+ *
+ * The model writes a finding as prose plus supporting statements, and the
+ * statements are where it says which groups the finding is about — so the
+ * citations are the only honest link between a finding and a computed prior.
+ * A finding citing no group gets no prior, and the renderer shows no second
+ * opinion for it rather than inventing one.
+ */
+function priorForCitedSignatures({
+  claims,
+  priorBySignature,
+}: {
+  claims: Claim[];
+  priorBySignature: Map<string, Severity>;
+}): Severity | null {
+  const cited = claims
+    .flatMap((claim) => claim.citations)
+    .filter((citation) => citation.kind === "signature")
+    .map((citation) => priorBySignature.get(citation.signatureId))
+    .filter((severity): severity is Severity => severity !== undefined);
+
+  return cited.length === 0 ? null : [...cited].sort(bySeverityDescending)[0]!;
+}
+
 function buildArtifactsBlock({
   answer,
+  evidence,
   admit,
   offset,
 }: {
   answer: DraftAnswer;
+  evidence: ReportEvidence;
   admit: Admit;
   offset: number;
 }): Block | null {
@@ -226,9 +264,13 @@ function buildArtifactsBlock({
       cursor += artifact.statements?.length ?? 0;
       return {
         artifactType: artifact.artifactType,
-        title: artifact.title,
-        rationale: artifact.rationale,
-        body: artifact.body,
+        title: humaniseRunIds({ text: artifact.title, evidence }),
+        rationale: humaniseRunIds({ text: artifact.rationale, evidence }),
+        // The body is a copyable artifact - a scenario definition, a line of
+        // agent instructions, a guardrail rule - so it is left exactly as
+        // written apart from the same id-for-name swap every other surface
+        // gets. A rule naming a run id names something a reader cannot use.
+        body: humaniseRunIds({ text: artifact.body, evidence }),
         claims,
       };
     })

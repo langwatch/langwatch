@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { generateObject } from "ai";
 import { z } from "zod";
 import type { QuestionDescriptor } from "../questions/question-registry";
-import { buildNarrativeSystemPrompt } from "./prompts";
+import { buildNarrativeSystemPrompt, wrapUntrustedData } from "./prompts";
 
 const logger = createLogger("langwatch:batch-run-report:narrative");
 
@@ -166,7 +166,7 @@ export async function runNarrativePass({
         "One answer per question, each citing the evidence it rests on.",
       schema: draftReportSchema,
       system: buildNarrativeSystemPrompt({ questions }),
-      prompt: `EVIDENCE\n\n${evidenceBlock}`,
+      prompt: wrapUntrustedData(evidenceBlock),
       temperature: 0.2,
       abortSignal,
     });

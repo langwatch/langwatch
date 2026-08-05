@@ -1,5 +1,16 @@
-import type { ScenarioRunStatus } from "./scenario-event.enums";
-import { categorizeRunStatus } from "./scenario-run-category";
+/**
+ * The one tally of run outcomes, and the pass rate derived from it.
+ *
+ * Lives in `shared/` because both sides count the same runs: the run history
+ * panel renders the numbers, the report and the export compute them. Both
+ * import the functions as values rather than types, so a home under `server/`
+ * would drag that module's graph into the browser bundle.
+ *
+ * @see specs/suites/pass-rate-single-source.feature
+ */
+
+import type { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
 
 /**
  * How many runs landed in each outcome bucket, plus the two derived totals
