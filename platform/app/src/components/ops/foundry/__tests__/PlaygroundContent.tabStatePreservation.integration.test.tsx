@@ -74,36 +74,38 @@ describe("PlaygroundContent tab state", () => {
     cleanup();
   });
 
-  describe("when an uncommitted attribute key is typed and the user leaves and returns to the Editor tab", () => {
-    it("preserves the typed key in the input", async () => {
-      renderPlaygroundWithSelectedSpan();
+  describe("given a selected span", () => {
+    describe("when an uncommitted attribute key is typed and the user leaves and returns to the Editor tab", () => {
+      it("preserves the typed key in the input", async () => {
+        renderPlaygroundWithSelectedSpan();
 
-      await userEvent.type(newAttributeKeyInput(), NEW_ATTRIBUTE_KEY);
-      expect(newAttributeKeyInput()).toHaveValue(NEW_ATTRIBUTE_KEY);
-
-      await switchTo("Waterfall");
-      await switchTo("Editor");
-
-      await waitFor(() => {
+        await userEvent.type(newAttributeKeyInput(), NEW_ATTRIBUTE_KEY);
         expect(newAttributeKeyInput()).toHaveValue(NEW_ATTRIBUTE_KEY);
+
+        await switchTo("Waterfall");
+        await switchTo("Editor");
+
+        await waitFor(() => {
+          expect(newAttributeKeyInput()).toHaveValue(NEW_ATTRIBUTE_KEY);
+        });
       });
     });
-  });
 
-  describe("when the user leaves and returns to the Editor tab", () => {
-    it("reuses the Editor panel DOM node rather than remounting it", async () => {
-      renderPlaygroundWithSelectedSpan();
+    describe("when the user leaves and returns to the Editor tab", () => {
+      it("reuses the Editor panel DOM node rather than remounting it", async () => {
+        renderPlaygroundWithSelectedSpan();
 
-      const beforeSwitch = newAttributeKeyInput();
+        const beforeSwitch = newAttributeKeyInput();
 
-      await switchTo("Waterfall");
-      await switchTo("Editor");
+        await switchTo("Waterfall");
+        await switchTo("Editor");
 
-      // Same DOM node, not a fresh one: this is the mechanism the draft
-      // survival depends on, asserted directly so a failure says which of the
-      // two broke.
-      await waitFor(() => {
-        expect(newAttributeKeyInput()).toBe(beforeSwitch);
+        // Same DOM node, not a fresh one: this is the mechanism the draft
+        // survival depends on, asserted directly so a failure says which of the
+        // two broke.
+        await waitFor(() => {
+          expect(newAttributeKeyInput()).toBe(beforeSwitch);
+        });
       });
     });
   });
