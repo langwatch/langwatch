@@ -79,6 +79,7 @@ const DEFAULT_TOOLS: LoginCeremonyTool[] = [
   { slug: "claude", displayName: "Claude Code" },
   { slug: "codex", displayName: "Codex" },
   { slug: "copilot", displayName: "GitHub Copilot CLI" },
+  { slug: "code", displayName: "VS Code Copilot Chat" },
   { slug: "cursor", displayName: "Cursor" },
   { slug: "gemini", displayName: "Gemini CLI" },
   { slug: "opencode", displayName: "opencode" },
