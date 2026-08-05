@@ -765,6 +765,7 @@ export function initializeDefaultApp(options?: {
     ? {
         processStore: repositories.processStore,
         endpoints: webhookEndpointService,
+        prisma,
         getPlan: (organizationId: string) =>
           planProvider.getActivePlan({ organizationId }),
       }

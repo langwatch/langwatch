@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
 import { listIngestionSources } from "@/cli/utils/governance/cli-api";
 import { reportCommandError } from "@/cli/utils/errorOutput";
+import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
  * `langwatch ingest list [--all] [--json]`
@@ -41,7 +42,7 @@ export async function ingestListCommand(options: {
     console.log(
       chalk.gray(
         "No ingestion sources yet. Open the admin UI at " +
-          `${cfg.control_plane_url.replace(/\/+$/, "")}/settings/governance/ingestion-sources` +
+          `${normalizeEndpoint(cfg.control_plane_url)}/settings/governance/ingestion-sources` +
           " to connect your first source.",
       ),
     );

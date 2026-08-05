@@ -17,19 +17,33 @@ import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  readIdempotencyKey,
+  withIdempotency,
+} from "~/server/api/idempotency";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import {
-  sendWebhook,
-  WEBHOOK_DELIVERY_ID_HEADER,
-} from "~/server/app-layer/automations/delivery/sendWebhook";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
+import {
+  sendWebhook,
+  WEBHOOK_DELIVERY_ID_HEADER,
+} from "~/server/webhooks/sendWebhook";
+import { allowsInsecureLocalUrls } from "~/server/webhooks/urlPolicy";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { canonicalBaseResponses } from "../../shared/base-responses";
+import {
+  canonicalBaseResponses,
+  canonicalConflictResponses,
+} from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
+import {
+  idempotencyKeyParameter,
+  idempotentJson,
+  idempotentReplayHeaders,
+} from "../../shared/idempotent-response";
 import { apiErrorSchema } from "../../shared/schemas";
 import { handleWebhookApiError } from "./error-handler";
 
@@ -319,13 +333,18 @@ secured.access(requires("webhookEndpoints:manage")).post(
   "/endpoints",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Create a webhook endpoint",
     description:
-      "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one.",
+      "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+    parameters: [idempotencyKeyParameter],
     responses: {
       ...canonicalBaseResponses,
+      ...canonicalConflictResponses,
       201: {
         description:
           "The endpoint, with the signing secret this body alone carries",
+        headers: idempotentReplayHeaders,
         content: {
           "application/json": {
             schema: resolver(z.object({ data: endpointWithSecretDtoSchema })),
@@ -338,15 +357,30 @@ secured.access(requires("webhookEndpoints:manage")).post(
   async (c) => {
     const organization = c.get("organization") as Organization;
     const body = c.req.valid("json");
-    const { endpoint, secret } = await endpoints.create({
-      organizationId: organization.id,
-      url: body.url,
-      enabledEvents: body.enabled_events,
-      maxBatchSize: body.max_batch_size,
-      maxBatchDelayMs: body.max_batch_delay_ms,
-      maxInFlight: body.max_in_flight,
+    // Scoped to the organization, not a project: this family authenticates at
+    // the org, so that is the tenancy a key is unique within.
+    const outcome = await withIdempotency({
+      prisma,
+      operation: "webhooks.v1.endpoints.create",
+      scopeId: organization.id,
+      key: readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER)),
+      validatedBody: body,
+      handler: async () => {
+        const { endpoint, secret } = await endpoints.create({
+          organizationId: organization.id,
+          url: body.url,
+          enabledEvents: body.enabled_events,
+          maxBatchSize: body.max_batch_size,
+          maxBatchDelayMs: body.max_batch_delay_ms,
+          maxInFlight: body.max_in_flight,
+        });
+        return {
+          status: 201,
+          body: { data: { ...endpointResponse(endpoint), secret } },
+        };
+      },
     });
-    return c.json({ data: { ...endpointResponse(endpoint), secret } }, 201);
+    return idempotentJson({ c, outcome });
   },
 );
 
@@ -354,6 +388,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/endpoints",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "List webhook endpoints",
     description: "List the organization's webhook endpoints",
     responses: okResponse(
       "Every endpoint the organization has, archived ones excluded",
@@ -371,6 +407,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/endpoints/:id",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Get a webhook endpoint",
     description: "Get one webhook endpoint",
     responses: {
       ...okResponse("The endpoint", z.object({ data: endpointDtoSchema })),
@@ -391,6 +429,8 @@ secured.access(requires("webhookEndpoints:manage")).patch(
   "/endpoints/:id",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Update a webhook endpoint",
     description:
       "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
     responses: {
@@ -447,6 +487,8 @@ secured.access(requires("webhookEndpoints:manage")).delete(
   "/endpoints/:id",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Archive a webhook endpoint",
     description: "Archive a webhook endpoint",
     responses: {
       ...okResponse(
@@ -470,6 +512,8 @@ secured.access(requires("webhookEndpoints:manage")).post(
   "/endpoints/:id/roll-secret",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Roll an endpoint's signing secret",
     description:
       "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.",
     responses: {
@@ -494,6 +538,8 @@ secured.access(requires("webhookEndpoints:manage")).post(
   "/endpoints/:id/test",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Send a test event to an endpoint",
     description:
       "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.",
     responses: {
@@ -527,6 +573,11 @@ secured.access(requires("webhookEndpoints:manage")).post(
         dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
         signingSecrets: secrets,
         attempt: 1,
+        // The test button has to reach exactly what real delivery reaches. It
+        // did not: real delivery passes this flag and the test send did not,
+        // so on an install running the escape hatch a local endpoint delivered
+        // fine and its own test said the address was blocked.
+        allowInsecureLocal: allowsInsecureLocalUrls(),
       });
       const delivered = result.status >= 200 && result.status < 300;
       await recordTestFire({
@@ -571,6 +622,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/endpoints/:id/deliveries",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "List an endpoint's delivery attempts",
     description:
       "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error",
     responses: {
@@ -627,6 +680,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/endpoints/:id/health",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Read an endpoint's delivery health",
     description:
       "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.",
     responses: {
@@ -664,6 +719,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/event-types",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "List subscribable event types",
     description:
       "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet",
     responses: okResponse(
@@ -688,6 +745,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/events",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "List emitted events",
     description:
       "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
     responses: okResponse(
@@ -721,6 +780,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/events/:id",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Get one emitted event",
     description:
       "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.",
     responses: {

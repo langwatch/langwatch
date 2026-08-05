@@ -1,3 +1,12 @@
+import { scopedApiKey } from "@/internal/credentialContext";
+import {
+  CURSOR_WALK_PAGE_SIZE,
+  walkCursorPages,
+} from "@/client-sdk/services/_shared/collect-cursor-pages";
+import {
+  mutationInit,
+  type MutationOptions,
+} from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -69,7 +78,21 @@ export interface SpendSummaryRow {
   cost: { total_usd: string; nano_usd: number };
 }
 
-export interface SpendSummariesResponse {
+/**
+ * The states a request can be filtered by, which is more than the two a
+ * caller usually thinks in: a request is `admitted` when it starts,
+ * `confirmed` or `failed` when it ends, and `settled` once its cost is final.
+ * `success` and `error` are the coarse outcome pair over those.
+ */
+export type SpendEventStatus =
+  | "success"
+  | "error"
+  | "admitted"
+  | "confirmed"
+  | "failed"
+  | "settled";
+
+export interface SpendSummariesPage {
   data: SpendSummaryRow[];
   /**
    * Pass back as `cursor` for the next page; null means the walk is done.
@@ -137,6 +160,19 @@ export class SpendEventsApiError extends Error {
 /**
  * Client for the gateway spend reconciliation surface (/api/gateway/v1).
  * Authenticates with an ORGANIZATION API key (sk-lw-*).
+ *
+ * Entity types mirror the wire verbatim, so their fields are lowercase
+ * snake_case. Call options this SDK invents (query filters, per-call
+ * behaviour, action arguments) are camelCase like the rest of the SDK.
+ *
+ * There is no project id here: `/spend-summaries` takes `project_id` as a
+ * query filter rather than scoping on a header, so the project belongs to the
+ * call, not to the client.
+ *
+ * Neither collection on this service offers an eager whole-set read. The
+ * ledger is unbounded, and materialising a window of it is the very
+ * under-counting and out-of-memory footgun the page docstrings warn about:
+ * take pages, or stream with `iterate()` / `iterSummaries()`.
  */
 export class SpendEventsApiService {
   private readonly endpoint: string;
@@ -144,7 +180,7 @@ export class SpendEventsApiService {
 
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
-    this.apiKey = config?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private async request<T>(
@@ -185,7 +221,16 @@ export class SpendEventsApiService {
     return (await response.json()) as T;
   }
 
-  async list(options: {
+  /**
+   * ONE page of the per-request spend ledger for a window. Pass `next_cursor`
+   * back as `cursor` for the next page, verbatim.
+   *
+   * A full page does NOT mean there is more and a short page does NOT mean
+   * there is no more: only a null cursor ends the walk. A reconciler that
+   * stops on the first page silently under-counts the window, so read every
+   * page or stream them with `iterate()`.
+   */
+  async listPage(options: {
     /** Required: the pull is a ranged read by contract. */
     from: number;
     to: number;
@@ -195,7 +240,7 @@ export class SpendEventsApiService {
     endUserId?: string;
     projectId?: string;
     model?: string;
-    status?: "success" | "error";
+    status?: SpendEventStatus;
   }): Promise<SpendEventsPage> {
     const params = new URLSearchParams();
     params.set("from", String(options.from));
@@ -215,13 +260,56 @@ export class SpendEventsApiService {
   }
 
   /**
-   * Per-key spend rollups for a window, paged by group key ascending.
+   * Every spend event in the window, one row at a time, fetching each page
+   * only when the consumer reaches it.
    *
-   * The page is a walk, not a whole answer: follow `next_cursor` until it
-   * comes back null. A reconciler that reads only the first page silently
-   * under-counts every tenant past the limit.
+   * This is how a reconciler reads a whole window without holding it: the
+   * ledger is unbounded, so there is deliberately no eager `list()` to
+   * collect it into an array. Raises rather than looping forever on a cursor
+   * chain that never ends.
    */
-  async summaries(options: {
+  async *iterate(options: {
+    /** Required: the pull is a ranged read by contract. */
+    from: number;
+    to: number;
+    cursor?: string;
+    limit?: number;
+    virtualKeyId?: string;
+    endUserId?: string;
+    projectId?: string;
+    model?: string;
+    status?: SpendEventStatus;
+  }): AsyncGenerator<SpendEvent> {
+    const pages = walkCursorPages<SpendEventsPage>({
+      startCursor: options.cursor,
+      nextCursorOf: (page) => page.next_cursor,
+      onEndlessWalk: (reason) =>
+        new SpendEventsApiError(
+          `Failed to list spend events: ${reason}.`,
+          "list spend events",
+        ),
+      fetchPage: (cursor) =>
+        this.listPage({
+          ...options,
+          cursor,
+          limit: options.limit ?? CURSOR_WALK_PAGE_SIZE,
+        }),
+    });
+    for await (const page of pages) {
+      yield* page.data;
+    }
+  }
+
+  /**
+   * ONE page of per-key spend rollups for a window, paged by group key
+   * ascending.
+   *
+   * The page is a step of a walk, not a whole answer: follow `next_cursor`
+   * until it comes back null, or stream the walk with `iterSummaries()`. A
+   * reconciler that reads only the first page silently under-counts every
+   * tenant past the limit.
+   */
+  async summariesPage(options: {
     groupBy: "virtual_key" | "end_user";
     from: number;
     to: number;
@@ -230,7 +318,7 @@ export class SpendEventsApiService {
     virtualKeyId?: string;
     cursor?: string;
     limit?: number;
-  }): Promise<SpendSummariesResponse> {
+  }): Promise<SpendSummariesPage> {
     const params = new URLSearchParams();
     params.set("group_by", options.groupBy);
     params.set("from", String(options.from));
@@ -240,10 +328,48 @@ export class SpendEventsApiService {
       params.set("virtual_key_id", options.virtualKeyId);
     if (options.cursor) params.set("cursor", options.cursor);
     if (options.limit !== undefined) params.set("limit", String(options.limit));
-    return await this.request<SpendSummariesResponse>(
+    return await this.request<SpendSummariesPage>(
       "read spend summaries",
       `/api/gateway/v1/spend-summaries?${params.toString()}`,
     );
+  }
+
+  /**
+   * Every rollup row for the window, one at a time, fetching each page only
+   * when the consumer reaches it.
+   *
+   * The rollup has one row per tenant seen in the window, which no bound
+   * covers, so there is deliberately no eager whole-set read here either: a
+   * checksum that quietly covers part of the window is worse than none.
+   */
+  async *iterSummaries(options: {
+    groupBy: "virtual_key" | "end_user";
+    from: number;
+    to: number;
+    projectId?: string;
+    /** Narrow the rollup to one key, exact match. */
+    virtualKeyId?: string;
+    cursor?: string;
+    limit?: number;
+  }): AsyncGenerator<SpendSummaryRow> {
+    const pages = walkCursorPages<SpendSummariesPage>({
+      startCursor: options.cursor,
+      nextCursorOf: (page) => page.next_cursor,
+      onEndlessWalk: (reason) =>
+        new SpendEventsApiError(
+          `Failed to read spend summaries: ${reason}.`,
+          "read spend summaries",
+        ),
+      fetchPage: (cursor) =>
+        this.summariesPage({
+          ...options,
+          cursor,
+          limit: options.limit ?? CURSOR_WALK_PAGE_SIZE,
+        }),
+    });
+    for await (const page of pages) {
+      yield* page.data;
+    }
   }
 
   /**
@@ -253,11 +379,13 @@ export class SpendEventsApiService {
    * window before replaying old ranges. The window is capped server-side
    * at 7 days per call.
    */
-  async replay(options: {
-    from: number;
-    to: number;
-    endpointId: string;
-  }): Promise<SpendReplayResult> {
+  async replay(
+    options: {
+      from: number;
+      to: number;
+      endpointId: string;
+    } & MutationOptions,
+  ): Promise<SpendReplayResult> {
     const response = await this.request<{ data: SpendReplayResult }>(
       "replay spend events",
       "/api/gateway/v1/spend-events/replay",
@@ -268,6 +396,7 @@ export class SpendEventsApiService {
           to: options.to,
           endpoint_id: options.endpointId,
         }),
+        ...mutationInit(options),
       },
     );
     return response.data;

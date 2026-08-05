@@ -52,10 +52,10 @@ export const updateWebhookCommand = async (
   try {
     const endpoint = await service.update(id, {
       url: options.url,
-      maxBatchSize,
-      maxBatchDelayMs,
-      maxInFlight,
-      enabledEvents: options.events !== undefined
+      max_batch_size: maxBatchSize,
+      max_batch_delay_ms: maxBatchDelayMs,
+      max_in_flight: maxInFlight,
+      enabled_events: options.events !== undefined
         ? options.events.split(",").map((e) => e.trim()).filter(Boolean)
         : undefined,
     });

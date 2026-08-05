@@ -58,7 +58,16 @@ export class TiktokenClient implements TokenizerClient {
 
   private async resolveEncoding(model: string): Promise<string> {
     try {
-      const models = (await import("tiktoken/model_to_encoding.json")) as {
+      // The `with` attribute is required, not decorative: production runs the
+      // esbuild bundle, where tiktoken stays external, so this survives as a
+      // real dynamic import and Node resolves it through the ESM loader, which
+      // rejects JSON without it (ERR_IMPORT_ATTRIBUTE_MISSING). tsx used to
+      // absorb that, which is why it only broke once the bundles shipped — and
+      // it broke quietly, because the catch below falls back to a default
+      // encoding rather than failing.
+      const models = (await import("tiktoken/model_to_encoding.json", {
+        with: { type: "json" },
+      })) as {
         default: Record<string, string>;
       };
       if (model in models.default) return models.default[model]!;
@@ -74,7 +83,10 @@ export class TiktokenClient implements TokenizerClient {
     try {
       const { Tiktoken } = await import("tiktoken/lite");
       const { load } = await import("tiktoken/load");
-      const registry = (await import("tiktoken/registry.json")) as {
+      // See resolveEncoding: JSON needs the import attribute under the bundle.
+      const registry = (await import("tiktoken/registry.json", {
+        with: { type: "json" },
+      })) as {
         default: Record<string, unknown>;
       };
 
