@@ -77,6 +77,16 @@ type ControlPlaneConfig struct {
 	InternalSecret string `env:"INTERNAL_SECRET"     validate:"required"`
 	JWTSecret      string `env:"JWT_SECRET"          validate:"required"`
 	JWTSecretPrev  string `env:"JWT_SECRET_PREVIOUS"`
+	// BaseURLExplicit distinguishes an operator-provided BaseURL from the
+	// compatibility default (see defaultConfig). Not populated by Hydrate
+	// (no env tag): LoadConfig sets it directly from the same env vars
+	// BaseURL itself can come from, canonical or legacy, so a value that
+	// happens to match the default still counts as explicit. Serve logs a
+	// warning at boot when this is false, naming the resolved URL: every
+	// spend, budget and auth call this gateway makes depends on it pointing
+	// at the right control plane, and a wrong one fails silently (every
+	// request still answers 200, nothing errors anywhere).
+	BaseURLExplicit bool
 }
 
 // AuthCacheConfig governs the resolver's stale-while-error behavior. The
@@ -193,6 +203,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
+	cfg.ControlPlane.BaseURLExplicit = os.Getenv("LW_GATEWAY_BASE_URL") != "" || os.Getenv("GATEWAY_CONTROL_PLANE_URL") != ""
 	applyLegacyEnvAliases(&cfg)
 	if err := validateRetiredEnvVars(); err != nil {
 		return Config{}, err
