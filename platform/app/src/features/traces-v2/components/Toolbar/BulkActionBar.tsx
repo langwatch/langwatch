@@ -1,6 +1,7 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
-import { Database, Download, Sparkles } from "lucide-react";
+import { Database, Download, PenLine, Sparkles } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
@@ -9,10 +10,12 @@ import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
 } from "../../stores/selectionStore";
+import { AddToAnnotationQueueDialog } from "../annotationQueue/AddToAnnotationQueueDialog";
 
 interface BulkActionBarProps {
   /** Total traces matching the active filter (for the "Select all N" hint). */
@@ -24,6 +27,50 @@ interface BulkActionBarProps {
   /** Open the export config dialog with the active selection. */
   onExportSelected: (traceIds: string[]) => void;
 }
+
+/**
+ * Hands the checked traces to a teammate or a queue. Hidden from users who
+ * cannot manage annotations, and explicit-selection only — the all-matching
+ * mode stands for far more traces than a review queue should absorb at once.
+ */
+const AddToAnnotationQueueAction: React.FC<{
+  traceIds: string[];
+  isAllMatchingMode: boolean;
+}> = ({ traceIds, isAllMatchingMode }) => {
+  const gate = usePersonalFeatureGate("annotations");
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  return (
+    <>
+      <Tooltip
+        content="Disabled. Add to annotation queue requires explicit row selection."
+        disabled={!isAllMatchingMode}
+        showArrow
+      >
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={isAllMatchingMode}
+          onClick={async () => {
+            if (isAllMatchingMode) return;
+            const allowed = await gate.requestEnable();
+            if (!allowed) return;
+            setDialogOpen(true);
+          }}
+        >
+          <PenLine size={14} />
+          Add to annotation queue
+        </Button>
+      </Tooltip>
+      <PersonalFeatureGateDialog state={gate.dialogState} />
+      <AddToAnnotationQueueDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        traceIds={traceIds}
+      />
+    </>
+  );
+};
 
 export const BulkActionBar: React.FC<BulkActionBarProps> = ({
   totalHits,
@@ -37,6 +84,8 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
   const clear = useSelectionStore((s) => s.clear);
   const { openDrawer } = useDrawer();
   const datasetGate = usePersonalFeatureGate("datasets");
+  const { hasPermission } = useOrganizationTeamProject();
+  const canQueueForAnnotation = hasPermission("annotations:manage");
   // `langy:create`, not `langy:view`. This control exists to prime a question —
   // filling a composer that cannot send is a dead end that looks like a feature.
   const showLangy = useCanAskLangy();
@@ -148,6 +197,13 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
             Add to dataset
           </Button>
         </Tooltip>
+
+        {canQueueForAnnotation && (
+          <AddToAnnotationQueueAction
+            traceIds={idsArray}
+            isAllMatchingMode={isAllMatchingMode}
+          />
+        )}
       </SelectionActionBar>
       <PersonalFeatureGateDialog state={datasetGate.dialogState} />
     </>

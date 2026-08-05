@@ -29,13 +29,36 @@ vi.mock("~/features/langy/stores/langyStore", () => ({
   ) => selector({ attachContext: langyMock.attach, openPanel: langyMock.open }),
 }));
 vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({ openDrawer: vi.fn() }),
+  useDrawer: () => ({ openDrawer: vi.fn(), drawerOpen: () => false }),
 }));
+const gateMock = { allow: true };
 vi.mock("~/components/me/usePersonalFeatureGate", () => ({
-  usePersonalFeatureGate: () => ({
-    requestEnable: async () => true,
-    dialogState: { open: false },
+  usePersonalFeatureGate: (feature: string) => ({
+    requestEnable: async () => gateMock.allow,
+    dialogState: { open: false, feature },
   }),
+}));
+const permissionMock = { canManageAnnotations: true };
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1", slug: "proj" },
+    hasPermission: (permission: string) =>
+      permission === "annotations:manage"
+        ? permissionMock.canManageAnnotations
+        : true,
+  }),
+}));
+// The queue dialog is exercised in its own test; here it only needs to report
+// whether the bar decided to open it.
+vi.mock("../../annotationQueue/AddToAnnotationQueueDialog", () => ({
+  AddToAnnotationQueueDialog: ({
+    open,
+    traceIds,
+  }: {
+    open: boolean;
+    traceIds: string[];
+  }) =>
+    open ? <div data-testid="queue-dialog">{traceIds.join(",")}</div> : null,
 }));
 
 import { useSelectionStore } from "../../../stores/selectionStore";
@@ -57,6 +80,8 @@ beforeEach(() => {
   langyMock.showLangy = true;
   langyMock.attach.mockClear();
   langyMock.open.mockClear();
+  gateMock.allow = true;
+  permissionMock.canManageAnnotations = true;
   useSelectionStore.getState().clear();
 });
 afterEach(cleanup);
@@ -110,6 +135,76 @@ describe("BulkActionBar Add to context", () => {
       expect(
         screen.getByRole("button", { name: /Add to context/ }),
       ).toBeDisabled();
+    });
+  });
+});
+
+/**
+ * Spec: specs/traces-v2/annotation-queue-actions.feature — bulk entry.
+ */
+describe("BulkActionBar Add to annotation queue", () => {
+  const queueButton = () =>
+    screen.queryByRole("button", { name: /Add to annotation queue/ });
+
+  describe("given the user can manage annotations", () => {
+    describe("when rows are selected", () => {
+      it("offers the action alongside Add to dataset", () => {
+        useSelectionStore.getState().setMany(["t1", "t2"], true);
+        renderBar();
+
+        expect(queueButton()).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /Add to dataset/ }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when the action is clicked", () => {
+      it("opens the dialog with the selected traces", async () => {
+        useSelectionStore.getState().setMany(["t1", "t2"], true);
+        renderBar();
+
+        fireEvent.click(queueButton()!);
+
+        const dialog = await screen.findByTestId("queue-dialog");
+        expect(dialog).toHaveTextContent("t1,t2");
+      });
+    });
+
+    describe("when the personal-workspace gate is declined", () => {
+      it("leaves the dialog closed", async () => {
+        gateMock.allow = false;
+        useSelectionStore.getState().setMany(["t1"], true);
+        renderBar();
+
+        fireEvent.click(queueButton()!);
+        await Promise.resolve();
+
+        expect(screen.queryByTestId("queue-dialog")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given all-matching selection mode", () => {
+    it("disables the action, which needs rows picked one by one", () => {
+      useSelectionStore.getState().setMany(["t1", "t2"], true);
+      useSelectionStore.getState().enableAllMatching();
+      renderBar();
+
+      expect(queueButton()).toBeDisabled();
+    });
+  });
+
+  describe("given the user cannot manage annotations", () => {
+    it("hides the action but keeps the other bulk actions", () => {
+      permissionMock.canManageAnnotations = false;
+      useSelectionStore.getState().setMany(["t1"], true);
+      renderBar();
+
+      expect(queueButton()).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Add to dataset/ }),
+      ).toBeInTheDocument();
     });
   });
 });

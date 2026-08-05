@@ -10,6 +10,7 @@ import {
   LuLock,
   LuLockOpen,
   LuMessagesSquare,
+  LuPenLine,
   LuPin,
   LuPinOff,
   LuScanSearch,
@@ -33,6 +34,11 @@ interface TraceOverflowMenuProps {
   onShowShortcuts: () => void;
   /** Opens the share dialog. Rendered by the header so the menu returns no JSX. */
   onShare: () => void;
+  /**
+   * Opens the annotation-queue dialog, also rendered by the header. Null when
+   * the user cannot manage annotations, which hides the item.
+   */
+  onAddToAnnotationQueue: (() => void) | null;
   /** Current dock state. When true the drawer stays open on outside clicks. */
   pinned: boolean;
   onTogglePinned: () => void;
@@ -53,6 +59,7 @@ export function TraceOverflowMenu({
   onOpenRawJson,
   onShowShortcuts,
   onShare,
+  onAddToAnnotationQueue,
   pinned,
   onTogglePinned,
 }: TraceOverflowMenuProps) {
@@ -165,6 +172,18 @@ export function TraceOverflowMenu({
             <Menu.ItemCommand>
               {conversationTraceIds.length} turns
             </Menu.ItemCommand>
+          </Menu.Item>
+        )}
+
+        {onAddToAnnotationQueue && (
+          <Menu.Item
+            value="add-annotation-queue"
+            onClick={onAddToAnnotationQueue}
+          >
+            <HStack gap={2}>
+              <Icon as={LuPenLine} boxSize={3.5} />
+              <Text>Add to annotation queue</Text>
+            </HStack>
           </Menu.Item>
         )}
 

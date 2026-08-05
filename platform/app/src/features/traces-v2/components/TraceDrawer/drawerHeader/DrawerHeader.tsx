@@ -52,6 +52,7 @@ import {
   STATUS_COLORS,
 } from "../../../utils/formatters";
 import { isTerminalOrigin } from "../../../utils/terminalOrigin";
+import { AddToAnnotationQueueDialog } from "../../annotationQueue/AddToAnnotationQueueDialog";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
 import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
 import { ModelsTooltip } from "../../TraceTable/registry/cells/trace/ModelCell";
@@ -509,7 +510,8 @@ export const DrawerHeader = memo(function DrawerHeader({
     useTraceDrawerNavigation();
 
   const statusColor = STATUS_COLORS[trace.status] as string;
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const canQueueForAnnotation = hasPermission("annotations:manage");
   const dejaView = useDejaViewLink({
     aggregateId: trace.traceId,
     tenantId: project?.id,
@@ -786,6 +788,7 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   const [rawOpen, setRawOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [queueDialogOpen, setQueueDialogOpen] = useState(false);
 
   // Local listener for the `\` shortcut. Lives here (rather than in
   // TraceDrawerShell) because the raw-JSON dialog's open state is also
@@ -1067,6 +1070,9 @@ export const DrawerHeader = memo(function DrawerHeader({
               onOpenRawJson={() => setRawOpen(true)}
               onShowShortcuts={() => setShortcutsOpen(true)}
               onShare={() => setShareOpen(true)}
+              onAddToAnnotationQueue={
+                canQueueForAnnotation ? () => setQueueDialogOpen(true) : null
+              }
               pinned={pinned}
               onTogglePinned={togglePinned}
             />
@@ -1346,6 +1352,13 @@ export const DrawerHeader = memo(function DrawerHeader({
           onClose={() => setShareOpen(false)}
           projectId={project?.id}
           traceId={trace.traceId}
+        />
+      )}
+      {!readOnly && canQueueForAnnotation && (
+        <AddToAnnotationQueueDialog
+          open={queueDialogOpen}
+          onClose={() => setQueueDialogOpen(false)}
+          traceIds={[trace.traceId]}
         />
       )}
     </VStack>
