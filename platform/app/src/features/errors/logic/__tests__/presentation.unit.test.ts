@@ -97,6 +97,35 @@ describe("explainHandledError", () => {
 
       expect(description).toBe("");
     });
+
+    it.each([
+      ["chat", "POST /v1/chat/completions"],
+      ["messages", "POST /v1/messages"],
+      ["responses", "POST /v1/responses"],
+      ["embeddings", "POST /v1/embeddings"],
+      ["speech", "POST /v1/audio/speech"],
+      ["transcription", "multipart form"],
+      ["passthrough", "Gemini request URL"],
+    ])("explains where a %s request expects its model", (requestType, expected) => {
+      const { description } = explainHandledError(
+        shape({ code: "missing_model", meta: { request_type: requestType } }),
+      );
+
+      expect(description).toContain(expected);
+    });
+
+    it("uses surface-neutral missing-model copy for an unknown request type", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "missing_model",
+          meta: { request_type: "future_surface" },
+        }),
+      );
+
+      expect(description).toBe(
+        "Set the model where this endpoint expects it, then try again.",
+      );
+    });
   });
 
   describe("given a code the registry has never seen", () => {

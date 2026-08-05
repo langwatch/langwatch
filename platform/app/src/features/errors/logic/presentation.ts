@@ -60,6 +60,41 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+type MissingModelRequestType =
+  | "chat"
+  | "messages"
+  | "responses"
+  | "embeddings"
+  | "speech"
+  | "transcription"
+  | "passthrough";
+
+const missingModelDescriptions = {
+  chat: 'Add a top-level "model" field to POST /v1/chat/completions, then try again.',
+  messages:
+    'Add a top-level "model" field to POST /v1/messages, then try again.',
+  responses:
+    'Add a top-level "model" field to POST /v1/responses, then try again.',
+  embeddings:
+    'Add a top-level "model" field to POST /v1/embeddings, then try again.',
+  speech:
+    'Add a top-level "model" field to POST /v1/audio/speech, then try again.',
+  transcription:
+    'Add a "model" field to the multipart form for POST /v1/audio/transcriptions, then try again.',
+  passthrough: "Put the model in the Gemini request URL, then try again.",
+} satisfies Record<MissingModelRequestType, string>;
+
+const describeMissingModel = (error: HandledErrorShape): string => {
+  const requestType = error.meta.request_type;
+  if (
+    typeof requestType === "string" &&
+    Object.hasOwn(missingModelDescriptions, requestType)
+  ) {
+    return missingModelDescriptions[requestType as MissingModelRequestType];
+  }
+  return "Set the model where this endpoint expects it, then try again.";
+};
+
 /**
  * Whether any code in the error's reason chain (depth-first, nested included)
  * is one of `codes`.
@@ -1392,7 +1427,7 @@ const presentations = {
   },
   missing_model: {
     title: "Choose a model",
-    describe: () => "Set the model in your request, then try again.",
+    describe: describeMissingModel,
   },
 
   // ---- Langy agent ----
