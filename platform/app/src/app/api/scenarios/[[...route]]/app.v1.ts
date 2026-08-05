@@ -96,6 +96,16 @@ function toScenarioResponse(scenario: Scenario) {
 export function registerScenarioRoutes(
   secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
 ): void {
+  registerListRoute(secured);
+  registerGetRoute(secured);
+  registerCreateRoute(secured);
+  registerUpdateRoute(secured);
+  registerArchiveRoute(secured);
+}
+
+function registerListRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:view")).get(
     "/",
     describeRoute({
@@ -130,7 +140,11 @@ export function registerScenarioRoutes(
       );
     },
   );
+}
 
+function registerGetRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:view")).get(
     "/:id",
     describeRoute({
@@ -177,16 +191,22 @@ export function registerScenarioRoutes(
       });
     },
   );
+}
 
-  // Creating asks for `scenarios:create`, not `scenarios:manage`.
-  //
-  // Nobody loses access: `:manage` implies `:create` through the RBAC
-  // hierarchy, so every role and key that could create a scenario yesterday
-  // still can. What changes is that access granted at the CREATE grain now
-  // works — it used to be a permission the product would issue and then refuse
-  // to honour, which is how an assistant scoped to exactly "read and create"
-  // ended up unable to create anything. A viewer is unaffected: they keep the
-  // read routes and are declined the write, as before.
+/**
+ * Creating asks for `scenarios:create`, not `scenarios:manage`.
+ *
+ * Nobody loses access: `:manage` implies `:create` through the RBAC
+ * hierarchy, so every role and key that could create a scenario yesterday
+ * still can. What changes is that access granted at the CREATE grain now
+ * works — it used to be a permission the product would issue and then refuse
+ * to honour, which is how an assistant scoped to exactly "read and create"
+ * ended up unable to create anything. A viewer is unaffected: they keep the
+ * read routes and are declined the write, as before.
+ */
+function registerCreateRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:create")).post(
     "/",
     describeRoute({
@@ -237,9 +257,15 @@ export function registerScenarioRoutes(
       );
     },
   );
+}
 
-  // `:update` for the same reason as `:create` above — `:manage` still implies
-  // it, so no existing caller changes.
+/**
+ * `:update` for the same reason as `:create` above. `:manage` still implies
+ * it, so no existing caller changes.
+ */
+function registerUpdateRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:update")).put(
     "/:id",
     describeRoute({
@@ -307,11 +333,17 @@ export function registerScenarioRoutes(
       });
     },
   );
+}
 
-  // Archiving deliberately still asks for `:manage`. Create and update were
-  // refined because access issued at that grain was being refused; nothing is
-  // asking to destroy scenarios at a finer grain, and the destructive verb is
-  // the wrong place to widen who qualifies.
+/**
+ * Archiving deliberately still asks for `:manage`. Create and update were
+ * refined because access issued at that grain was being refused; nothing is
+ * asking to destroy scenarios at a finer grain, and the destructive verb is
+ * the wrong place to widen who qualifies.
+ */
+function registerArchiveRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:manage")).delete(
     "/:id",
     describeRoute({
