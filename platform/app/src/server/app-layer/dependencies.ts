@@ -14,11 +14,11 @@ import type { UsageLimitService } from "../../../ee/billing/notifications/usage-
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { BillableEventsClickHouseRepository } from "../../../ee/billing/services/billableEvents.clickhouse.repository";
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
-import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import type { PersonalUsageClickHouseRepository } from "../../../ee/governance/services/personalUsage.clickhouse.repository";
+import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
@@ -117,8 +117,7 @@ export interface AppDependencies {
     steps: DspyStepService;
   };
   /**
-   * Agent 4 batch (analytics / automations / evaluations / workers ClickHouse
-   * access migration). The ADR-034 read API, built once in presets.ts and
+   * The ADR-034 analytics read API, built once in presets.ts and
    * handed out here instead of each of its ~6 callers (routers, REST apps,
    * the graph-trigger dispatch closure) constructing — and each resolving a
    * ClickHouse client — its own.
@@ -198,6 +197,7 @@ export interface AppDependencies {
       finder: OrphanedRunFinder | null;
     };
   };
+  /**
    * Governance's OCSF SIEM-export sink (`governance_ocsf_events`). One
    * repository for both directions — the puller worker, the workspace-view
    * audit trail and the reactor sync write through it; the SIEM export

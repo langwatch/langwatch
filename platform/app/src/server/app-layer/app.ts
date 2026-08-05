@@ -20,7 +20,7 @@ export class App {
     AppCommands["evaluations"];
   readonly experimentRuns: AppCommands["experimentRuns"];
   readonly dspySteps: AppDependencies["dspySteps"];
-  /** Agent 4 batch: the ADR-034 analytics read API. */
+  /** The ADR-034 analytics read API. */
   readonly analytics: AppDependencies["analytics"];
   readonly simulations: AppDependencies["simulations"] &
     AppCommands["simulations"];

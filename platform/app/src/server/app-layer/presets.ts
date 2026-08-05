@@ -495,7 +495,7 @@ export function initializeDefaultApp(options?: {
     ),
     "DspyStepService",
   );
-  // Agent 4 batch: the ADR-034 analytics read API, built once here (same
+  // The ADR-034 analytics read API, built once here (same
   // shape `createAnalyticsService` always used — unconditional on
   // `clickhouseEnabled`, since the resolver itself already throws at query
   // time when ClickHouse isn't configured) and handed out as
