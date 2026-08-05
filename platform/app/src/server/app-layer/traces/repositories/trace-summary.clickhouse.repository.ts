@@ -23,6 +23,26 @@ const logger = createLogger(
   "langwatch:app-layer:traces:trace-summary-repository",
 );
 
+function storageAnchorForWrite(data: TraceSummaryData): number {
+  const now = Date.now();
+  const max = now + 24 * 60 * 60 * 1000;
+  for (const candidate of [data.storageAnchorMs, data.createdAt, now]) {
+    if (
+      typeof candidate === "number" &&
+      Number.isFinite(candidate) &&
+      candidate > 0 &&
+      candidate <= max
+    ) {
+      return candidate;
+    }
+  }
+  return now;
+}
+
+function eventCheckpointForWrite(value: number): Date {
+  return value ? new Date(value) : new Date(0);
+}
+
 type ClickHouseSummaryWriteRecord = WithDateWrites<
   ClickHouseSummaryRecord,
   "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
@@ -34,6 +54,7 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   Attributes: Record<string, string>;
   HasAnnotation: number | null;
   LastEventOccurredAt: number;
+  EarliestSpanStartMs: number;
   _retention_days: number;
 }
 
@@ -349,6 +370,7 @@ export class TraceSummaryClickHouseRepository
           t.Version AS Version,
           t.Attributes AS Attributes,
           toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
+          t.EarliestSpanStartMs AS EarliestSpanStartMs,
           toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
           toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
           t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
@@ -453,7 +475,14 @@ export class TraceSummaryClickHouseRepository
       annotationIds: record.AnnotationIds ?? [],
       traceName: record.TraceName ?? "",
       attributes: record.Attributes ?? {},
-      occurredAt: record.OccurredAt,
+      // Pre-split rows used OccurredAt for both jobs. Adopt that value as the
+      // frozen anchor and as the timing baseline so they heal in place without
+      // a version-triggered population refold.
+      storageAnchorMs: record.OccurredAt,
+      occurredAt:
+        record.Version === TRACE_SUMMARY_PROJECTION_VERSION_LATEST
+          ? Number(record.EarliestSpanStartMs ?? 0)
+          : record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
@@ -473,12 +502,13 @@ export class TraceSummaryClickHouseRepository
       TraceId: data.traceId,
       Version: version,
       Attributes: data.attributes,
-      OccurredAt: new Date(data.occurredAt),
+      // OccurredAt is the storage/partition/TTL anchor. The timing baseline is
+      // persisted separately so late earlier spans cannot move this address.
+      OccurredAt: new Date(storageAnchorForWrite(data)),
+      EarliestSpanStartMs: data.occurredAt,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
-      LastEventOccurredAt: data.LastEventOccurredAt
-        ? new Date(data.LastEventOccurredAt)
-        : new Date(0),
+      LastEventOccurredAt: eventCheckpointForWrite(data.LastEventOccurredAt),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,

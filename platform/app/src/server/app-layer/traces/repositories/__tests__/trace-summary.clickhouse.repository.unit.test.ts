@@ -13,6 +13,11 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it, vi } from "vitest";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import {
+  TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+  TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.repository";
 
 const heavyRow = {
@@ -45,6 +50,69 @@ function makeRepo(responder: (sql: string) => unknown[]) {
 const isResolve = (sql: string) => sql.includes("count() AS rowCount");
 
 describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
+  it("decodes the post-split timing baseline separately from its storage anchor", async () => {
+    const { repo } = makeRepo(() => [
+      {
+        ...heavyRow,
+        Version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+        OccurredAt: 1_760_000_060_000,
+        EarliestSpanStartMs: 1_760_000_055_000,
+      },
+    ]);
+
+    const result = await repo.findByTraceId("tenant-1", "t1", {
+      window: { fromMs: 1_760_000_000_000, toMs: 1_760_000_100_000 },
+    });
+
+    expect(result?.storageAnchorMs).toBe(1_760_000_060_000);
+    expect(result?.occurredAt).toBe(1_760_000_055_000);
+  });
+
+  it("adopts a pre-split OccurredAt as both anchor and timing baseline", async () => {
+    const { repo } = makeRepo(() => [
+      {
+        ...heavyRow,
+        Version: TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
+        OccurredAt: 1_760_000_055_000,
+        EarliestSpanStartMs: 0,
+      },
+    ]);
+
+    const result = await repo.findByTraceId("tenant-1", "t1", {
+      window: { fromMs: 1_760_000_000_000, toMs: 1_760_000_100_000 },
+    });
+
+    expect(result?.storageAnchorMs).toBe(1_760_000_055_000);
+    expect(result?.occurredAt).toBe(1_760_000_055_000);
+  });
+
+  it("writes the frozen anchor and timing baseline to separate columns", async () => {
+    const insert = vi.fn().mockResolvedValue(undefined);
+    const client = { insert } as unknown as ClickHouseClient;
+    const repo = new TraceSummaryClickHouseRepository(async () => client);
+    const anchorMs = 1_760_000_060_000;
+    const baselineMs = 1_760_000_055_000;
+
+    await repo.upsert(
+      {
+        traceId: "t1",
+        storageAnchorMs: anchorMs,
+        occurredAt: baselineMs,
+        createdAt: anchorMs,
+        updatedAt: anchorMs,
+        LastEventOccurredAt: anchorMs,
+        attributes: {},
+        annotationIds: [],
+        models: [],
+      } as unknown as TraceSummaryData,
+      "tenant-1",
+    );
+
+    const record = insert.mock.calls[0]?.[0]?.values[0];
+    expect(record.OccurredAt).toEqual(new Date(anchorMs));
+    expect(record.EarliestSpanStartMs).toBe(baselineMs);
+  });
+
   it("issues an unbounded heavy read for the OccurredAt=0 sentinel", async () => {
     const { repo, queries } = makeRepo((sql) =>
       isResolve(sql) ? [{ rowCount: "1", occurredAtMs: "0" }] : [heavyRow],
