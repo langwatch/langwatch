@@ -83,13 +83,12 @@ function servedRequest(options: {
   };
 }
 
-describe("given a blocking budget on traffic the gateway is serving", () => {
-  // First statement in the file, so the lock is taken before the first debit
-  // is written and released after the last teardown. This suite both replays
-  // the rollup rebuild and reads the rollup back, and neither the rebuild nor
-  // the rollup is scoped to this run's tenant.
-  holdClickHouseSchemaLockForFile();
+// Held for the whole file. This suite both replays the rollup rebuild and
+// reads the rollup back, and neither the rebuild nor the rollup is scoped to
+// this run's tenant.
+holdClickHouseSchemaLockForFile();
 
+describe("given a blocking budget on traffic the gateway is serving", () => {
   let service: GatewayBudgetService;
   let recordOneRequest: () => Promise<void>;
   let writeDebits: (payload: WriteGatewayDebitsPayload) => Promise<void>;

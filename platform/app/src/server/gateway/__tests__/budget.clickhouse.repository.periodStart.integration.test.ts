@@ -74,13 +74,12 @@ function budgetFor(window: GatewayBudgetWindow): GatewayBudget {
   } as GatewayBudget;
 }
 
-describe("given a debit recorded against a budget in ClickHouse", () => {
-  // First statement in the file, so the lock is taken before the first debit
-  // is written and released after the last teardown. The rollup this file
-  // writes to and reads back is database-wide, and a neighbouring suite
-  // rebuilding it drops the materialised view for the length of the rebuild.
-  holdClickHouseSchemaLockForFile();
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
+describe("given a debit recorded against a budget in ClickHouse", () => {
   const budgets = ALL_WINDOWS.map(budgetFor);
   let repo: GatewayBudgetClickHouseRepository;
   let spendByBudgetId: Map<string, string>;

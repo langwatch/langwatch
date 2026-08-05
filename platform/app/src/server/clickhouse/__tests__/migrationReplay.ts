@@ -12,7 +12,14 @@
  * Only the variables the replayed migrations use are supported; an
  * unrecognised `${...}` placeholder throws instead of reaching ClickHouse.
  */
-import { closeSync, openSync, statSync, unlinkSync, writeSync } from "node:fs";
+import {
+  closeSync,
+  openSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeSync,
+} from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,9 +49,19 @@ export const CURRENT_ROLLUP_REBUILD_MIGRATION =
  */
 const SCHEMA_LOCK_PATH = join(tmpdir(), "langwatch-clickhouse-schema.lock");
 
-/** Longer than any replay, short enough that a killed run frees it quickly. */
-const SCHEMA_LOCK_STALE_MS = 120_000;
-const SCHEMA_LOCK_TIMEOUT_MS = 60_000;
+/**
+ * A holder that is still running keeps the lock however long it needs, so the
+ * fallback only has to cover a lock file whose pid cannot be read at all.
+ */
+const SCHEMA_LOCK_STALE_MS = 600_000;
+
+/**
+ * Under serial files a wait is the tail of one neighbour's teardown. Under
+ * opt-in file parallelism it is a whole neighbouring file, so leave room for
+ * the slowest of them and still surface below the 120s hook timeout, where
+ * the message says what was waited for.
+ */
+const SCHEMA_LOCK_TIMEOUT_MS = 110_000;
 
 let lockDepth = 0;
 
@@ -103,13 +120,18 @@ export async function acquireClickHouseSchemaLock(): Promise<() => void> {
 /**
  * Holds the schema lock for a whole test file.
  *
- * Call it as the first statement of the file's outermost `describe`, before
- * the file registers any hook of its own: vitest runs `beforeAll` in
- * definition order and `afterAll` in reverse, so the lock is taken before the
- * first fixture writes anything and released after the last teardown. Any
- * suite that writes the budget ledger and reads the rollup needs this, not
- * only the ones that replay a migration, because the damage lands on the
- * neighbour rather than on the replay.
+ * Call it at file scope, above the first `describe` and above any hook the
+ * file registers itself. It hangs the hooks on the root suite, which is what
+ * covers a file with several top-level describes, and vitest runs `beforeAll`
+ * in definition order and `afterAll` in reverse, so the lock is taken before
+ * the first fixture writes anything and released after the last teardown.
+ *
+ * Every suite that writes the budget ledger or reads spend back through
+ * `gateway_budget_scope_totals` needs this, not only the two that replay a
+ * migration. The damage lands on the neighbour rather than on the replay: a
+ * writer loses rows the dropped view never folded, and a reader sees a rollup
+ * that is partway through being re-derived, which surfaces as one row short
+ * of the expected count rather than as zeroes.
  */
 export function holdClickHouseSchemaLockForFile(): void {
   let release: (() => void) | undefined;
@@ -141,17 +163,40 @@ function removeLockFile(): void {
   }
 }
 
+/**
+ * Breaks a lock nobody is holding.
+ *
+ * The holder's pid is in the file, so liveness answers this exactly rather
+ * than by guessing how long a suite is allowed to take: a worker killed hard
+ * enough to skip its exit handler frees the lock on the next waiter's poll,
+ * and a suite that legitimately runs for minutes keeps it. The age fallback
+ * only covers a lock file whose pid cannot be read.
+ */
 function dropStaleLock(): void {
   try {
-    const heldForMs = Date.now() - statSync(SCHEMA_LOCK_PATH).mtimeMs;
-    if (heldForMs > SCHEMA_LOCK_STALE_MS) removeLockFile();
+    const holderPid = Number.parseInt(
+      readFileSync(SCHEMA_LOCK_PATH, "utf-8").split(" ")[0] ?? "",
+      10,
+    );
+    if (Number.isNaN(holderPid)) {
+      const writtenMsAgo = Date.now() - statSync(SCHEMA_LOCK_PATH).mtimeMs;
+      if (writtenMsAgo > SCHEMA_LOCK_STALE_MS) removeLockFile();
+      return;
+    }
+    if (holderPid === process.pid) return;
+    try {
+      // Signal 0 checks the process exists without touching it.
+      process.kill(holderPid, 0);
+    } catch {
+      removeLockFile();
+    }
   } catch {
     // The holder released it between the two calls, which is the good case.
   }
 }
 
-// A worker killed mid-replay would otherwise leave the lock standing for the
-// whole stale window.
+// A worker killed mid-replay would otherwise leave the lock standing until a
+// waiter notices the pid is gone.
 process.on("exit", () => {
   if (lockDepth > 0) removeLockFile();
 });

@@ -56,6 +56,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   };
 });
 
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/migrationReplay";
 import { app } from "../[[...route]]/app";
 
 const ns = `billing-api-${nanoid(8)}`;
@@ -91,6 +92,11 @@ async function deleteOrganizationDependents(
     });
   }
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   let organization: Organization;

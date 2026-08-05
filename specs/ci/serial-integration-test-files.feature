@@ -27,12 +27,27 @@ Feature: Integration test files run one at a time
   # no-docker-integration-tests.feature.
 
   @unimplemented
-  Scenario: A rollup rebuild never runs beside another suite's fixtures
+  Scenario: A rollup rebuild never runs beside another suite's writes
     Given a suite replays the migration that rebuilds the budget rollup
     And that rebuild drops the rollup's materialised view while it runs
     When another suite records spend at the same moment
     Then the spend is recorded against a rollup that is whole
     And every budget window reports it
+
+  @unimplemented
+  Scenario: A rollup rebuild never runs beside another suite's reads
+    Given a suite replays the migration that rebuilds the budget rollup
+    And the rebuild re-derives every rollup row from the ledger
+    When another suite reads spend back at the same moment
+    Then it reads a rollup that is whole
+    And it sees every row it recorded, not one short
+
+  @unimplemented
+  Scenario: Reading the rollup is enough to need the lock
+    Given a suite never replays a migration itself
+    And it writes the budget ledger or reads spend back from the rollup
+    When it runs in the same shard as a suite that does replay one
+    Then it waits for the rebuild rather than observing it half applied
 
   @unimplemented
   Scenario: Two rollup rebuilds never run at once
