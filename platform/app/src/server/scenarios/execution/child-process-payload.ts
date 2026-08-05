@@ -19,13 +19,12 @@ import { type ChildProcessJobData, ScenarioConfigSchema } from "./types";
  * schema directly: a stored budget past the maximum would have been billed in
  * full. Parsing here is what makes them real.
  *
- * The rest of the envelope is deliberately left as it arrives.
- * `ChildProcessJobDataSchema` describes it, but `LiteLLMParamsSchema` requires
- * an `api_key` that Vertex and Bedrock params legitimately do not carry — the
- * prefetcher accepts `vertex_credentials` or `aws_access_key_id` instead — so
- * validating the whole envelope here would reject runs that work today. That
- * mismatch is worth fixing in the schema; it is not worth fixing by failing
- * every Vertex run.
+ * The rest of the envelope is left as it arrives. `ChildProcessJobDataSchema`
+ * describes it, but `LiteLLMParamsSchema` requires an `api_key` that Vertex
+ * and Bedrock params legitimately do not carry, so parsing the whole envelope
+ * here rejects runs that work end to end. Widening that schema and moving this
+ * to the full envelope is tracked in
+ * https://github.com/langwatch/langwatch/issues/6576.
  */
 export function parseChildProcessJobData(raw: string): ChildProcessJobData {
   const payload = JSON.parse(raw) as ChildProcessJobData;
