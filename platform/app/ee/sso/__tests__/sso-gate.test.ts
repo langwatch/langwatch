@@ -14,6 +14,13 @@ vi.mock("~/env.mjs", () => ({
     AUTH0_CLIENT_ID: "auth0-client",
     AUTH0_CLIENT_SECRET: "auth0-secret",
     AUTH0_ISSUER: "https://acme.us.auth0.com/",
+    COGNITO_CLIENT_ID: "cognito-client",
+    COGNITO_CLIENT_SECRET: "cognito-secret",
+    COGNITO_ISSUER:
+      "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123",
+    ONELOGIN_CLIENT_ID: "onelogin-client",
+    ONELOGIN_CLIENT_SECRET: "onelogin-secret",
+    ONELOGIN_ISSUER: "https://acme.onelogin.com/oidc/2",
     NEXTAUTH_URL: "https://acme.test",
   },
 }));
@@ -57,6 +64,12 @@ const envMock = env as unknown as {
   AUTH0_CLIENT_ID: string | undefined;
   AUTH0_CLIENT_SECRET: string | undefined;
   AUTH0_ISSUER: string | undefined;
+  COGNITO_CLIENT_ID: string | undefined;
+  COGNITO_CLIENT_SECRET: string | undefined;
+  COGNITO_ISSUER: string | undefined;
+  ONELOGIN_CLIENT_ID: string | undefined;
+  ONELOGIN_CLIENT_SECRET: string | undefined;
+  ONELOGIN_ISSUER: string | undefined;
   NEXTAUTH_URL: string | undefined;
 };
 
@@ -402,6 +415,33 @@ describe("resolveAuthProvider", () => {
 
       expect(provider).toBe("email");
     });
+
+    /** @scenario Without a license the provider is not offered */
+    it.each([
+      "cognito",
+      "onelogin",
+    ])("coerces %s to email as well, credentials notwithstanding", async (configured) => {
+      envMock.NEXTAUTH_PROVIDER = configured;
+      __setSsoLicenseRepositoryForTests(repoWithOrgs([]));
+
+      const provider = await resolveAuthProvider();
+
+      expect(provider).toBe("email");
+    });
+  });
+
+  describe("when the gate allows an OIDC provider", () => {
+    it.each([
+      "cognito",
+      "onelogin",
+    ])("reports %s, so the sign-in page federates to it", async (configured) => {
+      allowTheGate();
+      envMock.NEXTAUTH_PROVIDER = configured;
+
+      const provider = await resolveAuthProvider();
+
+      expect(provider).toBe(configured);
+    });
   });
 
   describe("when the gate allows", () => {
@@ -446,12 +486,12 @@ describe("resolveAuthProvider", () => {
 
     it("names the provider in the warning, so the operator can see what to fix", async () => {
       allowTheGate();
-      envMock.NEXTAUTH_PROVIDER = "cognito";
+      envMock.NEXTAUTH_PROVIDER = "azureAd";
 
       await resolveAuthProvider();
 
       expect(loggerMock.warn).toHaveBeenCalledWith(
-        { provider: "cognito" },
+        { provider: "azureAd" },
         expect.stringContaining("cannot mount"),
       );
     });

@@ -313,7 +313,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/* Validate NextAuth OAuth provider secrets */}}
-{{- $oauthProviders := list "auth0" "azureAd" "cognito" "github" "gitlab" "google" "okta" }}
+{{- $oauthProviders := list "auth0" "azureAd" "cognito" "github" "gitlab" "google" "okta" "onelogin" }}
 {{- range $provider := $oauthProviders }}
   {{- $providerConfig := index $.Values.app.nextAuth.providers $provider }}
   {{- if $providerConfig }}
@@ -329,7 +329,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       {{- end }}
     {{- end }}
     
-    {{- if and (has $provider (list "auth0" "cognito" "okta")) $providerConfig.issuer }}
+    {{- if and (has $provider (list "auth0" "cognito" "okta" "onelogin")) $providerConfig.issuer }}
       {{- if $providerConfig.issuer.secretKeyRef.name }}
         {{- if not $providerConfig.issuer.secretKeyRef.key }}
           {{- $errors = append $errors (printf "app.nextAuth.providers.%s.issuer.secretKeyRef.name is set but key is empty" $provider) }}

@@ -176,29 +176,132 @@ export const parseIssuerUrl = (issuer: string, envName: string): URL => {
 };
 
 /**
- * Subset of env needed to select and configure a generic-OAuth provider.
+ * Discovery URL for an OpenID Connect issuer. Normalizes the issuer first, so
+ * an operator who omits the scheme or leaves a trailing slash still gets a
+ * well-formed URL rather than a 404 at first sign-in.
+ *
+ * Exported for unit testing.
  */
-type GenericOAuthEnv = Pick<
-  typeof env,
-  | "NEXTAUTH_PROVIDER"
-  | "AUTH0_CLIENT_ID"
-  | "AUTH0_CLIENT_SECRET"
-  | "AUTH0_ISSUER"
-  | "OKTA_CLIENT_ID"
-  | "OKTA_CLIENT_SECRET"
-  | "OKTA_ISSUER"
-  | "NEXTAUTH_URL"
->;
+export const discoveryUrlFor = (issuer: string, envName: string): string => {
+  const issuerUrl = parseIssuerUrl(issuer, envName);
+  return `${issuerUrl.toString().replace(/\/$/, "")}/.well-known/openid-configuration`;
+};
+
+/**
+ * A plain OIDC provider configured from nothing but a client id, a secret and
+ * an issuer. Every endpoint comes from the issuer's discovery document, which
+ * is what lets Cognito work without asking the operator for the hosted-UI
+ * domain separately: Cognito publishes that domain as the
+ * `authorization_endpoint` of the user pool's discovery document.
+ *
+ * `redirectURI` is pinned to `/api/auth/callback/<providerId>` rather than the
+ * genericOAuth plugin's own `/api/auth/oauth2/callback/<providerId>` so that
+ * every provider in the self-hosting docs registers the same shape of callback
+ * URL. BetterAuth serves that path because the plugin registers each config in
+ * `ctx.socialProviders`, which is what the core callback route resolves against.
+ *
+ * Exported for unit testing.
+ */
+export const oidcProviderConfig = ({
+  providerId,
+  clientId,
+  clientSecret,
+  issuer,
+  issuerEnvName,
+  baseUrl,
+}: {
+  providerId: string;
+  clientId: string;
+  clientSecret: string;
+  issuer: string;
+  issuerEnvName: string;
+  baseUrl: string;
+}): NonNullable<Parameters<typeof genericOAuth>[0]["config"]>[number] => ({
+  providerId,
+  clientId,
+  clientSecret,
+  discoveryUrl: discoveryUrlFor(issuer, issuerEnvName),
+  scopes: ["openid", "email", "profile"],
+  pkce: true,
+  redirectURI: `${baseUrl}/api/auth/callback/${providerId}`,
+  mapProfileToUser: (profile) => ({
+    name: fallbackName(profile),
+    email: profile.email,
+    image: profile.picture,
+  }),
+});
+
+/**
+ * Subset of env needed to select and configure a generic-OAuth provider.
+ *
+ * Only the two fields every provider needs are required. The per-provider
+ * credentials are optional because they genuinely are: a deployment configures
+ * exactly one identity provider and leaves the rest unset. Requiring them all
+ * would also mean every caller has to be edited each time a provider is added,
+ * which is churn that proves nothing.
+ */
+type GenericOAuthEnv = Pick<typeof env, "NEXTAUTH_PROVIDER" | "NEXTAUTH_URL"> &
+  Partial<
+    Pick<
+      typeof env,
+      | "AUTH0_CLIENT_ID"
+      | "AUTH0_CLIENT_SECRET"
+      | "AUTH0_ISSUER"
+      | "OKTA_CLIENT_ID"
+      | "OKTA_CLIENT_SECRET"
+      | "OKTA_ISSUER"
+      | "COGNITO_CLIENT_ID"
+      | "COGNITO_CLIENT_SECRET"
+      | "COGNITO_ISSUER"
+      | "ONELOGIN_CLIENT_ID"
+      | "ONELOGIN_CLIENT_SECRET"
+      | "ONELOGIN_ISSUER"
+    >
+  >;
+
+/**
+ * Providers that need nothing but a client id, a secret and an OIDC issuer,
+ * with every endpoint coming from the issuer's discovery document. Adding one
+ * is a row here rather than another branch in the builder below.
+ *
+ * Auth0 and Okta are not in this table: they go through BetterAuth's own
+ * helpers and each carries a quirk of its own (Auth0 forces a fresh login
+ * prompt, Okta needs its issuer normalized before the helper concatenates it).
+ */
+const PLAIN_OIDC_PROVIDERS = [
+  {
+    providerId: "cognito",
+    issuerEnvName: "COGNITO_ISSUER",
+    // The issuer is the user pool's own
+    // (`https://cognito-idp.<region>.amazonaws.com/<userPoolId>`), not the
+    // hosted-UI domain — the domain is what its discovery document points at.
+    credentials: (e: GenericOAuthEnv) => ({
+      clientId: e.COGNITO_CLIENT_ID,
+      clientSecret: e.COGNITO_CLIENT_SECRET,
+      issuer: e.COGNITO_ISSUER,
+    }),
+  },
+  {
+    providerId: "onelogin",
+    issuerEnvName: "ONELOGIN_ISSUER",
+    // `https://<subdomain>.onelogin.com/oidc/2`
+    credentials: (e: GenericOAuthEnv) => ({
+      clientId: e.ONELOGIN_CLIENT_ID,
+      clientSecret: e.ONELOGIN_CLIENT_SECRET,
+      issuer: e.ONELOGIN_ISSUER,
+    }),
+  },
+] as const;
 
 /**
  * Builds the BetterAuth genericOAuth `config` array from environment
  * configuration. Only the provider named by `NEXTAUTH_PROVIDER` is added, and
  * only when its credentials are present. Each entry carries a `providerId`
- * (`"auth0"` / `"okta"`) so the genericOAuth plugin registers it under that id.
+ * (`"auth0"`, `"okta"`, `"cognito"`, `"onelogin"`) so the genericOAuth plugin
+ * registers it under that id.
  *
- * Exported for unit testing — lets us assert auth0/okta provider selection
- * directly, without re-initializing the module under a different
- * `NEXTAUTH_PROVIDER`.
+ * Exported for unit testing — lets us assert provider selection directly,
+ * without re-initializing the module under a different `NEXTAUTH_PROVIDER`.
  */
 export const buildGenericOAuthConfigs = (
   e: GenericOAuthEnv,
@@ -265,6 +368,24 @@ export const buildGenericOAuthConfigs = (
         image: profile.image ?? profile.picture,
       }),
     });
+  }
+
+  for (const provider of PLAIN_OIDC_PROVIDERS) {
+    if (e.NEXTAUTH_PROVIDER !== provider.providerId) continue;
+
+    const { clientId, clientSecret, issuer } = provider.credentials(e);
+    if (!clientId || !clientSecret || !issuer) continue;
+
+    genericOAuthConfigs.push(
+      oidcProviderConfig({
+        providerId: provider.providerId,
+        clientId,
+        clientSecret,
+        issuer,
+        issuerEnvName: provider.issuerEnvName,
+        baseUrl: e.NEXTAUTH_URL,
+      }),
+    );
   }
 
   return genericOAuthConfigs;
