@@ -94,8 +94,12 @@ secured
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
-      if (typeof body !== "object") {
-        logger.warn("collector request body is not json");
+      // `typeof null` is "object" and an array is one too, so both walk past a
+      // bare typeof check and reach `"metadata" in body` below — which throws on
+      // null. That is the same customer mistake as the two guards above, so it
+      // belongs on the same 400 rather than in the error stream as a 500.
+      if (body === null || Array.isArray(body) || typeof body !== "object") {
+        logger.warn("collector request body is not a json object");
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
