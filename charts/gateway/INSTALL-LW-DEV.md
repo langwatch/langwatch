@@ -164,7 +164,7 @@ curl -sS http://localhost:5563/health | jq .
 
 # /v1/models — 401 without auth, 200 with a valid VK
 curl -si http://localhost:5563/v1/models
-# → HTTP/1.1 401 + X-LangWatch-Request-Id + X-LangWatch-Gateway-Version
+# → HTTP/1.1 401 + X-Request-Id + X-LangWatch-Gateway-Version
 
 # /metrics — Prometheus scrape
 curl -sSf http://localhost:5563/metrics | head -30

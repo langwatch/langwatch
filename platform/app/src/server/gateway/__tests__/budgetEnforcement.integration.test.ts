@@ -20,8 +20,8 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  CURRENT_ROLLUP_REBUILD_MIGRATION,
   replayGooseMigrationUp,
+  replayRollupRebuild,
 } from "~/server/clickhouse/__tests__/migrationReplay";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
@@ -423,10 +423,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       // honest as the rollup evolves: the claim is that spend folded by any
       // older view still enforces after the upgrade a deployment runs.
       preRebuildDecision = await decidePreProject();
-      await replayGooseMigrationUp({
-        client,
-        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
-      });
+      await replayRollupRebuild(client);
     }, 120_000);
 
     afterAll(async () => {
@@ -435,10 +432,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       // anywhere in this describe can never leave later suites running
       // against the 00055 view. Idempotent by the migration's own design.
       const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
-      await replayGooseMigrationUp({
-        client: client!,
-        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
-      });
+      await replayRollupRebuild(client!);
     }, 120_000);
 
     describe("when the rollup rebuild has not run", () => {

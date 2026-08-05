@@ -13,6 +13,7 @@ import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...rout
 import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
+import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
@@ -65,6 +66,7 @@ import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
+import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
@@ -129,6 +131,10 @@ export default async function execute() {
   const simulationRunsSpec = await generateSpecs(simulationRunsApp);
   console.log("Building suites spec...");
   const suitesSpec = await generateSpecs(suitesApp);
+  console.log("Building teams spec...");
+  const teamsSpec = await generateSpecs(teamsApp);
+  console.log("Building groups spec...");
+  const groupsSpec = await generateSpecs(groupsApp);
   console.log("Building traces spec...");
   const tracesSpec = await generateSpecs(tracesApp);
   console.log("Building triggers spec...");
@@ -161,6 +167,8 @@ export default async function execute() {
       secretsSpec,
       simulationRunsSpec,
       suitesSpec,
+      teamsSpec,
+      groupsSpec,
       tracesSpec,
       triggersSpec,
       webhooksSpec,

@@ -25,9 +25,18 @@ export interface CreateGatewayBudgetOptions {
   onBreach?: "block" | "warn";
   timezone?: string;
   providerKey?: string;
+  cycleAnchorAt?: string;
 }
 
-const ALLOWED_WINDOWS: BudgetWindow[] = ["minute", "hour", "day", "week", "month", "total"];
+const ALLOWED_WINDOWS = [
+  "minute",
+  "hour",
+  "day",
+  "week",
+  "month",
+  "total",
+  "manual",
+] as const satisfies readonly BudgetWindow[];
 
 function buildScope(options: CreateGatewayBudgetOptions): CreateGatewayBudgetScope {
   switch (options.scope) {
@@ -68,7 +77,7 @@ export const createGatewayBudgetCommand = async (
   // The flag stays case-insensitive for the human typing it; the wire value
   // is always lowercase.
   const window = options.window.toLowerCase() as BudgetWindow;
-  if (!ALLOWED_WINDOWS.includes(window)) {
+  if (!(ALLOWED_WINDOWS as readonly BudgetWindow[]).includes(window)) {
     console.error(
       chalk.red(`Error: --window must be one of ${ALLOWED_WINDOWS.join(", ")}`),
     );
@@ -100,6 +109,9 @@ export const createGatewayBudgetCommand = async (
       on_breach: onBreach,
       timezone: options.timezone ?? null,
       provider_key: options.providerKey ?? null,
+      // Immutable on the server, so an unset flag must leave the key off the
+      // wire entirely rather than send a null the API would have to reject.
+      ...(options.cycleAnchorAt ? { cycle_anchor_at: options.cycleAnchorAt } : {}),
     });
 
     spinner.succeed(`Created budget "${chalk.cyan(budget.name)}"`);
@@ -120,6 +132,13 @@ export const createGatewayBudgetCommand = async (
           console.log(`${chalk.bold("Provider:")} ${budget.provider_key}`);
         }
         console.log(`${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`);
+        if (budget.cycle_anchor_at) {
+          // Only anchored budgets have a phase worth showing; calendar
+          // aligned ones are already implied by the window.
+          console.log(
+            `${chalk.bold("Anchor:")}   ${new Date(budget.cycle_anchor_at).toLocaleString()}`,
+          );
+        }
         console.log();
       },
     };

@@ -7,7 +7,6 @@ import { getProtectionsForProject } from "~/server/api/utils";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
   consumeEmailCapSlot,
@@ -40,6 +39,7 @@ import type { FoldProjectionStore } from "~/server/event-sourcing/projections/fo
 import { RedisCachedFoldStore } from "~/server/event-sourcing/projections/redisCachedFoldStore";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
+import { sendWebhook } from "~/server/webhooks/sendWebhook";
 import type { TriggerSettlementDispatchDeps } from "../../../event-sourcing/pipelines/automations/process-manager/triggerSettlementIntentHandlers";
 
 /**
