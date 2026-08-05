@@ -49,6 +49,13 @@ Feature: A test mock cannot name a module that does not exist
       When the mock check runs over it
       Then nothing is reported, because no mock was called
 
+    @unit
+    Scenario: A mock written with doMock is checked like any other
+      Given a test file whose only mock call is written with doMock
+      When the mock check runs over it
+      Then the file is still examined
+      And a specifier naming nothing is reported
+
   Rule: the check resolves the way the test runner does
 
     @unit
@@ -57,6 +64,13 @@ Feature: A test mock cannot name a module that does not exist
       When the mock check builds its resolver
       Then it expands each alias against the directory of the config declaring it
       And an alias entry it cannot read fails loudly instead of being dropped
+
+    @unit
+    Scenario: An alias path expands the way the config's own call does
+      Given one config building an alias path with join and another with resolve
+      When the mock check reads those tables
+      Then each path expands the way that call expands it
+      And an absolute segment is treated as that call treats it
 
     @unit
     Scenario: Overlapping aliases keep the order the config declares

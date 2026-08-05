@@ -45,6 +45,48 @@ describe("reading a vitest config's alias table", () => {
     });
   });
 
+  describe("given a path built with join rather than resolve", () => {
+    /** @scenario "An alias path expands the way the config's own call does" */
+    it("keeps the config's directory in front of an absolute segment", () => {
+      expect(
+        parse(
+          [
+            "export default defineConfig({",
+            '  resolve: { alias: { "~/": join(__dirname, "/src") } },',
+            "});",
+          ].join("\n"),
+        ),
+      ).toEqual([{ find: "~/", replacement: join(APP_ROOT, "src") }]);
+    });
+
+    it("keeps a trailing separator without doubling it", () => {
+      expect(
+        parse(
+          [
+            "export default defineConfig({",
+            '  resolve: { alias: { "~/": join(__dirname, "./src/") } },',
+            "});",
+          ].join("\n"),
+        ),
+      ).toEqual([{ find: "~/", replacement: `${join(APP_ROOT, "src")}/` }]);
+    });
+  });
+
+  describe("given a path built with resolve rather than join", () => {
+    /** @scenario "An alias path expands the way the config's own call does" */
+    it("lets an absolute segment discard the config's directory", () => {
+      expect(
+        parse(
+          [
+            "export default defineConfig({",
+            '  resolve: { alias: { "~/": resolve(__dirname, "/src") } },',
+            "});",
+          ].join("\n"),
+        ),
+      ).toEqual([{ find: "~/", replacement: "/src" }]);
+    });
+  });
+
   describe("given the array table vite also accepts", () => {
     /** @scenario "The check reads the alias table from the vitest configs" */
     it("reads each find and replacement pair", () => {

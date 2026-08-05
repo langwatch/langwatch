@@ -1,4 +1,4 @@
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import ts from "typescript";
 
 /**
@@ -63,11 +63,16 @@ function pathCallValue({
   const segments = pathSegmentsAfterDirname({ node });
   if (!segments) return undefined;
 
-  const expanded = resolve(configDir, ...segments);
-  // `resolve` drops a trailing separator, and the separator is load-bearing:
-  // it is what makes `"~/"` expand to a directory rather than glue the rest
-  // of the specifier onto the directory's name.
-  return segments.at(-1)?.endsWith("/") ? `${expanded}/` : expanded;
+  // Expand with the function the config actually called. The two part company
+  // on an absolute segment: `join(dir, "/src")` keeps the directory, while
+  // `resolve(dir, "/src")` discards everything before it.
+  const expanded = (name === "join" ? join : resolve)(configDir, ...segments);
+
+  // A trailing separator is load-bearing: it is what makes `"~/"` expand to a
+  // directory rather than glue the rest of the specifier onto the directory's
+  // name. `join` keeps one, `resolve` drops it.
+  if (!segments.at(-1)?.endsWith("/")) return expanded;
+  return expanded.endsWith("/") ? expanded : `${expanded}/`;
 }
 
 /** The key and value of one `"key": value` entry, or undefined for any other shape. */

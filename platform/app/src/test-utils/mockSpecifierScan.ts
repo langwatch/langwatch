@@ -105,6 +105,27 @@ function isMockCall({ node }: { node: ts.CallExpression }): boolean {
 }
 
 /**
+ * Whether a file could hold a mock call at all, as a cheap substring test so
+ * a walk parses only the files that might matter.
+ *
+ * Derived from `MOCK_METHODS` rather than spelled out separately: the method
+ * names share no common case-sensitive substring, since `vi.doMock` carries
+ * no lowercase "mock". A filter written by hand drifts from the set it is
+ * meant to mirror, and the drift is invisible, because the file it wrongly
+ * skips is reported clean.
+ */
+export function mightContainMockCall({
+  sourceText,
+}: {
+  sourceText: string;
+}): boolean {
+  for (const method of MOCK_METHODS) {
+    if (sourceText.includes(method)) return true;
+  }
+  return false;
+}
+
+/**
  * Every module named by a mock call in one file. Pure: takes text, returns
  * call sites, so the rule itself is unit-testable.
  */

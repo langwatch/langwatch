@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
+  mightContainMockCall,
   resolveMockSpecifier,
   scanSourceForMockSpecifiers,
 } from "../mockSpecifierScan";
@@ -75,7 +76,7 @@ function offendersIn({
 }): string[] {
   const fileName = join(REPO_ROOT, relativePath);
   const sourceText = readFileSync(fileName, "utf8");
-  if (!sourceText.includes("mock")) return [];
+  if (!mightContainMockCall({ sourceText })) return [];
 
   const aliases = aliasesForFile({ file: fileName, aliasesByConfigDir });
   const offenders: string[] = [];
@@ -192,6 +193,48 @@ describe("the mock-specifier rule", () => {
       );
 
       expect(found).toEqual([]);
+    });
+  });
+
+  describe("given the pre-filter that decides whether to parse a file", () => {
+    /** @scenario "A mock written with doMock is checked like any other" */
+    it("lets a file through for every method the rule covers", () => {
+      // `vi.doMock` carries no lowercase "mock", so a filter looking for that
+      // substring drops the file before the rule ever sees it.
+      expect('vi.doMock("./a");'.includes("mock")).toBe(false);
+
+      for (const call of [
+        'vi.mock("./a");',
+        'vi.doMock("./a");',
+        'vi.unmock("./a");',
+        'vi.doUnmock("./a");',
+      ]) {
+        expect(mightContainMockCall({ sourceText: call })).toBe(true);
+      }
+    });
+
+    it("skips a file with no mock call in it", () => {
+      expect(
+        mightContainMockCall({ sourceText: 'it("adds", () => {});' }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given a file whose only mock call is doMock", () => {
+    /** @scenario "A mock written with doMock is checked like any other" */
+    it("reports its dead specifier rather than passing it over", () => {
+      const sourceText = 'vi.doMock("./no/such/module", () => ({}));';
+
+      const dead = scan(sourceText).filter(
+        (site) =>
+          resolveIn({
+            specifier: site.specifier,
+            fromDir: join(APP_ROOT, "src"),
+            exists: [],
+          }).kind === "missing",
+      );
+
+      expect(dead).toEqual([{ line: 1, specifier: "./no/such/module" }]);
     });
   });
 
