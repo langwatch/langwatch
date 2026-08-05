@@ -52,7 +52,7 @@ jobs:
             # is the only spelling that stays one: the earlier per-prefix list
             # left out `internal/**` and root-level `*.go`, so a code declared
             # there changed the generated artifact while the drift job skipped
-            # and `go-ci-complete` went green on it. The whole `langwatch/` tree
+            # and `go-ci-complete` went green on it. The whole `platform/app/` tree
             # is still deliberately NOT listed, since a frontend-only PR has no
             # Go to check.
             go:
@@ -61,8 +61,8 @@ jobs:
               - 'pkg/**'
               - 'cmd/**'
               - 'tools/**'
-              - 'sdk-go/**'
-              - 'clickhouse-serverless/**'
+              - 'sdks/go/**'
+              - 'infra/clickhouse-serverless/**'
               - 'packages/handled-error/**'
               - 'go.mod'
               - 'go.sum'
@@ -131,7 +131,7 @@ jobs:
       #
       # Also note: a bare `golangci-lint run` cannot replace the explicit
       # package list — ./... pulls in the non-compiling codegen snippets under
-      # langwatch/src/.../snippets/go and fails on typecheck.
+      # platform/app/src/.../snippets/go and fails on typecheck.
       #
       # --disable below drops the three house-rule linters; they are gated on
       # changed lines only in the step after this one.

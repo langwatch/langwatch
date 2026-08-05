@@ -8,7 +8,7 @@ LangWatch is open-core. The Apache 2.0 self-hosted floor gives you a
 single trace store, append-only event log, persona-aware chrome,
 governed CLI flow, and 30-day retention, enough to satisfy basic
 auditability and PII redaction. Going beyond that, multi-source
-ingestion, multi-class retention, anomaly detection, OCSF/SIEM export,
+ingestion, extended retention, anomaly detection, OCSF/SIEM export,
 tamper-evidence, requires an **Enterprise** license.
 
 This page is the canonical self-hosted compliance map. Skim it before
@@ -30,8 +30,11 @@ on which mechanisms you actually need on day one.
 | Routing policies for the AI Gateway | ✅ | ✅ |
 | Ingestion sources, `otel_generic` only, 1 source max | ✅ | ✅ |
 | Ingestion sources, multi-source (Workato, S3, Copilot Studio, OpenAI/Anthropic compliance APIs) | ❌ | ✅ |
-| Retention, `thirty_days` | ✅ | ✅ |
-| Retention, `one_year`, `seven_years` classes | ❌ | ✅ |
+| Retention, platform default window | ✅ | ✅ |
+| Retention, configurable per-scope policies (extended windows) | ❌ | ✅ |
+| Billing spend ledger, fixed 13-month retention (with ClickHouse) | ✅ | ✅ |
+| Webhook endpoints platform (signed event delivery, retries, replay) | ❌ | ✅ |
+| Billing events APIs (spend-events pull, summaries, replay) | ❌ | ✅ |
 | Anomaly Rules, admin-curated detection + dispatch | ❌ | ✅ |
 | OCSF/SIEM export (Splunk, Datadog, Sentinel pull API) | ❌ | ✅ |
 | Audit log, org-wide cross-team | ❌ | ✅ |
@@ -59,7 +62,7 @@ the *common-criteria* baseline:
 | CC6.7, Termination of access | CLI token revoke on user deactivation (CliTokenRevocationService, Phase 1B-1) | Apache 2.0 |
 | CC7.1, Detection | Anomaly rules on activity-event traffic (spend-spike, geo-mismatch, off-hours) | **Enterprise** |
 | CC7.2, Monitoring | Append-only event_log + 30-day retention | Apache 2.0 |
-| CC7.2, Monitoring (≥1y) | Per-origin retention TTL with `one_year`, `seven_years` classes | **Enterprise** |
+| CC7.2, Monitoring (≥1y) | Per-scope retention policies with extended (multi-year) windows | **Enterprise** |
 | CC7.4, Incident response | OCSF v1.1 SIEM export with cursor pagination | **Enterprise** |
 | CC8.1, Change management | Per-org settings audit + SCIM provisioning history | **Enterprise** |
 
@@ -82,7 +85,7 @@ require Enterprise.
 | Art. 32(1)(b), confidentiality | Per-org tenancy + Layer-1 cross-org guards | Apache 2.0 |
 | Art. 32(1)(d), restoration | Backups (env-configured), trace store replay | Apache 2.0 |
 | Art. 30, record of processing | event_log @ 30d retention | Apache 2.0 |
-| Art. 30, record of processing (extended) | event_log @ `seven_years` retention | **Enterprise** |
+| Art. 30, record of processing (extended) | event_log under extended per-scope retention policies | **Enterprise** |
 | Art. 33, breach notification | Anomaly rule dispatch (Slack, PagerDuty, SIEM webhook, email) | **Enterprise** |
 | Art. 35, DPIA evidence | OCSF/SIEM export bundle | **Enterprise** |
 
@@ -92,6 +95,15 @@ where feasible, not later than 72 hours"), Enterprise is the right tier
 even for non-EU customers because GDPR's extra-territorial scope
 applies.
 
+One retention clause to state explicitly in DPAs: **billing spend
+records** (the per-request metering ledger under
+[Billing & spend events](/ai-gateway/billing-events)) are kept for a
+**fixed 13 months**, outside tenant retention policies, on every
+deployment with the ClickHouse spend path. They carry ids, quantities,
+and cost, never prompt or response content, and they exist so
+invoiceable evidence survives operational retention shortening. Map
+them as financial records with their own fixed lifetime.
+
 ## HIPAA: most uses
 
 HIPAA's covered-entity vs business-associate split + the §164.312
@@ -99,7 +111,7 @@ technical safeguards map cleanly onto the open-core split:
 
 - **§164.312(a)(1) Access control**: Apache 2.0 RBAC catalog + per-project tenancy
 - **§164.312(b) Audit controls**: Apache 2.0 event_log @ 30d retention
-- **§164.312(b) ≥6yr retention**: Enterprise `seven_years` retention class
+- **§164.312(b) ≥6yr retention**: Enterprise extended retention policies (multi-year windows)
 - **§164.312(c)(1) Integrity**: Enterprise tamper-evidence (post-GA follow-up)
 - **§164.312(d) Authentication**: Apache 2.0 SSO (env-configured) + Personal IDE keys
 - **§164.312(e) Transmission security**: Apache 2.0 (TLS at gateway + dataplane)
@@ -120,7 +132,7 @@ provider/deployer record-keeping (Art. 18) map onto:
 - **Art. 12(2)(b) reference DB used**: Apache 2.0 (`gen_ai.system` + `gen_ai.request.model` attrs on each span)
 - **Art. 12(2)(c) input data check**: Apache 2.0 (prompt + tool-call payloads on traces, redacted via Presidio)
 - **Art. 12(2)(d) human oversight**: **Enterprise** anomaly-rule dispatch (so a person reviews flagged events) + OCSF/SIEM forwarding
-- **Art. 18(1) record-keeping ≥10y**: This is **Enterprise**'s 10y retention class (note: shipped as `seven_years` today; 10y class is on the post-GA roadmap).
+- **Art. 18(1) record-keeping ≥10y**: Enterprise extended retention policies, with windows set in years to match the record-keeping clause your assessment requires.
 
 Most enterprise-deploying-an-LLM-agent uses fall under Art. 12 (1-3
 year retention windows). Art. 18 record-keeping for high-risk systems
@@ -133,7 +145,7 @@ floor narrow enough to be free-as-in-beer-AND-as-in-speech:
 
 - **Anomaly detection + dispatch** is Enterprise. The detection is the
   thing you pay for.
-- **Multi-class retention** is Enterprise. 30 days is sufficient for
+- **Extended retention** is Enterprise. The default window is sufficient for
   CC7.2 monitoring + Art. 30 GDPR processing-records-baseline.
 - **OCSF/SIEM export** is Enterprise. Apache 2.0 customers can still
   pull traces from the trace store via the same query API the dashboard

@@ -1,5 +1,5 @@
 # Builds the standalone `langwatch` CLI binary (Bun --compile, bytecode +
-# minify — see typescript-sdk/scripts/build-cli-binary.ts) for every supported
+# minify — see sdks/typescript/scripts/build-cli-binary.ts) for every supported
 # platform and attaches it (with sha256 sidecars, a signed SHA256SUMS and a
 # build-provenance attestation) to the typescript-sdk GitHub release, so users
 # can install the CLI without npm.
@@ -202,12 +202,18 @@ jobs:
           "${HOME}/.bun/bin/bun" --version
 
       - name: Install dependencies
-        # Full monorepo checkout: `prepare` (run by install) generates
-        # src/internal/generated/* from langwatch/ + langevals/ sources and
-        # skills/ — the Bun compile fails to resolve those otherwise (same
-        # gotcha Dockerfile.langyagent's cli-builder stage documents).
-        working-directory: typescript-sdk
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter "langwatch..."
+
+      - name: Generate the SDK's derived sources
+        # src/internal/generated/* is gitignored and derived from platform/app/
+        # + services/langevals/ sources and skills/, so the Bun compile cannot
+        # resolve it until the generators have run. Invoked explicitly rather
+        # than left to an install hook: the app depends on the SDK with
+        # `workspace:*`, so an install hook here also fires on every consumer
+        # install — including the one `npx @langwatch/server` performs, where
+        # the generators' devDependencies are absent by definition.
+        # Dockerfile.langyagent's cli-builder stage does the same.
+        run: pnpm --filter langwatch run generate
 
       - name: Resolve asset name
         id: names
@@ -237,7 +243,7 @@ jobs:
       # since neither tool exists on ubuntu. Until then, do NOT claim the
       # darwin assets are signed anywhere in the docs or release notes.
       - name: Build binary
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
         env:
           TARGET: ${{ matrix.target }}
           ASSET: ${{ steps.names.outputs.asset }}
@@ -257,7 +263,7 @@ jobs:
         # so a version mismatch now blocks ALL five uploads rather than being
         # noticed after four of them already landed.
         if: matrix.target == 'bun-linux-x64'
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
         env:
           ASSET: ${{ steps.names.outputs.asset }}
           VERSION: ${{ needs.resolve.outputs.version }}
@@ -271,7 +277,7 @@ jobs:
           fi
 
       - name: Compute sha256 sidecar
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
         env:
           ASSET: ${{ steps.names.outputs.asset }}
         run: |
@@ -287,8 +293,8 @@ jobs:
         with:
           name: cli-binary-${{ matrix.target }}
           path: |
-            typescript-sdk/dist/bin/${{ steps.names.outputs.asset }}
-            typescript-sdk/dist/bin/${{ steps.names.outputs.asset }}.sha256
+            sdks/typescript/dist/bin/${{ steps.names.outputs.asset }}
+            sdks/typescript/dist/bin/${{ steps.names.outputs.asset }}.sha256
           if-no-files-found: error
           retention-days: 7
 

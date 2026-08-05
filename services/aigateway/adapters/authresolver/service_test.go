@@ -323,6 +323,31 @@ func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing
 	}
 }
 
+/** @scenario Disable and enable propagate through the change feed */
+func TestApplyChange_VkDisableAndEnableEvictTheKey(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	for _, kind := range []string{
+		ChangeKindVirtualKeyDisabled,
+		ChangeKindVirtualKeyEnabled,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			matchingKey := hashKey("vk-lw-lifecycle-matching-" + kind)
+			otherKey := hashKey("vk-lw-lifecycle-other-" + kind)
+			svc.storeL1(matchingKey, &domain.Bundle{VirtualKeyID: "vk-flipped"})
+			svc.storeL1(otherKey, &domain.Bundle{VirtualKeyID: "vk-untouched"})
+
+			svc.applyChange("org-1", CacheChange{Kind: kind, VirtualKeyID: "vk-flipped"})
+
+			_, isMatchingPresent := svc.l1.Get(matchingKey)
+			_, isOtherPresent := svc.l1.Get(otherKey)
+			assert.False(t, isMatchingPresent, "a disabled or enabled key must be evicted so the next request re-resolves its status")
+			assert.True(t, isOtherPresent, "unrelated keys must remain cached")
+		})
+	}
+}
+
 // --- Background refresh classification --------------------------------------
 
 func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {
