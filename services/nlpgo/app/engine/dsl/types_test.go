@@ -266,7 +266,7 @@ func TestUnknownNodeKindParses(t *testing.T) {
 }
 
 // Prompt-config fields land on the Component struct exactly as the TS
-// signatureComponentSchema (langwatch/src/optimization_studio/types/
+// signatureComponentSchema (platform/app/src/optimization_studio/types/
 // dsl.ts:414-428) ships them: flat configId/handle on data, nested
 // versionMetadata sub-object. nlpgo's engine reads these to stamp the
 // PromptApiService.get + Prompt.compile span identity attributes.

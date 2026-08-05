@@ -5,7 +5,7 @@
 # via tsx, and below that V8 can't size its heap and the pod OOMs at boot.
 # ClickHouse auto-tunes to its limit, so give it >=1Gi.
 #
-# Budget accordingly: this totals ~4.7Gi of memory requests and ~2.4 CPU across
+# Budget accordingly: this totals ~4.9Gi of memory requests and ~2.4 CPU across
 # the release, which is more than a single 2-vCPU node can schedule once
 # control-plane reservations are counted. "Minimal" here means the smallest
 # that actually boots, not something that fits anywhere.
@@ -46,12 +46,13 @@ langwatch_nlp:
 
 langevals:
   replicaCount: 1
+  # One worker holding every local model needs ~2.6Gi. The limit is a ceiling,
+  # not a reservation, so it costs nothing until an evaluator loads a model.
   resources:
-    requests: { cpu: 100m, memory: 512Mi }
-    limits:   { cpu: 500m, memory: 1Gi }
+    requests: { cpu: 100m, memory: 768Mi }
+    limits:   { cpu: 500m, memory: 4Gi }
   extraEnvs:
     - { name: DISABLE_EVALUATORS_PRELOAD, value: "true" }
-    - { name: WEB_CONCURRENCY, value: "1" }
 
 clickhouse:
   chartManaged: true

@@ -1,0 +1,568 @@
+import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LicenseEnforcementRepository } from "../license-enforcement.repository";
+
+/**
+ * Unit tests for LicenseEnforcementRepository.
+ *
+ * Tests the data access layer with mocked Prisma:
+ * - Verifies correct where clauses for each method
+ * - Confirms archivedAt: null filtering for projects
+ * - Validates query structure for the surviving Prisma-based methods
+ *
+ * Note: Message/trace counting is NOT tested here because it lives in
+ * TraceUsageService (ClickHouse, not Prisma). See
+ * src/server/traces/__tests__/trace-usage.service.unit.test.ts.
+ *
+ * Note: Classification function tests (isViewOnlyPermission, isViewOnlyCustomRole,
+ * classifyMemberType, isFullMember, isLiteMember) are in member-classification.unit.test.ts
+ *
+ * Terminology: The EXTERNAL enum value corresponds to "Lite Member" in user-facing text.
+ */
+
+// Create mock Prisma client
+const createMockPrisma = () => ({
+  project: {
+    count: vi.fn().mockResolvedValue(0),
+    findMany: vi.fn().mockResolvedValue([]),
+  },
+  organizationUser: {
+    count: vi.fn().mockResolvedValue(0),
+    findMany: vi.fn().mockResolvedValue([]),
+  },
+  organizationInvite: {
+    findMany: vi.fn().mockResolvedValue([]),
+  },
+  team: {
+    count: vi.fn().mockResolvedValue(0),
+    findMany: vi.fn().mockResolvedValue([]),
+  },
+  teamUser: {
+    findMany: vi.fn().mockResolvedValue([]),
+  },
+  roleBinding: {
+    findMany: vi.fn().mockResolvedValue([]),
+  },
+  customRole: {
+    findMany: vi.fn().mockResolvedValue([]),
+  },
+  cost: {
+    aggregate: vi.fn().mockResolvedValue({ _sum: { amount: null } }),
+  },
+});
+
+type MockPrisma = ReturnType<typeof createMockPrisma>;
+
+describe("LicenseEnforcementRepository", () => {
+  let repository: LicenseEnforcementRepository;
+  let mockPrisma: MockPrisma;
+  const organizationId = "org-123";
+
+  beforeEach(() => {
+    mockPrisma = createMockPrisma();
+    repository = new LicenseEnforcementRepository(
+      mockPrisma as unknown as PrismaClient,
+    );
+  });
+
+  describe("getMemberCount", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2024-03-15T12:00:00.000Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("counts ADMIN and MEMBER role users as full members", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.ADMIN },
+        { userId: "u2", role: OrganizationUserRole.MEMBER },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      expect(result).toBe(2);
+    });
+
+    it("counts EXTERNAL role users with non-view custom role as full members (elevated from Lite Member)", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: "role-1" },
+      ]);
+      mockPrisma.customRole.findMany.mockResolvedValue([
+        { id: "role-1", permissions: ["project:view", "project:manage"] },
+      ]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      expect(result).toBe(1);
+    });
+
+    it("does not count EXTERNAL role users with view-only custom role as full members (they are Lite Member)", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: "role-1" },
+      ]);
+      mockPrisma.customRole.findMany.mockResolvedValue([
+        { id: "role-1", permissions: ["project:view", "analytics:view"] },
+      ]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    /** @scenario Pending invites count toward total member limit */
+    it("counts pending invites with ADMIN role as full members", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        {
+          role: OrganizationUserRole.ADMIN,
+          teamAssignments: null,
+          expiration: new Date("2024-03-20"),
+        },
+      ]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      expect(result).toBe(1);
+    });
+
+    it("counts pending invites with MEMBER role as full members", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        {
+          role: OrganizationUserRole.MEMBER,
+          teamAssignments: null,
+          expiration: new Date("2024-03-20"),
+        },
+      ]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      expect(result).toBe(1);
+    });
+
+    /** @scenario Pending invite with non-view custom role counts as Full Member */
+    it("counts pending invites with non-view custom role as full members", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.customRole.findMany.mockResolvedValue([
+        { id: "role-1", permissions: ["project:view", "project:update"] },
+      ]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        {
+          role: OrganizationUserRole.EXTERNAL,
+          teamAssignments: [{ teamId: "team-1", customRoleId: "role-1" }],
+          expiration: new Date("2024-03-20"),
+        },
+      ]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      expect(result).toBe(1);
+    });
+
+    /** @scenario Pending invite with view-only custom role counts as Lite Member */
+    it("does not count pending invites with view-only custom role as full members", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.customRole.findMany.mockResolvedValue([
+        { id: "role-1", permissions: ["project:view", "analytics:view"] },
+      ]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        {
+          role: OrganizationUserRole.EXTERNAL,
+          teamAssignments: [{ teamId: "team-1", customRoleId: "role-1" }],
+          expiration: new Date("2024-03-20"),
+        },
+      ]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    /** @scenario Expired invites do not count toward member limit */
+    /** @scenario Only non-expired pending invites count toward limit */
+    it("does not count expired invites", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      // Expired invites should be filtered by query, not returned
+      expect(result).toBe(0);
+    });
+
+    it("does not count EXTERNAL role users without team assignment as full members (they are Lite Member)", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]); // No team assignment
+      mockPrisma.customRole.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    it("returns zero when no full members exist", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    it("combines users and pending invites in total count", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.ADMIN },
+        { userId: "u2", role: OrganizationUserRole.MEMBER },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        {
+          role: OrganizationUserRole.ADMIN,
+          teamAssignments: null,
+          expiration: new Date("2024-03-20"),
+        },
+      ]);
+
+      const result = await repository.getMemberCount(organizationId);
+
+      expect(result).toBe(3);
+    });
+  });
+
+  describe("getMembersLiteCount", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2024-03-15T12:00:00.000Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario Lite Member users are counted separately from full members */
+    it("counts EXTERNAL users without custom role as Lite Member", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: null },
+      ]);
+      mockPrisma.customRole.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(1);
+    });
+
+    it("counts EXTERNAL users with view-only custom role as Lite Member", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: "role-1" },
+      ]);
+      mockPrisma.customRole.findMany.mockResolvedValue([
+        { id: "role-1", permissions: ["project:view", "analytics:view"] },
+      ]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(1);
+    });
+
+    it("does not count EXTERNAL users with non-view custom role as Lite Member", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: "role-1" },
+      ]);
+      mockPrisma.customRole.findMany.mockResolvedValue([
+        { id: "role-1", permissions: ["project:view", "project:manage"] },
+      ]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    it("does not count ADMIN or MEMBER users as Lite Member", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.ADMIN },
+        { userId: "u2", role: OrganizationUserRole.MEMBER },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    it("counts pending invites with EXTERNAL role and no custom role as Lite Member", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.customRole.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        {
+          role: OrganizationUserRole.EXTERNAL,
+          teamAssignments: null,
+          expiration: new Date("2024-03-20"),
+        },
+      ]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(1);
+    });
+
+    it("counts pending invites with EXTERNAL role and view-only custom role as Lite Member", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.customRole.findMany.mockResolvedValue([
+        { id: "role-1", permissions: ["project:view", "analytics:view"] },
+      ]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        {
+          role: OrganizationUserRole.EXTERNAL,
+          teamAssignments: [{ teamId: "team-1", customRoleId: "role-1" }],
+          expiration: new Date("2024-03-20"),
+        },
+      ]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(1);
+    });
+
+    it("does not count pending invites with non-view custom role as Lite Member", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.customRole.findMany.mockResolvedValue([
+        { id: "role-1", permissions: ["project:view", "project:update"] },
+      ]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        {
+          role: OrganizationUserRole.EXTERNAL,
+          teamAssignments: [{ teamId: "team-1", customRoleId: "role-1" }],
+          expiration: new Date("2024-03-20"),
+        },
+      ]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    it("does not count pending invites with ADMIN or MEMBER role as Lite Member", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        {
+          role: OrganizationUserRole.ADMIN,
+          teamAssignments: null,
+          expiration: new Date("2024-03-20"),
+        },
+        {
+          role: OrganizationUserRole.MEMBER,
+          teamAssignments: null,
+          expiration: new Date("2024-03-20"),
+        },
+      ]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    it("returns zero when no Lite Member users exist", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    it("counts EXTERNAL users without team assignment as Lite Member", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]); // No team assignment
+      mockPrisma.customRole.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(1);
+    });
+
+    it("combines users and pending invites in total count", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: null },
+      ]);
+      mockPrisma.customRole.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        {
+          role: OrganizationUserRole.EXTERNAL,
+          teamAssignments: null,
+          expiration: new Date("2024-03-20"),
+        },
+      ]);
+
+      const result = await repository.getMembersLiteCount(organizationId);
+
+      expect(result).toBe(2);
+    });
+  });
+
+  describe("getCurrentMonthCost", () => {
+    /** @scenario "getCurrentMonthCost remains available in the repository" */
+    it("fetches project IDs and aggregates cost for current month", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([
+        { id: "proj-1" },
+        { id: "proj-2" },
+      ]);
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 150.5 } });
+
+      const result = await repository.getCurrentMonthCost(organizationId);
+
+      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
+        where: { team: { organizationId } },
+        select: { id: true },
+      });
+      expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
+        where: {
+          projectId: { in: ["proj-1", "proj-2"] },
+          createdAt: { gte: expect.any(Date) },
+        },
+        _sum: { amount: true },
+      });
+      expect(result).toBe(150.5);
+    });
+
+    it("returns zero when no cost data exists", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
+
+      const result = await repository.getCurrentMonthCost(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    it("returns zero when no projects exist", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([]);
+
+      const result = await repository.getCurrentMonthCost(organizationId);
+
+      // Should still call aggregate with empty array
+      expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
+        where: {
+          projectId: { in: [] },
+          createdAt: { gte: expect.any(Date) },
+        },
+        _sum: { amount: true },
+      });
+      expect(result).toBe(0);
+    });
+
+    it("uses start of current month for date filter", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2024-03-20T15:30:00.000Z"));
+      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 100 } });
+
+      await repository.getCurrentMonthCost(organizationId);
+
+      const call = mockPrisma.cost.aggregate.mock.calls[0]?.[0];
+      const dateFilter = call?.where?.createdAt?.gte as Date;
+
+      expect(dateFilter.getFullYear()).toBe(2024);
+      expect(dateFilter.getMonth()).toBe(2); // March (0-indexed)
+      expect(dateFilter.getDate()).toBe(1);
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe("getCurrentMonthCostForProjects", () => {
+    it("aggregates cost for specified project IDs", async () => {
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 75.25 } });
+      const projectIds = ["proj-a", "proj-b", "proj-c"];
+
+      const result =
+        await repository.getCurrentMonthCostForProjects(projectIds);
+
+      expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
+        where: {
+          projectId: { in: projectIds },
+          createdAt: { gte: expect.any(Date) },
+        },
+        _sum: { amount: true },
+      });
+      expect(result).toBe(75.25);
+    });
+
+    it("returns zero when amount is null", async () => {
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
+
+      const result = await repository.getCurrentMonthCostForProjects([
+        "proj-1",
+      ]);
+
+      expect(result).toBe(0);
+    });
+
+    it("handles empty project array", async () => {
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
+
+      const result = await repository.getCurrentMonthCostForProjects([]);
+
+      expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
+        where: {
+          projectId: { in: [] },
+          createdAt: { gte: expect.any(Date) },
+        },
+        _sum: { amount: true },
+      });
+      expect(result).toBe(0);
+    });
+  });
+});

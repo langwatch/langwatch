@@ -3,13 +3,13 @@
 # Design: dev/docs/adr/028-trace-facet-sidebar-presentation-and-perspectives.md
 #
 # Implementation:
-#   langwatch/src/server/app-layer/traces/facet-registry.ts        (RangeFacetDef: integer flag + default mode)
-#   langwatch/src/server/app-layer/traces/trace-list.service.ts    (discrete-values descriptor for integer facets)
-#   langwatch/src/features/traces-v2/components/FilterSidebar/RangeSection.tsx     (Range mode — existing slider)
-#   langwatch/src/features/traces-v2/components/FilterSidebar/FacetSection.tsx     (Discrete mode — reused categorical list)
-#   langwatch/src/features/traces-v2/components/FilterSidebar/SidebarSection.tsx   (header mode-toggle icon)
-#   langwatch/src/features/traces-v2/components/FilterSidebar/FacetManagerPopover.tsx  (mode picker in the manager)
-#   langwatch/src/features/traces-v2/stores/                        (per-project per-facet mode setting, sibling of visibility)
+#   platform/app/src/server/app-layer/traces/facet-registry.ts        (RangeFacetDef: integer flag + default mode)
+#   platform/app/src/server/app-layer/traces/trace-list.service.ts    (discrete-values descriptor for integer facets)
+#   platform/app/src/features/traces-v2/components/FilterSidebar/RangeSection.tsx     (Range mode — existing slider)
+#   platform/app/src/features/traces-v2/components/FilterSidebar/FacetSection.tsx     (Discrete mode — reused categorical list)
+#   platform/app/src/features/traces-v2/components/FilterSidebar/SidebarSection.tsx   (header mode-toggle icon)
+#   platform/app/src/features/traces-v2/components/FilterSidebar/FacetManagerPopover.tsx  (mode picker in the manager)
+#   platform/app/src/features/traces-v2/stores/                        (per-project per-facet mode setting, sibling of visibility)
 #
 # Related specs:
 #   specs/traces-v2/search.feature           — owns the Range slider behaviour (Rule: Range facets) and the query syntax

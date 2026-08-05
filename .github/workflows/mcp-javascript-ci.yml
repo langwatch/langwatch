@@ -33,12 +33,19 @@ jobs:
           # push-strategy diff + no release-please-manifest entry: the
           # integration step spends real LLM money (Anthropic), so it must
           # not run on pushes or release PRs that touched nothing under
-          # mcp-server/. A release PR still matches via
-          # mcp-server/CHANGELOG.md.
+          # mcp/typescript/. A release PR still matches via
+          # mcp/typescript/CHANGELOG.md.
           push-strategy: diff
           filters: |
             relevant:
-              - 'mcp-server/**'
+              - 'mcp/typescript/**'
+              # The single lockfile, workspace definition, root manifest and
+              # hoist config live at the repo root since ADR-076; a dependency
+              # or override change touches only these.
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
               - '.github/workflows/mcp-javascript-ci.yml'
               - '.github/actions/setup-pnpm-node/**'
 
@@ -57,11 +64,10 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "mcp-server/pnpm-lock.yaml"
-          install-dir: mcp-server
+          install: "@langwatch/mcp-server..."
 
       - name: Run typecheck
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
 
   build_and_test:
@@ -79,11 +85,10 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "mcp-server/pnpm-lock.yaml"
-          install-dir: mcp-server
+          install: "@langwatch/mcp-server..."
 
       - name: Build
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         run: pnpm run build
 
       - name: Run tests
@@ -95,7 +100,7 @@ jobs:
            || github.event.pull_request.head.repo.full_name == github.repository)
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         env:
           LANGWATCH_API_KEY: ${{ secrets.MCP_SERVER_LANGWATCH_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.MCP_SERVER_ANTHROPIC_API_KEY }}

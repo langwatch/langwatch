@@ -91,7 +91,7 @@ See [Per-origin retention](/ai-gateway/governance/retention) for the full retent
 
 ### 3. RBAC: permission-driven, not role-driven
 
-LangWatch's RBAC layer (`langwatch/src/server/api/rbac.ts`) is the single source of truth for governance access. Permissions are the abstraction; role enums (`OrganizationUserRole.{ADMIN, MEMBER, EXTERNAL}`) are just default permission bags. Custom roles compose any subset via the existing `CustomRolePermissions` JSON column without requiring a Prisma enum change.
+LangWatch's RBAC layer (`platform/app/src/server/api/rbac.ts`) is the single source of truth for governance access. Permissions are the abstraction; role enums (`OrganizationUserRole.{ADMIN, MEMBER, EXTERNAL}`) are just default permission bags. Custom roles compose any subset via the existing `CustomRolePermissions` JSON column without requiring a Prisma enum change.
 
 **Governance permissions catalog** (added in this PR):
 

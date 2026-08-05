@@ -1,0 +1,83 @@
+import { resolver } from "hono-openapi/zod";
+import {
+  apiErrorSchema,
+  badRequestSchema,
+  conflictSchema,
+  errorSchema,
+  unauthorizedSchema,
+} from "~/app/api/shared/schemas";
+import type { RouteResponse } from "./types";
+
+/**
+ * The documented errors for the families that predate the canonical envelope,
+ * in the flat `{ error, message? }` shape they actually emit. Do not migrate
+ * this in place: the apps importing it publish that shape to live consumers,
+ * so changing it here would make ~21 apps' docs describe a body they do not
+ * send. A family that moves to the canonical envelope switches to
+ * {@link canonicalBaseResponses} at the same time it flips.
+ */
+export const baseResponses: Record<number, RouteResponse> = {
+  401: {
+    description: "Unauthorized",
+    content: {
+      "application/json": { schema: resolver(unauthorizedSchema) },
+    },
+  },
+  400: {
+    description: "Bad Request",
+    content: {
+      "application/json": { schema: resolver(badRequestSchema) },
+    },
+  },
+  422: {
+    description: "Unprocessable Entity",
+    content: {
+      "application/json": { schema: resolver(errorSchema) },
+    },
+  },
+  500: {
+    description: "Internal Server Error",
+    content: {
+      "application/json": { schema: resolver(errorSchema) },
+    },
+  },
+};
+
+export const conflictResponses: Record<409, RouteResponse> = {
+  409: {
+    description: "Conflict",
+    content: {
+      "application/json": { schema: resolver(conflictSchema) },
+    },
+  },
+};
+
+/** One documented error body, the canonical envelope, for a given status. */
+function canonicalResponse(description: string): RouteResponse {
+  return {
+    description,
+    content: { "application/json": { schema: resolver(apiErrorSchema) } },
+  };
+}
+
+/**
+ * The documented errors for the families that publish the canonical envelope
+ * ({@link apiErrorSchema}). Every refusal these families can answer with is
+ * one shape, so the documented 400/401/500 match the body a caller actually
+ * receives, whichever layer refused.
+ *
+ * 422 is absent on purpose: the canonical families answer request-validation
+ * failures 400 `validation_error`, so documenting a 422 would describe a
+ * status they never send.
+ */
+export const canonicalBaseResponses: Record<number, RouteResponse> = {
+  400: canonicalResponse("Bad Request"),
+  401: canonicalResponse("Unauthorized"),
+  403: canonicalResponse("Forbidden"),
+  500: canonicalResponse("Internal Server Error"),
+};
+
+/** The canonical 409, for families that publish the canonical envelope. */
+export const canonicalConflictResponses: Record<409, RouteResponse> = {
+  409: canonicalResponse("Conflict"),
+};

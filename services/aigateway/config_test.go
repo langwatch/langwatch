@@ -25,6 +25,53 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	}
 }
 
+// Spend emission is the only source of gateway budget debits, so an install
+// that never heard of the setting must still emit.
+func TestLoadConfig_SpendEmitterDefaultsOn(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if !cfg.SpendEmitter.Enabled {
+		t.Error("SpendEmitter.Enabled default = false, want true: an unset LW_GATEWAY_SPEND_ENABLED must still emit spend")
+	}
+}
+
+// The kill switch keeps its documented name and both spellings of off. An
+// operator rolling back to a control plane without the ingest route reaches
+// for this and cannot afford it to be a no-op.
+func TestLoadConfig_SpendEmitterKillSwitch(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		want  bool
+	}{
+		{"false", false},
+		{"0", false},
+		{"true", true},
+		{"1", true},
+		{"", true}, // Unset: Hydrate leaves the default alone.
+	} {
+		t.Run("LW_GATEWAY_SPEND_ENABLED="+tc.value, func(t *testing.T) {
+			clearGatewayEnv(t)
+			t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+			t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+			t.Setenv("LW_GATEWAY_SPEND_ENABLED", tc.value)
+
+			cfg, err := LoadConfig(context.Background())
+			if err != nil {
+				t.Fatalf("LoadConfig: %v", err)
+			}
+			if cfg.SpendEmitter.Enabled != tc.want {
+				t.Errorf("SpendEmitter.Enabled = %v, want %v for %q", cfg.SpendEmitter.Enabled, tc.want, tc.value)
+			}
+		})
+	}
+}
+
 // Canonical env vars (post-Hydrate) should land on the right struct fields.
 func TestLoadConfig_CanonicalEnv(t *testing.T) {
 	clearGatewayEnv(t)
@@ -199,6 +246,11 @@ func clearGatewayEnv(t *testing.T) {
 		"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP",
 		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE",
 		"CUSTOMER_TRACE_BRIDGE_BASE_URL",
+		"LW_GATEWAY_SPEND_ENABLED",
+		"LW_GATEWAY_SPEND_SPOOL_DIR",
+		"LW_GATEWAY_SPEND_SPOOL_MAX_BYTES",
+		"LW_GATEWAY_SPEND_FLUSH_INTERVAL_SECONDS",
+		"LW_GATEWAY_SPEND_INGEST_BASE_URL",
 		"OTEL_OTLP_ENDPOINT",
 		"OTEL_OTLP_HEADERS",
 		"OTEL_SAMPLE_RATIO",

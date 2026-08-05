@@ -249,6 +249,7 @@
             "group": "Help",
             "pages": [
               "pricing",
+              "pricing/billable-events",
               "support",
               "status"
             ]
@@ -566,12 +567,22 @@
             ]
           },
           {
+            "group": "Billing & Metering",
+            "pages": [
+              "ai-gateway/billing-events",
+              "features/webhooks",
+              "ai-gateway/cookbooks/metering-and-rebilling",
+              "ai-gateway/demo-agent-platform"
+            ]
+          },
+          {
             "group": "Governance",
             "pages": [
               "ai-gateway/governance/overview",
               "ai-gateway/governance/personal-keys",
               "ai-gateway/governance/admin-setup",
-              "ai-gateway/governance/routing-policies"
+              "ai-gateway/governance/routing-policies",
+              "ai-gateway/governance/retention"
             ]
           },
           {
@@ -607,6 +618,7 @@
                 ]
               },
               "ai-gateway/model-naming",
+              "ai-gateway/parameter-mapping",
               "ai-gateway/model-aliases",
               {
                 "group": "Operations",
@@ -685,7 +697,8 @@
             "pages": [
               "ai-governance/workspaces",
               "ai-governance/members-and-invites",
-              "ai-governance/roles-and-permissions"
+              "ai-governance/roles-and-permissions",
+              "ai-governance/audit-log"
             ]
           },
           {
@@ -800,6 +813,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "self-hosting/licensing",
               "hybrid-setup/overview",
               "self-hosting/troubleshooting"
             ]
@@ -811,18 +825,10 @@
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
               "self-hosting/configuration/sso",
+              "self-hosting/configuration/email",
               "self-hosting/configuration/observability",
-              "self-hosting/configuration/third-party-integrations"
-            ]
-          },
-          {
-            "group": "Langy",
-            "pages": [
-              "self-hosting/langy/overview",
-              "self-hosting/langy/setup",
-              "self-hosting/langy/github-app",
-              "self-hosting/langy/environment-variables",
-              "self-hosting/langy/networking-and-egress"
+              "self-hosting/configuration/third-party-integrations",
+              "self-hosting/webhooks"
             ]
           },
           {
@@ -860,6 +866,16 @@
               "self-hosting/ops/projection-replay",
               "self-hosting/ops/dejaview",
               "self-hosting/ops/foundry"
+            ]
+          },
+          {
+            "group": "Langy",
+            "pages": [
+              "self-hosting/langy/overview",
+              "self-hosting/langy/setup",
+              "self-hosting/langy/github-app",
+              "self-hosting/langy/environment-variables",
+              "self-hosting/langy/networking-and-egress"
             ]
           }
         ]
@@ -1315,7 +1331,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1785478464",
+      "source": "/ci/cache/busted/1785919427",
       "destination": "/"
     },
     {

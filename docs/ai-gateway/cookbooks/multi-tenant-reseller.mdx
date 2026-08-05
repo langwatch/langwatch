@@ -59,38 +59,61 @@ langwatch model-providers list --format json | \
 
 ## Step 3: Provision a VK with its cap when a customer signs up
 
-One call mints the key AND its budget, atomically: the key can never exist for a moment without the cap you asked for. Server-side code (Node.js example):
+One call mints the key AND its budget, atomically: the key can never exist for a moment without the cap you asked for. Server-side code (Node.js example, plain REST):
 
 ```ts
-import { VirtualKeysApiService } from "langwatch";
-
-const langwatch = new VirtualKeysApiService({
-  apiKey: process.env.LANGWATCH_BACKEND_TOKEN,
-});
+const LW = "https://app.langwatch.ai/api/gateway/v1";
+const headers = {
+  Authorization: `Bearer ${process.env.LANGWATCH_BACKEND_TOKEN}`,
+  "Content-Type": "application/json",
+};
 
 export async function provisionCustomer(customerId: string, planLimitUsd: string) {
-  const { virtual_key, secret } = await langwatch.create({
-    name: `customer-${customerId}`,
-    description: `Tenant key for ${customerId}`,
-    // scopes omitted: the key defaults to your backend token's project,
-    // which is exactly where you want the customer's traces to land.
-    budget: {
-      limit_usd: planLimitUsd, // from your plans table
-      window: "MONTH",
-      on_breach: "BLOCK",      // or WARN for grace periods
-    },
-    config: {
-      modelsAllowed: ["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"],
-      cache: { mode: "respect" },
-    },
+  const res = await fetch(`${LW}/virtual-keys`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      name: `customer-${customerId}`,
+      description: `Tenant key for ${customerId}`,
+      // scopes omitted: the key defaults to your backend token's project,
+      // which is exactly where you want the customer's traces to land.
+      budget: {
+        limit_usd: planLimitUsd, // from your plans table
+        window: "month",
+        on_breach: "block",      // or warn for grace periods
+      },
+      config: {
+        modelsAllowed: ["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"],
+        cache: { mode: "respect" },
+      },
+    }),
   });
+  const { virtual_key, secret } = await res.json();
 
-  // Persist vk.id; hand the secret to the customer exactly once.
+  // Persist virtual_key.id; hand the secret to the customer exactly once.
   return { vkId: virtual_key.id, secret };
 }
 ```
 
-The eligible-provider set is the union of every ModelProvider visible from the key's scopes (the ones you configured in Step 2). Pin `routing_policy_id` plus `routing_mode: "POLICY"` if you run a custom ordering; otherwise leave routing at its default.
+To also cap each **end user inside** the tenant (their seats, their agents' users), add one attributed-user template on the key; it covers every current and future end user with lazy per-user buckets, nothing to provision per user:
+
+```ts
+await fetch(`${LW}/budgets`, {
+  method: "POST",
+  headers,
+  body: JSON.stringify({
+    scope: { kind: "attributed_user", anchor_virtual_key_id: vkId },
+    name: `customer-${customerId} per-user cap`,
+    window: "month",
+    limit_usd: "25",
+    on_breach: "block",
+  }),
+});
+```
+
+Requests then carry the end-user id in the OpenAI `user` field (or the `X-LangWatch-End-User-Id` header); see [Budgets → per-end-user budgets](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates).
+
+The eligible-provider set is the union of every ModelProvider visible from the key's scopes (the ones you configured in Step 2). Pin `routing_policy_id` plus `routing_mode: "policy"` if you run a custom ordering; otherwise leave routing at its default.
 
 In a signup webhook:
 
@@ -110,8 +133,10 @@ The `budget` field on update upserts the key's own cap, so plan changes are one 
 
 ```ts
 export async function setCustomerPlan(vkId: string, planLimitUsd: string) {
-  await langwatch.update(vkId, {
-    budget: { limit_usd: planLimitUsd, window: "MONTH" },
+  await fetch(`${LW}/virtual-keys/${vkId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ budget: { limit_usd: planLimitUsd, window: "month" } }),
   });
 }
 ```
@@ -142,10 +167,11 @@ The gateway:
 
 ## Step 6: Show the customer their spend and bill them
 
-The read-back half of the loop is one REST call per key:
+For **display**, the read-back is one REST call per key:
 
 ```ts
-const spend = await langwatch.spend(vkId); // current UTC month by default
+const res = await fetch(`${LW}/virtual-keys/${vkId}/spend`, { headers });
+const spend = await res.json(); // current UTC month by default
 // { virtual_key_id, spent_usd: "12.4531", requests: 1841, window: {...} }
 ```
 
@@ -164,17 +190,13 @@ langwatch gateway-budgets list --scope-type virtual-key -f json | \
 
 `spend_available: false` in that output means spend could not be totalled server-side; hold billing until it recovers rather than invoicing a zero.
 
-### (a) Bill from your pricing table
+For **invoicing**, do not poll aggregates: ingest the per-request [spend event stream](/ai-gateway/billing-events) through a signed [webhook endpoint](/features/webhooks) into your own billing ledger, and reconcile against `spend-summaries` checksums at period close. Every event carries exact integer quantities per token class, integer nano-USD cost, the tenant key, the end-user id, and your echoed metadata, which is what a rebilling invoice needs and what an aggregate cannot give you. The full billing loop (receive, verify, dedup, settled supersession, reconcile, period close) is its own cookbook: [Metering and rebilling your customers](/ai-gateway/cookbooks/metering-and-rebilling), with a runnable reference implementation in TypeScript and Python.
 
-You define a markup over what the gateway shows you spent, and your Stripe/billing layer reads the spend numbers above and invoices.
-
-### (b) Passthrough billing
-
-For passthrough, your UI shows the same numbers you see in LangWatch + a per-customer markup or flat management fee.
+Rating stays in your billing system: you define the markup over the gateway-reported cost (or bill passthrough plus a management fee), and events carry `rate_version` so cost is re-derivable.
 
 ## Handling over-limit customers
 
-When `on_breach: BLOCK`, the gateway returns `402 budget_exceeded`. Your customer sees:
+When `on_breach: block`, the gateway returns `402 budget_exceeded`. Your customer sees:
 
 ```json
 {
@@ -193,11 +215,13 @@ Your customer's app should catch this and either:
 
 Because the response is standard OpenAI-compatible, your error handler only needs to switch on `error.type`.
 
-## Rotation & revocation
+## Suspension, rotation, revocation
 
-**Customer resets their API key in your UI** → you call `langwatch.rotate(vkId)`, get a new secret, send it to the customer. The old secret keeps authenticating for a 24 h grace window, so a client you have not reached yet does not start failing mid-rollout. The gateway's cache TTL (~60 s) is only how long the new secret takes to be accepted everywhere, not when the old one expires.
+**Customer stops paying, or you need an emergency stop** → `POST /virtual-keys/:id/disable`. Requests are rejected with the distinct `403 virtual_key_disabled` until you call `/enable`; budgets, config, and any running rotation grace stay intact, and propagation is seconds. This is the reversible kill switch, use it for anything the customer might come back from. See [Virtual Keys → Disable and enable](/ai-gateway/virtual-keys#disable-and-enable-the-reversible-stop).
 
-**Customer cancels their subscription** → `langwatch.revoke(vkId)`. The next request returns `403 virtual_key_revoked`. If you want a grace period, schedule the revoke job for 24–48 h after cancellation instead.
+**Customer resets their API key in your UI** → `POST /virtual-keys/:id/rotate`, get a new secret, send it to the customer. The old secret keeps authenticating for a 24 h grace window, so a client you have not reached yet does not start failing mid-rollout. The gateway's cache TTL (~60 s) is only how long the new secret takes to be accepted everywhere, not when the old one expires.
+
+**Customer is gone for good** → `POST /virtual-keys/:id/revoke`. The next request returns `403 virtual_key_revoked`. One-way; for a cancellation grace period, disable now and revoke after the grace, rather than scheduling a bare revoke.
 
 ## Audit: who did what
 
@@ -218,10 +242,10 @@ If you need SIEM export: query ONLY the gateway-shape `AuditLog` rows with a rea
 If you want to throttle a specific customer without moving them to a different plan:
 
 ```ts
-await langwatch.update(vkId, {
-  config: {
-    rateLimits: { rpm: 60, tpm: 100000 },
-  },
+await fetch(`${LW}/virtual-keys/${vkId}`, {
+  method: "PATCH",
+  headers,
+  body: JSON.stringify({ config: { rateLimits: { rpm: 60 } } }),
 });
 ```
 
@@ -229,8 +253,9 @@ Gateway enforces at the VK level; customer sees `429 rate_limit_exceeded`. Combi
 
 ## See also
 
+- [Metering and rebilling your customers](/ai-gateway/cookbooks/metering-and-rebilling): the event-driven billing loop this provisioning pattern plugs into.
 - [Management REST API](/ai-gateway/api/management): every endpoint used above.
-- [Virtual Keys](/ai-gateway/virtual-keys): VK lifecycle semantics.
-- [Budgets](/ai-gateway/budgets): hierarchical scope logic.
+- [Virtual Keys](/ai-gateway/virtual-keys): VK lifecycle semantics, including disable vs revoke.
+- [Budgets](/ai-gateway/budgets): hierarchical scope logic and per-end-user templates.
 - [Security](/ai-gateway/security): how backend tokens are isolated from VK secrets.
 - [CI smoke-test cookbook](/ai-gateway/cookbooks/ci-smoke-test): validate the full flow in CI.

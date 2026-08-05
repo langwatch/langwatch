@@ -52,13 +52,13 @@ func TestStripInheritedEnvFilesRemovesUntrackedSecretsAndKeepsTheReposOwn(t *tes
 		checkout := t.TempDir()
 		gitInit(t, checkout)
 
-		mustWrite(t, filepath.Join(checkout, "langwatch"), ".env.example", "OPENAI_API_KEY=\n")
-		gitAddCommit(t, checkout, "langwatch/.env.example")
+		mustWrite(t, filepath.Join(checkout, "platform", "app"), ".env.example", "OPENAI_API_KEY=\n")
+		gitAddCommit(t, checkout, "platform/app/.env.example")
 
 		// What the hook would have copied in.
-		mustWrite(t, filepath.Join(checkout, "langwatch"), ".env", "OPENAI_API_KEY=sk-real-secret\n")
-		mustWrite(t, filepath.Join(checkout, "langwatch"), ".env.portless", "DATABASE_URL=postgres://real\n")
-		mustWrite(t, filepath.Join(checkout, "python-sdk"), ".env", "ANTHROPIC_API_KEY=sk-ant-real\n")
+		mustWrite(t, filepath.Join(checkout, "platform", "app"), ".env", "OPENAI_API_KEY=sk-real-secret\n")
+		mustWrite(t, filepath.Join(checkout, "platform", "app"), ".env.portless", "DATABASE_URL=postgres://real\n")
+		mustWrite(t, filepath.Join(checkout, "sdks", "python"), ".env", "ANTHROPIC_API_KEY=sk-ant-real\n")
 		mustWrite(t, checkout, ".env", "STRIPE_SECRET_KEY=sk_live_real\n")
 
 		t.Run("when the sandbox strips inherited env files", func(t *testing.T) {
@@ -67,9 +67,9 @@ func TestStripInheritedEnvFilesRemovesUntrackedSecretsAndKeepsTheReposOwn(t *tes
 			}
 
 			for _, gone := range []string{
-				filepath.Join("langwatch", ".env"),
-				filepath.Join("langwatch", ".env.portless"),
-				filepath.Join("python-sdk", ".env"),
+				filepath.Join("platform", "app", ".env"),
+				filepath.Join("platform", "app", ".env.portless"),
+				filepath.Join("sdks", "python", ".env"),
 				".env",
 			} {
 				if _, err := os.Stat(filepath.Join(checkout, gone)); !os.IsNotExist(err) {
@@ -79,7 +79,7 @@ func TestStripInheritedEnvFilesRemovesUntrackedSecretsAndKeepsTheReposOwn(t *tes
 
 			// Tracked files are the repo's own content, not the developer's: removing
 			// them would dirty the checkout and change what the PR's code sees.
-			if _, err := os.Stat(filepath.Join(checkout, "langwatch", ".env.example")); err != nil {
+			if _, err := os.Stat(filepath.Join(checkout, "platform", "app", ".env.example")); err != nil {
 				t.Errorf("tracked .env.example was removed: %v", err)
 			}
 		})

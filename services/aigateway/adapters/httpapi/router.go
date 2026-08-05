@@ -149,7 +149,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// secret (`LW_GATEWAY_INTERNAL_SECRET`). Currently used by the
 	// LangWatch governance ingestion pipeline to validate and execute
 	// OTTL statements over inbound OTLP payloads. See
-	// `langwatch/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
+	// `platform/app/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
 	// for the matching client.
 	if deps.OTTLServer != nil {
 		r.Route("/internal", func(in chi.Router) {
@@ -962,6 +962,9 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 	if meta.CacheMode != "" {
 		h.Set("X-LangWatch-Cache-Mode", meta.CacheMode)
 	}
+	if len(meta.ParamsDropped) > 0 {
+		h.Set("X-LangWatch-Params-Dropped", strings.Join(meta.ParamsDropped, ","))
+	}
 	if meta.CustomerTraceparent != "" {
 		h.Set("Traceparent", meta.CustomerTraceparent)
 	}
@@ -1175,6 +1178,8 @@ func registerErrorStatuses() {
 	}
 	errorsRegistered = true
 	herr.RegisterStatus(domain.ErrInvalidAPIKey, http.StatusUnauthorized)
+	herr.RegisterStatus(domain.ErrKeyRevoked, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrKeyDisabled, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrRateLimited, http.StatusTooManyRequests)
 	herr.RegisterStatus(domain.ErrBudgetExceeded, http.StatusPaymentRequired)
 	herr.RegisterStatus(domain.ErrGuardrailBlocked, http.StatusForbidden)
@@ -1184,6 +1189,12 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
+	// Fail-closed attribution: the request is missing a required field
+	// (the end-user id) while a per-end-user template is active. A
+	// request-shape error like the two around it, so 400 per the house
+	// table; unregistered it fell to 500 and read as a platform bug.
+	herr.RegisterStatus(domain.ErrEndUserRequired, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrUnsupportedParameter, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(domain.ErrChainExhausted, http.StatusBadGateway)
 	// 503, not 500: an open breaker is the gateway declining to hit an
