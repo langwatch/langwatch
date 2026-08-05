@@ -1,7 +1,10 @@
 import { getApp } from "~/server/app-layer/app";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import {
+  type ClickHouseClientResolver,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
 import { createS3Client } from "~/server/storage";
 import type { BlobResolutionDeps } from "./trace.service";
 
@@ -39,10 +42,18 @@ export function buildTraceBlobResolutionDeps(overrides?: {
   clickhouseEnabled?: boolean;
   resolveClickHouseClient?: ClickHouseClientResolver;
 }): BlobResolutionDeps {
+  // Deferred to the first actual resolution, not read while the deps are being
+  // built. Routers construct these per request, including on paths that never
+  // resolve a blob, so reading the App here made merely *assembling* the deps
+  // require an initialised App - which turned every such route into a 500
+  // wherever one is not (unit tests, and any caller that builds deps before
+  // boot completes). The App is still the single source of the resolver; it is
+  // just consulted when the resolver is used.
+  const resolveClickHouseClient: ClickHouseClientResolver =
+    overrides?.resolveClickHouseClient ??
+    ((tenantId) => getApp().clickhouse.resolveClient(tenantId));
   const clickhouseEnabled =
-    overrides?.clickhouseEnabled ?? getApp().clickhouse.enabled;
-  const resolveClickHouseClient =
-    overrides?.resolveClickHouseClient ?? getApp().clickhouse.resolveClient;
+    overrides?.clickhouseEnabled ?? isClickHouseEnabled();
 
   return {
     blobStore: new BlobStore(
