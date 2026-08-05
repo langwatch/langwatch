@@ -59,7 +59,7 @@ export interface EventStoreReadContext<_EventType extends Event = Event> {
    * commit must EXTEND the applied-event-id set rather than replace it, or the
    * earlier sub-batches' ids are erased and a retry re-applies them (#6578).
    */
-  deliveryContinuation?: boolean;
+  isDeliveryContinuation?: boolean;
 }
 
 /**

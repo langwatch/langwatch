@@ -908,11 +908,15 @@ describe.skipIf(!hasTestcontainers)(
           );
           await queue.waitUntilReady();
 
+          // Future-dated so all eight are staged before any is due — staging
+          // races the dispatcher, and a partial root softens the exact descent
+          // this test asserts.
+          const dueAt = Date.now() + 2500;
           await queue.sendBatch(
             Array.from({ length: 8 }, (_, i) => ({
               id: `j${i}`,
               groupId: "group-a",
-              value: String(i),
+              value: String((dueAt + i) / 1000),
             })),
           );
 
@@ -976,11 +980,15 @@ describe.skipIf(!hasTestcontainers)(
           );
           await queue.waitUntilReady();
 
+          // Future-dated so all eight are staged before any is due — staging
+          // races the dispatcher, and a partial root softens the exact descent
+          // this test asserts.
+          const dueAt = Date.now() + 2500;
           await queue.sendBatch(
             Array.from({ length: 8 }, (_, i) => ({
               id: `j${i}`,
               groupId: "group-a",
-              value: String(i),
+              value: String((dueAt + i) / 1000),
             })),
           );
 
@@ -997,10 +1005,13 @@ describe.skipIf(!hasTestcontainers)(
           // every sub-batch a split produces must still be ascending and
           // contiguous — never a reshuffle or an interleave.
           for (const batch of attempted) {
-            const values = batch.map((p) => Number(p.value));
-            expect(values).toEqual([...values].sort((a, b) => a - b));
-            for (let i = 1; i < values.length; i++) {
-              expect(values[i]! - values[i - 1]!).toBe(1);
+            // Contiguity in the ORIGINAL arrival sequence: ids are j0..j7, so
+            // a sub-batch must be a run of consecutive indices — a reshuffle
+            // or an interleave breaks either the ordering or the step.
+            const indices = batch.map((p) => Number(p.id.slice(1)));
+            expect(indices).toEqual([...indices].sort((a, b) => a - b));
+            for (let i = 1; i < indices.length; i++) {
+              expect(indices[i]! - indices[i - 1]!).toBe(1);
             }
           }
         });
@@ -1044,11 +1055,15 @@ describe.skipIf(!hasTestcontainers)(
           );
           await queue.waitUntilReady();
 
+          // Future-dated so all eight are staged before any is due — staging
+          // races the dispatcher, and a partial root softens the exact descent
+          // this test asserts.
+          const dueAt = Date.now() + 2500;
           await queue.sendBatch(
             Array.from({ length: 8 }, (_, i) => ({
               id: `j${i}`,
               groupId: "group-a",
-              value: String(i),
+              value: String((dueAt + i) / 1000),
             })),
           );
 
@@ -1095,11 +1110,15 @@ describe.skipIf(!hasTestcontainers)(
           });
           await queue.waitUntilReady();
 
+          // Future-dated so all eight are staged before any is due — staging
+          // races the dispatcher, and a partial root softens the exact descent
+          // this test asserts.
+          const dueAt = Date.now() + 2500;
           await queue.sendBatch(
             Array.from({ length: 8 }, (_, i) => ({
               id: `j${i}`,
               groupId: "group-a",
-              value: String(i),
+              value: String((dueAt + i) / 1000),
             })),
           );
 

@@ -287,7 +287,7 @@ export class FoldProjectionExecutor {
     //   the rest of the chain, so a redelivery after a failed later sub-batch
     //   would double-apply the committed prefix (#6578).
     const isRetry = (context.deliveryAttempt ?? 1) > 1;
-    return isRetry || context.deliveryContinuation
+    return isRetry || context.isDeliveryContinuation
       ? mergeAppliedEventIds({ previous: loadedAppliedIds, applied: freshIds })
       : [...freshIds];
   }

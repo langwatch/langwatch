@@ -29,7 +29,7 @@ import { ProjectionRouter } from "../projectionRouter";
 
 describe("continuation forwarding", () => {
   describe("when the queue manager's registry entry receives a batch delivery", () => {
-    it("stamps deliveryAttempt and deliveryContinuation on the read context", async () => {
+    it("stamps deliveryAttempt and isDeliveryContinuation on the read context", async () => {
       const registry = new Map<
         string,
         {
@@ -63,12 +63,12 @@ describe("continuation forwarding", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         createTestTenantId(),
       );
-      const delivery: JobDelivery = { attempt: 2, continuation: true };
+      const delivery: JobDelivery = { attempt: 2, isContinuation: true };
       await entry.processBatch!([event], delivery);
 
       expect(seenContexts[0]).toMatchObject({
         deliveryAttempt: 2,
-        deliveryContinuation: true,
+        isDeliveryContinuation: true,
       });
     });
   });
@@ -131,7 +131,7 @@ describe("continuation forwarding", () => {
       // Continuation: the commit must carry the loaded ids AND the new ones.
       await onEventBatch("continuation-fold", makeEvents(["new-1", "new-2"]), {
         tenantId,
-        deliveryContinuation: true,
+        isDeliveryContinuation: true,
       });
       expect(stored[0]?.appliedEventIds).toEqual(
         expect.arrayContaining(["prev-1", "prev-2", "new-1", "new-2"]),

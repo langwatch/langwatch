@@ -108,7 +108,7 @@ export interface JobDelivery {
    * sub-batch's ids, and replacing would erase the ids the earlier commits
    * recorded, letting a retry re-apply them (#6578).
    */
-  continuation?: boolean;
+  isContinuation?: boolean;
 }
 
 /**

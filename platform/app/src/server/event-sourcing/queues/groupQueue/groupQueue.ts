@@ -111,7 +111,7 @@ export const MAX_BISECTION_SPLITS_PER_DISPATCH = 32;
 /** Mutable state shared across one dispatch's bisection descent. */
 interface BisectionDispatchState {
   /** True once any sub-batch of this dispatch committed successfully. */
-  committed: boolean;
+  hasCommitted: boolean;
   /** Splits performed so far — compared against the budget above. */
   splits: number;
 }
@@ -1009,7 +1009,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const maxBatch = this.coalesceMaxBatch?.(payload) ?? 1;
     let batchPayloads: Payload[] | null = null;
     // Staged-job id per batch member, index-aligned with batchPayloads, so a
-    // bisected failure can name the payload it narrowed to.
+    // bisected failure can name the payload it isNarrowed to.
     let batchJobIds: string[] = [];
     let drainedSiblings: DrainedJob[] = [];
     if (maxBatch > 1 && this.processBatch) {
@@ -1829,7 +1829,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * Re-running a payload that already applied is safe — fold redelivery is
    * idempotent via the store's applied-event-id set (#6016) — but ONLY because
    * every sub-batch call after the first successful commit carries
-   * `delivery.continuation`, which tells the fold commit to EXTEND that set
+   * `delivery.isContinuation`, which tells the fold commit to EXTEND that set
    * rather than replace it. Without the flag, each sub-batch commit would erase
    * the ids the earlier sub-batches recorded, and a retry after a failed later
    * sub-batch would re-apply the committed prefix (#6578).
@@ -1851,8 +1851,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     attempt,
     routingLabels,
     span,
-    narrowed = false,
-    dispatch = { committed: false, splits: 0 },
+    isNarrowed = false,
+    dispatch = { hasCommitted: false, splits: 0 },
   }: {
     /**
      * Payloads paired with the staged job each came from, so a failure that
@@ -1866,10 +1866,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     routingLabels: Record<string, string>;
     span: Span;
     /** True in a recursive call — i.e. this batch is the product of a split. */
-    narrowed?: boolean;
+    isNarrowed?: boolean;
     /**
      * State shared across the whole descent of ONE dispatch, deliberately
-     * mutable: `committed` flips once the first sub-batch commits (every later
+     * mutable: `hasCommitted` flips once the first sub-batch commits (every later
      * call is a continuation and must carry the flag — see JobDelivery), and
      * `splits` is the call budget that bounds work under the group lock.
      */
@@ -1882,16 +1882,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     try {
       await this.processBatch(
         entries.map((entry) => entry.payload),
-        { attempt, ...(dispatch.committed ? { continuation: true } : {}) },
+        { attempt, ...(dispatch.hasCommitted ? { isContinuation: true } : {}) },
       );
-      dispatch.committed = true;
+      dispatch.hasCommitted = true;
     } catch (err) {
       await this.splitFailedBatch({
         entries,
         attempt,
         routingLabels,
         span,
-        narrowed,
+        isNarrowed,
         dispatch,
         err,
       });
@@ -1911,7 +1911,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     attempt,
     routingLabels,
     span,
-    narrowed,
+    isNarrowed,
     dispatch,
     err,
   }: {
@@ -1919,7 +1919,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     attempt: number;
     routingLabels: Record<string, string>;
     span: Span;
-    narrowed: boolean;
+    isNarrowed: boolean;
     dispatch: BisectionDispatchState;
     err: unknown;
   }): Promise<void> {
@@ -1933,7 +1933,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // Smallest attributable unit — report it, then let the existing retry
       // and quarantine path take over.
       this.reportBisectedIsolate({
-        entry: narrowed ? entries[0] : undefined,
+        entry: isNarrowed ? entries[0] : undefined,
         attempt,
         span,
         err,
@@ -1992,7 +1992,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       attempt,
       routingLabels,
       span,
-      narrowed: true,
+      isNarrowed: true,
       dispatch,
     });
     await this.processBatchBisecting({
@@ -2000,13 +2000,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       attempt,
       routingLabels,
       span,
-      narrowed: true,
+      isNarrowed: true,
       dispatch,
     });
   }
 
   /**
-   * Names the payload a bisection narrowed to, so the offender is attributable
+   * Names the payload a bisection isNarrowed to, so the offender is attributable
    * rather than "something in that batch".
    *
    * `entry` is undefined when the failing batch of one was never split — an
@@ -2032,7 +2032,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         attempt,
         error: err instanceof Error ? err : new Error(String(err)),
       },
-      "Coalesced batch narrowed to a single failing payload; this staged job is the offender",
+      "Coalesced batch isNarrowed to a single failing payload; this staged job is the offender",
     );
     span.setAttribute("queue.batch_offending_job_id", entry.stagedJobId);
   }

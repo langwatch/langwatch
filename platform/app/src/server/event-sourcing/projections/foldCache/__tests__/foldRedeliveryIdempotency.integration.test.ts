@@ -273,7 +273,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
         {
           ...context,
           deliveryAttempt: delivery?.attempt,
-          deliveryContinuation: delivery?.continuation,
+          isDeliveryContinuation: delivery?.isContinuation,
         },
       );
       if (failuresLeft > 0) {
@@ -822,7 +822,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
         // The mechanism, not just the outcome: the leaf that committed after
         // the first successful leaf carried the continuation flag.
         expect(
-          deliveries.some((delivery) => delivery.continuation === true),
+          deliveries.some((delivery) => delivery.isContinuation === true),
         ).toBe(true);
       }, 40_000);
     });

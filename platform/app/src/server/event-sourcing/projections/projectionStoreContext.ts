@@ -102,5 +102,5 @@ export interface ProjectionStoreContext {
    * dispatch whose earlier sub-batch already committed (batch bisection). The
    * applied-event-id set must be extended, not replaced (#6578).
    */
-  deliveryContinuation?: boolean;
+  isDeliveryContinuation?: boolean;
 }

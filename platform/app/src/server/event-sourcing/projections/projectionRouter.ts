@@ -668,8 +668,8 @@ export class ProjectionRouter<
           // fold commit must extend the applied-id set, not replace it
           // (#6578). Dropping this here silently re-enables the double-apply
           // this chain exists to prevent.
-          ...(context.deliveryContinuation !== undefined
-            ? { deliveryContinuation: context.deliveryContinuation }
+          ...(context.isDeliveryContinuation !== undefined
+            ? { isDeliveryContinuation: context.isDeliveryContinuation }
             : {}),
         });
       },
@@ -1822,7 +1822,7 @@ export class ProjectionRouter<
           event: first,
           key,
           deliveryAttempt: context.deliveryAttempt,
-          deliveryContinuation: context.deliveryContinuation,
+          isDeliveryContinuation: context.isDeliveryContinuation,
         });
 
         const foldState = await withMetrics({
@@ -2290,12 +2290,12 @@ export class ProjectionRouter<
     event,
     key,
     deliveryAttempt,
-    deliveryContinuation,
+    isDeliveryContinuation,
   }: {
     event: EventType;
     key?: string;
     deliveryAttempt?: number;
-    deliveryContinuation?: boolean;
+    isDeliveryContinuation?: boolean;
   }): Promise<ProjectionStoreContext> {
     const retentionPolicy = await this.resolveRetention(event.tenantId);
     return {
@@ -2303,7 +2303,9 @@ export class ProjectionRouter<
       tenantId: event.tenantId,
       ...(key !== undefined ? { key } : {}),
       ...(deliveryAttempt !== undefined ? { deliveryAttempt } : {}),
-      ...(deliveryContinuation !== undefined ? { deliveryContinuation } : {}),
+      ...(isDeliveryContinuation !== undefined
+        ? { isDeliveryContinuation }
+        : {}),
       retentionPolicy,
     };
   }

@@ -90,12 +90,12 @@ describe("the shared queue's handler wrappers", () => {
           { ...ROUTING, value: "a" },
           { ...ROUTING, value: "b" },
         ],
-        { attempt: 2, continuation: true },
+        { attempt: 2, isContinuation: true },
       );
 
       expect(entry.processBatch).toHaveBeenCalledWith(
         [{ value: "a" }, { value: "b" }],
-        { attempt: 2, continuation: true },
+        { attempt: 2, isContinuation: true },
       );
       await eventSourcing.close();
     });
