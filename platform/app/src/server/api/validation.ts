@@ -327,10 +327,13 @@ export const validator = build as unknown as typeof openApiValidator;
  * offending fields. Both are the shapes `validator` produces, so a caller
  * cannot tell which ordering answered it.
  */
-export async function validateJsonBody<S extends ZodSchema>(
-  c: { req: { text: () => Promise<string> } },
-  schema: S,
-): Promise<S["_output"]> {
+export async function validateJsonBody<S extends ZodSchema>({
+  c,
+  schema,
+}: {
+  c: { req: { text: () => Promise<string> } };
+  schema: S;
+}): Promise<S["_output"]> {
   const raw = await c.req.text();
   let parsed: unknown;
   try {

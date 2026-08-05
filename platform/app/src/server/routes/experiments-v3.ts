@@ -624,7 +624,10 @@ secured.access(apiKeyAuthWrite).post("/:slug/comparison", async (c) => {
   }
   const workbenchState = parseResult.data;
 
-  const body = await validateJsonBody(c, attachComparisonBodySchema);
+  const body = await validateJsonBody({
+    c,
+    schema: attachComparisonBodySchema,
+  });
 
   try {
     const { targets, comparisonTargetId, createdTargetIds, reusedTargetIds } =

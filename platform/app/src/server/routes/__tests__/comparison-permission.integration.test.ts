@@ -37,10 +37,12 @@ describe("POST /api/experiments/:slug/comparison permission enforcement", () => 
   let request: (path: string, init?: RequestInit) => Promise<Response>;
 
   beforeAll(async () => {
-    const { createApiRouter } = await import("~/server/api-router");
-    const router = createApiRouter();
+    // Only the experiments family, not the composed router. This asserts one
+    // route's behaviour, and pulling in every other family costs minutes of
+    // transform for modules nothing here touches.
+    const { app } = await import("~/server/routes/experiments-v3");
     request = async (path, init) =>
-      await router.fetch(new Request(`http://localhost${path}`, init));
+      await app.fetch(new Request(`http://localhost${path}`, init));
 
     const project = await getTestProject("comparison-permission");
     projectId = project.id;
