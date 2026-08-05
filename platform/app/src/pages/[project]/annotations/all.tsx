@@ -1,0 +1,213 @@
+import { Button, Container, Heading, HStack, Spacer } from "@chakra-ui/react";
+import type { Annotation } from "@prisma/client";
+import Parse from "papaparse";
+import { Download } from "react-feather";
+import AnnotationsLayout from "~/components/AnnotationsLayout";
+import {
+  AnnotationsTable,
+  type AnnotationWithUser,
+} from "~/components/annotations/AnnotationsTable";
+import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
+import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
+import { useFilterParams } from "~/hooks/useFilterParams";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { Trace } from "~/server/tracer/types";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
+
+export default function Annotations() {
+  const { project } = useOrganizationTeamProject();
+  const router = useRouter();
+  const { filterParams, queryOpts, nonEmptyFilters } = useFilterParams();
+
+  const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
+  const traceGroups = api.traces.getAllForProject.useQuery(
+    {
+      ...filterParams,
+      query: getSingleQueryParam(router.query.query),
+      groupBy: "none",
+      pageOffset: 0,
+      pageSize: 10000,
+      sortBy: getSingleQueryParam(router.query.sortBy),
+      sortDirection: getSingleQueryParam(router.query.orderBy),
+    },
+    queryOpts,
+  );
+
+  const {
+    period: { startDate, endDate },
+    mode,
+    setPeriod,
+    setRelativePeriod,
+  } = usePeriodSelector();
+
+  // Both queries are declared unconditionally (rules of hooks) and gated
+  // via `enabled` on the active mode. `getByTraceIds` is chunked so a
+  // fully-filtered project with thousands of matching traces doesn't blow
+  // past the GET URL ceiling tRPC batches into.
+  const filteredTraceIds =
+    traceGroups.data?.groups.flatMap((group) =>
+      group.map((trace) => trace.trace_id),
+    ) ?? [];
+
+  const filteredAnnotations = useAnnotationsByTraceIds({
+    projectId: project?.id ?? "",
+    traceIds: filteredTraceIds,
+    enabled: hasAnyFilters && project?.id !== undefined,
+  });
+
+  const allAnnotations = api.annotation.getAll.useQuery(
+    { projectId: project?.id ?? "", startDate, endDate },
+    { enabled: !hasAnyFilters && !!project },
+  );
+
+  const annotations = hasAnyFilters ? filteredAnnotations : allAnnotations;
+  // In filtered mode the ids come from `traceGroups`, so its load must count
+  // toward the table's loading state — otherwise the table flashes an empty
+  // state before the ids (and then the annotations) arrive.
+  const annotationsLoading = hasAnyFilters
+    ? traceGroups.isLoading || filteredAnnotations.isLoading
+    : allAnnotations.isLoading;
+
+  const traceIds = annotations.data?.map((annotation) => annotation.traceId);
+
+  const traces = api.traces.getTracesWithSpans.useQuery(
+    {
+      projectId: project?.id ?? "",
+      traceIds: traceIds ?? [],
+    },
+    {
+      enabled: !!project?.id,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  type GroupedAnnotation = {
+    traceId: string;
+    trace?: Trace;
+    annotations: AnnotationWithUser[];
+  };
+
+  const groupByTraceId = (dataArray: Annotation[]): GroupedAnnotation[] => {
+    const grouped = dataArray.reduce(
+      (acc: Record<string, GroupedAnnotation>, item) => {
+        if (!acc[item.traceId]) {
+          acc[item.traceId] = {
+            traceId: item.traceId,
+            annotations: [],
+            trace: traces.data?.find(
+              (trace) => trace.trace_id === item.traceId,
+            ),
+          };
+        }
+
+        // Create a proper AnnotationWithUser object that includes all original annotation fields
+        const annotationWithUser: AnnotationWithUser = {
+          ...item, // Include all original annotation fields
+          user: (item as any).user, // Include the user data from the query
+        };
+
+        const groupedAnnotation = acc[item.traceId];
+        if (groupedAnnotation) {
+          groupedAnnotation.annotations.push(annotationWithUser);
+        }
+
+        return acc;
+      },
+      {},
+    );
+
+    return Object.values(grouped);
+  };
+
+  const groupedAnnotations = groupByTraceId(annotations.data ?? []);
+
+  const downloadCSV = () => {
+    const fields = [
+      "User",
+      "Input",
+      "Output",
+      "Expected Output",
+      "Comment",
+      "Trace ID",
+      "Rating",
+      "Scoring",
+      "Created At",
+    ];
+
+    const csv =
+      annotations?.data?.map((annotation) => {
+        const trace = traces.data?.find(
+          (trace) => trace.trace_id === annotation.traceId,
+        );
+
+        return [
+          annotation.user?.name ?? "",
+          trace?.input?.value ?? "",
+          trace?.output?.value ?? "",
+          annotation.expectedOutput ?? "",
+          annotation.comment ?? "",
+          annotation.traceId ?? "",
+          annotation.isThumbsUp ? "Thumbs Up" : "Thumbs Down",
+          JSON.stringify(annotation.scoreOptions ?? {}),
+          annotation.createdAt?.toLocaleString() ?? "",
+        ];
+      }) ?? [];
+
+    const csvBlob = Parse.unparse({
+      fields: fields,
+      data: csv,
+    });
+
+    const url = window.URL.createObjectURL(new Blob([csvBlob]));
+
+    const link = document.createElement("a");
+    link.href = url;
+    const today = new Date();
+    const formattedDate = today.toISOString().split("T")[0];
+    const fileName = `Traces - ${formattedDate}.csv`;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const tableHeader = (
+    <HStack width="full" align="top">
+      <Heading as={"h1"} size="lg" paddingTop={1}>
+        All Annotations
+      </Heading>
+      <Spacer />
+      <Button
+        minWidth="fit-content"
+        variant="ghost"
+        onClick={() => downloadCSV()}
+      >
+        Export all <Download style={{ marginLeft: "8px" }} />
+      </Button>
+      <PeriodSelector
+        period={{ startDate, endDate }}
+        mode={mode}
+        setPeriod={setPeriod}
+        setRelativePeriod={setRelativePeriod}
+      />
+    </HStack>
+  );
+
+  return (
+    <AnnotationsLayout>
+      <Container maxW={"calc(100vw - 330px)"} padding={0} margin={0}>
+        <AnnotationsTable
+          groupedAnnotations={groupedAnnotations}
+          allAnnotationsLoading={annotationsLoading || traces.isLoading}
+          heading="Annotations"
+          isDone={true}
+          tableHeader={tableHeader}
+          noDataTitle="No recent annotations yet, change the date range to see more or annotate your messages"
+          noDataDescription="Annotate your messages to add more context and improve your analysis."
+        />
+      </Container>
+    </AnnotationsLayout>
+  );
+}

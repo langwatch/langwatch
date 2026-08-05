@@ -34,7 +34,7 @@ This is parity with `make dev-full` from the dev tree, but for an end-user, **wi
 | BDD specs                      | `/specs/npx-installer/`                     |
 | CI workflows                   | `/.github/workflows/npx-server-*.yml`       |
 
-Existing `langwatch` (next.js app) becomes a workspace dep of `@langwatch/server`.
+The app — `@langwatch/web` since ADR-076, a Vite app in `langwatch/` — ships inside `@langwatch/server`'s tarball under `app/`, one workspace with the CLI.
 
 ---
 
@@ -209,14 +209,16 @@ type RuntimeEvent =
   | { type: "starting"; service: string }
   | { type: "healthy"; service: string; durationMs: number }
   | { type: "log"; service: string; stream: "stdout" | "stderr"; line: string }
-  | { type: "crashed"; service: string; code: number };
+  | { type: "restarting"; service: string; code: number; attempt: number; maxAttempts: number; delayMs: number }
+  | { type: "crashed"; service: string; code: number }
+  | { type: "stopped"; service: string };
 ```
 
 The CLI consumes events to render the listr2 status grid and tee log lines to TTY (prefixed + colored). No synchronous coupling between runtime and CLI animation.
 
 `Ctrl+C` triggers `stopAll(handles)`: SIGTERM each handle in reverse start order, 10s grace, then SIGKILL. `~/.langwatch/run/<service>.pid` files are removed on clean exit. The supervisor pidfile (`~/.langwatch/run/langwatch.pid`) doubles as a re-entry guard — second concurrent `npx @langwatch/server` invocations refuse to start with a clear "already running" error.
 
-Crash policy: any non-langwatch service crash emits `{ type: "crashed", code }` and the CLI calls `stopAll(handles)` followed by exit 1. The langwatch app (in-proc workers) is allowed up to 3 restarts in 60s before the same fate.
+Crash policy: a service that dies before its first `healthy` event is a boot failure and fails fast: `{ type: "crashed", code }` is emitted with no retry and the boot error path takes it from there. A service that dies after having been healthy is restarted in place, up to 3 attempts with 1s / 5s / 15s backoff, each announced as `{ type: "restarting", attempt }` on the bus and as a `[supervisor]` line in the service's log file. Staying up for 5 minutes resets the budget. When the budget is exhausted the crash falls through to `{ type: "crashed", code }`, the CLI prints the log-file pointer, calls `stopAll(handles)` and exits 1.
 
 ---
 
@@ -283,7 +285,7 @@ Auto-open browser on macOS (`open`) and Linux (`xdg-open`). Skip if `--no-open` 
 Triggers:
 - `workflow_dispatch` (manual)
 - `schedule: '0 4 * * *'` (nightly 04:00 UTC)
-- `push` paths: `package.json`, `pnpm-workspace.yaml`, `packages/server/**`, `langwatch_nlp/pyproject.toml`, `langevals/**/pyproject.toml`, `services/aigateway/**`, `langwatch/package.json`, `langwatch/scripts/**`
+- `push` paths: `package.json`, `pnpm-workspace.yaml`, `packages/server/**`, `langwatch_nlp/pyproject.toml`, `services/langevals/**/pyproject.toml`, `services/aigateway/**`, `platform/app/package.json`, `platform/app/scripts/**`
 
 Matrix:
 - `macos-latest` (arm64)
@@ -321,7 +323,7 @@ Steps:
 3. `pnpm --filter @langwatch/server build` (which builds langwatch app + monobinary references)
 4. `pnpm --filter @langwatch/server publish --access public --no-git-checks`
 
-Version is read from `langwatch/package.json`. The `@langwatch/server` package version is **always equal** to the langwatch app version. A pre-publish step asserts both versions match the GH release tag, fails fast if not.
+Version is read from `platform/app/package.json`. The `@langwatch/server` package version is **always equal** to the langwatch app version. A pre-publish step asserts both versions match the GH release tag, fails fast if not.
 
 ---
 
@@ -336,14 +338,17 @@ Version is read from `langwatch/package.json`. The `@langwatch/server` package v
 | `/.github/workflows/langwatch-server-publish.yml`     | replaced by `npx-server-publish.yml`                |
 | `Makefile` targets `python-build`, `python-install`, `start` | uv/pip flow gone; `start` redundant with new CLI |
 
-**Keep** `.python-version` (used by langwatch_nlp + langevals).
+**Keep** the `.python-version` pin (used by the Python projects). It now lives in each
+one — `sdks/python/`, `services/langevals/`, `mcp/typescript/` — rather than at the repo
+root, because `uv` resolves it by walking up from its working directory and the repo root
+holds no Python of its own.
 
 ---
 
 ## 12. Open questions
 
-- [x] Postgres in or out of pre-deps? **In** — Prisma needs it, helm chart has it, compose.dev.yml has it.
-- [ ] Quickwit/Elasticsearch? Currently not in compose.dev.yml — test if app boots without it. If yes, skip; if no, add as a fifth predep or shim with a no-op.
+- [x] Postgres in or out of pre-deps? **In** — Prisma needs it, helm chart has it, dev/compose.dev.yml has it.
+- [ ] Quickwit/Elasticsearch? Currently not in dev/compose.dev.yml — test if app boots without it. If yes, skip; if no, add as a fifth predep or shim with a no-op.
 - [ ] Should we ship the langwatch next.js app **prebuilt** in the npm tarball, or build on first run? Prebuilt = faster first-run, larger tarball. **Recommend prebuilt** (build at publish, not at install).
 - [ ] When the user has an `OPENAI_API_KEY` in env, should the CLI propagate it into `~/.langwatch/langwatch.env`? **Yes**, but read-only — don't persist user secrets to disk.
 

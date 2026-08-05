@@ -102,4 +102,4 @@ Queue names now include braces in logs, metrics, and span attributes (`{collecto
 - Redis Cluster hash tags: https://redis.io/docs/reference/cluster-spec/#hash-tags
 - BullMQ Redis Cluster guide: https://docs.bullmq.io/guide/going-to-production#redis-cluster
 - GitHub issue: https://github.com/langwatch/langwatch/issues/1419
-- Migration script: `langwatch/scripts/migrate-queue-names.ts`
+- Migration script: `platform/app/scripts/migrate-queue-names.ts`

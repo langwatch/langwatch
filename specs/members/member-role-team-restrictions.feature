@@ -6,7 +6,7 @@ Feature: Member Role Team Restrictions
 
   # The role-validation + auto-correction logic is bound below to
   # the unit tests in
-  # `langwatch/src/utils/__tests__/memberRoleConstraints.unit.test.ts`
+  # `platform/app/src/utils/__tests__/memberRoleConstraints.unit.test.ts`
   # and `computeEffectiveTeamRoleUpdates.unit.test.ts`. Remaining
   # `@unimplemented` scenarios describe UI dropdown behaviour ("only
   # see Viewer in dropdown", "team role updates render in form",

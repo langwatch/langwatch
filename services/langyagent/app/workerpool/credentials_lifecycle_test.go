@@ -18,19 +18,21 @@ import (
 // path does — capabilitiesFor → app.SignatureKeys → domain.SignatureOf — so tests
 // exercise the real composition rather than a hand-spelled copy that could drift.
 func sigOf(creds domain.Credentials) domain.CredentialSignature {
-	return domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)))
+	return domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier)
 }
 
 type recordingRevoker struct {
-	mu    sync.Mutex
-	calls []string // apiKeyIDs
-	err   error
+	mu       sync.Mutex
+	calls    []string // apiKeyIDs
+	projects []string // projectIDs, parallel to calls
+	err      error
 }
 
-func (r *recordingRevoker) Revoke(_ context.Context, _ string, apiKeyID string) error {
+func (r *recordingRevoker) Revoke(_ context.Context, _ string, projectID, apiKeyID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, apiKeyID)
+	r.projects = append(r.projects, projectID)
 	return r.err
 }
 

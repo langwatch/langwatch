@@ -102,7 +102,9 @@ const (
 // once when the router is built (mirrors aigateway's registerErrorStatuses).
 func RegisterStatuses() {
 	herr.RegisterStatus(ErrUnauthorized, http.StatusUnauthorized)
-	herr.RegisterStatus(ErrInvalidConversationID, http.StatusBadRequest)
+	// Validation of a parsed value — 422, matching the shared decoder's
+	// unprocessable_entity posture (parse failures stay 400).
+	herr.RegisterStatus(ErrInvalidConversationID, http.StatusUnprocessableEntity)
 	herr.RegisterStatus(ErrConversationBusy, http.StatusConflict)
 	herr.RegisterStatus(ErrCredentialsRequired, http.StatusPreconditionRequired)
 	herr.RegisterStatus(ErrMaxWorkers, http.StatusServiceUnavailable)

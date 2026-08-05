@@ -66,7 +66,13 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 }
 
 func (s *Server) start(ctx context.Context) error {
-	if exec.CommandContext(ctx, "brew", "list", "--formula", s.formula).Run() != nil {
+	if err := exec.CommandContext(ctx, "brew", "list", "--formula", s.formula).Run(); err != nil {
+		// A cancelled context kills the probe too, so a failed `brew list`
+		// only means "not installed" when the context is still alive —
+		// otherwise the honest answer is that we never got to look.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return fmt.Errorf("could not check whether %s is installed: %w", s.formula, ctxErr)
+		}
 		return fmt.Errorf("%s is not installed — `brew install %s` (or set HAVEN_PG_FORMULA to a version you already have)", s.formula, s.formula)
 	}
 	if err := exec.CommandContext(ctx, "brew", "services", "start", s.formula).Run(); err != nil {

@@ -36,6 +36,7 @@ trace pipeline                         evaluation pipeline
                     recordTriggerMatch
                          │
                  trigger_match_recorded ─────► automationAudit map (ClickHouse)
+                         │                     (removed — see Amendment 2026-07)
                          │ GroupQueue, FIFO per trigger
                          ▼
                   triggerSettlement PM
@@ -85,9 +86,10 @@ key. Activity in a later window records a new event and re-arms the process.
 ### Dedicated automations pipeline
 
 The pipeline has aggregate type `trigger`, the `recordTriggerMatch` command,
-an ID-only `automationAudit` ClickHouse map projection, and both automation
-process managers. GroupQueue serializes commands and committed-event
-consumption by trigger, preserving FIFO end to end.
+an ID-only `automationAudit` ClickHouse map projection (since removed — see
+Amendment 2026-07), and both automation process managers. GroupQueue
+serializes commands and committed-event consumption by trigger, preserving
+FIFO end to end.
 
 Process managers subscribe by declaring `.on(EVENT_TYPE, handler)`. There is
 no feed, fact port, `.trigger()`, or cross-pipeline PM mount. The runtime
@@ -212,6 +214,22 @@ observability are outside this decision.
 - `ReactorOutbox` write amplification and heartbeat infrastructure disappear.
 - Wake polling can deliver a boundary a few seconds late, but cannot silently
   lose a committed promise.
+
+## Amendment: automationAudit projection removed (2026-07)
+
+The ID-only `automationAudit` ClickHouse map projection is gone. It stored
+nothing the substrate does not already persist — every trigger match is a
+committed `trigger_match_recorded` event in the event log, and its settlement
+lifecycle lives in the `triggerSettlement` process-manager state in Postgres —
+and no code path ever read the `automation_audit` table. Maintaining it was
+pure write overhead: as a `dedupeByIdempotencyKey` projection it also paid an
+event-history dedup scan on every flush.
+
+The projection, its append store, and `AutomationAuditRepository` are removed.
+The `automation_audit` table and migration 00048 stay in place for one release
+(expand/contract — the same cutover shape the run-aggregates ADR
+(`061-run-aggregates-are-queries.md`, proposed on PR #6051) uses for
+`suite_runs`); the drop migration follows separately.
 
 ## References
 

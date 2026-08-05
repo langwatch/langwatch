@@ -20,7 +20,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/langwatch/langwatch/sdk-go/prompts"
+	"github.com/langwatch/langwatch/sdks/go/prompts"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
@@ -311,7 +311,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentHTTP:
 		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentSignature:
-		return e.runSignature(ctx, req, node, inputs, ns)
+		return e.runSignature(ctx, node, inputs, ns)
 	case dsl.ComponentPromptingTechnique:
 		// Decorator: produces no outputs of its own; signature nodes
 		// reference it via a parameter and apply it at LLM-call time.
@@ -376,6 +376,57 @@ def execute(**inputs):
     return {"result": result}
 `
 
+// nodeErrorFromCodeBlock normalises a code-runner failure onto a NodeError code
+// the client knows.
+//
+// codeblock.Error.Type is an OPEN set: it is whatever Python exception class the
+// customer's code raised, plus the two types the runner synthesizes. Forwarding
+// it verbatim put a `ValueError` on the wire as if it were one of our codes, so
+// the client had no copy for it and fell through to a generic failure — and
+// nothing failed to compile, because a forwarded value is invisible to the code
+// generator. Every path here lands on a code that exists: the timeout has its
+// own, and everything else is the code runner reporting a failure, which is what
+// code_runner_error means. The Python class name is not lost — it leads the
+// message, where it belongs, rather than posing as a code.
+//
+// The two synthesized types are the codeblock package's own consts rather than
+// literals repeated here: the switch has no way to tell a renamed discriminant
+// from a customer exception, so a rename on the producing side used to send the
+// timeout down `default` and reclassify it as code_runner_error, with nothing
+// failing to compile and no test going red.
+func nodeErrorFromCodeBlock(err *codeblock.Error) *NodeError {
+	switch err.Type {
+	case codeblock.TimeoutType:
+		return &NodeError{
+			Type:      "code_block_timeout",
+			Message:   "the code block ran past its time limit and was stopped",
+			Traceback: err.Traceback,
+		}
+	case codeblock.RunnerErrorType:
+		return &NodeError{
+			Type:      "code_runner_error",
+			Message:   err.Message,
+			Traceback: err.Traceback,
+		}
+	default:
+		return &NodeError{
+			Type:      "code_runner_error",
+			Message:   codeBlockMessage(err),
+			Traceback: err.Traceback,
+		}
+	}
+}
+
+// codeBlockMessage leads with the Python exception class when the runner named
+// one, so the customer still reads "ValueError: ..." even though the code on the
+// wire is ours.
+func codeBlockMessage(err *codeblock.Error) string {
+	if err.Type == "" {
+		return err.Message
+	}
+	return err.Type + ": " + err.Message
+}
+
 func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
 	if e.code == nil {
 		return nil, &NodeError{Type: "code_runner_unavailable", Message: "no code runner configured"}
@@ -396,7 +447,7 @@ func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map
 	ns.Stdout = res.Stdout
 	ns.Stderr = res.Stderr
 	if res.Error != nil {
-		return nil, &NodeError{Type: res.Error.Type, Message: res.Error.Message, Traceback: res.Error.Traceback}
+		return nil, nodeErrorFromCodeBlock(res.Error)
 	}
 	result, ok := res.Outputs["result"].(bool)
 	if !ok {
@@ -460,7 +511,7 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 	ns.Stdout = res.Stdout
 	ns.Stderr = res.Stderr
 	if res.Error != nil {
-		return nil, &NodeError{Type: res.Error.Type, Message: res.Error.Message, Traceback: res.Error.Traceback}
+		return nil, nodeErrorFromCodeBlock(res.Error)
 	}
 	return res.Outputs, nil
 }
@@ -507,16 +558,25 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 	return out, nil
 }
 
-func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
 	if e.llm == nil {
 		return nil, &NodeError{Type: "llm_executor_unavailable", Message: "LLM executor not yet wired"}
 	}
-	llmCfg := resolveLLMConfig(node, execReq.Workflow)
-	model := ""
-	provider := ""
-	if llmCfg != nil && llmCfg.Model != nil {
-		model, provider = splitModel(*llmCfg.Model)
+	// Nodes own their LLM config (spec_version 1.5): there is no
+	// workflow-level default to fall back to. The app materializes a
+	// model on every llm parameter at save time and migrates legacy
+	// DSLs on read, so a missing model here is stale client state —
+	// fail with a clear, user-fixable error instead of dispatching an
+	// empty model for the gateway to 400 on.
+	llmCfg := paramLLMConfig(node.Data.Parameters)
+	if llmCfg == nil || llmCfg.Model == nil || *llmCfg.Model == "" {
+		return nil, &NodeError{
+			NodeID:  node.ID,
+			Type:    "llm_model_not_set",
+			Message: "LLM node has no model selected. Open the node and choose a model.",
+		}
 	}
+	model, provider := splitModel(*llmCfg.Model)
 	// Emit the PromptApiService.get + Prompt.compile span pair when this
 	// signature node is bound to a saved prompt config (configId set on
 	// the DSL). Both spans inherit ctx's current span as parent so they
@@ -842,7 +902,7 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 	}
 
 	// Evaluator slug lives on the typed `data.evaluator` field in the
-	// canonical Studio shape (langwatch/src/optimization_studio/types/
+	// canonical Studio shape (platform/app/src/optimization_studio/types/
 	// dsl.ts → `evaluator?: EvaluatorTypes | "custom/<id>" | "evaluators/<id>"`).
 	// Older workflows may have stuffed it into parameters[]; honor both
 	// so existing user workflows keep evaluating.
@@ -1488,27 +1548,6 @@ func paramLLMConfig(params []dsl.Field) *dsl.LLMConfig {
 			return nil
 		}
 		return &c
-	}
-	return nil
-}
-
-// resolveLLMConfig returns the effective LLM config for a signature
-// node, falling back to workflow.DefaultLLM when the node-level
-// `llm` parameter is missing, null, or carries no model. Mirrors
-// langwatch_nlp's `has_llm_node_using_default_llm` (regression
-// 6d3d8a823) — a workflow with a signature node relying on
-// default_llm pre-fix had its default_llm blanked before dispatch
-// because the previous `node.type == "llm"` check never matched
-// (signature nodes carry an `llm` parameter, not a node of type
-// "llm"). Without this fallback, dispatch would emit an empty model
-// and the gateway would 400.
-func resolveLLMConfig(node *dsl.Node, w *dsl.Workflow) *dsl.LLMConfig {
-	if cfg := paramLLMConfig(node.Data.Parameters); cfg != nil &&
-		cfg.Model != nil && *cfg.Model != "" {
-		return cfg
-	}
-	if w != nil {
-		return w.DefaultLLM
 	}
 	return nil
 }

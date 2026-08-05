@@ -1,3 +1,4 @@
+{{- if .Values.langwatch_nlp.enabled }}
 # Deployment for the LangWatch NLP service
 apiVersion: apps/v1
 kind: Deployment
@@ -43,10 +44,8 @@ spec:
       # The NLP service does not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
-      {{- with (coalesce .Values.langwatch_nlp.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.langwatch_nlp) | nindent 8 }}
 
       # Node selection - https://kubespec.dev/v1/Pod#spec.nodeSelector
       {{- with (coalesce .Values.langwatch_nlp.nodeSelector .Values.global.scheduling.nodeSelector)}}
@@ -72,10 +71,15 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # PriorityClass - https://kubespec.dev/v1/Pod#spec.priorityClassName
+      {{- with (coalesce .Values.langwatch_nlp.priorityClassName .Values.global.scheduling.priorityClassName)}}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
+      {{- with .Values.langwatch_nlp.extraInitContainers}}
       initContainers:
-        {{- with .Values.langwatch_nlp.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
 
       containers:
         {{- with .Values.langwatch_nlp.extraContainers}}
@@ -83,7 +87,7 @@ spec:
         {{- end }}
         - name: {{ .Release.Name }}-langwatch-nlp
           securityContext:
-            {{- toYaml (coalesce .Values.langwatch_nlp.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.langwatch_nlp) | nindent 12 }}
           image: "{{ .Values.images.langwatch_nlp.repository }}:{{ .Values.images.langwatch_nlp.tag }}"
           imagePullPolicy: "{{ .Values.images.langwatch_nlp.pullPolicy }}"
           ports:
@@ -152,6 +156,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.langwatch_nlp.scratchSizeLimit }}
         - name: log-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.langwatch_nlp.scratchSizeLimit }}
+{{- end }}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -55,6 +57,7 @@ func paramsWithBodies() domain.AITraceParams {
 		RequestType:        domain.RequestType("chat"),
 		VirtualKeyID:       "vk-1",
 		GatewayRequestID:   "req-1",
+		ModelProviderID:    "mp-1",
 		Usage: domain.Usage{
 			PromptTokens:     120,
 			CompletionTokens: 34,
@@ -71,7 +74,7 @@ func TestStampInternalGenAI_OmitsPromptAndCompletionContent(t *testing.T) {
 	span := stampedSpan(t, paramsWithBodies())
 
 	for _, kv := range span.Attributes() {
-		value := kv.Value.Emit()
+		value := kv.Value.String()
 		for _, secret := range []string{secretPrompt, secretCompletion, secretSystem} {
 			assert.NotContains(t, value, secret,
 				"attribute %q leaked message content onto the gateway's own span", kv.Key)
@@ -105,18 +108,19 @@ func TestStampInternalGenAI_KeepsOperationalMetadata(t *testing.T) {
 
 	got := make(map[string]string, len(span.Attributes()))
 	for _, kv := range span.Attributes() {
-		got[string(kv.Key)] = kv.Value.Emit()
+		got[string(kv.Key)] = kv.Value.String()
 	}
 
 	assert.Equal(t, "chat", got[AttrGenAIOperationName])
 	assert.Equal(t, "openai", got[AttrGenAISystem])
 	assert.Equal(t, "gpt-5-mini", got[AttrGenAIRequestModel])
 	assert.NotContains(t, got, AttrGenAIResponseModel)
-	assert.Equal(t, "120", got[AttrGenAIUsageIn])
+	assert.Equal(t, "120", got[customertracebridge.AttrGenAIUsageIn])
 	assert.Equal(t, "34", got[AttrGenAIUsageOut])
 	assert.Equal(t, "154", got[AttrGenAIUsageTotal])
-	assert.Equal(t, "vk-1", got[AttrVirtualKeyID])
-	assert.Equal(t, "req-1", got[AttrGatewayReqID])
+	assert.Equal(t, "vk-1", got[customertracebridge.AttrVirtualKeyID])
+	assert.Equal(t, "req-1", got[customertracebridge.AttrGatewayReqID])
+	assert.Equal(t, "mp-1", got[customertracebridge.AttrModelProviderID])
 }
 
 func TestStampInternalGenAI_OmitsUntrustedModelMetadata(t *testing.T) {
@@ -130,7 +134,7 @@ func TestStampInternalGenAI_OmitsUntrustedModelMetadata(t *testing.T) {
 
 	span := stampedSpan(t, params)
 	for _, kv := range span.Attributes() {
-		assert.NotContains(t, kv.Value.Emit(), secret,
+		assert.NotContains(t, kv.Value.String(), secret,
 			"attribute %q leaked a customer-controlled model value", kv.Key)
 	}
 }
@@ -144,7 +148,7 @@ func TestStampInternalGenAI_RecordsUpstreamFailure(t *testing.T) {
 
 	got := make(map[string]string, len(span.Attributes()))
 	for _, kv := range span.Attributes() {
-		got[string(kv.Key)] = kv.Value.Emit()
+		got[string(kv.Key)] = kv.Value.String()
 	}
 	assert.Equal(t, "provider_timeout", got[AttrErrorType])
 	assert.Equal(t, "504", got[AttrUpstreamStatusCode])
@@ -162,7 +166,7 @@ func TestStampInternalGenAI_ErrorTypeCarriesNoProviderText(t *testing.T) {
 		if string(kv.Key) != AttrErrorType {
 			continue
 		}
-		assert.NotContains(t, kv.Value.Emit(), " ",
+		assert.NotContains(t, kv.Value.String(), " ",
 			"error.type must stay a classifier token, not a message")
 	}
 }
@@ -186,9 +190,12 @@ func TestStampInternalGenAI_StampsOnlyTheAllowedKeySet(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{
 		AttrGenAIOperationName, AttrGenAISystem, AttrGenAIRequestModel,
-		AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
-		AttrGenAIUsageCacheRead, AttrGenAIUsageCacheCreate, AttrCostUSD,
-		AttrVirtualKeyID, AttrGatewayReqID,
+		customertracebridge.AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
+		customertracebridge.AttrGenAIUsageCacheRead, customertracebridge.AttrGenAIUsageCacheCreate, AttrCostUSD,
+		customertracebridge.AttrVirtualKeyID, customertracebridge.AttrGatewayReqID,
+		// The dispatched ModelProvider row id: a manager-owned identifier
+		// from gateway config, no content channel.
+		customertracebridge.AttrModelProviderID,
 		AttrErrorType, AttrUpstreamStatusCode,
 	}, got, "the internal span's key set changed — review whether the new key can carry content before extending this list")
 }
@@ -211,8 +218,8 @@ func TestPackageDeclaresNoContentAttributeConstants(t *testing.T) {
 		AttrGenAIRequestTemp, AttrGenAIRequestMaxTokens, AttrGenAIRequestTopP,
 		AttrGenAIRequestFreqPen, AttrGenAIRequestPresPen, AttrGenAIRequestStopSeqs,
 		AttrGenAIResponseID, AttrGenAIResponseModel, AttrGenAIResponseFinish,
-		AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
-		AttrGenAIUsageCacheRead, AttrGenAIUsageCacheCreate, AttrGenAIConversationID,
+		customertracebridge.AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
+		customertracebridge.AttrGenAIUsageCacheRead, customertracebridge.AttrGenAIUsageCacheCreate, customertracebridge.AttrGenAIConversationID,
 	}
 	for _, key := range declared {
 		assert.NotContains(t, ForbiddenInternalSpanAttrs, key,

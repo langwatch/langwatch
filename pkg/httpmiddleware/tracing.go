@@ -8,6 +8,8 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/langwatch/langwatch/pkg/clog"
 )
 
 // Tracing extracts inbound W3C trace context and opens a SERVER span for the
@@ -60,6 +62,12 @@ func Tracing(instrumentationName string) func(http.Handler) http.Handler {
 				),
 			)
 			defer span.End()
+
+			// Stamp trace_id/span_id onto the context logger. Without this the
+			// "logs correlate to the trace by id" promise below is empty — the
+			// logger core is not ctx-aware, so unless the ids are stamped as
+			// fields here every downstream log line is uncorrelated.
+			ctx = clog.WithSpanContext(ctx)
 
 			rec := &responseRecorder{ResponseWriter: w, status: 200}
 			next.ServeHTTP(rec, r.WithContext(ctx))

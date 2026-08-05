@@ -97,7 +97,7 @@ Every proxied response includes:
 
 - `X-LangWatch-Gateway-Version` — build version of the running gateway.
 - `X-LangWatch-Gateway-Request-Id` — gateway-minted ID for debit idempotency.
-- `X-LangWatch-Budget-Warning` — present when budget thresholds are breached.
+- `X-LangWatch-Budget-Warning` — `<scope>:<pct>` for every applicable budget at or past 80% of its limit, comma-separated. Present on streaming and non-streaming responses alike.
 - `X-LangWatch-Fallback-Count` — number of provider fallbacks attempted.
 - `X-LangWatch-Cache-Mode` — cache override decision (`respect`, `disable`, or `force`).
 
@@ -118,12 +118,12 @@ make service svc=aigateway       # run once
 make service-watch svc=aigateway # live reload via air
 ```
 
-This sources `langwatch/.env` in full — Go and the TS control-plane
+This sources `platform/app/.env` in full — Go and the TS control-plane
 share the same file, so secrets like `LW_GATEWAY_INTERNAL_SECRET` live in
 exactly one place. Vars the Go service doesn't need are ignored by
 `config.Hydrate`. Required: `LW_GATEWAY_INTERNAL_SECRET`,
 `LW_GATEWAY_JWT_SECRET`, `LW_GATEWAY_BASE_URL` (see
-`langwatch/.env.example`).
+`platform/app/.env.example`).
 
 Logs emit as pretty-printed JSON locally (`LOG_FORMAT=pretty` is set by the
 Makefile target).

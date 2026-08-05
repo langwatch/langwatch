@@ -125,24 +125,67 @@ describe("native skill generation", () => {
   // The image's skill set is the root-compiled native set Docker overlays into
   // the Go embed directory.
   describe("given Langy's AGENTS.md routing table", () => {
-    it("routes only to skills that exist in the shipped image", () => {
-      const langyAssets = path.resolve(skillsRoot, "..", "services", "langyagent", "internal", "assets");
-      const agentsMd = fs.readFileSync(path.join(langyAssets, "AGENTS.md"), "utf8");
+    const readAgentsMd = () =>
+      fs.readFileSync(
+        path.resolve(skillsRoot, "..", "services", "langyagent", "internal", "assets", "AGENTS.md"),
+        "utf8",
+      );
 
-      const routed = new Set<string>();
-      for (const row of agentsMd.split("\n")) {
-        if (!row.startsWith("|")) continue;
-        // | user intent | `skill` | commands | — skill is the second cell.
-        const cell = row.split("|").map((c) => c.trim())[2];
-        const m = cell?.match(/^`([a-z0-9-]+)`$/);
-        if (m) routed.add(m[1]!);
-      }
+    /** | user intent | `skill` | primary commands | — rows that name a skill. */
+    const routingRows = (): { skill: string; commands: string }[] =>
+      readAgentsMd()
+        .split("\n")
+        .filter((row) => row.startsWith("|"))
+        .map((row) => row.split("|").map((cell) => cell.trim()))
+        .flatMap((cells) => {
+          const skill = cells[2]?.match(/^`([a-z0-9-]+)`$/)?.[1];
+          return skill ? [{ skill, commands: cells[3] ?? "" }] : [];
+        });
+
+    it("routes only to skills that exist in the shipped image", () => {
+      const routed = new Set(routingRows().map((row) => row.skill));
       expect(routed.size, "no skill rows found — did the routing table move?").toBeGreaterThan(0);
 
       const shipped = new Set(skills.map((s) => s.slug));
       for (const name of routed) {
         expect(shipped.has(name), `AGENTS.md routes to a skill that does not ship: ${name}`).toBe(true);
       }
+    });
+
+    // The commands a row names are the ones the model reaches for. For an
+    // evaluation request the type it picks must come from the CATALOG — the
+    // accepted set — and never from `evaluator list`, which answers what this
+    // project already saved: on a project with none that draws an empty card
+    // mid-flow, reading as the create having failed before it was attempted.
+    describe("when the row answers an evaluation request", () => {
+      const EVALUATION_SKILLS = ["experiments", "online-evaluations"];
+      const evaluationRows = () =>
+        routingRows().filter((row) => EVALUATION_SKILLS.includes(row.skill));
+
+      /** @scenario The assistant is pointed at the catalog rather than the project's evaluators */
+      it("points choosing a type at the type catalog", () => {
+        const rows = evaluationRows();
+        expect(
+          rows.map((row) => row.skill).sort(),
+          "the evaluation routing rows moved — this check is scanning nothing",
+        ).toEqual([...EVALUATION_SKILLS].sort());
+
+        for (const row of rows) {
+          expect(
+            row.commands,
+            `${row.skill} does not name the evaluator type catalog`,
+          ).toContain("langwatch evaluator types");
+        }
+      });
+
+      it("never names listing the project's saved evaluators as a step", () => {
+        for (const row of evaluationRows()) {
+          expect(
+            row.commands,
+            `${row.skill} sends the model to the evaluator library`,
+          ).not.toContain("langwatch evaluator list");
+        }
+      });
     });
   });
 });
