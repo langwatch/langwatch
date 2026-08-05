@@ -81,10 +81,42 @@ function isUsableInteger(value: number | undefined): value is number {
   );
 }
 
-function positiveOr(value: number | undefined, fallback: number): number {
-  return value !== undefined && Number.isFinite(value) && value > 0
+/**
+ * A fractional replica or client count cannot exist, and treating it as one
+ * anyway (e.g. `clientsPerProcess: 0.5`) inflates the derived ceiling instead
+ * of shrinking it - the opposite of what the safety factor is for. Anything
+ * that is not a positive integer falls back to the default.
+ */
+function positiveIntegerOr(value: number | undefined, fallback: number): number {
+  return value !== undefined && Number.isInteger(value) && value > 0
     ? value
     : fallback;
+}
+
+/**
+ * The unclamped ceiling: how many connections per pod the server's budget
+ * actually allows, before the "never below one usable connection" floor is
+ * applied. Callers that only need the reportable ceiling want
+ * {@link deriveFleetPoolCeiling}; this is for detecting the case the floor
+ * would otherwise hide - a fleet so large that even a single connection per
+ * pod exceeds the budget.
+ */
+function rawFleetPoolCeiling(input: PoolSizingInput): number | null {
+  const replicas = input.replicas;
+  if (replicas === undefined || !Number.isInteger(replicas) || replicas <= 0) {
+    return null;
+  }
+
+  const serverMax = positiveIntegerOr(
+    input.serverMaxConcurrentQueries,
+    DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
+  );
+  const clients = positiveIntegerOr(
+    input.clientsPerProcess,
+    DEFAULT_CLIENTS_PER_PROCESS,
+  );
+
+  return Math.floor((serverMax * FLEET_SAFETY_FACTOR) / (replicas * clients));
 }
 
 /**
@@ -93,24 +125,9 @@ function positiveOr(value: number | undefined, fallback: number): number {
  * infer how many siblings it has.
  */
 export function deriveFleetPoolCeiling(input: PoolSizingInput): number | null {
-  const replicas = input.replicas;
-  if (replicas === undefined || !Number.isFinite(replicas) || replicas <= 0) {
-    return null;
-  }
-
-  const serverMax = positiveOr(
-    input.serverMaxConcurrentQueries,
-    DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
-  );
-  const clients = positiveOr(
-    input.clientsPerProcess,
-    DEFAULT_CLIENTS_PER_PROCESS,
-  );
-
-  const derived = Math.floor(
-    (serverMax * FLEET_SAFETY_FACTOR) / (replicas * clients),
-  );
-  return Math.min(MAX_POOL_SIZE, Math.max(MIN_POOL_SIZE, derived));
+  const raw = rawFleetPoolCeiling(input);
+  if (raw === null) return null;
+  return Math.min(MAX_POOL_SIZE, Math.max(MIN_POOL_SIZE, raw));
 }
 
 /**
@@ -121,7 +138,14 @@ export function deriveFleetPoolCeiling(input: PoolSizingInput): number | null {
 export function resolvePoolSize(
   input: PoolSizingInput = {},
 ): PoolSizingDecision {
-  const derivedCeiling = deriveFleetPoolCeiling(input);
+  const raw = rawFleetPoolCeiling(input);
+  const derivedCeiling =
+    raw === null ? null : Math.min(MAX_POOL_SIZE, Math.max(MIN_POOL_SIZE, raw));
+  // A raw ceiling below one means the fleet's budget cannot afford even a
+  // single connection per pod - `deriveFleetPoolCeiling` floors that to 1 for
+  // display, but a resolved size of 1 still exceeds the real budget, so the
+  // floor must not also silence the warning.
+  const infeasible = raw !== null && raw < MIN_POOL_SIZE;
 
   if (input.override !== undefined && isUsableInteger(input.override)) {
     return {
@@ -129,7 +153,8 @@ export function resolvePoolSize(
       source: "override",
       derivedCeiling,
       exceedsBudget:
-        derivedCeiling !== null && input.override > derivedCeiling,
+        infeasible ||
+        (derivedCeiling !== null && input.override > derivedCeiling),
       rejectedOverride: undefined,
     };
   }
@@ -144,7 +169,7 @@ export function resolvePoolSize(
       size: derivedCeiling,
       source: "derived",
       derivedCeiling,
-      exceedsBudget: false,
+      exceedsBudget: infeasible,
       rejectedOverride,
     };
   }

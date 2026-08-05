@@ -28,22 +28,22 @@ const logger = createLogger("langwatch:clickhouse");
  */
 export class ClickHouseLogger implements Logger {
   trace(params: LogParams): void {
-    emitVendorLog(logger, "trace", params);
+    emitVendorLog({ sink: logger, level: "trace", record: params });
   }
 
   debug(params: LogParams): void {
-    emitVendorLog(logger, "debug", params);
+    emitVendorLog({ sink: logger, level: "debug", record: params });
   }
 
   info(params: LogParams): void {
-    emitVendorLog(logger, "info", params);
+    emitVendorLog({ sink: logger, level: "info", record: params });
   }
 
   warn(params: WarnLogParams): void {
-    emitVendorLog(logger, "warn", params);
+    emitVendorLog({ sink: logger, level: "warn", record: params });
   }
 
   error(params: ErrorLogParams): void {
-    emitVendorLog(logger, "error", params);
+    emitVendorLog({ sink: logger, level: "error", record: params });
   }
 }

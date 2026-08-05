@@ -7,7 +7,7 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "incremental": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/clickhouse-client.tsbuildinfo",
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
@@ -16,7 +16,7 @@
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
-  // Tests run via vitest (`pnpm test`), which provides the `vitest` module and
-  // its types at runtime; the declaration build must not require them.
+  // Exclude Vitest tests from the source typecheck and declaration build;
+  // Vitest is a test-only dependency.
   "exclude": ["src/**/*.test.ts"]
 }

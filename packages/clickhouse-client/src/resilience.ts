@@ -29,7 +29,8 @@ export const TRANSIENT_HTTP_STATUSES: ReadonlySet<number> = new Set([
   429, 502, 503,
 ]);
 
-export interface TransientClassificationOptions {
+export interface TransientClassificationInput {
+  error: unknown;
   /**
    * Message fragments that mark a ClickHouse-side transient condition, owned by
    * the caller so this package cannot drift from the queue's classifier.
@@ -49,15 +50,15 @@ function statusOf(error: object): number | undefined {
  * permanent failure costs the full budget and, when the failure is a server
  * overload the retries themselves caused, makes the overload worse.
  */
-export function isTransientClickHouseError(
-  error: unknown,
-  options: TransientClassificationOptions = {},
-): boolean {
+export function isTransientClickHouseError({
+  error,
+  transientMessageFragments = [],
+}: TransientClassificationInput): boolean {
   if (!(error instanceof Error)) return false;
 
   if (/timeout/i.test(error.message)) return true;
 
-  for (const fragment of options.transientMessageFragments ?? []) {
+  for (const fragment of transientMessageFragments) {
     if (error.message.includes(fragment)) return true;
   }
 

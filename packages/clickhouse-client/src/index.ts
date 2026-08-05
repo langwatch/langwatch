@@ -21,6 +21,8 @@ export {
   VENDOR_CAUSE_FIELD,
 } from "./logging";
 export type {
+  DecideVendorLogInput,
+  EmitVendorLogInput,
   EmittedLevel,
   VendorLogDecision,
   VendorLogLevel,
@@ -38,5 +40,5 @@ export {
 } from "./resilience";
 export type {
   BackoffInput,
-  TransientClassificationOptions,
+  TransientClassificationInput,
 } from "./resilience";

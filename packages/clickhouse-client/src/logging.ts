@@ -40,16 +40,21 @@ export interface VendorLogDecision {
   fields: Record<string, unknown>;
 }
 
+export interface DecideVendorLogInput {
+  level: VendorLogLevel;
+  record: VendorLogRecord;
+}
+
 /**
  * Decide how a vendor record should be emitted, or `null` to drop it.
  *
  * Pure, so the policy is testable without a logger and identical in every
  * process that adopts it.
  */
-export function decideVendorLog(
-  level: VendorLogLevel,
-  record: VendorLogRecord,
-): VendorLogDecision | null {
+export function decideVendorLog({
+  level,
+  record,
+}: DecideVendorLogInput): VendorLogDecision | null {
   if (level === "error") return null;
 
   const fields: Record<string, unknown> = { ...(record.args ?? {}) };
@@ -70,17 +75,23 @@ export interface VendorLogSink {
   warn: (fields: Record<string, unknown>, message: string) => void;
 }
 
+export interface EmitVendorLogInput {
+  sink: VendorLogSink;
+  level: VendorLogLevel;
+  record: VendorLogRecord;
+}
+
 /**
  * Apply {@link decideVendorLog} to a sink. Returns whether anything was
  * emitted, which is what lets a caller assert the drop without reaching into
  * the sink.
  */
-export function emitVendorLog(
-  sink: VendorLogSink,
-  level: VendorLogLevel,
-  record: VendorLogRecord,
-): boolean {
-  const decision = decideVendorLog(level, record);
+export function emitVendorLog({
+  sink,
+  level,
+  record,
+}: EmitVendorLogInput): boolean {
+  const decision = decideVendorLog({ level, record });
   if (decision === null) return false;
   sink[decision.level](decision.fields, decision.message);
   return true;
