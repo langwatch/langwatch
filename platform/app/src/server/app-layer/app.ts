@@ -29,6 +29,9 @@ export class App {
     AppCommands["codingAgents"];
   readonly gateway: AppDependencies["gateway"];
   readonly filters: AppDependencies["filters"];
+  readonly clickhouse: AppDependencies["clickhouse"];
+  readonly billing: AppDependencies["billing"];
+  readonly scenarios: AppDependencies["scenarios"];
   readonly commands: AppCommands;
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
@@ -98,6 +101,9 @@ export class App {
     };
     this.gateway = deps.gateway;
     this.filters = deps.filters;
+    this.clickhouse = deps.clickhouse;
+    this.billing = deps.billing;
+    this.scenarios = deps.scenarios;
     this.commands = deps.commands;
     this.langy = deps.langy;
     this.ops = deps.ops;

@@ -29,6 +29,7 @@ import {
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { BillableEventsClickHouseRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { FilterService } from "~/server/filters/filter.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -47,6 +48,7 @@ import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { ClickHouseOrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation.clickhouse";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
@@ -81,8 +83,10 @@ import {
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import {
+  ExperimentIdLookupClickHouseRepository,
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
+  NullExperimentIdLookupRepository,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
@@ -692,6 +696,9 @@ export function initializeDefaultApp(options?: {
     experimentRunState: clickhouseEnabled
       ? new ExperimentRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new ExperimentRunStateRepositoryMemory(),
+    experimentIdLookup: clickhouseEnabled
+      ? new ExperimentIdLookupClickHouseRepository(resolveClickHouseClient)
+      : new NullExperimentIdLookupRepository(),
     traceSummaryFold: clickhouseEnabled
       ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
       : traceSummary.repository,
@@ -1335,6 +1342,26 @@ export function initializeDefaultApp(options?: {
           : null,
       ),
     },
+    clickhouse: {
+      enabled: clickhouseEnabled,
+      resolveClient: resolveClickHouseClient,
+    },
+    billing: {
+      events: new BillableEventsClickHouseRepository(
+        getClickHouseClientForOrganization,
+      ),
+    },
+    scenarios: {
+      // Boot-sweep-only: the two orphaned-run reconciliation sweeps read the
+      // shared (cross-tenant) client directly rather than a per-tenant
+      // repository — see clickhouse-queries.md's "boot-time system sweeps"
+      // carve-out. `sharedCh` is the same client `ops.eventExplorer` above
+      // was built from.
+      orphanReconciliation: {
+        client: sharedCh,
+        finder: sharedCh ? new ClickHouseOrphanedRunFinder(sharedCh) : null,
+      },
+    },
     codingAgents: {
       sessions: traced(
         new CodingAgentSessionService(
@@ -1553,6 +1580,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     gateway: { budgets: undefined, virtualKeySpend: undefined },
     filters: { options: new FilterService(null) },
+    clickhouse: {
+      enabled: false,
+      resolveClient: async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      },
+    },
+    billing: {
+      events: new BillableEventsClickHouseRepository(async () => null),
+    },
+    scenarios: {
+      orphanReconciliation: { client: null, finder: null },
+    },
     codingAgents: {
       sessions: new CodingAgentSessionService(
         new NullCodingAgentSessionRepository(),

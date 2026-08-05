@@ -23,6 +23,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   AGGREGATE_TYPE,
   assertOverThreshold,
@@ -334,6 +336,29 @@ describe.skipIf(!hasTestcontainers)(
       vi.mocked(
         clickhouseClientModule.getClickHouseClientForProject,
       ).mockResolvedValue(client);
+
+      // buildTraceBlobResolutionDeps()'s no-arg call — the exact shape the
+      // production routers use — now takes its default resolver from
+      // getApp().clickhouse, so this test needs a real App singleton whose
+      // resolver dials the same (mocked) testcontainer client above.
+      await resetApp();
+      globalForApp.__langwatch_app = createTestApp({
+        clickhouse: {
+          enabled: true,
+          resolveClient: async (tenantId: string) => {
+            const resolved =
+              await clickhouseClientModule.getClickHouseClientForProject(
+                tenantId,
+              );
+            if (!resolved) {
+              throw new Error(
+                `ClickHouse not available for tenant ${tenantId}`,
+              );
+            }
+            return resolved;
+          },
+        },
+      });
     }, 60_000);
 
     afterAll(async () => {
@@ -345,6 +370,7 @@ describe.skipIf(!hasTestcontainers)(
           });
         }
       }
+      await resetApp();
       await stopTestContainers();
     });
 

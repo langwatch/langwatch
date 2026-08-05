@@ -1,11 +1,15 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import type Stripe from "stripe";
+import type { BillableEventsRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
 import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import type { OrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
+import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
@@ -140,6 +144,32 @@ export interface AppDependencies {
   /** The values a filter can offer, read from the trace store. */
   filters: {
     options: FilterService;
+  };
+  /**
+   * The canonical per-tenant ClickHouse resolver, identical to the closure
+   * `presets.ts` uses to build every other repository. Exposed so the few
+   * call sites outside the composition root that build their own
+   * ClickHouse-backed repository (replay, the opt-in blob-resolution path)
+   * share the resolution policy instead of re-deriving it.
+   */
+  clickhouse: {
+    enabled: boolean;
+    resolveClient: ClickHouseClientResolver;
+  };
+  /** Deduplicated usage counters written to ClickHouse for billing. */
+  billing: {
+    events: BillableEventsRepository;
+  };
+  /**
+   * Cross-tenant boot-sweep dependencies for the two orphaned-run
+   * reconciliation sweeps (QUEUED and IN_PROGRESS). Null when ClickHouse is
+   * not configured, in which case both sweeps no-op.
+   */
+  scenarios: {
+    orphanReconciliation: {
+      client: ClickHouseClient | null;
+      finder: OrphanedRunFinder | null;
+    };
   };
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {
