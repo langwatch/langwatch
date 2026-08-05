@@ -66,7 +66,11 @@ immutability — the content hash freezes each file's bytes; the commit prefix
 freezes each build's namespace. Old tabs keep resolving because their build's
 prefix still exists. Cleanup is an S3 lifecycle rule expiring prefixes after a
 window safely longer than any tab's lifetime. `platform/app/scripts/upload-assets-to-cdn.sh`
-performs the sync; the SaaS deploy pipeline invokes it with the build's SHA.
+is this repo's reference implementation of that sync and fixes the contract: the
+prefix is the deployed image tag (`git-<short-sha>`), because that is what the
+running app requests via `LANGWATCH_ASSET_BASE`. The SaaS pipeline inlines the
+same `aws s3 sync` rather than calling the script, so the two must agree on that
+prefix.
 
 **CSP.** When `LANGWATCH_ASSET_BASE` names an external origin, that origin is
 added to `script-src`, `style-src`, `font-src`, `img-src`, `connect-src`, and
