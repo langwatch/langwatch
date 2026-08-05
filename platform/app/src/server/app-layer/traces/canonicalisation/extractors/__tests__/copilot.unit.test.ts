@@ -67,7 +67,19 @@ describe("CopilotExtractor", () => {
       expect(ctx.out["langwatch.user.id"]).toBe("a1b2c3hash");
     });
 
-    it("recognizes provenance from the @github/copilot instrumentation scope alone", () => {
+    it("recognizes provenance from the real github.copilot instrumentation scope alone", () => {
+      // The wire scope (verified on 1.0.71+ captures) is `github.copilot`.
+      const ctx = createExtractorContext(
+        { "enduser.pseudo.id": "hash", "gen_ai.operation.name": "chat" },
+        { instrumentationScope: { name: "github.copilot", version: null } },
+      );
+
+      new CopilotExtractor().apply(ctx);
+
+      expect(ctx.out["langwatch.user.id"]).toBe("hash");
+    });
+
+    it("recognizes provenance from the legacy @github/copilot scope alias", () => {
       const ctx = createExtractorContext(
         { "enduser.pseudo.id": "hash", "gen_ai.operation.name": "chat" },
         { instrumentationScope: { name: "@github/copilot", version: null } },
@@ -76,6 +88,63 @@ describe("CopilotExtractor", () => {
       new CopilotExtractor().apply(ctx);
 
       expect(ctx.out["langwatch.user.id"]).toBe("hash");
+    });
+
+    it("flags the usage-bearing invoke_agent rollup to skip token accumulation", () => {
+      const ctx = createExtractorContext({
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.usage.input_tokens": 15560,
+        "gen_ai.usage.output_tokens": 153,
+        "github.copilot.turn_id": "t1",
+      });
+
+      new CopilotExtractor().apply(ctx);
+
+      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe(
+        "true",
+      );
+    });
+
+    it("leaves chat spans unflagged so the model call's tokens count", () => {
+      const ctx = createExtractorContext({
+        "gen_ai.operation.name": "chat",
+        "gen_ai.usage.input_tokens": 15560,
+        "gen_ai.usage.output_tokens": 153,
+        "github.copilot.turn_id": "t1",
+      });
+
+      new CopilotExtractor().apply(ctx);
+
+      expect(
+        ctx.out["langwatch.reserved.skip_token_accumulation"],
+      ).toBeUndefined();
+    });
+
+    it("maps copilot's dotted reasoning usage spelling onto the canonical key", () => {
+      const ctx = createExtractorContext({
+        "gen_ai.operation.name": "chat",
+        "gen_ai.usage.reasoning.output_tokens": 128,
+        "github.copilot.turn_id": "t1",
+      });
+
+      new CopilotExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.reasoning_tokens"]).toBe(128);
+    });
+
+    it("leaves enduser.pseudo.id in the bag when a user id was already set upstream", () => {
+      // take-then-no-op would consume the attribute and the value would
+      // survive in neither `out` nor `remaining()`.
+      const ctx = createExtractorContext({
+        "enduser.pseudo.id": "hash",
+        "github.copilot.turn_id": "t1",
+      });
+      ctx.out["langwatch.user.id"] = "already-set";
+
+      new CopilotExtractor().apply(ctx);
+
+      expect(ctx.out["langwatch.user.id"]).toBe("already-set");
+      expect(ctx.bag.attrs.has("enduser.pseudo.id")).toBe(true);
     });
 
     /** @scenario A copilot tool-execution span canonicalizes as a tool span */

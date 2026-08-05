@@ -424,6 +424,50 @@ describe("resolveWrapperPath", () => {
       );
     });
 
+    it("names the seat bypass when copilot's gateway path is chosen at the prompt", async () => {
+      // The prompt answer is the route that actually moves spend off the
+      // user's Copilot seat — the saved-choice line must name the shift.
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: (async () => ({
+          path: "gateway",
+        })) as unknown as Parameters<
+          typeof resolveWrapperPath
+        >[0]["promptImpl"],
+        saveImpl: vi.fn(),
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
+    });
+
+    it("suppresses the seat-bypass notice when policy will downgrade the pinned gateway anyway", async () => {
+      // Warning about a billing shift the downgrade then cancels would be
+      // false; resolveWrapperMode's downgrade branch prints its own notice.
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          tool_mode: { copilot: "gateway" },
+          tool_policies: { copilot: { allowVk: false, allowOtelDirect: true } },
+        }),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        env: {},
+        writeImpl: write,
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).not.toHaveBeenCalled();
+    });
+
     /** @scenario A pinned gateway mode for copilot is honored without prompting */
     it("honors a pinned gateway mode for copilot without prompting and names the seat bypass", async () => {
       const write = vi.fn();

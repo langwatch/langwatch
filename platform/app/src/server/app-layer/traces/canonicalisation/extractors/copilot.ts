@@ -75,8 +75,7 @@ export class CopilotExtractor implements CanonicalAttributesExtractor {
     // `enduser.pseudo.id` is deliberately NOT a trigger — it's standard
     // OTel semconv any tenant SDK may emit; consuming it here would
     // rename a foreign tenant's attribute. Provenance = copilot's
-    // instrumentation scope (`@github/copilot`, verified on the 1.0.69
-    // wire) or a github.copilot.* attribute.
+    // instrumentation scope or a github.copilot.* attribute.
     const scopeName = ctx.span.instrumentationScope?.name ?? "";
     const hasCopilotProvenance =
       COPILOT_SCOPES.includes(scopeName) ||
@@ -91,9 +90,41 @@ export class CopilotExtractor implements CanonicalAttributesExtractor {
       );
     }
 
-    const pseudoId = attrs.take("enduser.pseudo.id");
-    if (isNonEmptyString(pseudoId)) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_USER_ID, pseudoId);
+    // Copilot's root `invoke_agent` span carries gen_ai.usage.* that is the
+    // exact rollup of its `chat` children (verified on the 1.0.79 wire: a
+    // single turn emits chat=15560/153 AND invoke_agent=15560/153). Without
+    // the skip marker the trace-summary fold sums both and every copilot
+    // trace reports 2× tokens and 2× cost. Same duplicate-rollup shape codex
+    // has with `handle_responses` (codex.ts markRedundantUsageSpan).
+    if (operation === "invoke_agent" && this.hasTokenUsage(ctx)) {
+      ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
+      ctx.recordRule(`${this.id}:skip-rollup-usage`);
+    }
+
+    // Copilot spells reasoning usage `gen_ai.usage.reasoning.output_tokens`
+    // (dotted), which no generic extractor maps to the canonical
+    // `gen_ai.usage.reasoning_tokens` — without this lift the fold reports
+    // reasoning: null while copilot's own footer shows reasoning tokens.
+    const reasoningTokens = attrs.get("gen_ai.usage.reasoning.output_tokens");
+    if (
+      typeof reasoningTokens === "number" &&
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS] === undefined
+    ) {
+      attrs.take("gen_ai.usage.reasoning.output_tokens");
+      ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoningTokens);
+      ctx.recordRule(`${this.id}:usage.reasoning`);
+    }
+
+    // Peek before take: if an earlier extractor already set the user id,
+    // taking here would consume the attribute and then no-op — the value
+    // would survive in neither `out` nor `remaining()`.
+    const pseudoId = attrs.get("enduser.pseudo.id");
+    if (
+      isNonEmptyString(pseudoId) &&
+      ctx.out[ATTR_KEYS.LANGWATCH_USER_ID] === undefined
+    ) {
+      attrs.take("enduser.pseudo.id");
+      ctx.setAttr(ATTR_KEYS.LANGWATCH_USER_ID, pseudoId);
       ctx.recordRule(`${this.id}:user.pseudo_id`);
     }
 
@@ -128,5 +159,18 @@ export class CopilotExtractor implements CanonicalAttributesExtractor {
       ctx.setAttr("metadata.copilot_organization", organization);
       ctx.recordRule(`${this.id}:organization`);
     }
+  }
+
+  /**
+   * GenAIExtractor runs before this one and lifts native gen_ai.usage.*
+   * into `out`, so look there as well as the still-unconsumed bag.
+   */
+  private hasTokenUsage(ctx: ExtractorContext): boolean {
+    return (
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] !== undefined ||
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS] !== undefined ||
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS) ||
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS)
+    );
   }
 }

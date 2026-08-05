@@ -243,7 +243,13 @@ export async function resolveWrapperPath(
     // Copilot seat — every route that lands there names the shift (ADR-039
     // D3): here, the pinned branch below, the policy branches, and
     // resolveWrapperMode's downgrade.
-    if (override === "gateway") {
+    if (
+      override === "gateway" &&
+      resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk
+    ) {
+      // Policy gate: when the org disables the gateway, resolveWrapperMode
+      // downgrades this run to ingestion with its own notice — warning about
+      // a billing shift that then doesn't happen would be false.
       const suffix = copilotSeatBypassSuffix(tool);
       if (suffix) {
         writeImpl(`${lwTag()} using the gateway (--tool-mode).${suffix}\n`);
@@ -255,7 +261,10 @@ export async function resolveWrapperPath(
   // 2. Remembered answer pinned in cfg.tool_mode[tool].
   const pinned = cfg.tool_mode?.[tool];
   if (pinned === "gateway" || pinned === "ingestion") {
-    if (pinned === "gateway") {
+    if (
+      pinned === "gateway" &&
+      resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk
+    ) {
       const suffix = copilotSeatBypassSuffix(tool);
       if (suffix) {
         writeImpl(
@@ -375,10 +384,16 @@ export async function resolveWrapperPath(
 
   const label =
     chosen === "gateway" ? "an API key (gateway)" : "your own plan (otlp)";
+  // The prompt answer is the route that actually moves copilot spend off
+  // the user's seat — it must name the shift like every other gateway
+  // route (ADR-039 D3), not leave the user to learn it from the pinned
+  // branch on run 2.
+  const seatSuffix =
+    chosen === "gateway" ? copilotSeatBypassSuffix(tool) : "";
   writeImpl(
     `${lwTag()} saved. \`${tool}\` will use ${label}. ` +
       `Override with --tool-mode=${chosen === "gateway" ? "otlp" : "gateway"}, ` +
-      `or edit ~/.langwatch/config.json (tool_mode.${tool}).\n`,
+      `or edit ~/.langwatch/config.json (tool_mode.${tool}).${seatSuffix}\n`,
   );
 
   return { mode: chosen, prompted: true };
