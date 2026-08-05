@@ -43,6 +43,7 @@ import {
 	appSettingsTargetFor,
 	installAppEnv,
 } from "./app-settings";
+import { installClaudeSessionContextHooks } from "./claude-hooks";
 import { type GovernanceConfig, saveConfig } from "./config";
 import { envForTool, type ToolEnv } from "./tool-env";
 
@@ -373,6 +374,19 @@ export async function maybeOfferIngestionShellRcPersist({
 					`  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`,
 				),
 			);
+			// Claude Code exports no repository identity over telemetry; the
+			// session hooks are what report it, and they belong to the same
+			// "yes" that persisted the exports.
+			if (tool === "claude") {
+				const hooks = installClaudeSessionContextHooks();
+				if (hooks.action !== "unchanged") {
+					console.log(
+						chalk.green(
+							`  ✓ Installed the hooks that report each session's repository and branch`,
+						),
+					);
+				}
+			}
 		} catch (err) {
 			console.log(
 				chalk.yellow(

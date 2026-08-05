@@ -572,6 +572,32 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       },
     );
 
+  // `langwatch ingest hook <tool>`: what the agent's own hook entries run.
+  // Hidden: nobody types this, the install path writes it into the agent's
+  // settings. It reads its payload on stdin, writes nothing to stdout (a
+  // SessionStart hook's stdout is injected into the user's session context)
+  // and always exits zero, so a hook can never be why a session broke.
+  //
+  // Registered as rendering its own result because it renders NO result, in
+  // any format. Left unregistered, the auto-detected agent mode a hook always
+  // runs under (Claude Code sets CLAUDECODE in its children) would print
+  // "the table below is not machine-readable" to stderr on every session
+  // start and stop, about a table that does not exist.
+  rendersOwnResult(
+    ingestCmd
+      .command("hook <tool>", { hidden: true })
+      .description(
+        "Hidden: reports the session's repository, branch and worktree. Run by the coding agent's own hooks, reading the hook payload on stdin.",
+      ),
+  ).action(async (tool: string) => {
+    try {
+      const { hookCommand } = await import("./commands/ingestion/hook.js");
+      await hookCommand({ tool });
+    } catch {
+      // Same contract as the command itself: never break the session.
+    }
+  });
+
   const governanceCmd = program
     .command("governance")
     .description(

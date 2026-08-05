@@ -20,6 +20,10 @@ import {
 	claudeProjectSettingsTarget,
 	installAppEnv,
 } from "../app-settings";
+import {
+	installClaudeSessionContextHooks,
+	SESSION_CONTEXT_HOOK_COMMAND,
+} from "../claude-hooks";
 import { telemetryEnvVarNames } from "../otel-env-block";
 import {
 	buildScopedToolFunction,
@@ -123,6 +127,38 @@ describe("scanTelemetryTargets", () => {
 			const after = JSON.parse(fs.readFileSync(claude.path, "utf8"));
 			expect(after.env).toEqual({ MY_OWN: "keep" });
 			expect(after.model).toBe("claude-sonnet-5");
+		});
+	});
+
+	describe("when settings.json carries the langwatch hooks and a user's own", () => {
+		const userEntry = {
+			hooks: [{ type: "command", command: "./scripts/session-log.sh" }],
+		};
+
+		/** @scenario "Logout removes exactly the LangWatch hook entries" */
+		it("removes the langwatch entries and leaves the user's hook", () => {
+			const claude = appSettingsTargetFor("claude")!;
+			fs.mkdirSync(path.dirname(claude.path), { recursive: true });
+			fs.writeFileSync(
+				claude.path,
+				JSON.stringify({ hooks: { SessionStart: [userEntry] } }, null, 2),
+			);
+			installClaudeSessionContextHooks();
+
+			expect(
+				presentLabels().some((l) => l.startsWith("claude session hooks")),
+			).toBe(true);
+
+			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+				expect(t.remove()).toBe(true);
+			}
+
+			const after = JSON.parse(fs.readFileSync(claude.path, "utf8"));
+			expect(after.hooks).toEqual({ SessionStart: [userEntry] });
+			expect(JSON.stringify(after)).not.toContain(
+				SESSION_CONTEXT_HOOK_COMMAND,
+			);
+			expect(presentLabels()).toEqual([]);
 		});
 	});
 

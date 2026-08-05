@@ -125,7 +125,7 @@ export function installAppEnv(
 ): void {
 	fs.mkdirSync(path.dirname(target.path), { recursive: true });
 
-	const settings = readSettings(target.path);
+	const settings = readAppSettingsFile(target.path);
 	const existingEnv = settings.env;
 	const nextEnv: Record<string, string> = isPlainObject(existingEnv)
 		? { ...(existingEnv as Record<string, string>) }
@@ -188,23 +188,28 @@ export function removeAppEnvVars(
 	return true;
 }
 
-function readSettings(filePath: string): Record<string, unknown> {
+/**
+ * The settings file's top-level object, as a mutable copy. Missing and
+ * malformed files both read as `{}`, because the write path replaces the file
+ * wholesale, so callers merging into this start from a clean object rather
+ * than losing their write to a stray comma in someone's config.
+ *
+ * Shared with claude-hooks.ts, which merges a different region of the same
+ * file and must read and write it exactly the way the env block does.
+ */
+export function readAppSettingsFile(filePath: string): Record<string, unknown> {
 	try {
 		const raw = fs.readFileSync(filePath, "utf8");
 		const parsed = JSON.parse(raw) as unknown;
 		if (isPlainObject(parsed)) return { ...parsed };
 		return {};
 	} catch {
-		// ENOENT, malformed JSON — start from an empty object so we
-		// don't lose the user's file to a stray comma. A parse error
-		// does silently drop other keys, which is why the read path
-		// returns {} — the write path replaces the file wholesale.
 		return {};
 	}
 }
 
 function readEnvMap(filePath: string): Record<string, string> {
-	const settings = readSettings(filePath);
+	const settings = readAppSettingsFile(filePath);
 	const env = settings.env;
 	if (!isPlainObject(env)) return {};
 	const out: Record<string, string> = {};

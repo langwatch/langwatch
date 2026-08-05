@@ -1,0 +1,409 @@
+/**
+ * `langwatch ingest hook <tool>`: the hook a coding agent runs at the start
+ * and end of every session.
+ *
+ * Claude Code knows exactly which repository, branch and worktree a session
+ * is working in and exports none of it over telemetry. The hook slot is the
+ * way in: it fires in every mode including print and SDK sessions, it hands
+ * the hook the session id and working directory on stdin, and on Stop the
+ * process inherits the session's live trace context. So this command runs
+ * git itself and posts one small OTLP log record to the endpoint the agent
+ * is already exporting to, which is what lets a session's traces be joined
+ * to the code they were working on.
+ *
+ * Two constraints shape every branch below.
+ *
+ *   - NOTHING ON STDOUT, EVER. A SessionStart hook's stdout is injected into
+ *     the user's session context, so one stray line would land in the
+ *     model's prompt. Diagnostics go to stderr, and only when `DEBUG`
+ *     contains "langwatch" (the CLI's existing debug convention).
+ *   - ALWAYS EXIT ZERO. Unparseable input, no repository, no telemetry
+ *     configured, a collector that refuses the post: every one of them
+ *     returns quietly. A hook is never allowed to be why a session broke.
+ *
+ * A failed post deliberately leaves the fingerprint file alone, so the next
+ * hook in the same session retries instead of assuming the context landed.
+ *
+ * Spec: specs/ai-governance/cli-wrappers/claude-session-context-hook.feature
+ */
+
+import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
+import { resolveLogsEndpoint } from "@/cli/telemetry/events";
+import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
+
+import {
+  buildSessionContextLogPayload,
+  parseGitRemoteUrl,
+  parseOtlpHeaders,
+  parseTraceparent,
+  type SessionContext,
+  sessionContextFingerprint,
+} from "./session-context";
+
+/** Agent slug per accepted tool argument. Anything else is a silent no-op. */
+const AGENT_BY_TOOL: Record<string, string> = {
+  claude_code: "claude_code",
+};
+
+/** How long the collector has to accept the record before we give up on it. */
+const POST_TIMEOUT_MS = 3_000;
+
+/** How long a single git invocation may take. */
+const GIT_TIMEOUT_MS = 2_000;
+
+/** Fingerprints for sessions last seen longer ago than this are pruned. */
+const STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
+
+/** Runs one git command in a directory. Trimmed stdout, or null on any failure. */
+export type GitRunner = (args: { args: string[]; cwd: string }) => string | null;
+
+export interface HookCommandOptions {
+  /** The agent the hook is running for (`claude-code`). */
+  tool: string;
+  env?: NodeJS.ProcessEnv;
+  /** Reads the hook payload. Defaults to draining this process's stdin. */
+  readInput?: () => Promise<string>;
+  runGit?: GitRunner;
+  fetchImpl?: typeof fetch;
+  /** Wall clock in milliseconds. */
+  now?: () => number;
+  /** Where per-session fingerprints live. Defaults under the config home. */
+  stateDir?: string;
+}
+
+interface HookInput {
+  sessionId?: string;
+  cwd?: string;
+  hookEventName?: string;
+}
+
+/**
+ * Emit the session's git context, once per distinct context per session.
+ * Never writes stdout, never throws, never exits non-zero.
+ */
+export async function hookCommand({
+  tool,
+  env = process.env,
+  readInput = readStdin,
+  runGit = runGitCommand,
+  fetchImpl = fetch,
+  now = Date.now,
+  stateDir = defaultStateDir(),
+}: HookCommandOptions): Promise<void> {
+  try {
+    await runHook({ tool, env, readInput, runGit, fetchImpl, now, stateDir });
+  } catch (error) {
+    debug(`hook failed: ${(error as Error).message}`, env);
+  }
+}
+
+async function runHook({
+  tool,
+  env,
+  readInput,
+  runGit,
+  fetchImpl,
+  now,
+  stateDir,
+}: {
+  tool: string;
+  env: NodeJS.ProcessEnv;
+  readInput: () => Promise<string>;
+  runGit: GitRunner;
+  fetchImpl: typeof fetch;
+  now: () => number;
+  stateDir: string;
+}): Promise<void> {
+  const agent = AGENT_BY_TOOL[tool.trim().toLowerCase().replace(/-/g, "_")];
+  if (!agent) {
+    debug(`no hook for tool '${tool}'`, env);
+    return;
+  }
+
+  const input = parseHookInput(await readInput());
+  const sessionId = firstNonEmpty(input.sessionId, env.CLAUDE_CODE_SESSION_ID);
+  if (!sessionId) {
+    debug("no session id in the hook input or the environment", env);
+    return;
+  }
+  debug(`${input.hookEventName ?? "hook"} for session ${sessionId}`, env);
+
+  // Checked before any git work: an agent with no telemetry configured is
+  // the common case, and it must cost nothing but this lookup.
+  const endpoint = resolveLogsEndpoint(env);
+  if (!endpoint) {
+    debug("no OTLP logs endpoint configured", env);
+    return;
+  }
+
+  // CLAUDE_PROJECT_DIR is the session's project root and survives a `cd`
+  // inside the session; the payload's cwd is the fallback for hook inputs
+  // that carry no such variable.
+  const directory =
+    firstNonEmpty(env.CLAUDE_PROJECT_DIR, input.cwd) ?? process.cwd();
+  const context = readSessionContext({ directory, runGit });
+  if (!context) {
+    debug(`no git repository with an origin remote at ${directory}`, env);
+    return;
+  }
+
+  const fingerprint = sessionContextFingerprint(context);
+  pruneStaleState({ stateDir, now });
+
+  const stateFile = path.join(stateDir, `${stateFileName(sessionId)}.json`);
+  if (readFingerprint(stateFile) === fingerprint) {
+    debug("context unchanged since the last post", env);
+    return;
+  }
+
+  const payload = buildSessionContextLogPayload({
+    sessionId,
+    agent,
+    context,
+    // OTLP timestamps are nanoseconds since the epoch, as a string.
+    timeUnixNano: `${now()}000000`,
+    scopeVersion: LANGWATCH_SDK_VERSION,
+    trace: parseTraceparent(env.TRACEPARENT),
+  });
+
+  const posted = await postSessionContext({
+    endpoint,
+    env,
+    payload,
+    fetchImpl,
+  });
+  if (!posted) return;
+
+  writeFingerprint({ stateFile, fingerprint, now, env });
+  debug(`posted ${fingerprint}`, env);
+}
+
+/** The git identity of `directory`, or null when it is not a repository we can name. */
+function readSessionContext({
+  directory,
+  runGit,
+}: {
+  directory: string;
+  runGit: GitRunner;
+}): SessionContext | null {
+  const remote = runGit({ args: ["remote", "get-url", "origin"], cwd: directory });
+  const repository = remote === null ? null : parseGitRemoteUrl(remote);
+  if (!repository) return null;
+
+  // Empty on a detached HEAD, which is a state to omit rather than invent.
+  const branch = runGit({ args: ["branch", "--show-current"], cwd: directory });
+  const worktree = readWorktreeName({ directory, runGit });
+
+  return {
+    repository,
+    ...(branch ? { branch } : {}),
+    ...(worktree ? { worktree } : {}),
+  };
+}
+
+/**
+ * The name of the linked worktree `directory` sits in, or undefined in the
+ * main checkout. A linked worktree is exactly the case where the per-worktree
+ * git dir differs from the common one; its name is the directory it is
+ * checked out into, which is what people call it.
+ */
+function readWorktreeName({
+  directory,
+  runGit,
+}: {
+  directory: string;
+  runGit: GitRunner;
+}): string | undefined {
+  const gitDir = runGit({ args: ["rev-parse", "--git-dir"], cwd: directory });
+  const commonDir = runGit({
+    args: ["rev-parse", "--git-common-dir"],
+    cwd: directory,
+  });
+  if (!gitDir || !commonDir) return undefined;
+  // Both may come back relative to the directory, so resolve before comparing.
+  if (path.resolve(directory, gitDir) === path.resolve(directory, commonDir)) {
+    return undefined;
+  }
+
+  const topLevel = runGit({ args: ["rev-parse", "--show-toplevel"], cwd: directory });
+  return topLevel ? path.basename(topLevel) : undefined;
+}
+
+async function postSessionContext({
+  endpoint,
+  env,
+  payload,
+  fetchImpl,
+}: {
+  endpoint: string;
+  env: NodeJS.ProcessEnv;
+  payload: unknown;
+  fetchImpl: typeof fetch;
+}): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
+  try {
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      headers: {
+        ...parseOtlpHeaders(env.OTEL_EXPORTER_OTLP_HEADERS),
+        // Last, so a headers variable carrying its own content-type cannot
+        // mislabel a body we know the encoding of.
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      debug(`collector answered ${response.status}`, env);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    debug(`post failed: ${(error as Error).message}`, env);
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function parseHookInput(raw: string): HookInput {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    const record = parsed as Record<string, unknown>;
+    return {
+      sessionId: stringField(record.session_id),
+      cwd: stringField(record.cwd),
+      hookEventName: stringField(record.hook_event_name),
+    };
+  } catch {
+    // Empty stdin, or something that is not JSON. Neither is worth a word.
+    return {};
+  }
+}
+
+function stringField(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
+}
+
+/** Drain stdin. A terminal is not a hook payload, so it reads as empty. */
+async function readStdin(): Promise<string> {
+  if (process.stdin.isTTY) return "";
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+function runGitCommand({ args, cwd }: { args: string[]; cwd: string }): string | null {
+  try {
+    const result = spawnSync("git", ["-C", cwd, ...args], {
+      encoding: "utf8",
+      timeout: GIT_TIMEOUT_MS,
+    });
+    if (result.status !== 0 || typeof result.stdout !== "string") return null;
+    const output = result.stdout.trim();
+    return output === "" ? null : output;
+  } catch {
+    return null;
+  }
+}
+
+/** `~/.langwatch/state/claude-session-context`, beside the CLI's own config. */
+function defaultStateDir(): string {
+  return path.join(os.homedir(), ".langwatch", "state", "claude-session-context");
+}
+
+/** One path segment, whatever the session id turns out to contain. */
+function stateFileName(sessionId: string): string {
+  return sessionId.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 128);
+}
+
+function readFingerprint(stateFile: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    if (parsed === null || typeof parsed !== "object") return null;
+    const fingerprint = (parsed as { fingerprint?: unknown }).fingerprint;
+    return typeof fingerprint === "string" ? fingerprint : null;
+  } catch {
+    // Nothing recorded for this session yet, or a file we cannot read: post.
+    return null;
+  }
+}
+
+function writeFingerprint({
+  stateFile,
+  fingerprint,
+  now,
+  env,
+}: {
+  stateFile: string;
+  fingerprint: string;
+  now: () => number;
+  env: NodeJS.ProcessEnv;
+}): void {
+  try {
+    fs.mkdirSync(path.dirname(stateFile), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(
+      stateFile,
+      JSON.stringify({
+        fingerprint,
+        updated_at: new Date(now()).toISOString(),
+      }),
+      { mode: 0o600 },
+    );
+  } catch (error) {
+    // A fingerprint we cannot record costs one duplicate record next time.
+    debug(`could not record the fingerprint: ${(error as Error).message}`, env);
+  }
+}
+
+/**
+ * Drop fingerprints for sessions nobody has touched in a week. Opportunistic:
+ * the directory is small, this runs on a hook that is already doing IO, and
+ * every failure is beneath mentioning.
+ */
+function pruneStaleState({
+  stateDir,
+  now,
+}: {
+  stateDir: string;
+  now: () => number;
+}): void {
+  try {
+    for (const entry of fs.readdirSync(stateDir)) {
+      if (!entry.endsWith(".json")) continue;
+      const file = path.join(stateDir, entry);
+      try {
+        if (now() - fs.statSync(file).mtimeMs > STATE_MAX_AGE_MS) {
+          fs.unlinkSync(file);
+        }
+      } catch {
+        // Raced with another hook, or unreadable. Either way, leave it.
+      }
+    }
+  } catch {
+    // No state directory yet.
+  }
+}
+
+function debug(message: string, env: NodeJS.ProcessEnv): void {
+  if (!env.DEBUG?.includes("langwatch")) return;
+  process.stderr.write(`langwatch:hook ${message}\n`);
+}

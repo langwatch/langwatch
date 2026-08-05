@@ -62,6 +62,7 @@ import {
 	installAppEnv,
 	removeAppEnvVars,
 } from "./app-settings";
+import { installClaudeSessionContextHooks } from "./claude-hooks";
 import {
 	extractLookupIdFromToken,
 	listIngestionKeys,
@@ -212,6 +213,10 @@ export async function resolveLiveIngestionKey({
  * block is already present (presence = the user opted into persistence
  * on some earlier run) and its values differ. Returns the refreshed
  * target's label, or null when nothing was touched.
+ *
+ * A refresh also re-asserts the session context hooks in the same file:
+ * they are part of the wiring the persisted block stands for, and a login
+ * against a different instance is exactly when they can be missing.
  */
 export function refreshClaudeUserTelemetryEnv({
 	vars,
@@ -225,6 +230,11 @@ export function refreshClaudeUserTelemetryEnv({
 	if (!otelWiringLooksLangwatchAuthored(current)) return null;
 	if (appEnvHasAllVars(target, vars)) return null;
 	installAppEnv(target, vars);
+	try {
+		installClaudeSessionContextHooks();
+	} catch {
+		// The env is the refresh that matters; the hooks are best-effort.
+	}
 	return `claude telemetry env (${target.displayPath})`;
 }
 

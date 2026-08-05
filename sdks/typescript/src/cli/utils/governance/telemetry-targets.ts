@@ -40,6 +40,10 @@ import {
 	claudeProjectSettingsTarget,
 	removeAppEnvVars,
 } from "./app-settings";
+import {
+	hasClaudeSessionContextHooks,
+	removeClaudeSessionContextHooks,
+} from "./claude-hooks";
 import { telemetryEnvVarNames } from "./otel-env-block";
 import {
 	type DetectedShell,
@@ -95,6 +99,16 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 				isClaudeEnvLangwatchOwned()
 					? removeAppEnvVars(claudeTarget, keys)
 					: false,
+		});
+
+		// claude, the session context hook entries in the same settings file.
+		// Ownership here is unambiguous: an entry is ours only when the command
+		// it runs is ours, so a user's own SessionStart or Stop hooks in the
+		// same arrays are neither listed nor removed.
+		targets.push({
+			label: `claude session hooks (${claudeTarget.displayPath})`,
+			present: hasClaudeSessionContextHooks(),
+			remove: () => removeClaudeSessionContextHooks(),
 		});
 	}
 

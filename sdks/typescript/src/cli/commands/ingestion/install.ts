@@ -1,5 +1,6 @@
 import chalk from "chalk";
 
+import { installClaudeSessionContextHooks } from "@/cli/utils/governance/claude-hooks";
 import {
   GovernanceCliError,
   mintIngestionKey,
@@ -18,7 +19,8 @@ import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
  *
  * Tools handled today:
  *   - codex      : toml merge + env exports
- *   - claude_code: env exports (no toml needed)
+ *   - claude_code: env exports + the session context hooks merged into
+ *                  ~/.claude/settings.json
  *   - gemini     : env exports (no toml needed; envs are read directly)
  *   - opencode   : env exports (no toml needed)
  *
@@ -37,7 +39,7 @@ type SupportedTool = (typeof SUPPORTED_TOOLS)[number];
 
 export interface InstallOptions {
   json?: boolean;
-  /** Suppress the toml write; useful for previewing exports only. */
+  /** Suppress the config-file writes; useful for previewing exports only. */
   envOnly?: boolean;
   /**
    * Override the codex config.toml path. Test-only — exposed because
@@ -45,6 +47,8 @@ export interface InstallOptions {
    * keeps the default unless explicitly threaded through.
    */
   codexConfigPath?: string;
+  /** Override the claude settings.json path. Test-only, same reason. */
+  claudeSettingsPath?: string;
 }
 
 interface InstallReport {
@@ -55,6 +59,8 @@ interface InstallReport {
   token_prefix: string;
   codex_config_action?: "created" | "updated" | "unchanged";
   codex_config_path?: string;
+  claude_hooks_action?: "created" | "updated" | "unchanged";
+  claude_hooks_path?: string;
   env_block: string[];
 }
 
@@ -139,6 +145,17 @@ async function runInstall(
     );
     report.codex_config_action = result.action;
     report.codex_config_path = result.path;
+  }
+
+  if (tool === "claude_code" && !options.envOnly) {
+    // Claude Code knows which repository, branch and worktree a session runs
+    // in and exports none of it over telemetry. The hooks are what report it,
+    // so activating capture installs them alongside the export block.
+    const result = installClaudeSessionContextHooks({
+      filePath: options.claudeSettingsPath,
+    });
+    report.claude_hooks_action = result.action;
+    report.claude_hooks_path = result.displayPath;
   }
 
   return report;
@@ -245,6 +262,16 @@ function renderHumanReport(report: InstallReport): void {
     );
   }
 
+  if (report.claude_hooks_action) {
+    const hooksVerb =
+      report.claude_hooks_action === "unchanged"
+        ? "already up to date"
+        : report.claude_hooks_action;
+    process.stdout.write(
+      `${chalk.green("✓")} ${report.claude_hooks_path} session hooks ${hooksVerb}\n`,
+    );
+  }
+
   process.stdout.write("\nAdd to your shell rc (or run in this shell):\n");
   for (const line of report.env_block) {
     process.stdout.write(`  ${line}\n`);
@@ -253,6 +280,11 @@ function renderHumanReport(report: InstallReport): void {
   if (report.tool === "codex") {
     process.stdout.write(
       `\nThe [otel] activation block in your codex config.toml has been wired automatically.\n`,
+    );
+  } else if (report.tool === "claude_code" && report.claude_hooks_action) {
+    process.stdout.write(
+      `\nSession hooks were added to your Claude Code settings, so every session reports\n` +
+        `the repository, branch and worktree it ran in. Your own hooks are untouched.\n`,
     );
   } else if (report.tool === "opencode") {
     process.stdout.write(
