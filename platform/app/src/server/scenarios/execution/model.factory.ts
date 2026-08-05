@@ -18,11 +18,11 @@ interface CreateModelFromParamsInput {
 // judge's forced function tool when reasoning is omitted. Do not broaden this
 // to -pro or other providers without evidence: some models cannot disable
 // reasoning, and the simulator/target do not necessarily use tools at all.
-const JUDGE_MODELS_REQUIRING_DISABLED_REASONING = new Set([
+const JUDGE_MODELS_REQUIRING_DISABLED_REASONING = new Set<string>([
   "openai/gpt-5.6-luna",
   "openai/gpt-5.6-sol",
   "openai/gpt-5.6-terra",
-]);
+] as const);
 
 /**
  * Creates a Vercel AI model using pre-fetched LiteLLM params.

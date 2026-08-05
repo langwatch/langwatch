@@ -46,10 +46,13 @@ describe("scenario model factory", () => {
     vi.unstubAllGlobals();
   });
 
-  async function callWithJudgeTool(
-    model: ReturnType<typeof createModelFromParams>,
-    providerOptions?: Parameters<typeof generateText>[0]["providerOptions"],
-  ) {
+  async function callWithJudgeTool({
+    model,
+    providerOptions,
+  }: {
+    model: ReturnType<typeof createModelFromParams>;
+    providerOptions?: Parameters<typeof generateText>[0]["providerOptions"];
+  }) {
     await generateText({
       model,
       prompt: "Judge this conversation",
@@ -71,17 +74,18 @@ describe("scenario model factory", () => {
     "sol",
     "terra",
   ])("sets reasoning_effort=none on the gpt-5.6-%s judge request", async (variant) => {
-    const body = await callWithJudgeTool(
-      createJudgeModelFromParams({
+    const body = await callWithJudgeTool({
+      model: createJudgeModelFromParams({
         litellmParams: {
           model: `openai/gpt-5.6-${variant}`,
           api_key: "test-key",
         },
         nlpServiceUrl: "http://nlp.test",
       }),
-    );
+    });
 
     expect(body?.reasoning_effort).toBe("none");
+    expect(body?.tool_choice).toBe("required");
     expect(body?.tools).toEqual(
       expect.arrayContaining([expect.objectContaining({ type: "function" })]),
     );
@@ -89,15 +93,15 @@ describe("scenario model factory", () => {
 
   /** @scenario "The same model outside the judge is untouched" */
   it("does not change the simulator or target model using the same model id", async () => {
-    const body = await callWithJudgeTool(
-      createModelFromParams({
+    const body = await callWithJudgeTool({
+      model: createModelFromParams({
         litellmParams: {
           model: "openai/gpt-5.6-sol",
           api_key: "test-key",
         },
         nlpServiceUrl: "http://nlp.test",
       }),
-    );
+    });
 
     expect(body).not.toHaveProperty("reasoning_effort");
   });
@@ -108,28 +112,28 @@ describe("scenario model factory", () => {
     "azure/gpt-5.6-sol",
     "openai/gpt-5.5-sol",
   ])("does not speculate about the unverified judge model %s", async (modelId) => {
-    const body = await callWithJudgeTool(
-      createJudgeModelFromParams({
+    const body = await callWithJudgeTool({
+      model: createJudgeModelFromParams({
         litellmParams: { model: modelId, api_key: "test-key" },
         nlpServiceUrl: "http://nlp.test",
       }),
-    );
+    });
 
     expect(body).not.toHaveProperty("reasoning_effort");
   });
 
   /** @scenario "The compatibility value is a default, not an override" */
   it("uses none only as a default, preserving explicit call intent", async () => {
-    const body = await callWithJudgeTool(
-      createJudgeModelFromParams({
+    const body = await callWithJudgeTool({
+      model: createJudgeModelFromParams({
         litellmParams: {
           model: "openai/gpt-5.6-sol",
           api_key: "test-key",
         },
         nlpServiceUrl: "http://nlp.test",
       }),
-      { openai: { reasoningEffort: "high" } },
-    );
+      providerOptions: { openai: { reasoningEffort: "high" } },
+    });
 
     expect(body?.reasoning_effort).toBe("high");
   });

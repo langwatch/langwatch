@@ -92,8 +92,12 @@ describe("classifyScenarioInfraError", () => {
       expect(result.code).toBe(
         ScenarioInfraErrorCode.ModelToolReasoningConflict,
       );
-      expect(result.message).not.toContain("/v1/responses");
-      expect(result.hint).toMatch(/Responses API|disable reasoning/i);
+      expect(result.message).toBe(
+        "The selected judge model cannot use its current reasoning mode with the judge's function tool.",
+      );
+      expect(result.hint).toBe(
+        "Choose a different judge model. If you manage this model request directly, use the Responses API or disable reasoning for Chat Completions.",
+      );
     });
   });
 
