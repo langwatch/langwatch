@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["es2020"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "./dist",
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts"],
+  // Tests run via vitest (`pnpm test`), which provides the `vitest` module and
+  // its types at runtime; the declaration build must not require them.
+  "exclude": ["src/**/*.test.ts"]
+}

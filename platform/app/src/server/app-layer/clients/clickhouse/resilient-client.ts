@@ -1,4 +1,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  RETRY_CAUSE_FIELD,
+  retryNoticeLevel,
+} from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import {
   incrementClickHouseQueryCount,
@@ -105,14 +109,18 @@ async function withTransientRetry<T>(
       const delay = jitteredBackoff({ attempt, baseDelayMs, maxDelayMs });
 
       try {
-        logger.warn(
+        // Only the first attempt warns, and the cause never rides under
+        // `error`. Both rules live in @langwatch/clickhouse-client: a 25-attempt
+        // budget otherwise turned one failure into 25 records, each of which
+        // Loki promoted to error because of the field name.
+        logger[retryNoticeLevel(attempt)](
           {
             source: "clickhouse",
             operation,
             attempt: attempt + 1,
             maxRetries,
             delayMs: Math.round(delay),
-            error,
+            [RETRY_CAUSE_FIELD]: error,
           },
           `Transient ClickHouse ${operation} error, retrying`,
         );
