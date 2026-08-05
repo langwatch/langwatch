@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
-  gqReadyScoreImplausibleTotal,
 } from "../metrics";
 import { GroupQueueMetricsCollector } from "../metricsCollector";
 import { MIN_PLAUSIBLE_EPOCH_MS } from "../readyScore";
@@ -89,17 +88,6 @@ function makeRedis(
         rest: args.slice(3),
       }),
     ),
-    // ZCOUNT over the same bounds the range model understands, so the
-    // implausible-score band is counted by the same semantics it is read by.
-    zcount: vi.fn(
-      async (_key: string, min: string | number, max: string | number) =>
-        zrangebyscoreModel({
-          entries: opts.readyZset ?? [],
-          min,
-          max,
-          rest: [],
-        }).length,
-    ),
     pipeline: vi.fn(() => {
       const cmds: string[] = [];
       const chain = {
@@ -177,17 +165,15 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
 
   /**
    * A just-unblocked group carries the sentinel score (1), which the
-   * plausible-epoch floor drops rather than surface as eligible. The sentinel
-   * is deliberate, so it must not be counted as corruption either.
+   * plausible-epoch floor drops rather than surface as eligible.
    */
-  /** @scenario "the unblock sentinel is not counted as an implausible score" */
+  /** @scenario "the unblock sentinel is not read as an age" */
   it("reports 0 when no group is eligible (empty / all in-flight / just unblocked)", async () => {
     const redis = makeRedis({
       readyZset: [{ member: "just-unblocked", score: 1 }],
     });
     await runCollect(redis);
     expect(await readGauge()).toBe(0);
-    expect(await readImplausibleCounter()).toBeUndefined();
   });
 
   it("never emits a negative age (clock skew / future score)", async () => {
@@ -200,12 +186,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
   });
 });
 
-async function readImplausibleCounter(): Promise<number | undefined> {
-  const m = await gqReadyScoreImplausibleTotal.get();
-  return m.values.find((v) => v.labels.queue_name === QUEUE)?.value;
-}
-
-describe("GroupQueueMetricsCollector - implausible ready scores", () => {
+describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
   beforeEach(() => {
     register.resetMetrics();
     vi.useFakeTimers({ now: Date.now() });
@@ -237,8 +218,7 @@ describe("GroupQueueMetricsCollector - implausible ready scores", () => {
       );
     });
 
-    /** @scenario "an implausible ready score raises a counter instead of being swallowed" */
-    it("raises the implausible-ready-score counter rather than skipping in silence", async () => {
+    it("leaves a healthy neighbour driving the gauge", async () => {
       const redis = makeRedis({
         readyZset: [
           { member: "mis-scored", score: 57_000 },
@@ -250,27 +230,18 @@ describe("GroupQueueMetricsCollector - implausible ready scores", () => {
 
       await runCollect(redis);
 
-      // Both mis-scored rows, and only those: the deliberate unblock sentinel
-      // is subtracted back out and the healthy group is above the floor.
-      expect(await readImplausibleCounter()).toBe(2);
-      // The healthy group still drives the gauge, undisturbed by its neighbours.
       expect(await readGauge()).toBe(5_000);
-    });
-
-    it("keeps counting for as long as the mis-scored row stays in the queue", async () => {
-      const redis = makeRedis({
-        readyZset: [{ member: "mis-scored", score: 57_000 }],
-      });
-
-      await runCollect(redis);
-      await runCollect(redis);
-
-      expect(await readImplausibleCounter()).toBe(2);
     });
   });
 
   describe("given a sampled group whose head job score is not a timestamp", () => {
-    it("drops the head from the backlog age and counts it", async () => {
+    /**
+     * A genuine backlog IS arbitrarily far in the past, so the gauge applies
+     * only the absolute bound, never the staging-time skew bounds - otherwise
+     * it would hide the very backlog it exists to report.
+     */
+    /** @scenario "the backlog gauge drops a head job score that is not a timestamp" */
+    it("drops the head from the backlog age", async () => {
       const redis = makeRedis({
         readyZset: [
           { member: "tenant/sub/trace:abc", score: Date.now() + 5_000 },
@@ -283,19 +254,23 @@ describe("GroupQueueMetricsCollector - implausible ready scores", () => {
       await runCollect(redis);
 
       expect(await readBacklogGauge()).toBe(0);
-      expect(await readImplausibleCounter()).toBe(1);
     });
-  });
 
-  describe("given every ready group carries a real timestamp", () => {
-    it("leaves the counter untouched", async () => {
+    it("still reports a genuinely old head job, however far past it is", async () => {
+      const veryOld = Date.now() - 30 * 24 * 60 * 60 * 1000;
       const redis = makeRedis({
-        readyZset: [{ member: "healthy", score: Date.now() - 1_000 }],
+        readyZset: [{ member: "tenant/sub/trace:old", score: Date.now() + 1 }],
+        headJobScores: {
+          [`${PREFIX}group:tenant/sub/trace:old:jobs`]: [
+            "job-1",
+            String(veryOld),
+          ],
+        },
       });
 
       await runCollect(redis);
 
-      expect(await readImplausibleCounter()).toBeUndefined();
+      expect(await readBacklogGauge()).toBe(30 * 24 * 60 * 60 * 1000);
     });
   });
 });

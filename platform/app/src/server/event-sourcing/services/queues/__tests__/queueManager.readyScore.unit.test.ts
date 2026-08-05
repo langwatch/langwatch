@@ -94,6 +94,28 @@ describe("QueueManager ready scores", () => {
       );
     });
 
+    /**
+     * The repair belongs to `GroupQueue`, not here. Only there is the queue
+     * name in scope to raise `gq_ready_score_implausible_total`, so quietly
+     * rewriting a supplied-but-broken value at this layer would hide the
+     * producer that needs fixing.
+     */
+    /** @scenario "a supplied occurrence time reaches the queue unrepaired" */
+    it("hands a supplied but implausible occurrence time over untouched", () => {
+      const registry = new Map<string, JobRegistryEntry>();
+      createManager(registry).registerJob({
+        name: "passThrough",
+        process: vi.fn(),
+      });
+
+      const entry = registry.get("test-pipeline:job:passThrough");
+
+      expect(entry?.scoreFn({ tenantId: "t1", occurredAt: 0 })).toBe(0);
+      expect(
+        entry?.scoreFn({ tenantId: "t1", occurredAt: Date.UTC(2021, 0, 1) }),
+      ).toBe(Date.UTC(2021, 0, 1));
+    });
+
     it("keeps an explicitly supplied score function", () => {
       const registry = new Map<string, JobRegistryEntry>();
       createManager(registry).registerJob({

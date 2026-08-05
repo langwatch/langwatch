@@ -15,7 +15,6 @@ import type {
   QueueSendOptions,
 } from "../../queues";
 import { resolveDeduplicationStrategy } from "../../queues";
-import { resolveReadyScore } from "../../queues/groupQueue/readyScore";
 import type { JobDelivery } from "../../queues/queue.types";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import {
@@ -30,19 +29,30 @@ const logger = createLogger("langwatch:event-sourcing:queue-manager");
 /**
  * Ready score for a payload whose own occurrence time orders its dispatch.
  *
- * A missing or implausible `occurredAt` means "we never recorded when this
- * happened", not "this happened in January 1970". The previous `?? 0` fallback
- * meant the latter: it staged the job with a ready score of epoch-plus-delay,
- * which both ranks it ahead of every real job and makes
+ * A missing `occurredAt` means "we never recorded when this happened", not
+ * "this happened in January 1970". The previous `?? 0` fallback meant the
+ * latter: it staged the job with a ready score of epoch-plus-delay, which both
+ * ranks it ahead of every real job and makes
  * `gq_oldest_pending_age_milliseconds` report about 56 years of backlog for the
  * whole queue (production, 2026-07-31 and 2026-08-03).
  *
- * Falling back to now matches every other producer in this file - the
- * `serializeByAggregate` branch scores `Date.now()` outright, and
+ * Scoring an absent value at `Date.now()` matches every other producer in this
+ * file - the `serializeByAggregate` branch scores `Date.now()` outright, and
  * `GroupQueue.send` does the same when no score function is registered.
+ *
+ * A value that IS present is handed over untouched, however odd it looks. It is
+ * `GroupQueue`'s guard that judges it against the staging clock, and only there
+ * is the queue name in scope to raise `gq_ready_score_implausible_total`.
+ * Repairing it here would silently hide the producer that needs fixing - which
+ * matters most for the highest-volume paths, where `occurredAt` is a
+ * customer-supplied OTLP timestamp (`recordDataPoint`, `contributeMetricFacts`,
+ * `contributeLogFacts`).
  */
 function occurredAtScore(payload: { occurredAt?: unknown }): number {
-  return resolveReadyScore({ score: payload.occurredAt });
+  const occurredAt = payload.occurredAt;
+  return occurredAt === undefined || occurredAt === null
+    ? Date.now()
+    : (occurredAt as number);
 }
 
 /**

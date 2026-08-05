@@ -11,23 +11,9 @@ import {
   gqOldestPendingAgeMilliseconds,
   gqParkedGroups,
   gqPendingGroups,
-  gqReadyScoreImplausibleTotal,
 } from "./metrics";
 import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore";
 import type { DispatchResult, GroupStagingScripts } from "./scripts";
-
-/**
- * Ready-score written by UNBLOCK_LUA (app-layer/ops/repositories/
- * queue.redis.repository.ts) to force a just-unblocked group to dispatch
- * promptly. It is a sentinel (epoch 1ms), not a real eligibility time, so the
- * oldest-pending-age gauge excludes it — see the computation in collect().
- *
- * It sits below MIN_PLAUSIBLE_EPOCH_MS, so the floor the gauges now apply
- * already drops it. The constant survives as the lower edge of the band the
- * implausible-score counter watches: a sentinel is deliberate, a score of 0 or
- * 57,000 is a producer bug, and only the second should raise a signal.
- */
-const READY_UNBLOCK_SENTINEL_SCORE = 1;
 
 /**
  * How many of the soonest-future-scored ("nearest deferred") ready groups the
@@ -46,13 +32,6 @@ const OLDEST_BACKLOG_SAMPLE_GROUPS = 50;
  */
 export class GroupQueueMetricsCollector {
   private interval: ReturnType<typeof setInterval> | null = null;
-  /**
-   * Implausible rows seen last cycle. Only the transition from none to some is
-   * logged: the counter carries the ongoing signal, and an implausibly-scored
-   * group can sit in ready for days, which at collect cadence would be a warn
-   * line every few seconds for as long as it stays.
-   */
-  private lastImplausibleRows = 0;
 
   constructor(
     private readonly params: {
@@ -169,14 +148,20 @@ export class GroupQueueMetricsCollector {
    * Exclude every score that cannot be a timestamp, not just the sentinel.
    * UNBLOCK_LUA (app-layer/ops/repositories/queue.redis.repository.ts) re-adds
    * a group to ready with the constant score 1 (epoch 1ms) to force prompt
-   * dispatch, and a producer whose score function returns 0 or NaN used to
+   * dispatch, and a producer whose score function returned 0 or NaN used to
    * stage at the epoch too (`?? 0` in queueManager, `??` in GroupQueue.send:
    * neither catches 0). Both read as ~56 years of age. The lower bound is
-   * therefore MIN_PLAUSIBLE_EPOCH_MS rather than `(1`, which makes the gauge
-   * structurally incapable of reporting an age that predates the queue,
-   * whatever a producer writes. Rows dropped for an implausible (rather than
-   * sentinel) score raise gq_ready_score_implausible_total, because a silent
-   * skip would leave a mis-scored producer invisible.
+   * therefore MIN_PLAUSIBLE_EPOCH_MS rather than `(1`, which drops the sentinel
+   * and every non-timestamp alike.
+   *
+   * This is the ABSOLUTE bound only, deliberately - not the two-sided one
+   * `resolveReadyScore` applies at staging. A genuine backlog IS arbitrarily
+   * far in the past, and reporting it is this gauge's entire job, so "old" must
+   * stay reportable while "not a timestamp" is skipped. Staging now bounds what
+   * can be written, so what this catches is rows staged before that guard
+   * existed; they are not counted here, because by the time a row is read back
+   * the producer that wrote it is no longer identifiable. The counter is raised
+   * at the staging fallback instead.
    *
    * Known residual: unpark restores a group's preserved (pre-park) ready
    * score, so a long-parked group briefly over-reports on unpark until it is
@@ -220,7 +205,7 @@ export class GroupQueueMetricsCollector {
       eligibleDueMs === null ? 0 : Math.max(0, nowMs - eligibleDueMs),
     );
 
-    const backlog = await this.foldDeferredHeads({
+    const oldestDueMs = await this.foldDeferredHeads({
       readyKey,
       keyPrefix,
       nowMs,
@@ -228,13 +213,8 @@ export class GroupQueueMetricsCollector {
     });
     gqOldestBacklogAgeMilliseconds.set(
       { queue_name: this.params.queueName },
-      backlog.oldest === null ? 0 : Math.max(0, nowMs - backlog.oldest),
+      oldestDueMs === null ? 0 : Math.max(0, nowMs - oldestDueMs),
     );
-
-    await this.reportImplausibleScores({
-      readyKey,
-      headRows: backlog.implausible,
-    });
   }
 
   /**
@@ -252,7 +232,7 @@ export class GroupQueueMetricsCollector {
     keyPrefix: string;
     nowMs: number;
     seed: number | null;
-  }): Promise<{ oldest: number | null; implausible: number }> {
+  }): Promise<number | null> {
     const deferredGroups = await this.params.redisConnection.zrangebyscore(
       readyKey,
       `(${nowMs}`,
@@ -261,7 +241,7 @@ export class GroupQueueMetricsCollector {
       0,
       OLDEST_BACKLOG_SAMPLE_GROUPS,
     );
-    if (deferredGroups.length === 0) return { oldest: seed, implausible: 0 };
+    if (deferredGroups.length === 0) return seed;
 
     const headPipeline = this.params.redisConnection.pipeline();
     for (const groupId of deferredGroups) {
@@ -275,54 +255,6 @@ export class GroupQueueMetricsCollector {
     const headResults = (await headPipeline.exec()) ?? [];
     return minDueMs(seed, headResults, nowMs);
   }
-
-  /**
-   * Counts the ready rows the age probes refused to read as a timestamp, and
-   * raises the counter that makes those refusals visible.
-   *
-   * The unblock sentinel is a deliberate score, so subtract it back out;
-   * anything else under the floor is a producer writing something that is not
-   * an occurrence time. The sentinel count only runs when something was found
-   * under the floor, so the healthy steady state pays for one ZCOUNT over an
-   * empty range.
-   */
-  private async reportImplausibleScores({
-    readyKey,
-    headRows,
-  }: {
-    readyKey: string;
-    headRows: number;
-  }): Promise<void> {
-    const belowFloorRows = await this.params.redisConnection.zcount(
-      readyKey,
-      "-inf",
-      `(${MIN_PLAUSIBLE_EPOCH_MS}`,
-    );
-    const sentinelRows =
-      belowFloorRows === 0
-        ? 0
-        : await this.params.redisConnection.zcount(
-            readyKey,
-            READY_UNBLOCK_SENTINEL_SCORE,
-            READY_UNBLOCK_SENTINEL_SCORE,
-          );
-    const implausibleRows =
-      Math.max(0, belowFloorRows - sentinelRows) + headRows;
-
-    if (implausibleRows > 0) {
-      gqReadyScoreImplausibleTotal.inc(
-        { queue_name: this.params.queueName },
-        implausibleRows,
-      );
-    }
-    if (implausibleRows > 0 && this.lastImplausibleRows === 0) {
-      this.params.logger.warn(
-        { queueName: this.params.queueName, implausibleRows },
-        "Queue holds jobs scored below the plausible-epoch floor - a producer's score function is returning a value that is not an occurrence time, which also ranks those jobs ahead of every real one",
-      );
-    }
-    this.lastImplausibleRows = implausibleRows;
-  }
 }
 
 /**
@@ -331,29 +263,22 @@ export class GroupQueueMetricsCollector {
  * future (delayed stage, monitor timers hours out) is not late work.
  *
  * A head score below the plausible-epoch floor is dropped for the same reason
- * the eligible probe drops one - `nowMs - 0` is not an age - and reported back
- * so the caller can count it. An absent or unreadable head is not implausible,
- * just nothing to fold.
+ * the eligible probe drops one: `nowMs - 0` is not an age. It is not counted
+ * here - the counter is raised at staging, where the value still exists and the
+ * producer is still identifiable.
  */
 function minDueMs(
   seed: number | null,
   headResults: Array<[unknown, unknown]>,
   nowMs: number,
-): { oldest: number | null; implausible: number } {
-  const heads = headResults
+): number | null {
+  return headResults
     .map(([err, value]) => (err ? [] : (value as string[])))
     .filter((arr) => arr.length >= 2)
-    .map((arr) => Number(arr[1]));
-
-  const oldest = heads
+    .map((arr) => Number(arr[1]))
     .filter((dueMs) => isPlausibleReadyScore(dueMs) && dueMs <= nowMs)
     .reduce<number | null>(
       (acc, dueMs) => (acc === null || dueMs < acc ? dueMs : acc),
       seed,
     );
-
-  return {
-    oldest,
-    implausible: heads.filter((dueMs) => !isPlausibleReadyScore(dueMs)).length,
-  };
 }

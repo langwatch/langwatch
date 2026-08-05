@@ -76,12 +76,17 @@ import {
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
   gqJobsStagedTotal,
+  gqReadyScoreImplausibleTotal,
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
   gqRetryEncodeFailuresTotal,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
-import { isPlausibleReadyScore, resolveReadyScore } from "./readyScore";
+import {
+  fallbackReadyScore,
+  isPlausibleReadyScore,
+  resolveReadyScore,
+} from "./readyScore";
 import {
   type DispatchResult,
   type DrainedJob,
@@ -460,6 +465,50 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
+   * Resolves a ready score and reports what it had to refuse.
+   *
+   * Every path that writes a ready score goes through here, so the counter is
+   * raised at the one moment the information exists. Counting it later, by
+   * scanning the ready set for out-of-range scores, cannot work: by then the
+   * bad value has already been replaced by this function and the scan finds
+   * nothing while the broken producer carries on.
+   *
+   * `delay` is deliberately NOT part of this. Deferral is a queue decision
+   * added to the resolved score by the caller; only the producer's own claim
+   * about when the work occurred is judged here.
+   */
+  private resolveScore(rawScore: unknown, nowMs: number = Date.now()): number {
+    const { score, rejected } = resolveReadyScore({ score: rawScore, nowMs });
+    if (rejected) {
+      gqReadyScoreImplausibleTotal.inc({ queue_name: this.queueName });
+    }
+    return score;
+  }
+
+  /**
+   * Ready score for a job the queue is putting BACK - an exhausted retry, a
+   * poison park, a drained sibling after a failed batch.
+   *
+   * Only the absolute check applies, not the two-sided one. The score was
+   * already judged against the producer's clock when the job was first staged,
+   * and re-judging it against a later clock would rewrite a legitimately old
+   * job (a long retry chain, a batch exported a day late) for no reason. What
+   * is still worth catching is a value that is not a timestamp at all, i.e. a
+   * row staged before this guard existed.
+   *
+   * All three re-stage paths share this so they cannot disagree. They used to:
+   * the exhausted-retry path re-scored an unusable value while drained siblings
+   * kept theirs verbatim, so one failure could move the failed job to now and
+   * leave its siblings at 0 - and on unblock the siblings dispatched ahead of
+   * the job they were drained behind.
+   */
+  private restageScore(originalScore: unknown): number {
+    if (isPlausibleReadyScore(originalScore)) return originalScore;
+    gqReadyScoreImplausibleTotal.inc({ queue_name: this.queueName });
+    return fallbackReadyScore();
+  }
+
+  /**
    * Stages a job into the group queue's Redis staging layer.
    */
   async send(
@@ -486,7 +535,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const stagedJobId = this.generateStagedJobId(payload);
     // Not `?? Date.now()`: a score function returning 0 or NaN (a payload with
     // no usable occurrence time) survives `??` and stages the job at the epoch.
-    const score = resolveReadyScore({ score: this.score?.(payload) });
+    const score = this.resolveScore(this.score?.(payload));
     const dispatchAfterMs = score + (delay ?? 0);
 
     // Get dedup config
@@ -618,11 +667,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         const groupId = this.groupKey(payload);
         const stagedJobId = this.generateStagedJobId(payload);
         // Same guard as send(); `now` is shared so a batch that falls back
-        // keeps its FIFO order.
-        const score = resolveReadyScore({
-          score: this.score?.(payload),
-          nowMs: now,
-        });
+        // keeps its FIFO order, and so every payload is judged against one
+        // clock reading rather than drifting across the batch.
+        const score = this.resolveScore(this.score?.(payload), now);
         // Add index to ensure FIFO order within the batch even if timestamps are identical
         const dispatchAfterMs = score + (delay ?? 0) + index;
 
@@ -1713,7 +1760,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         await this.scripts.stage({
           stagedJobId: sibling.stagedJobId,
           groupId,
-          dispatchAfterMs: sibling.originalScore,
+          // Guarded like every other re-stage. Unvalidated, a legacy row at 0
+          // was rewritten at 0 on every batch failure and never healed, and
+          // because the exhausted-retry path DID re-score, one failure could
+          // leave the siblings ordered ahead of the job they were drained
+          // behind.
+          dispatchAfterMs: this.restageScore(sibling.originalScore),
           dedupId: "",
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
@@ -1803,9 +1855,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // where it belongs in the queue - unless that score is not a usable
     // timestamp, in which case re-staging it would park the group at the epoch
     // for as long as it stays blocked.
-    const score = isPlausibleReadyScore(originalScore)
-      ? originalScore
-      : resolveReadyScore({ score: this.score?.(payload) });
+    const score = this.restageScore(originalScore);
 
     // Re-stage under the id the job was dispatched under (ADR-080), so the
     // staged job an operator inspects is named by the id its producer knows.
@@ -2036,7 +2086,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }): Promise<void> {
     // Same reasoning as handleExhaustedRetries: keep the original score when it
     // is a real timestamp, otherwise the parked group reads as decades old.
-    const score = resolveReadyScore({ score: originalScore });
+    const score = this.restageScore(originalScore);
     await this.scripts.restageAndBlock({
       groupId,
       // Parked under the id it was dispatched under (ADR-080). This used to

@@ -43,6 +43,17 @@ type TestPayload = {
   value: string;
 };
 
+/**
+ * Ready scores are validated against the staging clock now (`resolveReadyScore`),
+ * so a bare ordinal like `value * 1000` is rejected as "not a timestamp" and
+ * replaced with the staging time - which would silently turn every ordering
+ * assertion below into an assertion about arrival order. Anchor the ordinal to a
+ * real, recent timestamp instead: same relative order, and it exercises the
+ * shape a production score function actually returns.
+ */
+const SCORE_BASE_MS = Date.now() - 60 * 60 * 1000;
+const orderedScore = (n: number): number => SCORE_BASE_MS + n * 1000;
+
 function createQueueDefinition(
   overrides: Partial<EventSourcedQueueDefinition<TestPayload>> & {
     process: (payload: TestPayload) => Promise<void>;
@@ -140,6 +151,82 @@ describe.skipIf(!hasTestcontainers)(
             // timeout and charging the delay to whichever test runs next.
             releaseFirst?.();
           }
+        });
+      });
+
+      describe("when a producer's score function returns a value that is not a timestamp", () => {
+        /**
+         * The end-to-end version of the 2026-07-31 / 2026-08-03 defect, and the
+         * one assertion the unit tests cannot make: that what is WRITTEN to
+         * Redis is the resolved score, and that the resolved score takes its
+         * place in the real dispatch order.
+         *
+         * A test that recomputes the expected score in the test body would keep
+         * passing if `send` stopped calling the guard altogether. This one reads
+         * the staged score back out of the group's own jobs zset.
+         */
+        /** @scenario "a job staged with an unusable score dispatches behind one that occurred earlier" */
+        it("stages it at the current time and dispatches it behind an genuinely older job", async () => {
+          const processedOrder: string[] = [];
+          let releaseBlocker: (() => void) | undefined;
+          const blockerHeld = new Promise<void>((resolve) => {
+            releaseBlocker = resolve;
+          });
+
+          const queueName = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+          const scores: Record<string, number> = {
+            blocker: SCORE_BASE_MS,
+            older: Date.now() - 60_000,
+            broken: 0,
+          };
+          const queue = createQueue(
+            async (p) => {
+              if (p.id === "blocker") await blockerHeld;
+              processedOrder.push(p.id);
+            },
+            { name: queueName, score: (p) => scores[p.id] ?? 0 },
+          );
+          await queue.waitUntilReady();
+
+          // The blocker is staged first and carries the lowest score, so it
+          // leads the group and holds it while the two jobs behind it stay
+          // staged long enough to read their scores back out of Redis.
+          await queue.send({ id: "blocker", groupId: "g", value: "b" });
+
+          const stagedAtLeast = Date.now();
+          await queue.send({ id: "broken", groupId: "g", value: "x" });
+          await queue.send({ id: "older", groupId: "g", value: "y" });
+
+          try {
+            const jobsKey = `${queueName}:gq:group:g:jobs`;
+            await vi.waitFor(
+              async () => {
+                expect(await redis.zcard(jobsKey)).toBeGreaterThanOrEqual(2);
+              },
+              { timeout: 5000, interval: 50 },
+            );
+
+            // The broken score reached Redis as a real timestamp, not as 0.
+            const staged = await redis.zrange(jobsKey, 0, -1, "WITHSCORES");
+            const brokenScore = Number(
+              staged[staged.findIndex((m) => m.includes("broken")) + 1],
+            );
+            expect(brokenScore).toBeGreaterThanOrEqual(stagedAtLeast);
+            expect(brokenScore).toBeLessThanOrEqual(Date.now() + 1000);
+          } finally {
+            releaseBlocker?.();
+          }
+
+          await vi.waitFor(
+            () => {
+              expect(processedOrder).toHaveLength(3);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // Rescored to now, so it sorts BEHIND the job that really did occur a
+          // minute ago. Staged at 0 it would have led the group for ever.
+          expect(processedOrder).toEqual(["blocker", "older", "broken"]);
         });
       });
 
@@ -662,7 +749,7 @@ describe.skipIf(!hasTestcontainers)(
                 batches.push(ps as TestPayload[]);
               },
               coalesceMaxBatch: () => 50,
-              score: (p) => Number(p.value) * 1000,
+              score: (p) => orderedScore(Number(p.value)),
             },
           );
           await queue.waitUntilReady();
@@ -698,7 +785,7 @@ describe.skipIf(!hasTestcontainers)(
               if (ps.length > largest.length) largest = ps as TestPayload[];
             },
             coalesceMaxBatch: () => 50,
-            score: (p) => Number(p.value) * 1000,
+            score: (p) => orderedScore(Number(p.value)),
           });
           await queue.waitUntilReady();
 
@@ -733,7 +820,7 @@ describe.skipIf(!hasTestcontainers)(
                 batches.push(ps as TestPayload[]);
               },
               coalesceMaxBatch: () => 3,
-              score: (p) => Number(p.value) * 1000,
+              score: (p) => orderedScore(Number(p.value)),
             },
           );
           await queue.waitUntilReady();
@@ -777,7 +864,7 @@ describe.skipIf(!hasTestcontainers)(
                 batches.push(ps as TestPayload[]);
               },
               coalesceMaxBatch: () => 1,
-              score: (p) => Number(p.value) * 1000,
+              score: (p) => orderedScore(Number(p.value)),
             },
           );
           await queue.waitUntilReady();
@@ -818,7 +905,7 @@ describe.skipIf(!hasTestcontainers)(
                 for (const p of ps) succeeded.push(p as TestPayload);
               },
               coalesceMaxBatch: () => 50,
-              score: (p) => Number(p.value) * 1000,
+              score: (p) => orderedScore(Number(p.value)),
             },
           );
           await queue.waitUntilReady();
@@ -867,7 +954,7 @@ describe.skipIf(!hasTestcontainers)(
               },
               coalesceMaxBatch: () => 50,
               coalesceMaxBytes: () => 1500,
-              score: (p) => Number((p.id as string).slice(1)),
+              score: (p) => orderedScore(Number((p.id as string).slice(1))),
             },
           );
           await queue.waitUntilReady();
@@ -921,7 +1008,7 @@ describe.skipIf(!hasTestcontainers)(
               // Smaller than any single job's stored size, so every dispatch's
               // own initialBytes already exceeds the budget.
               coalesceMaxBytes: () => 50,
-              score: (p) => Number((p.id as string).slice(1)),
+              score: (p) => orderedScore(Number((p.id as string).slice(1))),
             },
           );
           await queue.waitUntilReady();
@@ -964,7 +1051,7 @@ describe.skipIf(!hasTestcontainers)(
                 batches.push(ps as TestPayload[]);
               },
               coalesceMaxBatch: () => 50,
-              score: (p) => Number((p.id as string).slice(1)),
+              score: (p) => orderedScore(Number((p.id as string).slice(1))),
             },
           );
           await queue.waitUntilReady();

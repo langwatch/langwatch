@@ -208,19 +208,22 @@ export const gqOldestBacklogAgeMilliseconds = new Gauge({
 });
 
 /**
- * Ready rows the age probe refused to read as a timestamp.
+ * Jobs whose producer supplied a ready score the queue refused.
  *
- * A ready score below MIN_PLAUSIBLE_EPOCH_MS cannot be an occurrence time, so
- * the gauges skip it rather than report `now - 0` as decades of backlog. The
- * skip is the right call for the gauge and the wrong thing to do silently: a
- * score that low means a producer staged a job with a broken score, which also
- * puts that job ahead of every real one in the dispatch order. Counted once per
- * collect cycle per offending row, so `increase(...[5m]) > 0` means "a queue is
- * carrying implausibly-scored work right now", not "N jobs were mis-scored".
+ * Raised at the staging fallback, once per job, the moment the value is
+ * rejected - not by scanning the ready set afterwards. That ordering is the
+ * whole point: the guard replaces the bad score before it is written, so a scan
+ * would find nothing and report zero for ever while the broken producer carried
+ * on. This is a true monotonic count of events, so `rate()` and `increase()`
+ * mean what they usually mean.
+ *
+ * Only a value the producer actually supplied counts. A payload with no
+ * occurrence time at all (`deferredOriginResolution` and friends) is scored at
+ * staging time by design, and is not a defect to report.
  */
 export const gqReadyScoreImplausibleTotal = new Counter({
   name: "gq_ready_score_implausible_total",
-  help: "Ready rows skipped by the age probes for a score below the plausible-epoch floor, counted once per collect cycle each",
+  help: "Jobs staged with a producer score the queue rejected (not a timestamp, or outside the allowed skew around now) and replaced with the staging time",
   labelNames: ["queue_name"] as const,
 });
 
