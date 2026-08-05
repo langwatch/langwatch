@@ -8208,6 +8208,81 @@
                         "null"
                       ]
                     },
+                    "targets": {
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "promptId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "promptVersion": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "agentId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "evaluatorId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "model": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "metadata": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "type"
+                        ]
+                      },
+                      "description": "Resolves the targetId each dataset row and evaluation carries"
+                    },
                     "dataset": {
                       "type": "array",
                       "items": {

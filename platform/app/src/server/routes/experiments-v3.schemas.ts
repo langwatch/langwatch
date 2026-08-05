@@ -211,6 +211,22 @@ const evaluationResultSchema = z.object({
   inputs: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
+/** What the run executed against — a prompt, an agent, an evaluator. */
+const runTargetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+  promptId: z.string().nullable().optional(),
+  promptVersion: z.number().nullable().optional(),
+  agentId: z.string().nullable().optional(),
+  evaluatorId: z.string().nullable().optional(),
+  model: z.string().nullable().optional(),
+  metadata: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+    .nullable()
+    .optional(),
+});
+
 export const runResultsResponseSchema = z.object({
   experimentId: z.string(),
   runId: z.string(),
@@ -218,6 +234,11 @@ export const runResultsResponseSchema = z.object({
   workflowVersionId: z.string().nullable().optional(),
   progress: z.number().nullable().optional(),
   total: z.number().nullable().optional(),
+  targets: z
+    .array(runTargetSchema)
+    .nullable()
+    .optional()
+    .describe("Resolves the targetId each dataset row and evaluation carries"),
   dataset: z
     .array(datasetEntrySchema)
     .describe("One row per dataset entry, with what the target predicted"),

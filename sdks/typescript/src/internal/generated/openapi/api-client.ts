@@ -6252,6 +6252,20 @@ export interface operations {
                         workflowVersionId?: string | null;
                         progress?: number | null;
                         total?: number | null;
+                        /** @description Resolves the targetId each dataset row and evaluation carries */
+                        targets?: {
+                            id: string;
+                            name: string;
+                            type: string;
+                            promptId?: string | null;
+                            promptVersion?: number | null;
+                            agentId?: string | null;
+                            evaluatorId?: string | null;
+                            model?: string | null;
+                            metadata?: {
+                                [key: string]: string | number | boolean;
+                            } | null;
+                        }[] | null;
                         /** @description One row per dataset entry, with what the target predicted */
                         dataset: {
                             index: number;
