@@ -95,11 +95,18 @@ export function createSchemaLock({
   waitTimeoutMs = DEFAULT_WAIT_TIMEOUT_MS,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
   abandonedAfterMs = DEFAULT_ABANDONED_AFTER_MS,
+  onBeforeClaim,
 }: {
   lockPath?: string;
   waitTimeoutMs?: number;
   pollIntervalMs?: number;
   abandonedAfterMs?: number;
+  /**
+   * Runs between reading an abandoned owner and claiming it. That gap is the
+   * window the protocol has to survive, and it is not reachable from outside
+   * the process, so the lock's own test opens it deliberately.
+   */
+  onBeforeClaim?: () => void;
 } = {}): SchemaLock {
   let depth = 0;
   let heldToken: string | undefined;
@@ -139,9 +146,15 @@ export function createSchemaLock({
       if (olderThanAbandonThreshold()) unlinkIfPresent(lockPath);
       return;
     }
-    if (isProcessAlive(observed.pid) && !olderThanAbandonThreshold()) return;
+    // A living owner keeps its lock however long it wants. The file's mtime
+    // is the moment it was acquired and is never refreshed, so it measures
+    // how long the holder has had the lock rather than how long it has been
+    // idle; recovering on age would evict a suite in the middle of its
+    // critical section, which is the thing this lock exists to prevent.
+    if (isProcessAlive(observed.pid)) return;
 
     const claimPath = claimPathFor(observed.token);
+    onBeforeClaim?.();
     try {
       linkSync(lockPath, claimPath);
     } catch (error) {
@@ -176,6 +189,7 @@ export function createSchemaLock({
       if (tryClaimLock(token)) {
         heldToken = token;
         depth = 1;
+        process.on("exit", releaseOnProcessExit);
         return releaseOnce();
       }
 
@@ -228,6 +242,7 @@ export function createSchemaLock({
       depth = 0;
       const wasHeldToken = heldToken;
       heldToken = undefined;
+      process.removeListener("exit", releaseOnProcessExit);
       // Releasing a lock that is no longer ours would hand a second holder's
       // critical section away. It cannot happen under the protocol above, so
       // if it ever does, say so rather than compound it.
@@ -240,11 +255,25 @@ export function createSchemaLock({
     };
   }
 
-  // A worker killed between acquiring and releasing would otherwise leave the
-  // lock standing until a waiter notices its pid is gone.
-  process.on("exit", () => {
-    if (depth > 0) unlinkIfPresent(lockPath);
-  });
+  /**
+   * Removes the lock only while it still carries our token, so a process
+   * exiting after its lock was taken away cannot free the new holder's.
+   */
+  function unlinkOwnLock(): void {
+    const owner = readOwner(lockPath);
+    if (owner.state === "held" && owner.token !== heldToken) return;
+    unlinkIfPresent(lockPath);
+  }
+
+  /**
+   * A worker killed between acquiring and releasing would otherwise leave the
+   * lock standing until a waiter notices its pid is gone. Registered only
+   * while the lock is held, and removed on release, so a process that builds
+   * many locks does not accumulate listeners.
+   */
+  function releaseOnProcessExit(): void {
+    if (heldToken !== undefined) unlinkOwnLock();
+  }
 
   return { path: lockPath, acquire };
 }

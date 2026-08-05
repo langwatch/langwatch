@@ -18,16 +18,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 const run = promisify(execFile);
 
 const CONTENDER = join(__dirname, "fixtures", "schemaLockContender.ts");
-const TSX = join(
-  __dirname,
-  "..",
-  "..",
-  "..",
-  "..",
-  "node_modules",
-  ".bin",
-  "tsx",
-);
+
+/**
+ * Resolved rather than assembled from a bin path: pnpm's layout decides where
+ * the shim lands, and a wrong guess would fail as a spawn error that says
+ * nothing about the lock.
+ */
+const TSX_CLI = require.resolve("tsx/cli");
 
 let lockPath: string;
 let journalPath: string;
@@ -39,9 +36,11 @@ function startContender({
   id: string;
   holdMs: number;
 }): Promise<unknown> {
-  return run(TSX, [CONTENDER, lockPath, journalPath, id, String(holdMs)], {
-    timeout: 60_000,
-  });
+  return run(
+    process.execPath,
+    [TSX_CLI, CONTENDER, lockPath, journalPath, id, String(holdMs)],
+    { timeout: 60_000 },
+  );
 }
 
 /**

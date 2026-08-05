@@ -95,12 +95,7 @@ describe("given another live process holds the lock", () => {
       });
 
       await expect(lock.acquire()).rejects.toThrow(
-        new RegExp(
-          `waiting for the ClickHouse schema lock at .*${
-            // The path is a regex literal in the message.
-            "schema\\.lock"
-          }`,
-        ),
+        /waiting for the ClickHouse schema lock at .*schema\.lock, held by pid \d+/,
       );
       expect(existsSync(lockPath)).toBe(true);
     });
@@ -154,23 +149,29 @@ describe("given the process that held the lock is gone", () => {
       const liveToken = randomUUID();
       writeForeignLock({ pid: DEAD_PID, token: abandonedToken });
 
+      // The window the protocol has to survive is between reading the owner
+      // and claiming it, and it is a few synchronous calls wide, so a timer
+      // cannot land inside it. `onBeforeClaim` opens it exactly once: the
+      // waiter has decided the abandoned holder is gone, and a live holder
+      // takes the lock before the claim can remove it.
+      let handedOver = false;
       const lock = createSchemaLock({
         lockPath,
         waitTimeoutMs: 120,
         pollIntervalMs: 10,
+        onBeforeClaim: () => {
+          if (handedOver) return;
+          handedOver = true;
+          writeForeignLock({ pid: process.pid, token: liveToken });
+        },
       });
-      const acquiring = lock.acquire();
 
-      // Stand in for the sequence the recovery has to survive: the abandoned
-      // holder's lock is replaced by a live holder's between the poll that
-      // read it and the claim that would remove it.
-      await new Promise((resolve) => setTimeout(resolve, 5));
-      writeForeignLock({ pid: process.pid, token: liveToken });
-
-      await expect(acquiring).rejects.toThrow(
+      await expect(lock.acquire()).rejects.toThrow(
         /waiting for the ClickHouse schema lock/,
       );
+      expect(handedOver).toBe(true);
       expect(readFileSync(lockPath, "utf-8")).toContain(liveToken);
+      expect(readFileSync(lockPath, "utf-8")).not.toContain(abandonedToken);
     });
   });
 });
