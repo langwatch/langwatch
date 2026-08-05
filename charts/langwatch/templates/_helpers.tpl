@@ -611,39 +611,63 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* ClickHouse client pool sizing                                 */}}
 {{/* ============================================================ */}}
 {{/*
-     Per-Deployment inputs for the ClickHouse client's pool sizing.
+     How many pods in this release hold a ClickHouse client.
 
-     The client derives its pool size from the server's concurrent-query budget
-     divided across the fleet (resolvePoolSize in @langwatch/clickhouse-client).
-     A pod that is not told how many siblings it has cannot divide by anything,
-     so the derivation is skipped and the client keeps a fixed 64 connections
-     per pool - the sizing that let a fleet of app and worker pods, each holding
-     two client instances, ask for far more connections than the server's
-     max_concurrent_queries allows, and had ClickHouse reject tens of thousands
-     of queries with TOO_MANY_SIMULTANEOUS_QUERIES on 2026-07-31. Rendering
-     these two variables is what turns the derivation on.
+     This is the WHOLE fleet, not one Deployment's own replicas, and the
+     distinction is the difference between a fix and a re-run of the incident.
+     resolvePoolSize divides the entire concurrent-query share by the count it
+     is handed, so a Deployment that reports only itself sizes its pools as
+     though it owned the whole share, and every other Deployment does the same
+     against the same server. Three app pods and ten worker pods each dividing
+     the full share come to well over it between them - arithmetic of the same
+     class as the one that had ClickHouse reject tens of thousands of queries
+     with TOO_MANY_SIMULTANEOUS_QUERIES on 2026-07-31, reached from the other
+     direction. Computed here rather than passed in, so the two Deployments
+     cannot be given different answers.
 
-     The replica count cannot come from the downward API: fieldRef exposes
-     pod-level fields only, and the replica count belongs to the Deployment, so
-     a pod cannot read its own. It is templated from the same value that sets
-     `spec.replicas` on the Deployment, so the two can never disagree in a
-     rendered release. An operator who scales outside Helm (`kubectl scale`, or
-     an autoscaler) must keep the value in step, otherwise the pods keep sizing
-     for the old count.
+     The app and the workers are the whole fleet: they are the only pods this
+     chart hands ClickHouse credentials to. CronJob pods only call the app's
+     HTTP API, and no other component receives CLICKHOUSE_URL. Workers count
+     only when they are enabled, because a disabled Deployment renders no pods.
+*/}}
+{{- define "langwatch.clickhouse.clientReplicas" -}}
+{{- $fleet := int (.Values.app.replicaCount | default 1) -}}
+{{- if .Values.workers.enabled -}}
+{{- $fleet = add $fleet (int (.Values.workers.replicaCount | default 1)) -}}
+{{- end -}}
+{{- max $fleet 1 -}}
+{{- end -}}
+
+{{/*
+     The pool-sizing inputs every pod that builds a ClickHouse client receives.
+
+     Both variables are identical on every such pod, by construction: they
+     describe one shared server and one shared fleet, and a pod holding a
+     different answer to either would size against a budget nobody else is
+     dividing.
+
+     Without CLICKHOUSE_CLIENT_REPLICAS the derivation is skipped entirely and
+     the client keeps a fixed 64 connections per pool - the pre-incident number.
+     Rendering these is what turns the derivation on at all.
+
+     The fleet size cannot come from the downward API: fieldRef exposes
+     pod-level fields only, and a replica count belongs to a Deployment, so a
+     pod cannot read even its own, let alone another's. It is templated from the
+     same values that set `spec.replicas`, so the numbers can never disagree in
+     a rendered release. An operator who scales outside Helm (`kubectl scale`,
+     or an autoscaler) has to keep those values in step, or the pods keep
+     sizing for the old fleet.
 
      CLICKHOUSE_CLIENTS_PER_PROCESS is deliberately not rendered. How many
      client instances a process constructs is a property of the application
      code, not of the deployment, so the chart has no honest value for it and
-     the package's own default (2, one raw client plus one app-layer factory)
-     is the right answer.
-
-     Usage: include with (dict "replicas" .Values.app.replicaCount "ctx" .)
+     the package's own default is the right answer.
 */}}
 {{- define "langwatch.clickhousePoolSizingEnv" -}}
 - name: CLICKHOUSE_CLIENT_REPLICAS
-  value: {{ .replicas | default 1 | quote }}
+  value: {{ include "langwatch.clickhouse.clientReplicas" . | quote }}
 - name: CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES
-  value: {{ ((.ctx.Values.clickhouse).serverMaxConcurrentQueries) | default 300 | quote }}
+  value: {{ ((.Values.clickhouse).platformConcurrentQueryShare) | default 270 | quote }}
 {{- end }}
 
 {{/* ============================================================ */}}

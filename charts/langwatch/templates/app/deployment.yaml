@@ -125,10 +125,11 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
-            # ClickHouse connection-pool sizing. Per-role rather than shared:
-            # the pool is derived from this Deployment's own replica count, and
-            # the app and the workers scale independently.
-            {{- include "langwatch.clickhousePoolSizingEnv" (dict "replicas" .Values.app.replicaCount "ctx" .) | nindent 12 }}
+            # ClickHouse connection-pool sizing. The fleet figure counts the
+            # app AND the workers, because both divide one server's share; a
+            # Deployment that counted only itself would size as though it owned
+            # the whole share.
+            {{- include "langwatch.clickhousePoolSizingEnv" . | nindent 12 }}
 
             # Names this process in telemetry. It becomes the OTel resource
             # `service.name` and the `service` field on every stdout log line,
