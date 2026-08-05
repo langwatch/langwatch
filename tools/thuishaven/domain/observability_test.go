@@ -31,6 +31,21 @@ func TestObservabilityEnvIsEmittedOnlyWhenTheStackIsUp(t *testing.T) {
 	}
 }
 
+// Browser telemetry rides the same collector, so it turns on with it and stays
+// off without it — otherwise the app's exporter would post to an ingest route
+// that has nowhere to forward to.
+func TestObservabilityEnvEnablesBrowserTelemetryWithTheStack(t *testing.T) {
+	down := Stack{Slug: "portless", APIPort: 4000}
+	if got := valueOf(down.OverlayEnv(), "RUM_ENABLED"); got != "" {
+		t.Errorf("with no collector running, RUM_ENABLED must be unset; got %q", got)
+	}
+
+	up := Stack{Slug: "portless", ObservabilityOTLPPort: 4318}
+	if got := valueOf(up.OverlayEnv(), "RUM_ENABLED"); got != "true" {
+		t.Errorf("RUM_ENABLED = %q, want true", got)
+	}
+}
+
 // The slug tag is the whole point of one shared collector: an agent debugging a
 // worktree filters Grafana to that worktree and sees only its own telemetry.
 func TestObservabilityEnvTagsTelemetryWithTheSlug(t *testing.T) {

@@ -40,7 +40,7 @@ type Worker struct {
 	// authProxy fronts opencode with bearer-token auth. Shutdown on worker exit
 	// so the externally-advertised port frees up.
 	authProxy *opencode.AuthProxy
-	// egress is the per-worker OUTBOUND egress handle (ADR-043) returned by the
+	// egress is the per-worker OUTBOUND egress handle (ADR-076) returned by the
 	// egress guard's PrepareWorker: it carries the loopback forward-proxy port
 	// the worker's HTTPS_PROXY points at (0 when the guard runs no proxy) and a
 	// Close that tears the proxy down. Closed on every teardown path (kill /
@@ -65,16 +65,19 @@ type Worker struct {
 	// worker rather than continue with stale env.
 	credSig domain.CredentialSignature
 
-	// apiKeyID + langwatchEndpoint are the two things needed to revoke this
+	// apiKeyID + projectID + langwatchEndpoint are what is needed to revoke this
 	// worker's session key when it dies, and nothing else. They are recorded at
 	// spawn because that is the only moment we have them: the key itself goes into
 	// the subprocess env and is never readable again, and later turns on a reused
-	// worker deliberately arrive with no credentials at all.
+	// worker deliberately arrive with no credentials at all. projectID scopes the
+	// revoke to the key's own tenant (the control plane refuses a cross-project
+	// revoke).
 	//
 	// The key's lifetime IS this worker's lifetime — it was injected at spawn and
 	// a reused worker keeps it — so the worker is the right thing to hang the
 	// revocation handle off.
 	apiKeyID          string
+	projectID         string
 	langwatchEndpoint string
 
 	mu sync.Mutex
@@ -96,6 +99,14 @@ type Worker struct {
 	handled     map[string]struct{}
 	handledRing [recentTurnsCap]string
 	handledNext int
+	// promptDelivered flips when a PostMessage has SUCCEEDED on this worker's
+	// session. It gates the history seed: the seed is folded into the session's
+	// first delivered message only, because from then on the session's own
+	// transcript carries it (and re-sending it would both bloat every later
+	// message and churn the provider's cached prefix). Distinct from
+	// HasServedTurn, which flips at Release even for a turn whose post FAILED:
+	// a failed post delivered nothing, so the next attempt must seed again.
+	promptDelivered bool
 }
 
 // recentTurnsCap bounds the per-worker recently-completed turnId set. Comfortably
@@ -146,6 +157,16 @@ func (w *Worker) ClaimTurn(turnID string) app.ClaimOutcome {
 	return app.ClaimGranted
 }
 
+// HasServedTurn reports whether this worker has completed at least one turn.
+// The manager words its pre-first-frame status off it: a worker that has never
+// answered is genuinely waking up, one that has is a quick round-trip — and the
+// two must not claim to be each other.
+func (w *Worker) HasServedTurn() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return len(w.handled) > 0
+}
+
 // Release marks the worker idle again and records the turn as recently-handled so
 // a re-dispatch arriving after completion is a benign no-op.
 func (w *Worker) Release() {
@@ -189,6 +210,14 @@ func (w *Worker) SetTurnTraceContext(sc trace.SpanContext) {
 	}
 }
 
+// ForwardTurnSpan emits the turn's customer-facing root span via the relay.
+// No relay (mediation off) is a no-op, like SetTurnTraceContext.
+func (w *Worker) ForwardTurnSpan(sc trace.SpanContext, start, end time.Time, failure *domain.TurnFailure) {
+	if w.otelRelay != nil {
+		w.otelRelay.ForwardTurnSpan(w.otelToken, sc, start, end, failure)
+	}
+}
+
 // LastLLMError is the typed gateway herr this worker's most recent mediated
 // LLM call failed with, if any — reset at each turn start. Read by the app
 // when the agent reports a turn error so the terminal frame carries the real
@@ -200,16 +229,36 @@ func (w *Worker) LastLLMError() (herr.E, bool) {
 	return w.otelRelay.LastLLMError(w.otelToken)
 }
 
-// PostMessage queues a turn on the worker's opencode session. resumeToken
-// (ADR-048) is the opaque checkpoint from a prior turn that handed off on
-// shutdown; empty on a normal cold start. It is forwarded verbatim to opencode,
-// never parsed by the manager.
-func (w *Worker) PostMessage(ctx context.Context, system, prompt, resumeToken string) error {
-	return w.agent.Post(ctx, w.endpoint, w.openCodeSessionID, app.Turn{
+// PostMessage queues a turn on the worker's opencode session.
+//
+// historySeed is the control plane's conversation-so-far block. It is folded in
+// AHEAD of the prompt on the session's first delivered message only
+// (promptDelivered gates it): a fresh session must be told what the durable
+// record already holds, and from that first message on the session's own
+// transcript carries it, so later messages stay lean and the request prefix the
+// provider caches stays byte-stable turn over turn. The flag flips only on a
+// SUCCESSFUL post, so a failed first delivery seeds again on the retry.
+//
+// resumeToken (ADR-048) is the opaque checkpoint from a prior turn that handed
+// off on shutdown; empty on a normal cold start. It is forwarded verbatim to
+// opencode, never parsed by the manager.
+func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string) error {
+	w.mu.Lock()
+	if !w.promptDelivered && historySeed != "" {
+		prompt = historySeed + "\n\n" + prompt
+	}
+	w.mu.Unlock()
+	err := w.agent.Post(ctx, w.endpoint, w.openCodeSessionID, app.Turn{
 		System:      system,
 		Prompt:      prompt,
 		ResumeToken: resumeToken,
 	})
+	if err == nil {
+		w.mu.Lock()
+		w.promptDelivered = true
+		w.mu.Unlock()
+	}
+	return err
 }
 
 // NotifyShutdownImminent posts a shutdown-imminent notice to this worker's

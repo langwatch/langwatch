@@ -24,13 +24,12 @@ const (
 	AttrGenAIResponseID       = "gen_ai.response.id"
 	AttrGenAIResponseModel    = "gen_ai.response.model"
 	AttrGenAIResponseFinish   = "gen_ai.response.finish_reasons"
-	AttrGenAIUsageIn          = "gen_ai.usage.input_tokens"
 	AttrGenAIUsageOut         = "gen_ai.usage.output_tokens"
 	AttrGenAIUsageTotal       = "gen_ai.usage.total_tokens"
-	AttrGenAIUsageCacheRead   = "gen_ai.usage.cache_read.input_tokens"
-	AttrGenAIUsageCacheCreate = "gen_ai.usage.cache_creation.input_tokens"
-	// AttrGenAIConversationID is the wrapped tool's own session / thread id,
-	// lifted from a request header (claude-code / codex / opencode) so the
-	// gateway-path trace carries a real conversation id the fold groups on.
-	AttrGenAIConversationID = "gen_ai.conversation.id"
+	// Audio usage measures (no upstream semconv exists yet for either):
+	// characters synthesized by a TTS call and seconds of audio transcribed
+	// by an STT call, the units character- and duration-priced audio
+	// providers bill by.
+	AttrGenAIUsageInputChars   = "gen_ai.usage.input_chars"
+	AttrGenAIUsageAudioSeconds = "gen_ai.usage.audio_seconds"
 )

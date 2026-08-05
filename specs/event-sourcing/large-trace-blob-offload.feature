@@ -52,16 +52,14 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   # ===========================================================================
 
   @e2e @track1
-  # Bound by redisCachedFoldStore.unit.test.ts — the @scenario annotation on
-  # "given a toCacheable projection and a fold state carrying a 1 MB output"
-  # asserts cached entry length < 1 MB and computedOutput is null in cache,
-  # while the inner ClickHouse store still receives the full state.
-  # Two complementary mechanisms enforce the bound:
-  #   1. The dispatch interposition replaces over-threshold IO attribute values
-  #      with a 64 KB preview before the projection queue, so the fold cache is
-  #      naturally bounded at the input boundary.
-  #   2. RedisCachedFoldStore.toCacheable on traceSummary.foldProjection strips
-  #      computedOutput from the cached shape (CH still gets the full state).
+  # Bound by foldCacheLeanTrace.integration.test.ts, which folds a 1 MB-output
+  # trace through leanForProjection -> TraceSummaryFoldProjection ->
+  # RedisCachedFoldStore and asserts against the raw cache entry.
+  # The bound is enforced at the input boundary: the dispatch interposition
+  # replaces over-threshold IO attribute values with a 64 KB preview before the
+  # projection queue, so the fold never sees the full value. (RedisCachedFoldStore
+  # no longer has a `toCacheable` hook — the fold state itself is now O(1)
+  # scalars plus previews, so there is nothing left to strip on the way in.)
   Scenario: Folding a trace with a 1 MB output keeps the Redis cache entry lean
     Given a trace whose span carries a 1 MB output value
     When all spans of the trace are folded into the trace summary
@@ -85,7 +83,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   # accumulateIO are unmodified by this PR. The lean step happens at the
   # dispatch interposition AFTER the event is durable in event_log, so the
   # fold sees the same inputs (preview-shaped) regardless of order.
-  Scenario: Out-of-order refold converges on the same state as in-order folding
+  Scenario: Out-of-order folding converges on the same state as in-order folding
     Given the span events of a trace arrive out of their occurrence order
     When the trace is folded
     Then the resulting trace summary matches the state produced by folding the
@@ -109,7 +107,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
 
   @e2e @track2 @unimplemented
   # Python SDK default raised to 32 KB (constructor + public factory:
-  # python-sdk/src/langwatch/telemetry/tracing.py:96, 786). TS SDK has no
+  # sdks/python/src/langwatch/telemetry/tracing.py:96, 786). TS SDK has no
   # transport-layer cap (grep confirms only CLI display helpers). Go gateway
   # has no sdktrace.WithSpanLimits and no manual truncation in
   # customertracebridge/emitter.go (OTel Go SDK v1.43.0 defaults to unlimited).
@@ -210,6 +208,24 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     Then both call sites invoke the same leanForProjection function
     And the derived shapes are byte-identical
 
+  @unit @track2
+  # A blind byte cut of an over-budget JSON chat payload leaves unparseable
+  # JSON in the preview, and everything computed from the leaned span — the
+  # fold's ComputedInput/ComputedOutput, the trace list, the Summary and
+  # Conversation views — degrades to a raw JSON blob. A coding-agent turn's
+  # developer/system prompt alone exceeds the budget, so every such turn used
+  # to lose its short user message ("hi") past the cut. Bound by
+  # lean-for-projection.unit.test.ts + trace-io-extraction.service.unit.test.ts.
+  Scenario: The preview of an over-budget chat payload stays structured and extractable
+    Given a span whose gen_ai.input.messages is a JSON chat array over the preview budget
+    And the array starts with a developer-role message larger than the whole budget
+    And the array ends with the user's short message
+    When leanForProjection derives the preview
+    Then the preview is valid JSON within the budget
+    And long message contents are clamped rather than the JSON cut mid-string
+    And middle messages are dropped before the first message or the newest tail
+    And trace input extraction on the leaned span still yields the user's message text
+
   @integration @track2
   # Already bound to span-attribute-keys.unit.test.ts via the existing
   # @scenario annotation on its test cases. Carry forward from ADR-021.
@@ -256,7 +272,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   # AC T1.2: "Trace-detail full read returns byte-identical IO"
   #   -> Scenario: Trace-detail full read returns input and output byte-identical to ingestion
   # AC T1.3: "Out-of-order refold + EvaluationTrigger reactor still produce correct state"
-  #   -> Scenario: Out-of-order refold converges on the same state as in-order folding
+  #   -> Scenario: Out-of-order folding converges on the same state as in-order folding
   #   -> Scenario: EvaluationTrigger reactor fires correctly off the lean event
   #
   # Track 2 — event_log as SoT + spool + SDKs + read resolution

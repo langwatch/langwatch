@@ -32,12 +32,28 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
   Scenario: The chart refuses to render when managed without a sandboxed runtime
     Given the chart manages the langy-agent pod
     And no sandboxed runtime is configured for the pod
+    And the operator has not accepted running without one
     When an operator renders the chart to deploy it
     Then the deploy fails before producing any manifests
     And the failure names the missing sandboxed runtime
     And the failure explains that running this workload without a sandbox
       re-opens the pod-to-host escape surface
+    And the failure names the value that accepts that risk deliberately
     # Same family as the existing replicaCount and service.type render guards.
+
+  # Most self-managed clusters cannot offer a sandboxed runtime, and refusing
+  # them outright made the assistant hosted-only in practice. The invariant that
+  # survives is narrower and still worth having: nobody runs this workload
+  # unsandboxed by ACCIDENT. Accepting the reduced isolation is a value the
+  # operator writes down, so it shows up in their own values file and in review,
+  # rather than being the silent consequence of leaving a field blank.
+  Scenario: An operator can accept the reduced isolation and render without a sandbox
+    Given the chart manages the langy-agent pod
+    And no sandboxed runtime is configured for the pod
+    And the operator has accepted running without one
+    When an operator renders the chart to deploy it
+    Then the pod renders successfully
+    And the pod is not pinned to any sandboxed runtime
 
   Scenario: The chart renders with the sandboxed runtime set
     Given the chart manages the langy-agent pod
@@ -46,13 +62,24 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     Then the pod renders successfully
     And the pod is pinned to the sandboxed runtime
 
+  Scenario: A default install on a cluster without the RuntimeClass degrades to Pending, not to unsandboxed
+    Given an operator installs the umbrella chart with default values
+    And the cluster defines no matching RuntimeClass
+    When the install completes
+    Then every other workload runs
+    And the langy-agent pod waits rather than running without its sandbox
+    And the install notes explain where a sandboxed runtime comes from on each major cloud
+    And the install notes name the values that accept running without one
+
   Scenario: The guard does not fire when the agent is not chart-managed
     Given the chart does not manage the langy-agent pod
     And no sandboxed runtime is configured for the pod
     When an operator renders the chart
     Then rendering succeeds without requiring a sandboxed runtime
-    # Opting the whole pod out is the only legitimate way to run without the
-    # sandbox; blanking the runtime while still managed is not, and is refused.
+    # Opting the whole pod out needs no acceptance: there is no workload to
+    # sandbox. Blanking the runtime while still managed does, and is refused
+    # until the operator accepts it (see the scenario above, and
+    # specs/langy/langy-selfhost-install.feature for the operator's story).
 
   # ===========================================================================
   # Local e2e manifest mirrors the production security posture

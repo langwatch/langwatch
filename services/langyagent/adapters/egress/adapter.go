@@ -6,14 +6,17 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/ssrf"
 )
 
-// egressAdapter is the per-worker outbound forward proxy (ADR-043). It is the
+// egressAdapter is the per-worker outbound forward proxy (ADR-076). It is the
 // egress twin of the workerpool authProxy: the authProxy fronts a worker's
 // INBOUND opencode control port; this fronts the worker's OUTBOUND traffic. The
 // worker's tools (`gh`, `git`, `npm`, `curl`, `pip`) egress through it via
@@ -30,7 +33,7 @@ import (
 //	                            with the TLS SNI as a cross-check.
 //	rung 0   monitor          — every decision above ALSO flags (see event.go).
 //
-// Honest limit (ADR-043 "Where FQDN enforcement lives"): within one pod netns
+// Honest limit (ADR-076 "Where FQDN enforcement lives"): within one pod netns
 // nothing forces a worker's traffic THROUGH this loopback proxy — a hostile
 // worker can ignore HTTPS_PROXY and connect() straight to an external IP:443.
 // This adapter is authoritative for COOPERATING clients (the primary
@@ -56,7 +59,8 @@ type egressAdapterConfig struct {
 	monitor        egressMonitor
 	// dial reaches the real upstream. Injected so tests can redirect any
 	// authority to a loopback listener; production uses a bounded net.Dialer.
-	dial func(ctx context.Context, network, addr string) (net.Conn, error)
+	dial    func(ctx context.Context, network, addr string) (net.Conn, error)
+	resolve func(ctx context.Context, host string) ([]net.IP, error)
 	// requireTLS refuses cleartext forwards and CONNECT to any port other than
 	// tlsPort (rung 1a). On by default in production — worker egress is HTTPS
 	// already, so this rung is the always-safe one.
@@ -194,12 +198,28 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "proxy misconfigured", http.StatusInternalServerError)
 		return
 	}
-	clientConn, _, err := hijacker.Hijack()
+	clientConn, bufrw, err := hijacker.Hijack()
 	if err != nil {
 		a.record(fqdn, port, decision, "hijack failed: "+err.Error(), 0)
 		return
 	}
 	defer clientConn.Close()
+
+	// Take back whatever net/http already buffered. A client that pipelines its
+	// CONNECT and its ClientHello into one segment leaves the hello sitting in
+	// the server's 4 KiB read buffer, and discarding that reader loses it: the
+	// peek below reads the RAW socket, finds nothing, and blocks for the whole
+	// sniPeekTimeout. Under an enforcing policy that is merely a slow deny, but
+	// with the cross-check off the tunnel is spliced with the ClientHello
+	// silently missing and the upstream handshake dies with no diagnostic.
+	if n := bufrw.Reader.Buffered(); n > 0 {
+		buffered := make([]byte, n)
+		if _, err := io.ReadFull(bufrw, buffered); err != nil {
+			a.record(fqdn, port, decision, "buffered read failed: "+err.Error(), 0)
+			return
+		}
+		clientConn = &prefixConn{Conn: clientConn, prefix: buffered}
+	}
 
 	if throttled && tarpit > 0 {
 		a.record(fqdn, port, egressThrottled, "connection burst tar-pit", 0)
@@ -212,24 +232,69 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	// rung 3 cross-check: peek the TLS ClientHello SNI (without terminating
 	// TLS) and re-run the decision against the host the client is REALLY
-	// negotiating with. Catches domain-fronting — `CONNECT allowed:443` then a
-	// TLS SNI of `attacker.com` on a shared CDN IP. The authority passed; if the
-	// differing SNI would NOT pass the same allow set, it never reaches the
-	// destination. A benign quirk (SNI differs but is itself allowed) proceeds.
+	// negotiating with. Catches the SNI variant of domain-fronting —
+	// `CONNECT allowed:443` then a TLS SNI of `attacker.com` on a shared CDN IP.
+	// The authority passed; if the differing SNI would NOT pass the same allow
+	// set, it never reaches the destination.
+	//
+	// It does NOT catch the classic variant, where the SNI is the allowed host
+	// and the deception is a `Host:` header INSIDE the encrypted stream. Seeing
+	// that would mean terminating TLS, which we decline to do — the tunnel stays
+	// opaque. ADR-076 records this as an accepted limit.
 	if a.cfg.sniCrossCheck {
-		sni, replay, perr := peekClientHelloSNI(clientConn, a.cfg.sniPeekTimeout)
+		sni, sawHandshake, replay, perr := peekClientHelloSNI(clientConn, a.cfg.sniPeekTimeout)
 		clientConn = replay
-		if perr == nil && sni != "" && sni != fqdn {
-			if a.cfg.policy.decide(sni).blocked() {
+		switch {
+		case sni != "" && sni != fqdn:
+			// Decided once, then both branches act on and RECORD that same
+			// value — recomputing it for the telemetry line would let the
+			// flagged decision drift from the one the branch acted on.
+			sniDecision := a.cfg.policy.decide(sni)
+			if sniDecision.blocked() {
 				a.record(sni, port, egressDeniedSNIMismatch,
 					fmt.Sprintf("sni %q not allowed (authority was %q)", sni, fqdn), 0)
 				return
 			}
+			// Allowed, but still worth a line. An SNI that differs from the
+			// authority is anomalous whether or not the target happens to be
+			// listed — it is the fingerprint of a fronting attempt, and rung 0
+			// says every decision flags. Without this, an operator reviewing
+			// egress telemetry after an incident sees a normal flow to the
+			// authority and no trace of the host actually spoken to.
+			a.record(sni, port, sniDecision,
+				fmt.Sprintf("sni %q differs from authority %q but is allowed", sni, fqdn), 0)
+		case sni == "" && sniUnreadable(sawHandshake, perr) &&
+			!isIPLiteral(host) && a.cfg.policy.enforcing():
+			// We could not positively read an SNI out of something we were
+			// meant to check. Under an enforcing policy that fails closed.
+			//
+			// The condition is "could not read", NOT "saw a handshake byte".
+			// Keying on the latter left the control bypassable by doing
+			// nothing at all: send CONNECT, then stall past sniPeekTimeout, and
+			// the read errors before the 5-byte header completes, so
+			// sawHandshake stays false, the error was discarded, neither branch
+			// fired and the tunnel was spliced uninspected. A `sleep` defeated
+			// the whole cross-check.
+			//
+			// Two deliberate exemptions. A stream that is CLEANLY not TLS
+			// (complete header, wrong content type, no error) still passes —
+			// require-TLS is the rung that governs cleartext, not this one. And
+			// an IP-literal authority is exempt because RFC 6066 forbids an SNI
+			// there, so an allow-listed bare address would otherwise be denied
+			// for obeying the spec.
+			a.record(fqdn, port, egressDeniedSNIUnreadable,
+				fmt.Sprintf("unreadable TLS ClientHello under an enforcing policy (authority was %q)", fqdn), 0)
+			return
 		}
 	}
 
 	ctx := r.Context()
-	upstream, err := a.cfg.dial(ctx, "tcp", authority)
+	dialAddress, err := a.checkedDialAddress(ctx, host, port)
+	if err != nil {
+		a.record(fqdn, port, egressDeniedPrivateAddress, "destination address rejected: "+err.Error(), 0)
+		return
+	}
+	upstream, err := a.cfg.dial(ctx, "tcp", dialAddress)
 	if err != nil {
 		a.record(fqdn, port, decision, "upstream dial failed: "+err.Error(), 0)
 		return
@@ -238,6 +303,28 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	bytesUp := a.tunnel(ctx, clientConn, upstream, fqdn)
 	a.record(fqdn, port, decision, "tunnel closed", bytesUp)
+}
+
+func (a *egressAdapter) checkedDialAddress(ctx context.Context, host, port string) (string, error) {
+	if a.cfg.resolve == nil {
+		return net.JoinHostPort(host, port), nil
+	}
+	addresses, err := a.cfg.resolve(ctx, host)
+	if err != nil {
+		return "", fmt.Errorf("resolve host: %w", err)
+	}
+	for _, ip := range addresses {
+		addr, ok := netip.AddrFromSlice(ip)
+		// pkg/ssrf.IsPublicAddress is the canonical, cross-service rule set
+		// (Unmap()s IPv4-mapped IPv6 and rejects metadata, private, CGNAT,
+		// benchmarking, documentation, NAT64, 6to4 and reserved ranges). Pinning
+		// the dial to the first resolved public address closes the DNS-rebinding
+		// window between policy decision and connect.
+		if ok && ssrf.IsPublicAddress(addr) {
+			return net.JoinHostPort(addr.Unmap().String(), port), nil
+		}
+	}
+	return "", fmt.Errorf("host has no public address")
 }
 
 // tunnel splices client<->upstream opaquely. The client→upstream direction

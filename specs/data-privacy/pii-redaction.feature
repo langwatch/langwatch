@@ -107,3 +107,62 @@ Feature: Redacting personal data from traces
     When a trace is ingested whose input contains a person's name
     Then the stored input has the name redacted
     And the analysis service was called
+
+  # Detection heuristics over-trigger on business identifiers that merely look
+  # like PII: a 14-digit reservation number reads as a credit card, an
+  # "orders@acme.internal" queue address reads as a personal email. Exception
+  # patterns are the release valve: a scope lists regexes for its own known-safe
+  # formats, and a detected span whose ENTIRE matched text matches one of them
+  # is left as it was. Exceptions never widen detection; they only veto
+  # individual matches, and everything else in the same text is still redacted.
+  # Like custom secret patterns they union down the cascade and are validated
+  # (compile + ReDoS analysis) at save time, never at ingestion.
+
+  @integration
+  Scenario: An exception pattern keeps a business identifier while other PII is still redacted
+    Given a rule on "web-app" with an exception pattern for 14-digit numbers starting with "00"
+    When a trace is ingested whose input contains a 14-digit reservation number starting with "00" and an email address
+    Then the stored input still contains the reservation number
+    And the stored input has the email address redacted
+
+  @integration
+  Scenario: An exception must cover the whole detected value
+    Given a rule on "web-app" with an exception pattern for the literal prefix of an email domain
+    When a trace is ingested whose input contains an email address on that domain
+    Then the stored input has the email address redacted
+
+  @integration
+  Scenario: Exception patterns union down the cascade
+    Given a rule on organization "acme" with an exception pattern for reservation numbers
+    And a rule on "web-app" with an exception pattern for internal queue addresses
+    When a trace is ingested whose input contains a reservation number and an internal queue address
+    Then the stored input still contains both identifiers
+
+  # At the strict level the analysis service re-scans for names and locations.
+  # When exceptions are configured, the pattern-based identifiers are handled
+  # exclusively by the native pass (where exceptions apply), and the analysis
+  # service is scoped to the identifiers only it can detect, so it cannot
+  # re-redact a value an exception kept.
+  @integration
+  Scenario: Exceptions hold at the strict level
+    Given a rule on "web-app" with the strict PII level and an exception pattern for reservation numbers
+    When a trace is ingested whose input contains a reservation number
+    Then the stored input still contains the reservation number
+
+  @integration
+  Scenario: An unsafe exception pattern is rejected when saving the rule
+    When an admin tries to save a PII exception pattern that is a catastrophic-backtracking regex
+    Then the request is rejected with a validation error
+
+  # An exception is the only pattern in this feature that REMOVES redaction, so
+  # a catch-all fails open rather than closed: anchored to the whole detected
+  # span, something like ".*" or "\d+" matches every finding and turns the PII
+  # pass off entirely while the level still reads as active in the UI. Save-time
+  # validation rejects a pattern that matches values of unrelated kinds, so an
+  # exception has to describe one identifier shape. A too-broad custom SECRET
+  # pattern only over-redacts, so it is not held to this.
+  @integration
+  Scenario: An over-broad exception pattern is rejected when saving the rule
+    When an admin tries to save a PII exception pattern that matches any value
+    Then the request is rejected with a validation error
+    And a pattern describing one specific identifier shape is still accepted

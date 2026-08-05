@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -291,6 +292,151 @@ func TestStreamSession_EmitsOwnSessionFramesAndFiltersSibling(t *testing.T) {
 	}
 }
 
+// The codex path streams reasoning-summary text on field=="text" — the SAME
+// channel as answer tokens — so the part's declared type (message.part.updated)
+// is the only routing authority. Reasoning-part deltas must ride as ephemeral
+// reasoning frames and NEVER as answer deltas, or the thinking titles
+// ("**Planning task execution strategy**") corrupt the persisted final text.
+func TestStreamSession_ReasoningPartTextDeltasNeverBecomeAnswerText(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fl, _ := w.(http.Flusher)
+		emit := func(s string) {
+			fmt.Fprintf(w, "data: %s\n", s)
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+		// Reasoning part created, then its deltas stream on field=="text".
+		emit(`{"type":"message.part.updated","properties":{"sessionID":"mine","part":{"id":"prt_r","type":"reasoning"}}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_r","field":"text","delta":"**Planning task execution strategy**"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_r","field":"text","delta":" weighing options"}}`)
+		// Then the real answer part and its tokens.
+		emit(`{"type":"message.part.updated","properties":{"sessionID":"mine","part":{"id":"prt_t","type":"text"}}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_t","field":"text","delta":"Hello"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_t","field":"text","delta":" there"}}`)
+		emit(`{"type":"message.completed","sessionID":"mine"}`)
+	}))
+	defer srv.Close()
+
+	got := collectFrames(t, srv.URL, "mine")
+
+	var deltas, reasonings []string
+	for _, line := range got {
+		var d struct {
+			Text string `json:"text"`
+		}
+		switch frameType(t, line) {
+		case "delta":
+			_ = json.Unmarshal([]byte(line), &d)
+			deltas = append(deltas, d.Text)
+		case "reasoning":
+			_ = json.Unmarshal([]byte(line), &d)
+			reasonings = append(reasonings, d.Text)
+		}
+	}
+	if answer := strings.Join(deltas, ""); answer != "Hello there" {
+		t.Errorf("answer text = %q, want %q — reasoning must never land in the answer", answer, "Hello there")
+	}
+	if thinking := strings.Join(reasonings, ""); thinking != "**Planning task execution strategy** weighing options" {
+		t.Errorf("reasoning frames = %q, want the reasoning part's text routed as reasoning", thinking)
+	}
+}
+
+// The stream carries no ordering guarantee between a part's first
+// message.part.delta and the message.part.updated that declares its type. A
+// reasoning delta that arrives BEFORE its declaration must still ride as a
+// reasoning frame, never as answer text: the manager holds an undeclared
+// part's deltas and replays them, in arrival order, once the declaration
+// lands. Answer deltas keep their relative order throughout.
+func TestStreamSession_ReasoningDeltaBeforeDeclarationStaysOutOfAnswer(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fl, _ := w.(http.Flusher)
+		emit := func(s string) {
+			fmt.Fprintf(w, "data: %s\n", s)
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+		// The reasoning part's deltas stream BEFORE the event that declares
+		// what the part is.
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_r","field":"text","delta":"**Planning**"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_r","field":"text","delta":" weighing options"}}`)
+		emit(`{"type":"message.part.updated","properties":{"sessionID":"mine","part":{"id":"prt_r","type":"reasoning"}}}`)
+		// Then the answer part, declared before its deltas as usual.
+		emit(`{"type":"message.part.updated","properties":{"sessionID":"mine","part":{"id":"prt_t","type":"text"}}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_t","field":"text","delta":"Hello"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_t","field":"text","delta":" there"}}`)
+		emit(`{"type":"message.completed","sessionID":"mine"}`)
+	}))
+	defer srv.Close()
+
+	got := collectFrames(t, srv.URL, "mine")
+
+	var deltas, reasonings []string
+	for _, line := range got {
+		var d struct {
+			Text string `json:"text"`
+		}
+		switch frameType(t, line) {
+		case "delta":
+			_ = json.Unmarshal([]byte(line), &d)
+			deltas = append(deltas, d.Text)
+		case "reasoning":
+			_ = json.Unmarshal([]byte(line), &d)
+			reasonings = append(reasonings, d.Text)
+		}
+	}
+	if want := []string{"Hello", " there"}; !slices.Equal(deltas, want) {
+		t.Errorf("answer deltas = %v, want %v unreordered, with no early reasoning landing in the answer", deltas, want)
+	}
+	if want := []string{"**Planning**", " weighing options"}; !slices.Equal(reasonings, want) {
+		t.Errorf("reasoning frames = %v, want the buffered deltas replayed in arrival order %v", reasonings, want)
+	}
+}
+
+// A part that streamed deltas but was never declared by the time the turn
+// settles flushes as answer text, exactly once: with no declaration there is
+// no evidence it was thinking, and its text must not be silently dropped from
+// the final.
+func TestStreamSession_UndeclaredPartDeltasFlushAsAnswerOnSettle(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fl, _ := w.(http.Flusher)
+		emit := func(s string) {
+			fmt.Fprintf(w, "data: %s\n", s)
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_x","field":"text","delta":"never"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_x","field":"text","delta":" declared"}}`)
+		emit(`{"type":"message.completed","sessionID":"mine"}`)
+	}))
+	defer srv.Close()
+
+	got := collectFrames(t, srv.URL, "mine")
+
+	var deltas, reasonings []string
+	for _, line := range got {
+		var d struct {
+			Text string `json:"text"`
+		}
+		switch frameType(t, line) {
+		case "delta":
+			_ = json.Unmarshal([]byte(line), &d)
+			deltas = append(deltas, d.Text)
+		case "reasoning":
+			_ = json.Unmarshal([]byte(line), &d)
+			reasonings = append(reasonings, d.Text)
+		}
+	}
+	if want := []string{"never", " declared"}; !slices.Equal(deltas, want) {
+		t.Errorf("answer deltas = %v, want the undeclared part flushed once as %v", deltas, want)
+	}
+	if len(reasonings) != 0 {
+		t.Errorf("reasoning frames = %v, want none for an undeclared part", reasonings)
+	}
+}
+
 // An opencode error event must terminate the stream with ErrAgentReportedError
 // — in ALL three spellings, and even when the event carries NO session id (a
 // provider-rejection error is emitted before the session is attached; the
@@ -355,7 +501,7 @@ func TestStreamSession_SiblingErrorEventStillFiltered(t *testing.T) {
 
 func TestTextDeltaFromEvent_MessagePartDelta(t *testing.T) {
 	// The current opencode shape: message.part.delta with a text field carries a
-	// token in properties.delta. This is the Stream B fast-path source (ADR-048).
+	// token in properties.delta. This is the Stream B fast-path source (ADR-077).
 	ev := decodeSSE(t, `{"type":"message.part.delta","properties":{"sessionID":"s1","field":"text","delta":"Hel"}}`)
 	got, ok := textDeltaFromEvent(ev)
 	if !ok || got != "Hel" {
@@ -1155,5 +1301,82 @@ func TestPlanItemsFromInput_AcceptsBareArray(t *testing.T) {
 	items, ok := planItemsFromInput(json.RawMessage(`[{"content":"Only step","status":"in_progress"}]`))
 	if !ok || len(items) != 1 || items[0].Content != "Only step" {
 		t.Fatalf("bare array must parse, got ok=%v items=%+v", ok, items)
+	}
+}
+
+// A failed LangWatch CLI command writes its failure DOCUMENT to stdout and a
+// one-line human summary to stderr. Overwriting stdout with the summary threw
+// away the code, the meta and the platform's own next steps at the first hop,
+// and the panel showed "This step couldn't be completed" for a failure the
+// platform had explained in full.
+func TestToolEndFrame_KeepsTheCLIFailureDocumentOverTheSummaryLine(t *testing.T) {
+	document := `{"ok":false,"error":{"code":"api_key_permission_denied","message":"denied","httpStatus":403,"meta":{"permission":"scenarios:create"},"isHandled":true}}`
+	part := &ssePart{
+		Tool: "bash",
+		State: sseToolState{
+			Output: json.RawMessage(strconv.Quote(document)),
+			Error:  json.RawMessage(strconv.Quote("Failed to create scenario: denied")),
+		},
+	}
+
+	frame, ok := toolEndFrame("call-1", part, true)
+	if !ok {
+		t.Fatal("expected a frame")
+	}
+	var decoded struct {
+		Output string `json:"output"`
+	}
+	if err := json.Unmarshal([]byte(frame.JSON()), &decoded); err != nil {
+		t.Fatalf("decode frame: %v", err)
+	}
+	if !strings.Contains(decoded.Output, "api_key_permission_denied") {
+		t.Fatalf("failure document was dropped, got %q", decoded.Output)
+	}
+}
+
+func TestToolEndFrame_UsesTheErrorMessageWhenStdoutHasNoDocument(t *testing.T) {
+	part := &ssePart{
+		Tool: "bash",
+		State: sseToolState{
+			Output: json.RawMessage(strconv.Quote("partial console output")),
+			Error:  json.RawMessage(strconv.Quote("command not found: langwatch")),
+		},
+	}
+
+	frame, ok := toolEndFrame("call-2", part, true)
+	if !ok {
+		t.Fatal("expected a frame")
+	}
+	var decoded struct {
+		Output string `json:"output"`
+	}
+	if err := json.Unmarshal([]byte(frame.JSON()), &decoded); err != nil {
+		t.Fatalf("decode frame: %v", err)
+	}
+	if decoded.Output != "command not found: langwatch" {
+		t.Fatalf("expected the error message, got %q", decoded.Output)
+	}
+}
+
+func TestCarriesFailureDocument(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{"a failure document", `{"ok":false,"error":{"code":"not_found"}}`, true},
+		{"a failure document after console noise", "- Creating...\n" + `{"ok":false,"error":{"code":"not_found"}}`, true},
+		{"a successful result", `{"id":"scenario_1"}`, false},
+		{"an ok-true document", `{"ok":true}`, false},
+		{"a document with no error", `{"ok":false}`, false},
+		{"a human table", "ID   NAME\n1    Support", false},
+		{"empty output", "", false},
+		{"truncated JSON", `{"ok":false,"error":{"code":"not_`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := carriesFailureDocument(tc.output); got != tc.want {
+				t.Fatalf("carriesFailureDocument(%q) = %v, want %v", tc.output, got, tc.want)
+			}
+		})
 	}
 }

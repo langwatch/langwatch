@@ -1,0 +1,13 @@
+id: no-empty-test-tsx
+valid:
+  - |
+    it("normalises the handle", () => {
+      expect(normalise(" a ")).toBe("a");
+    });
+  - |
+    it.todo("rejects a malformed cursor");
+invalid:
+  - |
+    it("rejects a malformed cursor", () => {});
+  - |
+    test("seeds the catalog", async () => {});

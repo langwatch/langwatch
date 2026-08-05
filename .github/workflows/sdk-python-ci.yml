@@ -20,7 +20,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -32,12 +35,29 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the e2e
+          # step spends real LLM money, so it must not run on pushes or
+          # release PRs that touched nothing under sdks/python/. An SDK
+          # release PR still matches via sdks/python/CHANGELOG.md.
+          #
+          # NO NEGATION PATTERNS. dorny/paths-filter ORs a filter's patterns
+          # and evaluates each one independently, so a lone `!x` matches every
+          # path that is not `x` — which is every path. This filter carried
+          # `!sdks/python/src/langwatch/__version__.py` to keep a release-please
+          # version bump from paying for the suite; instead it made `relevant`
+          # true on every PR in the repo, and `test` ran its ~9 minutes on
+          # changes that never touched sdks/python/. Measured on a PR with zero
+          # python-sdk files: `Changes output set to ["relevant"]`.
+          #
+          # The exclusion is not expressible under OR semantics, so it is gone
+          # rather than rewritten: a release PR now runs the suite it was meant
+          # to skip, which costs one run per release instead of one per PR.
+          # specs/ci/path-filters.feature already forbids negation here.
+          push-strategy: diff
           filters: |
             relevant:
-              - 'python-sdk/**'
-              - '!python-sdk/src/langwatch/__version__.py'
+              - 'sdks/python/**'
               - '.github/workflows/sdk-python-ci.yml'
-              - '.github/.release-please-manifest.json'
 
   test:
     needs: changes
@@ -56,14 +76,14 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
-          cache-dependency-glob: "python-sdk/uv.lock"
+          cache-dependency-glob: "sdks/python/uv.lock"
 
       - name: Setup Python UV
-        working-directory: python-sdk
+        working-directory: sdks/python
         run: uv sync --all-groups --all-extras
 
       - name: Run unit tests
-        working-directory: python-sdk
+        working-directory: sdks/python
         env:
           LANGWATCH_DEBUG: "true"
         run: make test-unit
@@ -77,7 +97,7 @@ jobs:
            || github.event.pull_request.head.repo.full_name == github.repository)
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
-        working-directory: python-sdk
+        working-directory: sdks/python
         env:
           LANGWATCH_DEBUG: "true"
           LANGWATCH_API_KEY: ${{ secrets.PYTHON_SDK_LANGWATCH_API_KEY }}
@@ -85,10 +105,14 @@ jobs:
           TEST_EVALUATION_SLUG: "test-evaluation"
           AZURE_OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
-          GEMINI_API_KEY: ${{ secrets.PYTHON_SDK_GEMINI_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.PYTHON_SDK_GROQ_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
-          CEREBRAS_API_KEY: ${{ secrets.PYTHON_SDK_CEREBRAS_API_KEY }}
+          # OpenAI traffic rides the LangWatch AI Gateway: the key is a
+          # LangWatch virtual key, and both base-URL spellings cover every
+          # client family in the examples (openai SDK and haystack read
+          # OPENAI_BASE_URL; litellm, dspy and langchain read
+          # OPENAI_API_BASE). Azure keeps its own endpoint above.
+          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
+          OPENAI_API_BASE: https://gateway.langwatch.ai/v1
         run: |
           make test-e2e
           make cli-examples
@@ -112,14 +136,14 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
-          cache-dependency-glob: "python-sdk/uv.lock"
+          cache-dependency-glob: "sdks/python/uv.lock"
 
       - name: Setup Python UV
-        working-directory: python-sdk
+        working-directory: sdks/python
         run: uv sync --all-groups --all-extras && uv pip install build
 
       - name: Build package
-        working-directory: python-sdk
+        working-directory: sdks/python
         run: uv run python -m build
 
   # One required check for the whole workflow. Reports success if every

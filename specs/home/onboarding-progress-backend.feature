@@ -111,16 +111,16 @@ Feature: Onboarding Progress Backend
     When I request the onboarding status
     Then step "createSimulation" should be complete
 
-  # Setup evaluation step
+  # Setup online evaluation step
   @unimplemented
-  Scenario: Step setupEvaluation is incomplete when no evaluations exist
-    Given the project has 0 monitors
+  Scenario: Step setupEvaluation is incomplete when no online evaluations exist
+    Given the project has 0 online evaluations
     When I request the onboarding status
     Then step "setupEvaluation" should be incomplete
 
   @unimplemented
-  Scenario: Step setupEvaluation is complete when at least one evaluation exists
-    Given the project has 1 monitor
+  Scenario: Step setupEvaluation is complete when at least one online evaluation exists
+    Given the project has 1 online evaluation
     When I request the onboarding status
     Then step "setupEvaluation" should be complete
 

@@ -13,8 +13,9 @@ for the full pipeline.
 
 These are NOT committed. The docs pipeline regenerates them on the fly:
 `docs/scripts/sync-prompts.sh` runs `generate.sh`, then folds the `.txt` files
-into `docs/snippets/prompts-data.jsx` (which IS committed and freshness-checked
-by docs-ci).
+into the accordion markup of `docs/skills/directory.mdx` and
+`docs/skills/pms-and-domain-experts.mdx` (which ARE committed and
+freshness-checked by docs-ci).
 
 ## `native/` — opencode skills for Langy (committed)
 

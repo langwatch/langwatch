@@ -27,6 +27,13 @@ const (
 	ReasonContextDone    Reason = "context_done"
 )
 
+// ErrNoAttempts marks a Walk that ended without a single attempt being made
+// (every slot short-circuited by the breaker). Callers must detect it with
+// errors.Is and translate it into their own typed "temporarily unavailable"
+// error: there is no underlying attempt error to surface, so letting it
+// escape as-is would degrade into a generic internal error at the transport.
+var ErrNoAttempts = errors.New("no attempts were made")
+
 // Attempt is the operation retried across chain slots. Return (result, nil)
 // on success, or (zero, err) on failure. The classify function determines
 // whether to retry.
@@ -95,6 +102,43 @@ var defaultTriggers = map[Reason]bool{
 	ReasonNetwork:      true,
 }
 
+// breakerFailureReasons are the outcomes that indicate the SLOT is unhealthy:
+// the upstream did not answer (timeout, network) or answered that it is
+// broken (5xx). Only these accumulate toward opening the circuit.
+//
+// 4xx-class outcomes (rate limit, not found, terminal client errors) are the
+// upstream answering normally: deterministic verdicts about THIS request or
+// THIS account, not about the slot's health. Counting them used to open the
+// circuit during a provider quota outage (every 429 counted as a slot
+// failure), after which every request short-circuited into a zero-attempt
+// walk and clients saw a generic internal error instead of the provider's
+// own 429. A burst of malformed client requests could poison a shared
+// credential the same way.
+var breakerFailureReasons = map[Reason]bool{
+	ReasonRetryable5xx: true,
+	ReasonTimeout:      true,
+	ReasonNetwork:      true,
+}
+
+// recordBreaker reports the attempt outcome to the breaker. Failure reasons
+// count toward opening the circuit; any answered-4xx outcome proves the slot
+// alive and resets it (which also releases a half-open probe). Aborted
+// attempts (caller canceled) say nothing about slot health and record
+// nothing, since crediting a success would erase legitimate failure counts.
+func recordBreaker(breaker BreakerChecker, slotID string, reason Reason) {
+	if breaker == nil || slotID == "" {
+		return
+	}
+	switch {
+	case breakerFailureReasons[reason]:
+		breaker.RecordFailure(slotID)
+	case reason == ReasonContextDone:
+		// Nothing to record.
+	default:
+		breaker.RecordSuccess(slotID)
+	}
+}
+
 // Options configures the retry engine.
 type Options struct {
 	Triggers          map[Reason]bool // reasons that trigger retry (default: 5xx, rate_limit, timeout, network)
@@ -112,6 +156,12 @@ func (o *Options) withDefaults() {
 // Walk executes the attempt across the chain. Returns the first successful
 // result, an EventLog (call Release when done), or an error if the chain is
 // exhausted.
+//
+// An exhausted chain surfaces the LAST attempt's error: it is the freshest
+// upstream verdict, and callers forward it to their own clients (an earlier
+// slot's stale failure would misreport what the final candidate said). A walk
+// where no attempt ran at all (every slot short-circuited by the breaker)
+// returns an error wrapping ErrNoAttempts for the caller to translate.
 func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[R], classify Classifier) (R, *EventLog, error) {
 	var zero R
 	opts.withDefaults()
@@ -121,7 +171,7 @@ func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[
 	}
 
 	el := eventsPool.Get().(*EventLog)
-	var firstErr error
+	var lastErr error
 	attempts := 0
 
 	for i, slotID := range chain {
@@ -165,9 +215,7 @@ func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[
 			return result, el, nil
 		}
 
-		if firstErr == nil {
-			firstErr = err
-		}
+		lastErr = err
 
 		reason := ReasonNonRetryable
 		if classify != nil {
@@ -175,16 +223,14 @@ func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[
 		}
 		el.events = append(el.events, Event{Slot: i, SlotID: slotID, Reason: reason, Duration: duration, Err: err})
 
-		if slotID != "" && opts.Breaker != nil {
-			opts.Breaker.RecordFailure(slotID)
-		}
+		recordBreaker(opts.Breaker, slotID, reason)
 		if !opts.Triggers[reason] {
 			return zero, el, err
 		}
 	}
 
-	if firstErr == nil {
-		firstErr = errors.New("retry chain exhausted with no attempts")
+	if lastErr == nil {
+		return zero, el, fmt.Errorf("retry chain exhausted: %w", ErrNoAttempts)
 	}
-	return zero, el, fmt.Errorf("retry chain exhausted: %w", firstErr)
+	return zero, el, fmt.Errorf("retry chain exhausted: %w", lastErr)
 }

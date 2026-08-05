@@ -25,4 +25,19 @@ spec:
                 name: {{ include "gateway.fullname" . }}
                 port:
                   number: {{ .Values.service.port }}
+          {{- if and .Values.ingress.healthPath .Values.ingress.healthPath.enabled }}
+          {{- /*
+            Status-page health endpoint. Exact publishes this one path and
+            nothing else, so the k8s probes, /metrics and /internal stay
+            in-cluster. It does not bound the method: the gateway route
+            registers only GET and HEAD, and chi answers 405 otherwise.
+          */}}
+          - path: {{ .Values.ingress.healthPath.path }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "gateway.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+          {{- end }}
 {{- end }}

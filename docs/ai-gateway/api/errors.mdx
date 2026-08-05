@@ -4,7 +4,7 @@ description: OpenAI-compatible error shapes and a complete type enum.
 sidebarTitle: Errors
 ---
 
-Every gateway error is returned in the OpenAI-compatible envelope:
+Every LangWatch error, from the gateway data plane and from the management API alike, is returned in one OpenAI-compatible envelope:
 
 ```json
 {
@@ -12,18 +12,60 @@ Every gateway error is returned in the OpenAI-compatible envelope:
     "type":    "<type>",
     "code":    "<code>",
     "message": "<human-readable>",
-    "param":   "<optional field name>"
+    "meta":    { "<key>": "<value>" }
   }
 }
 ```
 
 This matches what the `openai` Python and TypeScript SDKs, plus the Anthropic SDK (which parses a superset), expect. Existing client code raises its usual typed exceptions unchanged.
 
+## Two planes, one envelope, one difference
+
+`type`, `code`, `message` and `meta` mean the same thing on both LangWatch surfaces, and a client that reads only those four works against either. The surfaces are:
+
+- The **control plane**: the management API, `/api/gateway/v1/*` and `/api/webhooks/v1/*`. You create virtual keys, budgets, cache rules and webhook endpoints here.
+- The **data plane**: the OpenAI-compatible chat surface the gateway serves. Your application's model calls go here.
+
+They differ in exactly two ways, both consequences of the data plane being OpenAI-wire-shaped on purpose:
+
+| | Control plane | Data plane |
+|---|---|---|
+| Validation detail | `error.meta.reasons` | `error.reasons` |
+| `402 budget_exceeded` | never | this is the only place it is raised |
+
+Read the reason chain from the plane you called. Nothing else about the envelope moves, and the data plane's extra `tips`, `docs_url` and `fault` fields are additive on both.
+
+<Note>`402 budget_exceeded` is a data-plane refusal because a budget stops **traffic**, not administration. Creating or editing a budget over the control plane is never refused for being over cap.</Note>
+
+### Fields
+
+| Field | Always present | What it is |
+|---|---|---|
+| `type` | yes | The coarse discriminant provider SDKs branch on. On the gateway data plane it carries the same value as `code` (the table below is the enum). On the management API it is the status class: `bad_request`, `unauthenticated`, `permission_denied`, `not_found`, `conflict`, `precondition_failed`, `unprocessable_entity`, `rate_limited`, `internal_error`. |
+| `code` | yes | The specific, stable machine name for what happened. **This is the field to branch on**, on either plane. |
+| `message` | yes | One sentence for a human. Wording is not stable; never parse it. |
+| `meta` | no | Structured detail the sentence deliberately leaves out, so a client never has to scrape prose. Keys are `lower_snake_case` (for example `budget_id`, `budget_scope`, `scope_type`). Omitted entirely when there is nothing to add. On the data-plane `402`, `meta.budget_scope` is the offending budget's `scope_type`: it keeps the `budget_` prefix because it sits in a self-consistent family alongside `budget_id`, `budget_window` and `budget_provider`. |
+| `trace_id`, `span_id` | no | Correlation handles for the failing request, present when it was traced. Quote them when filing support tickets. |
+
+Validation failures put the offending fields under `meta`: `meta.target` names the part of the request that failed (`json`, `query`, `param`) and `meta.fields` lists the offending paths. The per-violation chain carries one `{ code, message, meta }` entry each, with `meta.field`, `meta.type` and, where the schema knows them, `meta.expected` and `meta.received`. That chain lives at **`error.meta.reasons` on the control plane** and at **`error.reasons` on the data plane**, as above.
+
+The gateway data plane adds three fields on the errors it can offer a next step for, most notably the `402 budget_exceeded`:
+
+| Field | What it is |
+|---|---|
+| `tips` | An ordered list of remediation sentences. |
+| `docs_url` | A deep link to the page explaining the refusal. |
+| `fault` | Who has to act: `customer`, `platform`, or `provider`. |
+
+A client that reads only `type`, `code`, `message` and `meta` works unchanged against both planes; the three fields above are additive.
+
+<Note>Clients must ignore unknown fields. Fields are added to this envelope over time and none of the additions above changes an existing one.</Note>
+
 ## Response headers
 
 Errors (like successes) always carry:
 
-- `X-LangWatch-Request-Id: grq_<ULID>`, use this when filing support tickets.
+- `X-LangWatch-Gateway-Request-Id: req_<hex>`, use this when filing support tickets. It is the same id that appears as `gateway_request_id` on spend events and webhook envelopes, so it joins a failing call to its billing records.
 - `X-LangWatch-Provider`, present when the error originated from an upstream provider (absent for gateway-internal errors).
 
 ## Type enum
@@ -31,10 +73,11 @@ Errors (like successes) always carry:
 | `type` | HTTP | When |
 |---|---|---|
 | `invalid_api_key` | `401` | The `Authorization: Bearer …`, `x-api-key`, `api-key` header is missing, malformed, or points to a non-existent virtual key. |
-| `virtual_key_revoked` | `403` | The VK exists but has been revoked. |
+| `virtual_key_revoked` | `403` | The VK exists but has been revoked. Terminal: revocation is one-way. |
+| `virtual_key_disabled` | `403` | The VK exists but is currently disabled, the **reversible** stop: an administrator can re-enable it and the same secret works again. Distinct from `virtual_key_revoked` so tenant tooling can branch on which one it is. |
 | `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it, **or** the model matched a `policy_rules.models` deny regex (or fell outside its allow regex). Also used when the model/alias doesn't resolve to any configured provider. |
 | `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
-| `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope (e.g. `Budget exceeded for scope=project window=month`). |
+| `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope, and `error.meta` is machine-readable: `budget_id`, `budget_scope` (lowercase: `organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), `budget_window`, and `budget_provider` when a provider-filtered budget emptied the candidate chain. `budget_scope` distinguishes "this end user's cap" (`attributed_user`) from the tenant cap (`virtual_key`). See [Budgets → the breach catalog](/ai-gateway/budgets#breaches-warnings-and-budget-events). |
 | `rate_limit_exceeded` | `429` | Gateway-level (per-VK RPM/RPD) or upstream. Gateway-level adds `code = vk_rate_limit_exceeded`, `Retry-After: <seconds>` (RFC 7231), and `X-LangWatch-RateLimit-Dimension: rpm\|rpd` telling you which ceiling fired. TPM is deferred to v1.1. |
 | `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. Post-block also records a zero-cost `blocked_by_guardrail` debit on the budget ledger. |
 | `guardrail_upstream_unavailable` | `503` | A pre- or post-call guardrail's evaluator service was unreachable or errored, and the VK's `guardrails.{request,response}_fail_open` is `false` (the fail-closed default). Flip to fail-open on the VK to pass through on guardrail outages. |
@@ -43,8 +86,10 @@ Errors (like successes) always carry:
 | `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed or used an unknown mode. |
 | `cache_override_not_implemented` | `400` | The `X-LangWatch-Cache` header was well-formed but named a mode deferred to v1.1 (`force` or `ttl=NNN`). `respect` and `disable` are the v1 modes. |
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
+| `circuit_open` | `503` | Repeated upstream 5xx/timeout/network failures opened the credential's circuit breaker, so the gateway declined to dial the provider for this request. Retryable; the breaker probes the upstream again after its cooldown. Answered 4xx (rate limits, quota, bad requests) never open the breaker. |
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
 | `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
+| `unsupported_parameter` | `400` | The parameter policy refused a request parameter for the target lane: either the request depends on it functionally and the lane cannot honor it, or `drop_tuning_params` is `false` and the lane has no mapping for it. The message names the parameter, the lane, and why. See [Parameter mapping](/ai-gateway/parameter-mapping). |
 | `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
 | `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Request-Id` is how we trace it. |
 
@@ -52,9 +97,13 @@ Errors (like successes) always carry:
 
 These are *soft* signals on **successful** responses:
 
-- `X-LangWatch-Budget-Warning: <scope>:<pct>`, a budget scope is over its soft threshold. Multiple can be present.
+- `X-LangWatch-Budget-Warning: <scope>:<pct>`, a budget scope is at or over the 80 percent soft threshold. Multiple can be present.
 
 A `warn` breach never turns into an error envelope; it's only a header.
+
+## `end_user_required` (fail-closed attribution)
+
+When a virtual key carries an active [attributed-user budget template](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates) and a request arrives with **no end-user id** anywhere the gateway resolves one, the request is rejected with `error.code = "end_user_required"` rather than passing uncapped. Branch on the `code`: the fix is always on the request side, send the OpenAI `user` field or the `X-LangWatch-End-User-Id` header (`X-Litellm-End-User-Id` is accepted as an alias), and the error's `message` and `tips` name exactly that. It is terminal for the request as sent; do not retry without adding the id.
 
 ## Examples
 
@@ -69,8 +118,7 @@ X-LangWatch-Request-Id: grq_01HZX9K3MNM...
   "error": {
     "type":    "invalid_api_key",
     "code":    "invalid_api_key",
-    "message": "No active virtual key matches the presented credential.",
-    "param":   null
+    "message": "No active virtual key matches the presented credential."
   }
 }
 ```
@@ -87,7 +135,14 @@ X-LangWatch-Request-Id: grq_01HZX9K3MNN...
     "type":    "budget_exceeded",
     "code":    "budget_exceeded",
     "message": "Budget exceeded for scope=project window=month",
-    "param":   null
+    "meta":    {
+      "budget_id":     "bgt_01HZX9K3MNN",
+      "budget_scope":  "project",
+      "budget_window": "month"
+    },
+    "tips":     ["Raise the project's monthly limit, or wait for the window to roll over."],
+    "docs_url": "https://docs.langwatch.ai/ai-gateway/budgets",
+    "fault":    "customer"
   }
 }
 ```
@@ -104,7 +159,7 @@ X-LangWatch-Request-Id: grq_01HZX9K3MNO...
     "type":    "tool_not_allowed",
     "code":    "tool_not_allowed",
     "message": "Tool 'shell.exec' is blocked by VK policy policy_rules.tools.",
-    "param":   "tools[0].function.name"
+    "meta":    { "tool": "shell.exec" }
   }
 }
 ```
@@ -122,8 +177,7 @@ X-LangWatch-Fallback-Count: 2
   "error": {
     "type":    "upstream_timeout",
     "code":    "upstream_timeout",
-    "message": "All 3 providers in the fallback chain timed out after 30000ms.",
-    "param":   null
+    "message": "All 3 providers in the fallback chain timed out after 30000ms."
   }
 }
 ```
@@ -134,7 +188,7 @@ For SSE streaming, a terminal `event: error` frame carries the same envelope and
 
 ```
 event: error
-data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection reset after 2 chunks","param":null}}
+data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection reset after 2 chunks"}}
 
 ```
 

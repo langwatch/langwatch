@@ -8,7 +8,7 @@ Feature: Fresh-clone dev setup friction removal
   # Friction #4 (DB ports) shipped via PR #3860.
 
   # --- Friction #1: ALREADY RESOLVED ON MAIN (2026-05-21) ---
-  # Direct verification of langwatch/package.json on the issue3903 branch (at main HEAD)
+  # Direct verification of platform/app/package.json on the issue3903 branch (at main HEAD)
   # found no top-level "overrides" key. Only "pnpm.overrides" remains, which is the
   # canonical pnpm v10 location and not dead code. No fix needed; AC #1 and AC #2 are
   # marked resolved in the issue body. Scenarios moved here as historical context.
@@ -17,21 +17,21 @@ Feature: Fresh-clone dev setup friction removal
 
   @unit
   Scenario: .env.example ships a sentinel placeholder for LW_GATEWAY_INTERNAL_SECRET
-    Given the file "langwatch/.env.example"
+    Given the file "platform/app/.env.example"
     When the line declaring "LW_GATEWAY_INTERNAL_SECRET" is read
     Then the value is a non-empty sentinel string naming the generation command
     And the preceding comment block instructs the reader to run "openssl rand -hex 32"
 
   @unit
   Scenario: .env.example ships a sentinel placeholder for LW_GATEWAY_JWT_SECRET
-    Given the file "langwatch/.env.example"
+    Given the file "platform/app/.env.example"
     When the line declaring "LW_GATEWAY_JWT_SECRET" is read
     Then the value is a non-empty sentinel string naming the generation command
     And the preceding comment block instructs the reader to run "openssl rand -hex 32"
 
   @unit
   Scenario: .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER
-    Given the file "langwatch/.env.example"
+    Given the file "platform/app/.env.example"
     When the line declaring "LW_VIRTUAL_KEY_PEPPER" is read
     Then the value is a non-empty sentinel string naming the generation command
     And the preceding comment block instructs the reader to run "openssl rand -hex 32"
@@ -48,7 +48,7 @@ Feature: Fresh-clone dev setup friction removal
 
   @unit
   Scenario: No postinstall script reaches the network to download goose
-    Given the file "langwatch/package.json"
+    Given the file "platform/app/package.json"
     When the "scripts.postinstall" and "scripts.prepare" fields are inspected
     Then no script downloads a binary from the network
     And goose installation is left to the host (out of scope here)
@@ -61,7 +61,7 @@ Feature: Fresh-clone dev setup friction removal
   # cannot self-test the "fresh clone" precondition. Run manually before
   # closing #3903:
   #   git clone git@github.com:langwatch/langwatch.git /tmp/lw-ac6 && cd /tmp/lw-ac6
-  #   cp langwatch/.env.example langwatch/.env
+  #   cp platform/app/.env.example platform/app/.env
   #   # generate three real secrets per the inline `openssl rand -hex 32` hints
   #   make quickstart all-local
   #   # expect: stack starts, no ERR_PNPM_LOCKFILE_CONFIG_MISMATCH,
@@ -69,7 +69,7 @@ Feature: Fresh-clone dev setup friction removal
   Scenario: Fresh clone reaches a green app via make quickstart all-local in one cycle
     Given a fresh clone of the repository at HEAD
     And the host has Docker, Node, and pnpm installed
-    When I copy "langwatch/.env.example" to "langwatch/.env"
+    When I copy "platform/app/.env.example" to "platform/app/.env"
     And I generate values for the three gateway secrets per the inline instructions
     And I run "make quickstart all-local"
     Then the stack starts without ERR_PNPM_LOCKFILE_CONFIG_MISMATCH
@@ -79,7 +79,7 @@ Feature: Fresh-clone dev setup friction removal
   # --- AC Coverage Map ---
   # AC 1 (~~"Top-level overrides block deleted"~~) — already resolved on main, no scenario
   # AC 2 (~~"pnpm install --frozen-lockfile succeeds"~~) — already passes on main, covered by AC 6 e2e
-  # AC 3 ("langwatch/.env.example declares sentinel placeholders for the three gateway secrets")
+  # AC 3 ("platform/app/.env.example declares sentinel placeholders for the three gateway secrets")
   #   -> Scenario: .env.example ships a sentinel placeholder for LW_GATEWAY_INTERNAL_SECRET
   #   -> Scenario: .env.example ships a sentinel placeholder for LW_GATEWAY_JWT_SECRET
   #   -> Scenario: .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER

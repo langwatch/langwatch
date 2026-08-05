@@ -1,0 +1,36 @@
+{
+	"extends": "./tsconfig.tsgo.json",
+	"compilerOptions": {
+		// Override the inherited app buildinfo path so the tests project keeps
+		// its own incremental cache instead of clobbering the app's.
+		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-tests.tsbuildinfo"
+	},
+	"include": [
+		"./src/**/*.test.ts",
+		"./src/**/*.test.tsx",
+		"./src/**/*.spec.ts",
+		"./src/**/*.spec.tsx",
+		"./src/**/__tests__/**/*",
+		"./src/**/__mocks__/**/*",
+		"./src/**/*.d.ts",
+		"./ee/**/*.test.ts",
+		"./ee/**/*.test.tsx",
+		"./ee/**/*.spec.ts",
+		"./ee/**/*.spec.tsx",
+		"./ee/**/__tests__/**/*",
+		"./ee/**/__mocks__/**/*",
+		"./ee/**/*.d.ts",
+		"./scripts/**/*.test.ts",
+		"./scripts/**/*.spec.ts",
+		"./scripts/__tests__/**/*",
+		"./e2e/**/*",
+		"next-env.d.ts"
+	],
+	"exclude": [
+		"node_modules",
+		"../../mcp/typescript",
+		".next",
+		".next-saas",
+		"**/*.snippet.*"
+	]
+}

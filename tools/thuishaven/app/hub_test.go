@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ type fakeStore struct {
 	removed    []string
 	slugCache  map[string]string
 	dbActivity map[string]time.Time
+	selection  map[string]domain.Selection
 	touched    []string
 }
 
@@ -59,7 +61,21 @@ func (f *fakeStore) DBActivity() map[string]time.Time {
 	}
 	return m
 }
-func (f *fakeStore) RemoveDBActivity(slug string)         { delete(f.dbActivity, slug) }
+func (f *fakeStore) RemoveDBActivity(slug string) { delete(f.dbActivity, slug) }
+func (f *fakeStore) ReadSelection(worktreeDir string) (domain.Selection, bool) {
+	if f.selection == nil {
+		return domain.Selection{}, false
+	}
+	sel, ok := f.selection[worktreeDir]
+	return sel, ok
+}
+func (f *fakeStore) WriteSelection(worktreeDir string, sel domain.Selection) error {
+	if f.selection == nil {
+		f.selection = map[string]domain.Selection{}
+	}
+	f.selection[worktreeDir] = sel
+	return nil
+}
 func (f *fakeStore) ClaimDaemon(DaemonInfo) (bool, error) { return true, nil }
 func (f *fakeStore) Daemon() (DaemonInfo, bool)           { return DaemonInfo{}, false }
 func (f *fakeStore) ClearDaemon()                         {}
@@ -68,6 +84,7 @@ type fakeSystem struct {
 	alive           map[int]bool
 	terminated      []int
 	groupTerminated []int
+	groupKilled     []int
 	pidsByPort      map[int][]int
 	now             time.Time
 }
@@ -83,7 +100,13 @@ func (f *fakeSystem) Terminate(pid int) {
 		f.alive[pid] = false
 	}
 }
-func (f *fakeSystem) TerminateGroup(pid int)                       { f.groupTerminated = append(f.groupTerminated, pid) }
+func (f *fakeSystem) TerminateGroup(pid int) { f.groupTerminated = append(f.groupTerminated, pid) }
+func (f *fakeSystem) KillGroup(pid int) {
+	f.groupKilled = append(f.groupKilled, pid)
+	if f.alive != nil {
+		f.alive[pid] = false
+	}
+}
 func (f *fakeSystem) PIDsOnPort(port int) []int                    { return f.pidsByPort[port] }
 func (f *fakeSystem) SpawnDetached([]string, string, string) error { return nil }
 func (f *fakeSystem) Now() time.Time                               { return f.now }
@@ -100,9 +123,12 @@ func (f *fakeProxy) Installed() bool                    { return true }
 func (f *fakeProxy) EnsureReady() error                 { return nil }
 func (f *fakeProxy) Endpoint() (string, int)            { return "https", 443 }
 func (f *fakeProxy) CACertPath() string                 { return "" }
+func (f *fakeProxy) Shutdown() error                    { return nil }
+func (f *fakeProxy) Install() error                     { return nil }
 
 type fakeDBServer struct {
 	databases []string
+	mu        sync.Mutex // guards dropped: the bulk delete drops concurrently
 	dropped   []string
 	dropErr   error // when set, DropDatabase records the attempt then fails
 }
@@ -110,7 +136,9 @@ type fakeDBServer struct {
 func (f *fakeDBServer) Ensure(context.Context) (int, error)               { return 1, nil }
 func (f *fakeDBServer) EnsureDatabase(_ context.Context, db string) error { return nil }
 func (f *fakeDBServer) DropDatabase(_ context.Context, db string) error {
+	f.mu.Lock()
 	f.dropped = append(f.dropped, db)
+	f.mu.Unlock()
 	return f.dropErr
 }
 func (f *fakeDBServer) Databases(context.Context) ([]string, error) { return f.databases, nil }
@@ -121,19 +149,62 @@ func (f *fakeDBServer) Health(context.Context) (bool, string)       { return tru
 func (f *fakeDBServer) Stop()                                       {}
 
 type fakeHygiene struct {
-	worktrees        []Worktree
+	worktrees []Worktree
+	// The scan facts, keyed by worktree dir. All optional: a nil map yields the
+	// original always-clean / zero-size / unknown-activity behaviour the existing
+	// tests rely on, so only the prune-scan tests need to populate them.
+	dirSizes     map[string]int64
+	dirtyDirs    map[string]bool
+	lastActivity map[string]time.Time
+	goneDirs     map[string]bool
+	// mu guards the two removal logs: DestroyWorktrees removes concurrently.
+	mu               sync.Mutex
+	removed          []string
 	removedWorktrees []string
+	pruned           int
 }
 
 func (f *fakeHygiene) Worktrees(string) ([]Worktree, error) { return f.worktrees, nil }
-func (f *fakeHygiene) Dirty(string) bool                    { return false }
-func (f *fakeHygiene) DirSize(string) (int64, bool)         { return 0, false }
-func (f *fakeHygiene) Remove(string) error                  { return nil }
-func (f *fakeHygiene) PruneGitWorktrees(string)             {}
-func (f *fakeHygiene) RemoveWorktree(_, dir string) error {
-	f.removedWorktrees = append(f.removedWorktrees, dir)
+func (f *fakeHygiene) Dirty(dir string) bool                { return f.dirtyDirs[dir] }
+func (f *fakeHygiene) DirSize(dir string) (int64, bool) {
+	if f.dirSizes == nil {
+		return 0, false
+	}
+	sz, ok := f.dirSizes[dir]
+	return sz, ok
+}
+func (f *fakeHygiene) DiskUsage(_ context.Context, dir string) (int64, bool) {
+	if f.dirSizes == nil {
+		return 0, false
+	}
+	sz, ok := f.dirSizes[dir]
+	return sz, ok
+}
+func (f *fakeHygiene) Remove(path string) error {
+	f.mu.Lock()
+	f.removed = append(f.removed, path)
+	f.mu.Unlock()
 	return nil
 }
+func (f *fakeHygiene) PruneGitWorktrees(string) {
+	f.mu.Lock()
+	f.pruned++
+	f.mu.Unlock()
+}
+func (f *fakeHygiene) RemoveWorktree(_, dir string) error {
+	f.mu.Lock()
+	f.removedWorktrees = append(f.removedWorktrees, dir)
+	f.mu.Unlock()
+	return nil
+}
+func (f *fakeHygiene) LastActivity(dir string) (time.Time, bool) {
+	if f.lastActivity == nil {
+		return time.Time{}, false
+	}
+	t, ok := f.lastActivity[dir]
+	return t, ok
+}
+func (f *fakeHygiene) UpstreamGone(dir, _ string) bool { return f.goneDirs[dir] }
 
 func hubOrchestrator(store *fakeStore, sys *fakeSystem, proxy *fakeProxy, ch, pg *fakeDBServer, hyg *fakeHygiene) *Orchestrator {
 	return &Orchestrator{

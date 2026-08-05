@@ -16,7 +16,7 @@ import (
 )
 
 // These tests are the executable acceptance bar for
-// specs/langy/langy-egress-enforcement.feature (ADR-043). They exercise the
+// specs/langy/langy-egress-enforcement.feature (ADR-076). They exercise the
 // adapter's decision pipeline end-to-end (a real CONNECT over a loopback
 // socket), not string assertions: a denied destination must never be dialed,
 // a cleartext forward must be refused, a listed host must tunnel, and the
@@ -111,12 +111,6 @@ func startEchoUpstream(t *testing.T) *echoUpstream {
 	}()
 	t.Cleanup(func() { _ = ln.Close() })
 	return e
-}
-
-func (e *echoUpstream) accepts() int32 {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.accepted
 }
 
 // dialRecorder wraps a dial func to (a) record which authorities were dialed
@@ -233,8 +227,33 @@ func baseCfg() egressAdapterConfig {
 	}
 }
 
+func TestCheckedDialAddressRejectsPrivateResolution(t *testing.T) {
+	cfg := baseCfg()
+	cfg.resolve = func(context.Context, string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("169.254.169.254")}, nil
+	}
+	a := &egressAdapter{cfg: cfg}
+	if _, err := a.checkedDialAddress(context.Background(), "metadata.google.internal", "443"); err == nil {
+		t.Fatal("private resolved address was accepted")
+	}
+}
+
+func TestCheckedDialAddressPinsPublicResolution(t *testing.T) {
+	cfg := baseCfg()
+	cfg.resolve = func(context.Context, string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("8.8.8.8")}, nil
+	}
+	a := &egressAdapter{cfg: cfg}
+	got, err := a.checkedDialAddress(context.Background(), "example.com", "443")
+	if err != nil || got != "8.8.8.8:443" {
+		t.Fatalf("checked address = %q, err = %v", got, err)
+	}
+}
+
 // ---- Rung 2: allow-list set means restrict to it ----
 
+// @scenario "With an allow-list set, a listed host is allowed"
+// @scenario "TLS egress to an allowed host still succeeds"
 func TestEgress_ListedHostIsAllowedAndTunnels(t *testing.T) {
 	cfg := baseCfg()
 	cfg.policy = egressPolicy{allowlist: []string{"registry.npmjs.org"}}
@@ -265,6 +284,7 @@ func TestEgress_ListedHostIsAllowedAndTunnels(t *testing.T) {
 	}
 }
 
+// @scenario "With an allow-list set, a non-listed host is blocked and flagged"
 func TestEgress_NonListedHostIsDeniedAndNeverDialed(t *testing.T) {
 	cfg := baseCfg()
 	cfg.policy = egressPolicy{allowlist: []string{"registry.npmjs.org"}}
@@ -287,6 +307,8 @@ func TestEgress_NonListedHostIsDeniedAndNeverDialed(t *testing.T) {
 
 // ---- Rung 2 default: no allow-list means monitor, not block ----
 
+// @scenario "With no allow-list, outbound traffic is monitored but allowed"
+// @scenario "An install that configures nothing upgrades into watching, not blocking"
 func TestEgress_NoAllowlistAllowsButFlagsMonitorOnly(t *testing.T) {
 	cfg := baseCfg()
 	cfg.policy = egressPolicy{} // no customer list, floor unset, enforceFloor off
@@ -310,6 +332,7 @@ func TestEgress_NoAllowlistAllowsButFlagsMonitorOnly(t *testing.T) {
 
 // ---- Rung 3: always-on FQDN floor ----
 
+// @scenario "Structural destinations stay reachable regardless of allow-list"
 func TestEgress_FloorHostAllowedEvenUnderRestrictiveList(t *testing.T) {
 	cfg := baseCfg()
 	// Customer restricts to one host; the floor must still let structural
@@ -330,6 +353,7 @@ func TestEgress_FloorHostAllowedEvenUnderRestrictiveList(t *testing.T) {
 	}
 }
 
+// @scenario "The floor composes with, and is not widened by, an empty customer list"
 func TestEgress_EmptyListDoesNotWidenOrDenyOutsideFloor(t *testing.T) {
 	cfg := baseCfg()
 	// Floor configured, no customer list, floor NOT enforced (default): a host
@@ -373,6 +397,7 @@ func TestEgress_EnforceFloorDeniesOutsideFloorWithoutCustomerList(t *testing.T) 
 
 // ---- Rung 1a: require TLS ----
 
+// @scenario "Cleartext egress to an external host is refused"
 func TestEgress_CleartextForwardIsRefused(t *testing.T) {
 	cfg := baseCfg()
 	cfg.policy = egressPolicy{} // even monitor-only refuses cleartext
@@ -413,8 +438,16 @@ func TestEgress_NonTLSPortIsRefusedWhenRequireTLS(t *testing.T) {
 	}
 }
 
-// ---- Rung 3 cross-check: SNI must match the authorised authority ----
+// ---- Rung 3 cross-check: SNI must match the authorized authority ----
 
+// The base case of the anti-fronting refusal, driven by a REAL tls.Client so
+// the bytes on the wire are a genuine handshake rather than a fixture: a
+// mismatching SNI is refused before the dial, and flagged as an SNI mismatch —
+// the two Then clauses of the scenario below. The scenario's FRAGMENTATION
+// clause is pinned separately, by TestEgress_FragmentedSNIMismatchIsRefused-
+// BeforeDial and by TestPeekClientHelloSNI_ReassemblesAFragmentedHello; this
+// test is the unfragmented sibling, not a substitute for either.
+// @scenario "A ClientHello split across TLS records still reveals its SNI"
 func TestEgress_SNIMismatchIsRefusedBeforeDial(t *testing.T) {
 	cfg := baseCfg()
 	cfg.sniCrossCheck = true
@@ -447,8 +480,223 @@ func TestEgress_SNIMismatchIsRefusedBeforeDial(t *testing.T) {
 	}
 }
 
+// enforcingSNICfg is the posture the fail-closed branch governs: an allow-list
+// is set, the cross-check is on, and the peek gives up quickly so a stalling
+// client does not add seconds to the suite.
+func enforcingSNICfg() egressAdapterConfig {
+	cfg := baseCfg()
+	cfg.sniCrossCheck = true
+	cfg.sniPeekTimeout = 250 * time.Millisecond
+	cfg.policy = egressPolicy{allowlist: []string{"allowed.example"}}
+	return cfg
+}
+
+// The branch these three cover had NO decision-level coverage: the whole
+// `case sni == "" && sniUnreadable(...)` arm could be deleted and the package
+// stayed green, because the only tests were over the pure helper `sniUnreadable`
+// (whose body is `return sawHandshake || err != nil`). What was unpinned is the
+// property that actually matters — that an unreadable hello never reaches the
+// destination while a policy is enforcing.
+
+// @scenario "An unreadable ClientHello is refused while a policy is enforcing"
+func TestEgress_StalledClientHelloIsRefusedBeforeDial(t *testing.T) {
+	h := newHarness(t, enforcingSNICfg())
+
+	// The cheapest bypass there is: CONNECT, then say nothing. The peek read
+	// errors before a complete record header, so `sawHandshake` stays false —
+	// keying the branch on that alone is what a `sleep` used to defeat.
+	conn, status := h.sendCONNECT(t, "allowed.example:443")
+	defer conn.Close()
+	if status != 200 {
+		t.Fatalf("authority is allow-listed but CONNECT got %d, want 200", status)
+	}
+	waitForDecision(t, h, egressDeniedSNIUnreadable)
+
+	if h.dialer.dialedAuthority("allowed.example:443") {
+		t.Fatal("an unreadable ClientHello must be refused BEFORE dialing the destination")
+	}
+}
+
+// The P0 this review caught: one byte of legacy_record_version turned the
+// cross-check off. RFC 8446 §5.1 says that field MUST be ignored, so the
+// destination parses the very hello the guard declined to read.
+// @scenario "A ClientHello with an implausible record version is refused"
+func TestEgress_ImplausibleRecordVersionIsRefusedBeforeDial(t *testing.T) {
+	h := newHarness(t, enforcingSNICfg())
+
+	conn, status := h.sendCONNECT(t, "allowed.example:443")
+	defer conn.Close()
+	if status != 200 {
+		t.Fatalf("authority is allow-listed but CONNECT got %d, want 200", status)
+	}
+
+	hello := clientHelloFor(t, "attacker.example")
+	hello[2] = 5 // 0x0301 -> 0x0305: deprecated field, ignored downstream.
+	if _, err := conn.Write(hello); err != nil {
+		t.Fatalf("write hello: %v", err)
+	}
+	waitForDecision(t, h, egressDeniedSNIUnreadable)
+
+	if h.dialer.dialedAuthority("allowed.example:443") {
+		t.Fatal("a record version we cannot follow must be refused BEFORE dialing")
+	}
+}
+
+// The stock posture blocks nothing, and must keep blocking nothing. Dropping
+// `a.cfg.policy.enforcing()` from the guard would turn every monitor-only
+// install into one that hard-denies unreadable handshakes — a silent breach of
+// the ADR's "unset = watch" guarantee.
+//
+// The hello is deliberately UNREADABLE — the same one-byte
+// legacy_record_version mangling the sibling implausible-version test uses — so
+// the peek returns no SNI and reports the stream as unreadable. That drives
+// execution into `case sni == "" && sniUnreadable(...)` with every other
+// conjunct satisfied (`sni` is empty, the peek errored, and the authority is a
+// name rather than an IP literal), leaving `enforcing()` as the ONE term
+// deciding allow vs. deny. Delete it and this test denies and never dials.
+//
+// A READABLE hello whose SNI equals the authority — what this test used to send
+// — reaches neither arm of the switch, so it could not fail for that property
+// however the guard were rewritten.
+// @scenario "An unreadable ClientHello is left alone under monitor-only"
+func TestEgress_UnreadableClientHelloIsAllowedUnderMonitorOnly(t *testing.T) {
+	cfg := baseCfg()
+	cfg.sniCrossCheck = true
+	cfg.sniPeekTimeout = 250 * time.Millisecond
+	cfg.policy = egressPolicy{} // no allow-list, no floor: watching, not blocking.
+	h := newHarness(t, cfg)
+
+	conn, status := h.sendCONNECT(t, "anywhere.example:443")
+	defer conn.Close()
+	if status != 200 {
+		t.Fatalf("monitor-only must not block, got %d", status)
+	}
+	hello := clientHelloFor(t, "anywhere.example")
+	hello[2] = 5 // 0x0301 -> 0x0305: a version no TLS record uses.
+	if _, err := conn.Write(hello); err != nil {
+		t.Fatalf("write hello: %v", err)
+	}
+
+	waitFor(t, func() bool { return h.dialer.dialedAuthority("anywhere.example:443") },
+		func() string { return "monitor-only must still dial the destination" })
+	if h.monitor.has(egressDeniedSNIUnreadable) {
+		t.Fatalf("monitor-only must not deny, got %v", h.monitor.decisions())
+	}
+	// "the flow is still monitored and attributable": allowed, and flagged.
+	if !h.monitor.has(egressAllowedMonitor) {
+		t.Fatalf("expected an allowed_monitor flag, got %v", h.monitor.decisions())
+	}
+}
+
+// ---- Rung 3 cross-check: the exemptions, pinned at the adapter ----
+
+// The adapter-level half of the fragmentation regression. The peek-level test
+// proves the SNI is recovered out of record 2; this proves the adapter ACTS on
+// what it recovered — a hostile client that hides its SNI behind a record
+// boundary is refused, and the destination is never dialed.
+// @scenario "A ClientHello split across TLS records still reveals its SNI"
+func TestEgress_FragmentedSNIMismatchIsRefusedBeforeDial(t *testing.T) {
+	h := newHarness(t, enforcingSNICfg())
+
+	conn, status := h.sendCONNECT(t, "allowed.example:443")
+	defer conn.Close()
+	if status != 200 {
+		t.Fatalf("authority is allow-listed but CONNECT got %d, want 200", status)
+	}
+
+	// Split right after the handshake header, so the server_name extension lands
+	// wholly in the second record — the shape a single-record peek walked past.
+	fragmented := refragment(t, clientHelloFor(t, "attacker.example"), 8)
+	if _, err := conn.Write(fragmented); err != nil {
+		t.Fatalf("write fragmented hello: %v", err)
+	}
+	waitForDecision(t, h, egressDeniedSNIMismatch)
+
+	if h.dialer.dialedAuthority("allowed.example:443") {
+		t.Fatal("a fragmented mismatching SNI must be refused BEFORE dialing the destination")
+	}
+}
+
+// The cross-check governs TLS and nothing else. A stream that is CLEANLY not
+// TLS — a complete record header carrying a non-handshake content type — must
+// still tunnel under an enforcing policy, because require-TLS is the rung that
+// governs cleartext. Make the not-TLS exit an error (or drop the clean-exit
+// case from sniUnreadable) and this denies an allow-listed destination.
+// @scenario "A tunnel that is not TLS at all is unaffected by the cross-check"
+func TestEgress_NonTLSTunnelIsNotRefusedByTheCrossCheck(t *testing.T) {
+	h := newHarness(t, enforcingSNICfg())
+
+	conn, status := h.sendCONNECT(t, "allowed.example:443")
+	defer conn.Close()
+	if status != 200 {
+		t.Fatalf("authority is allow-listed but CONNECT got %d, want 200", status)
+	}
+	if _, err := conn.Write([]byte("GET / HTTP/1.1\r\nHost: allowed.example\r\n\r\n")); err != nil {
+		t.Fatalf("write non-tls bytes: %v", err)
+	}
+
+	waitFor(t, func() bool { return h.dialer.dialedAuthority("allowed.example:443") },
+		func() string { return "a cleanly non-TLS tunnel must still reach its destination" })
+	if h.monitor.has(egressDeniedSNIUnreadable) {
+		t.Fatalf("the cross-check must not refuse a non-TLS tunnel, got %v", h.monitor.decisions())
+	}
+}
+
+// RFC 6066 forbids server_name for a bare address, so a conforming client sends
+// none and the peek can only report "unreadable". Sending nothing at all here
+// satisfies every other conjunct of the fail-closed guard — empty SNI, a peek
+// that errored, an enforcing policy — which leaves `!isIPLiteral(host)` as the
+// only term keeping an allow-listed IP out of a deny. Delete it and every
+// spec-conforming client on a bare-IP authority is refused.
+// @scenario "A bare IP authority is exempt from the SNI requirement"
+func TestEgress_BareIPAuthorityIsNotRefusedOnSNIGrounds(t *testing.T) {
+	cfg := baseCfg()
+	cfg.sniCrossCheck = true
+	cfg.sniPeekTimeout = 250 * time.Millisecond
+	cfg.policy = egressPolicy{allowlist: []string{"203.0.113.10"}}
+	h := newHarness(t, cfg)
+
+	conn, status := h.sendCONNECT(t, "203.0.113.10:443")
+	defer conn.Close()
+	if status != 200 {
+		t.Fatalf("allow-listed bare IP got status %d, want 200", status)
+	}
+
+	waitFor(t, func() bool { return h.dialer.dialedAuthority("203.0.113.10:443") },
+		func() string { return "an allow-listed bare IP must not be refused for sending no SNI" })
+	if h.monitor.has(egressDeniedSNIUnreadable) {
+		t.Fatalf("a bare IP authority must not be denied on SNI grounds, got %v", h.monitor.decisions())
+	}
+}
+
+// waitForDecision polls until the adapter records d, so the assertions do not
+// race the goroutine that handles the tunnel.
+func waitForDecision(t *testing.T, h *harness, d egressDecision) {
+	t.Helper()
+	waitFor(t, func() bool { return h.monitor.has(d) },
+		// Built at FAILURE time, not call time: the decisions slice is empty
+		// when polling starts, so an eagerly-formatted message would report
+		// "got []" on every timeout no matter what the adapter recorded.
+		func() string {
+			return fmt.Sprintf("expected decision %v, got %v", d, h.monitor.decisions())
+		})
+}
+
+func waitFor(t *testing.T, cond func() bool, msg func() string) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal(msg())
+}
+
 // ---- Rung 1b: per-destination throttle, keyed per host ----
 
+// @scenario "A burst of new connections to a rare host is throttled"
 func TestEgressThrottle_ConnectionBurstTarpitsOneHostOnly(t *testing.T) {
 	cfg := throttleConfig{
 		connWindow:          time.Second,
@@ -477,6 +725,7 @@ func TestEgressThrottle_ConnectionBurstTarpitsOneHostOnly(t *testing.T) {
 	}
 }
 
+// @scenario "A high-volume flow to a single destination is throttled and flagged"
 func TestEgressThrottle_ByteVolumeThrottlesOneHostNotAnother(t *testing.T) {
 	cfg := throttleConfig{
 		connWindow:        time.Minute,

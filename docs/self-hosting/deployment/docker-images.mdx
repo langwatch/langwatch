@@ -21,7 +21,7 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 **What it does:**
 - Serves the LangWatch web UI (Next.js)
 - Exposes REST and OTel APIs for trace ingestion from SDKs
-- Handles authentication (NextAuth.js with email or SSO providers)
+- Handles authentication (email or SSO providers)
 - Queries ClickHouse for analytics, dashboards, and trace search
 - Manages the control plane via PostgreSQL (Prisma ORM)
 - Broadcasts real-time updates via Server-Sent Events (SSE)

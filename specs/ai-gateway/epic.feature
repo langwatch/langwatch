@@ -61,7 +61,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
       | attr.langwatch.vk_id       | <the vk id>              |
       | attr.langwatch.project_id  | <acme gateway-demo>      |
       | attr.langwatch.org_id      | <acme org id>            |
-    And the project "gateway-demo" monthly budget "spent_usd" increases by the reported cost
+    And the project "gateway-demo" monthly budget spend, read from the ledger, increases by the reported cost
 
   @integration @epic @unimplemented
   Scenario: Single message — Anthropic shape — succeeds via Claude Code-compatible path
@@ -87,7 +87,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
     Then the gateway returns 200 ten times
     And /internal/gateway/resolve-key is still called zero times (JWT verified locally)
     And /internal/gateway/config/:vk_id is still called zero times (ETag unchanged)
-    And /internal/gateway/budget/debit is called 10 times (fire-and-forget)
+    And no per-request control-plane call is made for spend: the 10 spend records spool on the gateway's disk and ship in drained batches
 
   @integration @epic @unimplemented
   Scenario: Gateway survives control-plane outage after bootstrap
