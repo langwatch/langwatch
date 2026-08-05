@@ -46,6 +46,12 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
       When the span is ingested with the copilot_vscode ingest key
       Then the recorded span is stamped with sourceType "copilot_vscode"
 
+    @unit
+    Scenario: Foreign OTLP traffic on a copilot_vscode key is dropped at the receiver
+      Given a copilot_vscode ingest key receives spans from a non-copilot instrumentation scope
+      When the receiver applies key provenance
+      Then the foreign scopes are dropped and only Copilot's own scopes are recorded
+
     @integration @unimplemented
     Scenario: The source is stamped at the receiver, not taken from the payload
       Given a copilot-chat span whose payload claims sourceType "copilot_cli"

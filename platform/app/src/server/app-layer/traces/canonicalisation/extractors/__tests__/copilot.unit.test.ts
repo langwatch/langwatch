@@ -166,7 +166,9 @@ describe("CopilotExtractor", () => {
       // recognized from the scope alone or the span is misclassified.
       const ctx = createExtractorContext(
         { "gen_ai.operation.name": "execute_tool" },
-        { instrumentationScope: { name: "github.copilot", version: "1.0.71-0" } },
+        {
+          instrumentationScope: { name: "github.copilot", version: "1.0.71-0" },
+        },
       );
 
       new CopilotExtractor().apply(ctx);
@@ -343,9 +345,9 @@ describe("CopilotExtractor", () => {
         copilot_usage_nano_aiu: 230235000,
       });
 
-      expect(
-        result.appliedRules.some((r) => r.startsWith("genai:")),
-      ).toBe(true);
+      expect(result.appliedRules.some((r) => r.startsWith("genai:"))).toBe(
+        true,
+      );
       expect(result.attributes["gen_ai.request.model"]).toBe(
         "oswe-vscode-prime",
       );
@@ -353,9 +355,9 @@ describe("CopilotExtractor", () => {
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(11348);
       // the copilot extractor gates on the github.copilot scope, so it never
       // fires for copilot-chat — no VS-Code-specific extractor code.
-      expect(
-        result.appliedRules.some((r) => r.startsWith("copilot:")),
-      ).toBe(false);
+      expect(result.appliedRules.some((r) => r.startsWith("copilot:"))).toBe(
+        false,
+      );
     });
 
     /** @scenario Captured prompt content is lifted as span input */

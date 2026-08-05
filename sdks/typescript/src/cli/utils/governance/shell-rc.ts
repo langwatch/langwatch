@@ -45,10 +45,6 @@ import {
 } from "./app-settings";
 import { type GovernanceConfig, saveConfig } from "./config";
 import { envForTool, type ToolEnv } from "./tool-env";
-import {
-	clearVscodeTerminalOtelEnv,
-	type VscodePlatform,
-} from "./vscode-settings";
 
 /**
  * Wrapped tools included in the union'd export block. copilot is
@@ -500,25 +496,6 @@ export async function maybeOfferIngestionShellRcPersist({
 				`  ✓ Installed a scoped \`${tool}\` telemetry wrapper in ${wrote}`,
 			),
 		);
-		// VS Code hardening: `code` launches a long-lived editor whose integrated
-		// terminals inherit the injected env for the whole session. Clear the
-		// telemetry keys from integrated terminals so the ingest token never leaks
-		// to un-wrapped OTLP tools run there (the extension host keeps them —
-		// read at launch). ADR-039 §Extension #2.
-		if (tool === "code") {
-			const settingsPath = clearVscodeTerminalOtelEnv({
-				platform: process.platform as VscodePlatform,
-				home: os.homedir(),
-				keys: Object.keys(vars),
-			});
-			if (settingsPath) {
-				console.log(
-					chalk.green(
-						`  ✓ Cleared the telemetry env from VS Code integrated terminals in ${settingsPath}`,
-					),
-				);
-			}
-		}
 	} catch (err) {
 		console.log(
 			chalk.yellow(

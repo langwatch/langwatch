@@ -89,6 +89,72 @@ describe("clearVscodeTerminalOtelEnv()", () => {
     });
   });
 
+  describe("when settings.json is JSONC (VS Code's actual format)", () => {
+    it("preserves comments, trailing commas, and every user key", () => {
+      // VS Code ships a comment-only settings.json out of the box and
+      // preserves user comments — JSON.parse-based editing destroyed all
+      // of it (the P0 this pins).
+      const p = vscodeUserSettingsPath("darwin", home)!;
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(
+        p,
+        `{
+  // Editor
+  "editor.fontSize": 14,
+  "editor.fontFamily": "Berkeley Mono",
+  "terminal.integrated.env.osx": { "MY_OWN": "keep-me" },
+}
+`,
+      );
+
+      const written = clearVscodeTerminalOtelEnv({
+        platform: "darwin",
+        home,
+        keys: KEYS,
+      });
+
+      expect(written).toBe(p);
+      const text = fs.readFileSync(p, "utf8");
+      expect(text).toContain("// Editor");
+      expect(text).toContain('"editor.fontFamily": "Berkeley Mono"');
+      expect(text).toContain('"MY_OWN": "keep-me"');
+      expect(text).toContain('"OTEL_EXPORTER_OTLP_HEADERS": null');
+    });
+
+    it("handles VS Code's default comment-only file without destroying it", () => {
+      const p = vscodeUserSettingsPath("darwin", home)!;
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, "{\n  // Place your settings here\n}\n");
+
+      const written = clearVscodeTerminalOtelEnv({
+        platform: "darwin",
+        home,
+        keys: KEYS,
+      });
+
+      expect(written).toBe(p);
+      const text = fs.readFileSync(p, "utf8");
+      expect(text).toContain("// Place your settings here");
+      expect(text).toContain('"COPILOT_OTEL_ENABLED": null');
+    });
+
+    it("refuses to write a file that does not parse even as JSONC", () => {
+      const p = vscodeUserSettingsPath("darwin", home)!;
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      const broken = '{ "editor.fontSize": 14, "unterminated": "';
+      fs.writeFileSync(p, broken);
+
+      const written = clearVscodeTerminalOtelEnv({
+        platform: "darwin",
+        home,
+        keys: KEYS,
+      });
+
+      expect(written).toBeNull();
+      expect(fs.readFileSync(p, "utf8")).toBe(broken); // untouched
+    });
+  });
+
   it("is a no-op (returns null) on an unsupported platform", () => {
     expect(
       clearVscodeTerminalOtelEnv({

@@ -10,12 +10,16 @@ Feature: `langwatch code` captures VS Code Copilot Chat via a scoped shell funct
   /api/otel.
 
   The scoped-function env carries everything — enable, endpoint, Bearer, and
-  content capture — so no VS Code settings.json edit is needed: the
+  content capture — so CAPTURE needs no VS Code settings.json edit: the
   COPILOT_OTEL_ENABLED env overrides the extension's default-false
   `github.copilot.chat.otel.enabled` setting (spike-verified: an env-only
-  launch with an empty settings.json still captured a real turn). VS Code is
-  ingestion-only (direct OTLP); the chat extension has no gateway path. v1 is
-  tokens-only: cost and AI-units are out of scope.
+  launch with an empty settings.json still captured a real turn). The one
+  settings.json write that DOES happen is orthogonal hardening: a narrow
+  `terminal.integrated.env.<os>` clear (each telemetry key set to null,
+  JSONC/comment-preserving) so integrated terminals never inherit the ingest
+  token — the token itself is still delivered by env, never written to
+  settings. VS Code is ingestion-only (direct OTLP); the chat extension has
+  no gateway path. v1 is tokens-only: cost and AI-units are out of scope.
 
   Pairs with:
     - specs/ai-governance/cli-wrappers/shell-rc-persistence.feature
@@ -79,9 +83,9 @@ Feature: `langwatch code` captures VS Code Copilot Chat via a scoped shell funct
 
     @unit
     Scenario: Setting up code clears the telemetry env from VS Code integrated terminals
-      Given `langwatch code` persisted the scoped `code()` function
+      Given `langwatch code` resolved the telemetry env for a run
       Then VS Code settings unset every telemetry key for integrated terminals
-      And the extension host still receives the env at launch
+      And no telemetry value is ever written into settings, only null clears
 
     @integration @unimplemented
     Scenario: Logout removes the VS Code integrated-terminal telemetry clear

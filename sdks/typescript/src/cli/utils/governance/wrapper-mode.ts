@@ -24,6 +24,8 @@
  * first-run prompt similar to shell-rc.ts on top.
  */
 
+import * as os from "node:os";
+
 import {
 	codexTraceEndpoint,
 	writeCodexGatewayBlock,
@@ -48,6 +50,7 @@ import {
 	removeClaudeProjectTelemetryPin,
 	resolveLiveIngestionKey,
 } from "./telemetry-refresh";
+import { clearVscodeTerminalOtelEnv } from "./vscode-settings";
 
 export type WrapperMode = "gateway" | "ingestion";
 
@@ -248,7 +251,25 @@ export async function resolveWrapperMode(
 	// guaranteed true here, since the both-disabled case threw above).
 	if (mode === "gateway" && !policy.allowVk) {
 		mode = "ingestion";
-		notice = `${lwTag()} gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`;
+		// Blame accurately: a hardcoded platform policy (no org row — e.g.
+		// `code`, which is ingestion-only by design) is a product fact, not
+		// an admin decision.
+		notice =
+			cfg.tool_policies?.[tool] !== undefined
+				? `${lwTag()} gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`
+				: `${lwTag()} ${tool} supports direct OTLP ingestion only; using it.`;
+		// Self-heal a pinned gateway preference that can never be honored —
+		// otherwise the notice prints on every run forever (the gateway-side
+		// pin-forgetting in wrapper.ts only runs on runs that STAY gateway).
+		if (cfg.tool_mode?.[tool] === "gateway") {
+			const { [tool]: _dropped, ...rest } = cfg.tool_mode;
+			try {
+				saveConfig({ ...cfg, tool_mode: rest });
+				cfg.tool_mode = rest;
+			} catch {
+				// best-effort — a persist failure just re-prints next run.
+			}
+		}
 	}
 	if (mode === "ingestion" && !policy.allowOtelDirect) {
 		mode = "gateway";
@@ -256,6 +277,18 @@ export async function resolveWrapperMode(
 	}
 
 	if (mode === "gateway") {
+		// Structural guard: a tool with no gateway env shape (envForTool has
+		// no case for it — `code` is the current example) must fail loudly
+		// here, not launch with empty vars and no capture, no explanation.
+		// Reachable via a hand-edited config or a future policy row whose
+		// allowVk defaults true.
+		if (Object.keys(gatewayVars).length === 0) {
+			throw new GovernanceCliError(
+				501,
+				"gateway_unsupported",
+				`The gateway path isn't implemented for '${tool}'. Run it with --tool-mode=otlp to use direct OTLP ingestion instead.`,
+			);
+		}
 		if (tool === "gemini") {
 			warnIfGeminiOAuthSelected();
 		}
@@ -402,6 +435,41 @@ export async function resolveWrapperMode(
 		);
 	}
 
+	// VS Code hardening, coupled to the env INJECTION (not to the shell-rc
+	// persistence consent): every `code` ingestion run injects the bearer
+	// into a long-lived editor whose integrated terminals inherit it, so the
+	// terminal clear must be (re)applied on every run — declining or later
+	// removing the persisted function must not leave terminals inheriting
+	// the token. ADR-039 §Extension #2.
+	if (tool === "code") {
+		const vscodePlatform = process.platform;
+		if (
+			vscodePlatform === "darwin" ||
+			vscodePlatform === "linux" ||
+			vscodePlatform === "win32"
+		) {
+			tryRefresh(
+				"the VS Code terminal telemetry clear",
+				() => {
+					const written = clearVscodeTerminalOtelEnv({
+						platform: vscodePlatform,
+						home: os.homedir(),
+						keys: Object.keys(vars),
+					});
+					if (written === null) {
+						// The writer refuses to touch a settings.json it cannot
+						// round-trip — say so loudly instead of leaking silently.
+						process.stderr.write(
+							`${lwTag()} could not apply the VS Code terminal telemetry clear (settings.json did not parse); integrated terminals will inherit the telemetry env until it is fixed.\n`,
+						);
+					}
+					return written;
+				},
+				null,
+			);
+		}
+	}
+
 	let codexConfigPath: string | undefined;
 	if (tool === "codex") {
 		// codex's OTLP/HTTP exporter sends every signal to the configured
@@ -485,6 +553,14 @@ function ingestionClears(tool: string): string[] {
 			"COPILOT_PROVIDER_BASE_URL",
 			"COPILOT_PROVIDER_API_KEY",
 		];
+	}
+	if (tool === "code") {
+		// An inherited `COPILOT_OTEL_EXPORTER_TYPE=file` (the ccusage setup)
+		// redirects the copilot OTel family to a local file. Whether the VS
+		// Code Chat extension reads this var is unverified, so we SCRUB the
+		// inherited value rather than assert one of our own — neutral if the
+		// extension ignores it, protective if it doesn't.
+		return ["COPILOT_OTEL_EXPORTER_TYPE"];
 	}
 	return [];
 }

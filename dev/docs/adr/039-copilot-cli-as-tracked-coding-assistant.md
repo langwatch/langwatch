@@ -236,7 +236,7 @@ sourceType `copilot_vscode`, minted as a key distinct from `copilot_cli` / `copi
 | Invariant | Satisfied by |
 |---|---|
 | Config is native | enable / exporter / endpoint / capture via `settings.json`; only the token via env |
-| Token not set globally | the scoped `code` function sets the header only for the launch it wraps — never a bare global export (same guarantee as the copilot/gemini/opencode functions). It does reach that VS Code's integrated terminals; our CLI wrappers override `OTEL_EXPORTER_OTLP_HEADERS` per-invocation, so wrapped tools are unaffected (see Open questions for un-wrapped tools) |
+| Token not set globally | the scoped `code` function sets the header only for the launch it wraps — never a bare global export (same guarantee as the copilot/gemini/opencode functions). Integrated terminals are hardened via the narrow `terminal.integrated.env.<os>` null-clear (see Revisions — resolved), applied on every `code` run; the extension host keeps the env (read at launch) |
 | Aligned with existing tiers | reuses `shell-rc.ts` + `buildShellReapply`; introduces no new delivery mechanism |
 | Each call ingested once | native per-call `gen_ai.*` records; standard `/api/otel` dedup |
 | No cross-surface double-capture | `copilot_vscode` key distinct from `copilot_cli` / `copilot_app`; stamped at receiver |

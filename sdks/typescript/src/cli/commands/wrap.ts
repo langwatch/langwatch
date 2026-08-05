@@ -19,6 +19,13 @@ export const wrapCopilot = async (args: string[]): Promise<void> => {
 };
 
 export const wrapCode = async (args: string[]): Promise<void> => {
+  // VS Code hands `code <args>` to an ALREADY-RUNNING instance when one
+  // exists (`openExistingWindow` reuses the live extension host, which never
+  // sees this launch's env). Capture only applies to windows this launch
+  // creates — say so up front instead of silently not capturing.
+  process.stderr.write(
+    "[langwatch] capture applies to VS Code windows opened by this launch; if VS Code is already running, close it first (or run `code -n`) so Copilot Chat picks up the telemetry env.\n",
+  );
   await runWrapped("code", args);
 };
 

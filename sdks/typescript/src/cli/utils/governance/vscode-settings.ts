@@ -15,10 +15,25 @@
  * launch) while terminals do NOT inherit them. This is a NARROW settings write
  * (terminal env only) — distinct from the "settings.json carries the capture
  * config" approach the ADR rejected; the token is still delivered via env.
+ *
+ * settings.json is JSONC — comments and trailing commas are legal, VS Code
+ * preserves them, and the file VS Code ships out of the box contains nothing
+ * but a comment. All edits therefore go through `jsonc-parser` (VS Code's own
+ * library): `modify` + `applyEdits` produce minimal text edits that keep the
+ * user's comments and formatting byte-for-byte. A file that does not parse
+ * even as JSONC is NEVER written — refusing the hardening beats destroying a
+ * user's settings.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+
+import {
+  applyEdits,
+  modify,
+  parse as parseJsonc,
+  type ParseError,
+} from "jsonc-parser";
 
 export type VscodePlatform = "darwin" | "linux" | "win32";
 
@@ -91,11 +106,53 @@ interface VscodeSettingsArgs {
   appData?: string;
 }
 
+const JSONC_FORMAT = {
+  formattingOptions: { insertSpaces: true, tabSize: 2, eol: "\n" },
+};
+
+/** Read the raw settings text; "" when the file is missing. */
+function readSettingsText(filePath: string): string {
+  try {
+    return fs.readFileSync(filePath, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Parse settings text as JSONC. Returns the settings object, or null when the
+ * text does not parse even as JSONC (in which case NOTHING may be written) or
+ * parses to a non-object. Empty/whitespace-only text parses as `{}` — a fresh
+ * file has no user content to protect.
+ */
+function parseSettings(text: string): Record<string, unknown> | null {
+  if (text.trim() === "") return {};
+  const errors: ParseError[] = [];
+  const parsed = parseJsonc(text, errors, {
+    allowTrailingComma: true,
+    disallowComments: false,
+  }) as unknown;
+  if (errors.length > 0) return null;
+  if (!isPlainObject(parsed)) return null;
+  return parsed;
+}
+
+/** Write via temp+rename: VS Code writes this file concurrently, and a torn
+ * write would hand it a half-serialized settings.json. */
+function atomicWrite(filePath: string, content: string): void {
+  const tmp = `${filePath}.langwatch-tmp-${process.pid}`;
+  fs.writeFileSync(tmp, content);
+  fs.renameSync(tmp, filePath);
+}
+
 /**
  * Set each of `keys` to null under `terminal.integrated.env.<os>` so VS Code
- * unsets them in integrated terminals. Creates the file/dir when missing,
- * preserves every other user-authored setting verbatim. Returns the settings
- * path written, or null when the platform is unsupported or `keys` is empty.
+ * unsets them in integrated terminals. Creates the file/dir when missing.
+ * Comment/format-preserving: edits are minimal JSONC text edits, every other
+ * user-authored byte survives verbatim. Returns the settings path written, or
+ * null when the platform is unsupported, `keys` is empty, or the existing
+ * file does not parse as JSONC (refused rather than clobbered — the caller
+ * must surface that the hardening is NOT in place).
  */
 export function clearVscodeTerminalOtelEnv(
   args: VscodeSettingsArgs,
@@ -105,64 +162,56 @@ export function clearVscodeTerminalOtelEnv(
   if (!filePath || !envKey || args.keys.length === 0) return null;
 
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const settings = readSettings(filePath);
-  const existing = settings[envKey];
-  const nextEnv: Record<string, unknown> = isPlainObject(existing)
-    ? { ...existing }
-    : {};
-  for (const k of args.keys) nextEnv[k] = null;
-  settings[envKey] = nextEnv;
+  let text = readSettingsText(filePath);
+  if (parseSettings(text) === null) return null; // unparseable — refuse
 
-  fs.writeFileSync(filePath, JSON.stringify(settings, null, 2) + "\n");
+  for (const k of args.keys) {
+    text = applyEdits(text, modify(text, [envKey, k], null, JSONC_FORMAT));
+  }
+  atomicWrite(filePath, text.endsWith("\n") ? text : `${text}\n`);
   return filePath;
 }
 
 /**
  * Remove `keys` from `terminal.integrated.env.<os>` (logout teardown). Drops
  * the env object and the settings key when they become empty, preserving all
- * other settings. Returns true when the file changed; false when absent,
- * malformed, or none of the keys were present (idempotent). A malformed file
- * is left untouched rather than clobbered.
+ * other settings, comments, and formatting. Returns true when the file
+ * changed; false when absent, unparseable, or none of the keys were present
+ * (idempotent). An unparseable file is left untouched rather than clobbered.
  */
 export function removeVscodeTerminalOtelEnv(args: VscodeSettingsArgs): boolean {
   const filePath = vscodeUserSettingsPath(args.platform, args.home, args.appData);
   const envKey = vscodeTerminalEnvKey(args.platform);
   if (!filePath || !envKey) return false;
 
-  let raw: string;
+  let text: string;
   try {
-    raw = fs.readFileSync(filePath, "utf8");
+    text = fs.readFileSync(filePath, "utf8");
   } catch {
     return false; // ENOENT
   }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw) as unknown;
-  } catch {
-    return false; // malformed — do not touch
-  }
-  if (!isPlainObject(parsed)) return false;
+  const settings = parseSettings(text);
+  if (settings === null) return false; // unparseable — do not touch
 
-  const settings: Record<string, unknown> = { ...parsed };
   const env = settings[envKey];
   if (!isPlainObject(env)) return false;
 
-  const nextEnv: Record<string, unknown> = { ...env };
-  let removed = false;
-  for (const k of args.keys) {
-    if (k in nextEnv) {
-      delete nextEnv[k];
-      removed = true;
+  const present = args.keys.filter((k) => k in env);
+  if (present.length === 0) return false;
+
+  const survivors = Object.keys(env).filter((k) => !args.keys.includes(k));
+  if (survivors.length === 0) {
+    // env object becomes empty — drop the whole settings key.
+    text = applyEdits(text, modify(text, [envKey], undefined, JSONC_FORMAT));
+  } else {
+    for (const k of present) {
+      text = applyEdits(
+        text,
+        modify(text, [envKey, k], undefined, JSONC_FORMAT),
+      );
     }
   }
-  if (!removed) return false;
-
-  if (Object.keys(nextEnv).length === 0) {
-    delete settings[envKey];
-  } else {
-    settings[envKey] = nextEnv;
-  }
-  fs.writeFileSync(filePath, JSON.stringify(settings, null, 2) + "\n");
+  atomicWrite(filePath, text.endsWith("\n") ? text : `${text}\n`);
   return true;
 }
 
@@ -171,21 +220,11 @@ export function vscodeTerminalEnvHasAnyClear(args: VscodeSettingsArgs): boolean 
   const filePath = vscodeUserSettingsPath(args.platform, args.home, args.appData);
   const envKey = vscodeTerminalEnvKey(args.platform);
   if (!filePath || !envKey) return false;
-  const settings = readSettings(filePath);
+  const settings = parseSettings(readSettingsText(filePath));
+  if (settings === null) return false;
   const env = settings[envKey];
   if (!isPlainObject(env)) return false;
   return args.keys.some((k) => k in env);
-}
-
-function readSettings(filePath: string): Record<string, unknown> {
-  try {
-    const raw = fs.readFileSync(filePath, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    if (isPlainObject(parsed)) return { ...parsed };
-    return {};
-  } catch {
-    return {};
-  }
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
