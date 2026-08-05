@@ -50,7 +50,7 @@
     "task:backfill-datasets-s3": "pnpm run task backfillDatasetContentToS3",
     "prisma:generate:typescript": "pnpm prisma generate",
     "prisma:generate:migration": "pnpm prisma migrate dev --create-only",
-    "prisma:migrate": "sh -c 'if [ \"$SKIP_PRISMA_MIGRATE\" != \"true\" ]; then pnpm prisma migrate deploy; else echo \"Skipping Prisma migrations\"; fi'",
+    "prisma:migrate": "sh -c 'if [ \"$SKIP_PRISMA_MIGRATE\" != \"true\" ]; then pnpm prisma db execute --schema=prisma/schema.prisma --file=prisma/fixups/20260215183000-billing-enum-types.sql && pnpm prisma migrate deploy; else echo \"Skipping Prisma migrations\"; fi'",
     "prisma:seed": "tsx prisma/seed.ts",
     "seed:sample-traces": "tsx scripts/seed-sample-traces.ts",
     "seed:realistic-platform": "tsx scripts/seed-realistic-platform-data.ts",
