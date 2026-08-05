@@ -37,14 +37,18 @@ describe("isTransientClickHouseError", () => {
 
   describe("given a socket-level failure", () => {
     describe("when the code is a known transient one", () => {
-      it.each(["ECONNRESET", "EPIPE", "ETIMEDOUT", "EAI_AGAIN"])(
-        "retries %s",
-        (code) => {
-          expect(
-            isTransientClickHouseError({ error: withCode({ message: "socket", code }) }),
-          ).toBe(true);
-        },
-      );
+      it.each([
+        "ECONNRESET",
+        "EPIPE",
+        "ETIMEDOUT",
+        "EAI_AGAIN",
+      ])("retries %s", (code) => {
+        expect(
+          isTransientClickHouseError({
+            error: withCode({ message: "socket", code }),
+          }),
+        ).toBe(true);
+      });
     });
 
     describe("when the code is not recognised", () => {
@@ -62,7 +66,9 @@ describe("isTransientClickHouseError", () => {
     describe("when the status means busy", () => {
       it.each([429, 502, 503])("retries %s", (status) => {
         expect(
-          isTransientClickHouseError({ error: withStatus({ message: "busy", status }) }),
+          isTransientClickHouseError({
+            error: withStatus({ message: "busy", status }),
+          }),
         ).toBe(true);
       });
     });
@@ -70,7 +76,9 @@ describe("isTransientClickHouseError", () => {
     describe("when the status means permanent rejection", () => {
       it.each([400, 401, 404, 500])("does not retry %s", (status) => {
         expect(
-          isTransientClickHouseError({ error: withStatus({ message: "nope", status }) }),
+          isTransientClickHouseError({
+            error: withStatus({ message: "nope", status }),
+          }),
         ).toBe(false);
       });
     });
@@ -176,7 +184,9 @@ describe("retryNoticeLevel", () => {
     describe("when the level is chosen", () => {
       it("stays quiet so one failure is not counted many times", () => {
         // A 25-attempt budget previously produced 25 warn records per failure.
-        const levels = Array.from({ length: 25 }, (_, i) => retryNoticeLevel(i));
+        const levels = Array.from({ length: 25 }, (_, i) =>
+          retryNoticeLevel(i),
+        );
 
         expect(levels.filter((l) => l === "warn")).toHaveLength(1);
       });

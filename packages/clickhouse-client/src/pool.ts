@@ -87,7 +87,10 @@ function isUsableInteger(value: number | undefined): value is number {
  * of shrinking it - the opposite of what the safety factor is for. Anything
  * that is not a positive integer falls back to the default.
  */
-function positiveIntegerOr(value: number | undefined, fallback: number): number {
+function positiveIntegerOr(
+  value: number | undefined,
+  fallback: number,
+): number {
   return value !== undefined && Number.isInteger(value) && value > 0
     ? value
     : fallback;

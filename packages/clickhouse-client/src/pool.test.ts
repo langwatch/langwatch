@@ -226,8 +226,9 @@ describe("poolSizingFromEnv", () => {
       });
 
       it("treats an empty string as unset", () => {
-        expect(poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "" }).replicas)
-          .toBeUndefined();
+        expect(
+          poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "" }).replicas,
+        ).toBeUndefined();
       });
     });
   });

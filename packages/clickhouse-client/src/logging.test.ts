@@ -38,9 +38,7 @@ describe("decideVendorLog", () => {
   describe("given the vendor reports a warning", () => {
     describe("when decided", () => {
       it("keeps it at warn", () => {
-        expect(decideVendorLog({ level: "warn", record })?.level).toBe(
-          "warn",
-        );
+        expect(decideVendorLog({ level: "warn", record })?.level).toBe("warn");
       });
 
       it("attaches the cause away from the `error` field", () => {
@@ -79,9 +77,7 @@ describe("decideVendorLog", () => {
   describe("given the vendor reports below warning", () => {
     describe("when decided", () => {
       it("keeps info on its own level", () => {
-        expect(decideVendorLog({ level: "info", record })?.level).toBe(
-          "info",
-        );
+        expect(decideVendorLog({ level: "info", record })?.level).toBe("info");
       });
 
       it("keeps debug on its own level", () => {
