@@ -48,9 +48,6 @@ vi.mock("../../../rbac", async (importOriginal) => {
 });
 
 vi.mock("~/server/posthog", () => ({ trackServerEvent: vi.fn() }));
-vi.mock("~/server/license-enforcement", () => ({
-  enforceLicenseLimit: vi.fn(),
-}));
 
 // Every mutation goes through trpc's audit-log middleware, which writes a row
 // with the module-level prisma client — not `ctx.prisma`, so a fixture context
@@ -146,6 +143,27 @@ describe("scenarios.update", () => {
 
       expect(mockGetById).not.toHaveBeenCalled();
       expect(mockUpdate).toHaveBeenCalled();
+    });
+  });
+
+  describe("given an update that clears the objective but keeps the strategy", () => {
+    /** @scenario An attack objective is required */
+    it("refuses it as a field-level validation failure", async () => {
+      mockGetById.mockResolvedValue({ id: "scenario_1", ...storedAttack });
+
+      // `code`, not the sentence: the message is copy and will change, and the
+      // wire message on tRPC is the code anyway.
+      await expect(
+        caller().update({ ...base, redTeamTarget: null }),
+      ).rejects.toMatchObject({
+        cause: {
+          code: "validation_error",
+          meta: {
+            fieldErrors: { redTeamTarget: [expect.any(String)] },
+          },
+        },
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 });

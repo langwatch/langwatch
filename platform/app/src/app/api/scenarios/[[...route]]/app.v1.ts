@@ -7,7 +7,10 @@ import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
-import { ScenarioNotFoundError } from "~/server/scenarios/errors";
+import {
+  RedTeamConfigurationError,
+  ScenarioNotFoundError,
+} from "~/server/scenarios/errors";
 import {
   type RedTeamConfig,
   RedTeamConfigSchema,
@@ -209,7 +212,7 @@ export function registerScenarioRoutes(
 
       const issue = redTeamStateIssue(body);
       if (issue) {
-        return c.json({ error: issue.message, field: issue.field }, 400);
+        throw new RedTeamConfigurationError(issue);
       }
 
       const service = getService();
@@ -284,10 +287,7 @@ export function registerScenarioRoutes(
       });
       const updateIssue = redTeamStateIssue(merged);
       if (updateIssue) {
-        return c.json(
-          { error: updateIssue.message, field: updateIssue.field },
-          400,
-        );
+        throw new RedTeamConfigurationError(updateIssue);
       }
 
       const scenario = await service.update(id, project.id, {

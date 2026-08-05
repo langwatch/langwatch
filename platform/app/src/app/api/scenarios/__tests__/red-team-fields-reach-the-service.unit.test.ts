@@ -48,6 +48,7 @@ vi.mock("~/server/scenarios/scenario.service", () => ({
 // routes off a Hono app. Standing it in keeps this a test of the handler.
 vi.mock("~/server/api/security", async (importOriginal) => {
   const { Hono } = await import("hono");
+  const { handleError } = await import("~/app/api/middleware/error-handler");
   const actual = await importOriginal<typeof import("~/server/api/security")>();
   return {
     ...actual,
@@ -57,6 +58,10 @@ vi.mock("~/server/api/security", async (importOriginal) => {
         c.set("project", { id: "project_test", slug: "test-project" });
         await next();
       });
+      // The real builder installs this. Without it a refusal this route
+      // *throws* would come back as Hono's bare 500, and a test asserting on
+      // the rejection would be asserting on the wrong boundary.
+      hono.onError(handleError);
       // Loosely typed on purpose: this stands in for a builder whose real
       // generics carry auth context the handler never reads.
       const h = hono as any;
@@ -267,6 +272,50 @@ describe("the scenarios REST API", () => {
 
       expect(res.status).toBeGreaterThanOrEqual(400);
       expect(create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a strategy with no objective at all", () => {
+    /** @scenario An attack objective is required */
+    it("names the offending field so the caller knows what to fix", async () => {
+      const res = await post({
+        name: "n",
+        situation: "s",
+        criteria: [],
+        redTeamStrategy: "crescendo",
+      });
+      const body = (await res.json()) as Record<string, unknown>;
+
+      expect(res.status).toBe(422);
+      expect(body.error).toBe("validation_error");
+      expect(body.fieldErrors).toEqual({
+        redTeamTarget: [expect.any(String)],
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given planner settings on a GOAT update", () => {
+    /** @scenario Planner settings are refused on GOAT */
+    it("names the offending field rather than saving inert settings", async () => {
+      getById.mockResolvedValue(
+        scenarioRow({
+          redTeamStrategy: "goat",
+          redTeamTarget: "get the agent to reveal its internal override code",
+        }),
+      );
+
+      const res = await put("scenario_1", {
+        redTeamConfig: { attackPlan: "first be friendly, then escalate" },
+      });
+      const body = (await res.json()) as Record<string, unknown>;
+
+      expect(res.status).toBe(422);
+      expect(body.error).toBe("validation_error");
+      expect(body.fieldErrors).toEqual({
+        redTeamConfig: [expect.any(String)],
+      });
+      expect(update).not.toHaveBeenCalled();
     });
   });
 });

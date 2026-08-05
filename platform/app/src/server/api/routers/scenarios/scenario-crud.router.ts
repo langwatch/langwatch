@@ -4,7 +4,10 @@ import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { trackServerEvent } from "~/server/posthog";
-import { ScenarioNotFoundError } from "~/server/scenarios/errors";
+import {
+  RedTeamConfigurationError,
+  ScenarioNotFoundError,
+} from "~/server/scenarios/errors";
 import type { RedTeamConfig } from "~/server/scenarios/execution/types";
 import {
   mergeRedTeamState,
@@ -62,10 +65,7 @@ export const scenarioCrudRouter = createTRPCRouter({
       const input = normalizeRedTeamWrite(rawInput);
       const createIssue = redTeamStateIssue(input);
       if (createIssue) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: createIssue.message,
-        });
+        throw new RedTeamConfigurationError(createIssue);
       }
 
       const { redTeamConfig, ...rest } = input;
@@ -182,10 +182,7 @@ export const scenarioCrudRouter = createTRPCRouter({
           }),
         );
         if (updateIssue) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: updateIssue.message,
-          });
+          throw new RedTeamConfigurationError(updateIssue);
         }
       }
       const result = await service.update(id, projectId, {

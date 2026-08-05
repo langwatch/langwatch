@@ -1670,6 +1670,9 @@ const USER_VISIBLE_FIELDS: Record<string, string> = {
   userIdToImpersonate: "the account to impersonate",
   reason: "the reason",
   resource: "the resource",
+  // Red-team scenario editor. The words are the ones on the attack section.
+  redTeamTarget: "the attack objective",
+  redTeamConfig: "the advanced attack settings",
 };
 
 /** Joins labels into "a", "a and b", "a, b and c". */
