@@ -17,6 +17,7 @@ import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import { app as eventsApp } from "../app/api/events/[[...route]]/app";
 import { app as experimentsApp } from "../app/api/experiments/[[...route]]/app";
+import { app as batchRunReportApp } from "../app/api/export/batch-run-report/[[...route]]/app";
 import { app as exportScenarioRunsApp } from "../app/api/export/scenario-runs/[[...route]]/app";
 import { app as exportTracesApp } from "../app/api/export/traces/[[...route]]/app";
 import { app as filesApp } from "../app/api/files/[[...route]]/app";
@@ -129,6 +130,7 @@ export function createApiRouter() {
   api.route("/", experimentsApp);
   api.route("/", filesApp);
   api.route("/", exportTracesApp);
+  api.route("/", batchRunReportApp);
   api.route("/", exportScenarioRunsApp);
   // ORDERING: the unauthenticated spec document shares the /api/gateway/v1
   // namespace with the credentialed resource routes, so it is mounted first

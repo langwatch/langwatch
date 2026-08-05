@@ -9,9 +9,17 @@
  */
 
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight, Square } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  MoreVertical,
+  Square,
+  Zap,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
+import { Menu } from "~/components/ui/menu";
 import { useNow } from "~/hooks/useNow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
@@ -43,6 +51,16 @@ type RunRowDataProps = {
   isCancellingBatch?: boolean;
   cancellingJobId?: string | null;
   isHighlighted?: boolean;
+  /** Produces the run report for this batch. Absent when it cannot be scoped. */
+  onExportReport?: () => void;
+  /** Export with Langy's written analysis, which takes a minute or two. */
+  onExportReportWithLangy?: () => void;
+  /** Stops the report currently being produced for this batch. */
+  onCancelReport?: () => void;
+  /** Whether a report is being produced for THIS batch, not for any other. */
+  isReportRunning?: boolean;
+  /** Which stage the report is in, so the wait says what it is doing. */
+  reportStage?: string | null;
 };
 
 type RunRowProps = RunRowLoadingProps | RunRowDataProps;
@@ -136,6 +154,11 @@ function RunRowData({
   isCancellingBatch = false,
   cancellingJobId,
   isHighlighted = false,
+  onExportReport,
+  onExportReportWithLangy,
+  onCancelReport,
+  isReportRunning = false,
+  reportStage = null,
 }: RunRowDataProps) {
   const [isCancelAllDialogOpen, setIsCancelAllDialogOpen] = useState(false);
   const now = useNow();
@@ -178,8 +201,12 @@ function RunRowData({
         top={0}
         zIndex={20}
       >
+        {/* The row itself is a container rather than a button. It carries the
+            Stop chips and the actions menu, which are controls of their own,
+            and a control nested inside a button is invalid HTML that assistive
+            technology flattens away. Expanding has its own button; clicking
+            anywhere else on the row reaches the same handler by bubbling. */}
         <HStack
-          as="button"
           width="full"
           paddingX={4}
           paddingY={3}
@@ -188,8 +215,6 @@ function RunRowData({
           cursor="pointer"
           onClick={onToggle}
           className="group"
-          aria-expanded={isExpanded}
-          aria-label={`Run from ${timeAgo ?? "unknown time"}`}
           bg="color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 70%), transparent)"
           backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(140%))"
           borderWidth="1px"
@@ -200,39 +225,50 @@ function RunRowData({
           borderRadius="lg"
           boxShadow="xs"
         >
-          {isExpanded ? (
-            <ChevronDown size={14} style={{ flexShrink: 0 }} />
-          ) : (
-            <ChevronRight size={14} style={{ flexShrink: 0 }} />
-          )}
-          {suiteName && (
-            <>
-              <Text
-                fontSize="sm"
-                fontWeight="medium"
-                color="fg.default"
-                flexShrink={0}
-              >
-                {suiteName}
-              </Text>
-              <Text fontSize="sm" color="fg.muted" flexShrink={0}>
-                &middot;
-              </Text>
-            </>
-          )}
-          <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
-            {timeAgo}
-          </Text>
-          {expectedJobCount != null &&
-            summary.totalCount < expectedJobCount && (
-              <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-                {summary.totalCount} of {expectedJobCount}
-              </Text>
+          {/* No handler of its own: the click it fires bubbles to the row, so
+              expanding happens in exactly one place however it was asked for. */}
+          <HStack
+            as="button"
+            gap={3}
+            flexShrink={0}
+            cursor="pointer"
+            aria-expanded={isExpanded}
+            aria-label={`Run from ${timeAgo ?? "unknown time"}`}
+            data-testid="run-row-toggle"
+          >
+            {isExpanded ? (
+              <ChevronDown size={14} style={{ flexShrink: 0 }} />
+            ) : (
+              <ChevronRight size={14} style={{ flexShrink: 0 }} />
             )}
+            {suiteName && (
+              <>
+                <Text
+                  fontSize="sm"
+                  fontWeight="medium"
+                  color="fg.default"
+                  flexShrink={0}
+                >
+                  {suiteName}
+                </Text>
+                <Text fontSize="sm" color="fg.muted" flexShrink={0}>
+                  &middot;
+                </Text>
+              </>
+            )}
+            <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
+              {timeAgo}
+            </Text>
+            {expectedJobCount != null &&
+              summary.totalCount < expectedJobCount && (
+                <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+                  {summary.totalCount} of {expectedJobCount}
+                </Text>
+              )}
+          </HStack>
           {onCancelAll && hasCancellableRuns && (
             <HStack
-              as="span"
-              role="button"
+              as="button"
               tabIndex={isCancellingBatch ? -1 : 0}
               gap={1}
               paddingX={2}
@@ -254,16 +290,6 @@ function RunRowData({
                 e.stopPropagation();
                 if (!isCancellingBatch) setIsCancelAllDialogOpen(true);
               }}
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (
-                  !isCancellingBatch &&
-                  (e.key === "Enter" || e.key === " ")
-                ) {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  setIsCancelAllDialogOpen(true);
-                }
-              }}
               aria-label="Stop all remaining runs"
               aria-disabled={isCancellingBatch}
               data-testid="cancel-all-button"
@@ -272,8 +298,107 @@ function RunRowData({
               <Text fontSize="xs">Stop</Text>
             </HStack>
           )}
+          {/* Transient, like the Stop chip beside it: it exists only while a
+              report is being produced, and it is how that one is stopped. */}
+          {isReportRunning && onCancelReport && (
+            <HStack
+              as="button"
+              gap={1}
+              paddingX={2}
+              paddingY={0.5}
+              borderRadius="md"
+              border="1px solid"
+              borderColor="border"
+              fontSize="xs"
+              color="fg"
+              cursor="pointer"
+              flexShrink={0}
+              _hover={{ bg: "bg.muted", borderColor: "border.emphasized" }}
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onCancelReport();
+              }}
+              aria-label="Cancel report"
+              data-testid="cancel-report-button"
+            >
+              <Spinner size="xs" />
+              <Text fontSize="xs">{reportStage ?? "Report"}</Text>
+            </HStack>
+          )}
           <Box flex={1} />
           <RunMetricsSummary summary={summary} />
+          {/* Row actions live in one overflow menu (row-actions-overflow-menu.md).
+              Opening it is not expanding the row, so the click stops here. */}
+          {onExportReport && (
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Box
+                  as="button"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  padding={1}
+                  borderRadius="md"
+                  color="fg.muted"
+                  cursor="pointer"
+                  flexShrink={0}
+                  _hover={{ bg: "bg.muted", color: "fg" }}
+                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  aria-label={`Actions for ${suiteName ?? "this run"}`}
+                  data-testid="run-row-actions-button"
+                >
+                  <MoreVertical size={14} />
+                </Box>
+              </Menu.Trigger>
+              <Menu.Content>
+                {/* Instant first. Everything except Langy computes in under a
+                    millisecond, so most exports should not be paying a minute
+                    for a paragraph nobody asked for — and the computed report
+                    is a whole document, not a degraded one. */}
+                <Menu.Item
+                  value="export-report"
+                  disabled={isReportRunning}
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    if (isReportRunning) return;
+                    onExportReport();
+                  }}
+                  data-testid="export-report-menu-item"
+                >
+                  <Zap size={14} />
+                  <Text>Instant export</Text>
+                  <Box flex={1} />
+                  {/* The size of the job is on the menu item, not in a toast
+                      after the click. */}
+                  <Text fontSize="xs" color="fg.muted">
+                    {summary.totalCount}{" "}
+                    {summary.totalCount === 1 ? "scenario" : "scenarios"}
+                  </Text>
+                </Menu.Item>
+                {onExportReportWithLangy && (
+                  <Menu.Item
+                    value="export-report-langy"
+                    disabled={isReportRunning}
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      if (isReportRunning) return;
+                      onExportReportWithLangy();
+                    }}
+                    data-testid="export-report-langy-menu-item"
+                  >
+                    <FileText size={14} />
+                    <Text>Export with Langy</Text>
+                    <Box flex={1} />
+                    {/* Said before the click, because it is the whole
+                        difference between the two items. */}
+                    <Text fontSize="xs" color="fg.muted">
+                      a minute or two
+                    </Text>
+                  </Menu.Item>
+                )}
+              </Menu.Content>
+            </Menu.Root>
+          )}
         </HStack>
       </Box>
 

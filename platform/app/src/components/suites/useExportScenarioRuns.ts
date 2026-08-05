@@ -14,6 +14,10 @@ import type {
   ScenarioRunExportStatusFilter,
 } from "~/server/export/scenario-runs/types";
 import { api } from "~/utils/api";
+import {
+  filenameFromContentDisposition,
+  triggerBlobDownload,
+} from "~/utils/downloadBlob";
 
 /**
  * Orchestrates the scenario run CSV export: dialog state, the streaming
@@ -262,7 +266,7 @@ async function downloadExport({
 
     triggerBlobDownload({
       blob,
-      filename: extractFilename({
+      filename: filenameFromContentDisposition({
         contentDisposition: response.headers.get("Content-Disposition"),
         fallbackName: fallbackFilename(request),
       }),
@@ -299,35 +303,4 @@ async function readExportFailure(response: Response): Promise<unknown> {
 function fallbackFilename(request: ScenarioRunExportRequest): string {
   const today = new Date().toISOString().split("T")[0];
   return `${request.projectId} - Scenario Runs - ${today} - ${request.mode}.csv`;
-}
-
-function triggerBlobDownload({
-  blob,
-  filename,
-}: {
-  blob: Blob;
-  filename: string;
-}): void {
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.setAttribute("download", filename);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-}
-
-function extractFilename({
-  contentDisposition,
-  fallbackName,
-}: {
-  contentDisposition: string | null;
-  fallbackName: string;
-}): string {
-  if (!contentDisposition) return fallbackName;
-  const match = contentDisposition.match(
-    /filename\*?=(?:UTF-8''|")?([^";]+)"?/i,
-  );
-  return match?.[1] ? decodeURIComponent(match[1]) : fallbackName;
 }

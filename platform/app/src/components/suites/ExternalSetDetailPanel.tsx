@@ -25,6 +25,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { REPORT_STAGE_LABELS } from "~/shared/scenario-run-report/report-stages";
 import { api } from "~/utils/api";
 import { GroupRow } from "./GroupRow";
 import {
@@ -42,6 +43,7 @@ import {
 } from "./run-history-transforms";
 import { ScenarioTabConnectedBadge } from "./ScenarioTabConnectedBadge";
 import { useAutoExpansion } from "./useAutoExpansion";
+import { useBatchRunReport } from "./useBatchRunReport";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useScrollToBatch } from "./useScrollToBatch";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
@@ -66,6 +68,13 @@ export function ExternalSetDetailPanel({
   connectedToLocalRun = false,
 }: ExternalSetDetailPanelProps) {
   const { project } = useOrganizationTeamProject();
+
+  // One instance for the whole list: the scope of a report is passed per call,
+  // so two rows can be producing one at the same time.
+  const { startReport, cancelReport, isReportRunning, reportStage } =
+    useBatchRunReport({
+      projectId: project?.id,
+    });
   const { openDrawer } = useDrawer();
   const { highlightedBatchId } = useScrollToBatch({ highlightBatchId });
   const runListRef = useRef<HTMLDivElement>(null);
@@ -328,6 +337,35 @@ export function ExternalSetDetailPanel({
                           viewMode={viewMode}
                           isHighlighted={
                             highlightedBatchId === batchRun.batchRunId
+                          }
+                          onExportReport={() =>
+                            startReport({
+                              batchRunId: batchRun.batchRunId,
+                              scenarioSetId:
+                                batchRun.scenarioSetId ?? scenarioSetId,
+                              suiteName: scenarioSetId,
+                              withAnalysis: false,
+                            })
+                          }
+                          onExportReportWithLangy={() =>
+                            startReport({
+                              batchRunId: batchRun.batchRunId,
+                              scenarioSetId:
+                                batchRun.scenarioSetId ?? scenarioSetId,
+                              suiteName: scenarioSetId,
+                              withAnalysis: true,
+                            })
+                          }
+                          onCancelReport={() =>
+                            cancelReport({ batchRunId: batchRun.batchRunId })
+                          }
+                          isReportRunning={isReportRunning(batchRun.batchRunId)}
+                          reportStage={
+                            reportStage(batchRun.batchRunId)
+                              ? REPORT_STAGE_LABELS[
+                                  reportStage(batchRun.batchRunId)!
+                                ]
+                              : null
                           }
                         />
                       );

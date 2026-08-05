@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import {
+  countRunOutcomes,
+  passRateFrom,
+} from "~/shared/scenario-run-report/run-outcome-summary";
+import {
   availableGroupByOptions,
   computeBatchRunSummary,
   computeGroupSummary,
@@ -1267,6 +1271,64 @@ describe("availableGroupByOptions()", () => {
     it("returns all options including target", () => {
       const result = availableGroupByOptions({ viewContext: "all-runs" });
       expect(result).toEqual(["none", "scenario", "target"]);
+    });
+  });
+});
+
+describe("computeGroupSummary() agreement with the canonical calculation", () => {
+  describe("given a group holding every status the enum can produce", () => {
+    // Deliberately not a hand-written expectation: this asserts the panel
+    // CALLS the canonical arithmetic rather than that it happens to agree with
+    // a number someone typed. If the panel ever grows its own copy of the
+    // formula, this is what catches it.
+    const statuses = [
+      ScenarioRunStatus.SUCCESS,
+      ScenarioRunStatus.SUCCESS,
+      ScenarioRunStatus.FAILED,
+      ScenarioRunStatus.ERROR,
+      ScenarioRunStatus.STALLED,
+      ScenarioRunStatus.CANCELLED,
+      ScenarioRunStatus.IN_PROGRESS,
+      ScenarioRunStatus.PENDING,
+      ScenarioRunStatus.RUNNING,
+      ScenarioRunStatus.QUEUED,
+    ];
+    const group = groupRunsByBatchId({
+      runs: statuses.map((status, index) =>
+        makeScenarioRunData({
+          batchRunId: "batch_1",
+          scenarioRunId: `run_${index}`,
+          scenarioId: `scen_${index}`,
+          status,
+        }),
+      ),
+    })[0]!;
+
+    /** @scenario The run history summary reports the canonical pass rate */
+    it("reports the canonical pass rate and counts", () => {
+      const counts = countRunOutcomes({ statuses });
+      const summary = computeGroupSummary({ group });
+
+      expect(summary.passRate).toBe(passRateFrom({ counts }));
+      expect({
+        passedCount: summary.passedCount,
+        failedCount: summary.failedCount,
+        stalledCount: summary.stalledCount,
+        cancelledCount: summary.cancelledCount,
+        inProgressCount: summary.inProgressCount,
+        queuedCount: summary.queuedCount,
+        completedCount: summary.completedCount,
+        totalCount: summary.totalCount,
+      }).toEqual({
+        passedCount: counts.passedCount,
+        failedCount: counts.failedCount,
+        stalledCount: counts.stalledCount,
+        cancelledCount: counts.cancelledCount,
+        inProgressCount: counts.inProgressCount,
+        queuedCount: counts.queuedCount,
+        completedCount: counts.completedCount,
+        totalCount: counts.totalCount,
+      });
     });
   });
 });

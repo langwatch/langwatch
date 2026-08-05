@@ -16,6 +16,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { NullSimulationRepository } from "~/server/app-layer/simulations/repositories/simulation.repository";
 import { SimulationRunService } from "~/server/app-layer/simulations/simulation-run.service";
 import { prisma } from "~/server/db";
+import { BatchRunReportService } from "~/server/export/batch-run-report/batch-run-report.service";
 import { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
@@ -94,6 +95,7 @@ describe("Feature: simulation-runs platform link addresses the run", () => {
       simulations: {
         runs: new SimulationRunService(repository),
         export: ScenarioRunExportService.create(repository),
+        report: BatchRunReportService.create({ reader: repository }),
       },
     });
   }

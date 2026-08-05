@@ -83,6 +83,20 @@ export interface SimulationRepository {
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]>;
 
+  /**
+   * Runs for a known set of batches, without their transcripts.
+   *
+   * For comparing a run against the ones before it: the comparison needs each
+   * run's criteria and outcome, never its conversation, and reading full
+   * transcripts for a window of prior batches would cost far more than the
+   * answer is worth.
+   */
+  findRunOutcomesForBatchIds(params: {
+    projectId: string;
+    batchRunIds: string[];
+    scenarioSetId?: string;
+  }): Promise<ScenarioRunData[]>;
+
   getBatchRunCountForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
@@ -185,6 +199,10 @@ export class NullSimulationRepository implements SimulationRepository {
 
   async getBatchHistoryForScenarioSet(): Promise<BatchHistoryResult> {
     return { batches: [], hasMore: false, lastUpdatedAt: 0, totalCount: 0 };
+  }
+
+  async findRunOutcomesForBatchIds(): Promise<ScenarioRunData[]> {
+    return [];
   }
 
   async getRunDataForBatchRun(): Promise<BatchRunDataResult> {

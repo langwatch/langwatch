@@ -29,6 +29,7 @@ import {
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { BatchRunReportService } from "~/server/export/batch-run-report/batch-run-report.service";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
@@ -482,11 +483,14 @@ export function initializeDefaultApp(options?: {
   const simulationReads = SimulationRunService.create(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
-  // Shares the repository instance so the export reads through the same store
-  // the run history does, rather than opening a second one.
+  // Both share the repository instance so they read through the same store the
+  // run history does, rather than each opening a second one.
   const scenarioRunExport = ScenarioRunExportService.create(
     simulationReads.repository,
   );
+  const batchRunReport = BatchRunReportService.create({
+    reader: simulationReads.repository,
+  });
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
   const evaluations = {
@@ -1302,7 +1306,11 @@ export function initializeDefaultApp(options?: {
     triggerTemplates,
     emailSuppressions,
     dspySteps: { steps: dspySteps },
-    simulations: { runs: simulationReads, export: scenarioRunExport },
+    simulations: {
+      runs: simulationReads,
+      export: scenarioRunExport,
+      report: batchRunReport,
+    },
     suiteRuns: { runs: suiteRunService },
     topicClustering: {
       status: new TopicClusteringStatusService(
@@ -1512,6 +1520,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     simulations: {
       runs: testSimulationReads,
       export: ScenarioRunExportService.create(testSimulationReads.repository),
+      report: BatchRunReportService.create({
+        reader: testSimulationReads.repository,
+      }),
     },
     suiteRuns: {
       runs: SuiteRunService.create({

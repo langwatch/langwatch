@@ -50,6 +50,20 @@ export interface ErrorPresentation {
   describe?: (error: HandledErrorShape) => string;
 }
 
+/**
+ * The wait a rate limit asks for, as words.
+ *
+ * `meta.retryAfterSeconds` is a contract with this registry, but it still
+ * arrives over the wire, so a missing or nonsensical value falls back to the
+ * vaguer sentence rather than to "wait NaN seconds".
+ */
+const secondsToWait = (error: HandledErrorShape): string => {
+  const seconds = error.meta.retryAfterSeconds;
+  return typeof seconds === "number" && Number.isFinite(seconds) && seconds > 0
+    ? `${Math.ceil(seconds)} ${Math.ceil(seconds) === 1 ? "second" : "seconds"}`
+    : "a moment";
+};
+
 /** Reads a string out of `meta` without trusting it. */
 const str = (
   error: HandledErrorShape,
@@ -645,6 +659,21 @@ const presentations = {
   scenario_run_export_forbidden: {
     title: "You can't export this project's simulation runs",
     describe: () => "Ask an admin for access to simulations on this project.",
+  },
+  scenario_batch_run_not_found: {
+    title: "This run has nothing to report on",
+    // Covers "never existed", "belongs to another project" and "every scenario
+    // in it was archived" alike: one thing to do about all three, and spelling
+    // out which one it was would confirm whether a run id exists.
+    describe: () =>
+      "Refresh the run history and pick a run that still has scenarios in it.",
+  },
+  scenario_run_report_rate_limited: {
+    // The wait is the whole message, and the second sentence is the way out
+    // that does not involve waiting at all.
+    title: "Too many reports with Langy just now",
+    describe: (error) =>
+      `Wait ${secondsToWait(error)}, then export again. The instant export is not limited.`,
   },
   // ---- billing ----
   billing_customer_email_required: {

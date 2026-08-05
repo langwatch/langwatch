@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import type { BatchRunReportService } from "~/server/export/batch-run-report/batch-run-report.service";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
@@ -108,6 +109,13 @@ export interface AppDependencies {
      * `runs.repository`.
      */
     export: ScenarioRunExportService;
+
+    /**
+     * Per-run analysis report. A sibling of `runs` for the same reason as
+     * `export`: it has its own reads, its own renderers, and is reached
+     * straight from the API layer.
+     */
+    report: BatchRunReportService;
   };
   suiteRuns: {
     runs: SuiteRunService;

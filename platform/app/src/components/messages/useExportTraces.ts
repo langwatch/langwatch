@@ -8,6 +8,10 @@ import type {
   ExportProgress,
 } from "~/server/export/types";
 import { api } from "~/utils/api";
+import {
+  filenameFromContentDisposition,
+  triggerBlobDownload,
+} from "~/utils/downloadBlob";
 
 interface ExportConfig {
   mode: ExportMode;
@@ -43,50 +47,6 @@ interface UseExportTracesReturn {
   startExport: (config: ExportConfig) => void;
   /** Cancel the in-progress export */
   cancelExport: () => void;
-}
-
-/**
- * Triggers a browser download from a Blob and a filename.
- * Creates a temporary anchor element and clicks it.
- */
-function triggerBlobDownload({
-  blob,
-  filename,
-}: {
-  blob: Blob;
-  filename: string;
-}): void {
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.setAttribute("download", filename);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-}
-
-/**
- * Extracts a filename from a Content-Disposition header.
- * Falls back to a generated name if the header is missing.
- */
-function extractFilename({
-  contentDisposition,
-  fallbackName,
-}: {
-  contentDisposition: string | null;
-  fallbackName: string;
-}): string {
-  if (!contentDisposition) return fallbackName;
-
-  const filenameMatch = contentDisposition.match(
-    /filename\*?=(?:UTF-8''|")?([^";]+)"?/i,
-  );
-  if (filenameMatch?.[1]) {
-    return decodeURIComponent(filenameMatch[1]);
-  }
-
-  return fallbackName;
 }
 
 /**
@@ -300,7 +260,7 @@ export function useExportTraces({
             return false;
           }
 
-          const filename = extractFilename({
+          const filename = filenameFromContentDisposition({
             contentDisposition: response.headers.get("Content-Disposition"),
             fallbackName: fallbackFilename,
           });

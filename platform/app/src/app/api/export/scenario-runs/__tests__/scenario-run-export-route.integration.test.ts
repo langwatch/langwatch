@@ -16,6 +16,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 import type { ExportableRun } from "~/server/app-layer/simulations/repositories/simulation.repository";
 import { NullSimulationRepository } from "~/server/app-layer/simulations/repositories/simulation.repository";
 import { SimulationRunService } from "~/server/app-layer/simulations/simulation-run.service";
+import { BatchRunReportService } from "~/server/export/batch-run-report/batch-run-report.service";
 import { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
 import {
   ScenarioRunStatus,
@@ -126,6 +127,7 @@ function installApp() {
     simulations: {
       runs: new SimulationRunService(repository),
       export: ScenarioRunExportService.create(repository),
+      report: BatchRunReportService.create({ reader: repository }),
     },
   });
 }
@@ -268,6 +270,7 @@ describe("POST /api/export/scenario-runs/download", () => {
         simulations: {
           runs: new SimulationRunService(repository),
           export: ScenarioRunExportService.create(repository),
+          report: BatchRunReportService.create({ reader: repository }),
         },
       });
 
@@ -304,6 +307,7 @@ describe("POST /api/export/scenario-runs/download", () => {
         simulations: {
           runs: new SimulationRunService(repository),
           export: ScenarioRunExportService.create(repository),
+          report: BatchRunReportService.create({ reader: repository }),
         },
       });
 

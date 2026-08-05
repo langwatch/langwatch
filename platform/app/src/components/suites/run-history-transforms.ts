@@ -18,8 +18,11 @@ import type {
   ScenarioRunData,
   SuiteRunSummary,
 } from "~/server/scenarios/scenario-event.types";
-import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
+import {
+  countRunOutcomes,
+  passRateFrom,
+} from "~/shared/scenario-run-report/run-outcome-summary";
 
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
@@ -278,13 +281,15 @@ export function computeBatchRunSummary({
 /**
  * Computes pass/fail summary for any RunGroup (batch, scenario, or target).
  *
- * Pass rate = passed / settled. "Settled" = passed + failed + stalled + cancelled
- * (all terminal states). Only in-progress and queued runs are excluded from the
- * denominator since we don't know their outcome yet.
- * When no runs have settled yet (settledCount == 0), passRate is null.
+ * The outcome arithmetic itself lives in run-outcome-summary.ts and is called,
+ * not copied, so a report quoting a pass rate cannot disagree with this panel.
+ * What stays here is the cost and latency roll-up, which depends on
+ * computeMetricStats and so cannot move server-side.
  *
- * ⚠️  KEEP IN SYNC: The sidebar uses a separate ClickHouse aggregation query
- * with its own pass rate formula. If you change the formula here, also update:
+ * ⚠️  KEEP IN SYNC: the sidebar still uses a separate ClickHouse aggregation
+ * with its own formula, which buckets a run that stopped reporting differently
+ * from this one. Converging it changes a percentage already on screen, so it is
+ * recorded as a known divergence rather than silently fixed:
  *   - simulation.clickhouse.repository.ts → getSetSummaries() (sidebar query)
  *   - SuiteSidebar.tsx → RunSummaryLine() (sidebar display)
  */
@@ -293,46 +298,20 @@ export function computeGroupSummary({
 }: {
   group: RunGroup;
 }): RunGroupSummary {
-  let passedCount = 0;
-  let failedCount = 0;
-  let stalledCount = 0;
-  let cancelledCount = 0;
-  let inProgressCount = 0;
-  let queuedCount = 0;
-
-  for (const run of group.scenarioRuns) {
-    switch (categorizeRunStatus(run.status)) {
-      case "success":
-        passedCount++;
-        break;
-      case "failure":
-        failedCount++;
-        break;
-      case "stalled":
-        stalledCount++;
-        break;
-      case "cancelled":
-        cancelledCount++;
-        break;
-      case "in_progress":
-        inProgressCount++;
-        break;
-      case "queued":
-        queuedCount++;
-        break;
-    }
-  }
-
-  const completedCount = passedCount + failedCount;
-  const settledCount =
-    passedCount + failedCount + stalledCount + cancelledCount;
-  const totalCount = group.scenarioRuns.length;
-  const passRate =
-    settledCount > 0
-      ? (passedCount / settledCount) * 100
-      : totalCount > 0
-        ? null
-        : 0;
+  const counts = countRunOutcomes({
+    statuses: group.scenarioRuns.map((run) => run.status),
+  });
+  const {
+    passedCount,
+    failedCount,
+    stalledCount,
+    cancelledCount,
+    inProgressCount,
+    queuedCount,
+    completedCount,
+    totalCount,
+  } = counts;
+  const passRate = passRateFrom({ counts });
 
   let totalCost = 0;
   let totalDurationMs = 0;
@@ -491,34 +470,27 @@ export function resolveOriginLabel({
 /**
  * Computes aggregate totals from raw scenario runs.
  * Works regardless of grouping mode since it operates on flat runs.
+ *
+ * The headline strip has room for three numbers, not six, so a run that
+ * stalled or was cancelled is shown as failed — it did not pass, and that is
+ * the distinction this strip is making. The finer buckets are still available
+ * on the row itself via computeGroupSummary.
  */
 export function computeRunHistoryTotals({
   runs,
 }: {
   runs: ScenarioRunData[];
 }): RunHistoryTotals {
-  let passedCount = 0;
-  let failedCount = 0;
-  let pendingCount = 0;
-
-  for (const run of runs) {
-    const category = categorizeRunStatus(run.status);
-    if (category === "success") passedCount++;
-    else if (
-      category === "failure" ||
-      category === "stalled" ||
-      category === "cancelled"
-    )
-      failedCount++;
-    else if (category === "queued" || category === "in_progress")
-      pendingCount++;
-  }
+  const counts = countRunOutcomes({
+    statuses: runs.map((run) => run.status),
+  });
 
   return {
-    runCount: runs.length,
-    passedCount,
-    failedCount,
-    pendingCount,
+    runCount: counts.totalCount,
+    passedCount: counts.passedCount,
+    failedCount:
+      counts.failedCount + counts.stalledCount + counts.cancelledCount,
+    pendingCount: counts.inProgressCount + counts.queuedCount,
   };
 }
 

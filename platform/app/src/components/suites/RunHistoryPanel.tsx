@@ -30,6 +30,7 @@ import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { isSuiteSetId } from "~/server/suites/suite-set-id";
+import { REPORT_STAGE_LABELS } from "~/shared/scenario-run-report/report-stages";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { GroupRow } from "./GroupRow";
@@ -51,6 +52,10 @@ import {
 } from "./run-history-transforms";
 import { ScenarioRunExportDialog } from "./ScenarioRunExportDialog";
 import { useAutoExpansion } from "./useAutoExpansion";
+import {
+  type UseBatchRunReportReturn,
+  useBatchRunReport,
+} from "./useBatchRunReport";
 import { useCancelScenarioRun } from "./useCancelScenarioRun";
 import { useExportScenarioRuns } from "./useExportScenarioRuns";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
@@ -78,6 +83,46 @@ type RunHistoryPanelProps = {
   /** When set, the matching batch row is scrolled into view and highlighted. */
   highlightBatchId?: string | null;
 };
+
+/**
+ * The report props for one row.
+ *
+ * Both exports differ only by whether Langy is asked, and a row with no set to
+ * report on offers neither: building them together keeps that pairing in one
+ * place rather than as two near-identical ternaries in the middle of JSX.
+ */
+function reportActionsFor({
+  batchRunId,
+  scenarioSetId,
+  suiteName,
+  startReport,
+  cancelReport,
+  isReportRunning,
+  reportStage,
+}: {
+  batchRunId: string;
+  scenarioSetId: string | undefined;
+  suiteName: string | undefined;
+  startReport: UseBatchRunReportReturn["startReport"];
+  cancelReport: UseBatchRunReportReturn["cancelReport"];
+  isReportRunning: UseBatchRunReportReturn["isReportRunning"];
+  reportStage: UseBatchRunReportReturn["reportStage"];
+}) {
+  const start = (withAnalysis: boolean) =>
+    scenarioSetId
+      ? () =>
+          startReport({ batchRunId, scenarioSetId, suiteName, withAnalysis })
+      : undefined;
+  const stage = reportStage(batchRunId);
+
+  return {
+    onExportReport: start(false),
+    onExportReportWithLangy: start(true),
+    onCancelReport: () => cancelReport({ batchRunId }),
+    isReportRunning: isReportRunning(batchRunId),
+    reportStage: stage ? REPORT_STAGE_LABELS[stage] : null,
+  };
+}
 
 export function RunHistoryPanel({
   scenarioSetId,
@@ -215,6 +260,13 @@ export function RunHistoryPanel({
         showErrorToast({ error, fallbackTitle: "Couldn't cancel jobs" }),
     },
   );
+
+  // One instance for the whole list: the scope of a report is passed per call,
+  // so two rows can be producing one at the same time.
+  const { startReport, cancelReport, isReportRunning, reportStage } =
+    useBatchRunReport({
+      projectId: project?.id,
+    });
 
   // Apply filters to raw runs
   const filteredRuns = useMemo(() => {
@@ -516,6 +568,11 @@ export function RunHistoryPanel({
                     }) ?? undefined)
                   : undefined;
 
+                // A batch carries its own set in the all-runs view; the panel
+                // prop is the fallback for the single-suite view, where every
+                // batch belongs to the suite being looked at.
+                const reportSetId = batchRun.scenarioSetId ?? scenarioSetId;
+
                 return (
                   <RunRow
                     key={batchRun.batchRunId}
@@ -547,6 +604,15 @@ export function RunHistoryPanel({
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
                     isHighlighted={highlightedBatchId === batchRun.batchRunId}
+                    {...reportActionsFor({
+                      batchRunId: batchRun.batchRunId,
+                      scenarioSetId: reportSetId,
+                      suiteName,
+                      startReport,
+                      cancelReport,
+                      isReportRunning,
+                      reportStage,
+                    })}
                   />
                 );
               })

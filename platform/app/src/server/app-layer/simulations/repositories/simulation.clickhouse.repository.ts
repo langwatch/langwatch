@@ -31,6 +31,39 @@ const TABLE_NAME = "simulation_runs" as const;
 export const RUN_ID_CAP = 10000;
 
 /**
+ * Row ceiling for {@link SimulationClickHouseRepository.findRunOutcomesForBatchIds}.
+ *
+ * That read spans a whole page of batches at once, and a large suite replayed
+ * across ten of them yields far more runs than any caller renders, so the
+ * result set is bounded rather than streamed. What the cap protects is the
+ * memory of a single response: LIST_COLUMNS is slim but still carries six
+ * messages per run.
+ *
+ * It keeps the NEWEST rows, which is why the query sorts descending and the
+ * oldest-first order is restored in TypeScript. Truncation therefore costs a
+ * suite its oldest batches. The newest are the ones the run report's trend
+ * section compares against, and losing those silently reverses its verdicts.
+ */
+export const RUN_OUTCOMES_ROW_CAP = 5000;
+
+/**
+ * Restores the oldest-first order that {@link RUN_OUTCOMES_ROW_CAP}'s
+ * descending read inverts, on the same key the query sorted by.
+ *
+ * CreatedAt arrives as a millisecond string, so it is compared numerically
+ * rather than lexicographically, and ScenarioRunId breaks ties so runs sharing
+ * a millisecond land in one fixed order rather than an arbitrary one.
+ */
+function compareByCreatedAtAscending(
+  a: ClickHouseSimulationRunRow,
+  b: ClickHouseSimulationRunRow,
+): number {
+  const delta = Number(a.CreatedAt) - Number(b.CreatedAt);
+  if (delta !== 0) return delta;
+  return a.ScenarioRunId.localeCompare(b.ScenarioRunId);
+}
+
+/**
  * Sort key for the export sweep, as a single SQL expression.
  *
  * ORDER BY, the cursor predicate and the value returned as the cursor must all
@@ -845,7 +878,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         : undefined;
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({
+    const runs = await this.findRunOutcomesForBatchIds({
       projectId,
       batchRunIds,
       scenarioSetId,
@@ -965,7 +998,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
+    const runs = await this.findRunOutcomesForBatchIds({
+      projectId,
+      batchRunIds,
+    });
     const lastUpdatedAt = runs.reduce(
       (max, r) => Math.max(max, r.timestamp),
       0,
@@ -1470,7 +1506,18 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
   // ---- Batch helper ----
 
-  private async getRunsForBatchIds({
+  /**
+   * Runs for a known set of batches, read without transcripts.
+   *
+   * LIST_COLUMNS rather than RUN_COLUMNS: callers here want outcomes and
+   * criteria across several batches at once, and pulling every conversation
+   * for ten prior runs would be the most expensive read in the product.
+   *
+   * Returns rows oldest-first, capped at {@link RUN_OUTCOMES_ROW_CAP}. The
+   * ClickHouse sort is descending and the ascending order is restored here, so
+   * the cap sheds the oldest batches rather than the newest.
+   */
+  async findRunOutcomesForBatchIds({
     projectId,
     batchRunIds,
     scenarioSetId,
@@ -1503,8 +1550,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
              ${innerSetFilter}
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
-       ORDER BY CreatedAt ASC
-       LIMIT 5000`,
+       ORDER BY t.CreatedAt DESC, t.ScenarioRunId DESC
+       LIMIT ${RUN_OUTCOMES_ROW_CAP}`,
       {
         tenantId: projectId,
         batchRunIds,
@@ -1515,6 +1562,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     );
 
     const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    return rows
+      .sort(compareByCreatedAtAscending)
+      .map((row) => mapClickHouseRowToScenarioRunData(row, now));
   }
 }
