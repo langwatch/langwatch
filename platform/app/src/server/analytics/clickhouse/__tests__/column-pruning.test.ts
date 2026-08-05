@@ -274,6 +274,32 @@ describe("column-pruning", () => {
         expect(result.sql).not.toContain("ss.Input");
         expect(result.sql).not.toContain("ss.Output");
       });
+
+      /** @scenario Stored spans JOIN materializes only the referenced SpanAttributes key */
+      it("projects a narrow SpanAttributes map instead of the whole column", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+          groupBy: "metadata.span_type",
+        });
+
+        // The JOIN subquery reconstructs a map of only the referenced key so the
+        // wide SpanAttributes values never reach the join buffer.
+        expect(result.sql).toContain(
+          "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
+        );
+        // The bare whole-map column is never selected into the subquery.
+        expect(result.sql).not.toMatch(/,\s*SpanAttributes\s+FROM stored_spans/);
+        // Outer accesses still resolve against the reconstructed map.
+        expect(result.sql).toContain(
+          "ss.SpanAttributes['langwatch.span.type']",
+        );
+      });
     });
 
     describe("when grouping by events.event_type", () => {
