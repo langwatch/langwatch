@@ -85,26 +85,43 @@ const CLIENT_MODULE_VALUE_EXPORTS = new Set([
  * resolver that no by-name list can see.
  */
 function valueExportsOf(source: string): string[] {
-  const names: string[] = [];
-  if (/^export\s+default\b/m.test(source)) names.push("default");
-  for (const star of source.matchAll(
-    /^export\s*\*\s*(?:as\s+[A-Za-z_$][\w$]*\s*)?from\s*["']([^"']+)["']/gm,
-  )) {
-    names.push(`* from "${star[1]}"`);
-  }
-  for (const match of source.matchAll(
-    /^export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm,
-  )) {
-    names.push(match[1]!);
-  }
-  for (const block of source.matchAll(/^export\s*\{([^}]*)\}/gm)) {
-    for (const clause of block[1]!.split(",")) {
-      const parts = clause.trim().split(/\s+as\s+/);
-      const name = (parts[1] ?? parts[0] ?? "").trim();
-      if (name && !clause.trim().startsWith("type ")) names.push(name);
-    }
-  }
-  return names;
+  return [
+    ...unnamedExportsOf(source),
+    ...declarationExportsOf(source),
+    ...braceExportsOf(source),
+  ];
+}
+
+/** `export default x` and `export * from "..."` - neither carries a name. */
+function unnamedExportsOf(source: string): string[] {
+  const stars = [
+    ...source.matchAll(
+      /^export\s*\*\s*(?:as\s+[A-Za-z_$][\w$]*\s*)?from\s*["']([^"']+)["']/gm,
+    ),
+  ].map((match) => `* from "${match[1]}"`);
+  return /^export\s+default\b/m.test(source) ? ["default", ...stars] : stars;
+}
+
+/** `export function x`, `export const x`, `export class x`, and friends. */
+function declarationExportsOf(source: string): string[] {
+  return [
+    ...source.matchAll(
+      /^export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm,
+    ),
+  ].map((match) => match[1]!);
+}
+
+/** `export { a, b as c }`, with or without a `from`. Skips `type` clauses. */
+function braceExportsOf(source: string): string[] {
+  return [...source.matchAll(/^export\s*\{([^}]*)\}/gm)]
+    .flatMap((block) => block[1]!.split(","))
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length > 0 && !clause.startsWith("type "))
+    .map((clause) => {
+      const parts = clause.split(/\s+as\s+/);
+      return (parts[1] ?? parts[0] ?? "").trim();
+    })
+    .filter((name) => name.length > 0);
 }
 
 /**
