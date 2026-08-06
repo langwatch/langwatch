@@ -166,6 +166,19 @@ func TestProviderErrorCode_RejectsProseAndMalformedJSON(t *testing.T) {
 	}
 }
 
+// @scenario "maxProviderCodeBytes is the only length authority for a provider code"
+func TestProviderErrorCode_LengthBoundIsMaxProviderCodeBytesAlone(t *testing.T) {
+	tooLong := `{"code":"` + strings.Repeat("a", maxProviderCodeBytes+1) + `"}`
+	if got := providerErrorCode([]byte(tooLong)); got != "" {
+		t.Errorf("a %d-byte code must be rejected, got %q", maxProviderCodeBytes+1, got)
+	}
+
+	atCap := strings.Repeat("a", maxProviderCodeBytes)
+	if got := providerErrorCode([]byte(`{"code":"` + atCap + `"}`)); string(got) != atCap {
+		t.Errorf("a %d-byte code must be accepted, got %q", maxProviderCodeBytes, got)
+	}
+}
+
 // @scenario "Observed upstream response shapes become safe handled errors"
 func TestDecodeProviderErrorBody_ObservedProductionShapes(t *testing.T) {
 	tests := []struct {
@@ -254,6 +267,27 @@ func TestDecodeLLMErrorBody_TrustsOnlyMarkedHandledEnvelopes(t *testing.T) {
 		}
 		if e.Code != "missing_model" || e.Meta["message"] != "Choose a model." {
 			t.Fatalf("decoded envelope = %#v", e)
+		}
+	})
+
+	t.Run("trusts the marker even when the body will not parse", func(t *testing.T) {
+		// A gzip-garbled or transport-truncated body still carries the
+		// gateway-minted marker header; the marker is stronger evidence of
+		// provenance than a body shape that happens not to parse.
+		garbled := []byte{0x1f, 0x8b, 0xff, 0xfe, 0x00, 0x01}
+		e, typed := decodeLLMErrorBody(garbled, upstreamResponse{
+			handledCode: "missing_model",
+			status:      http.StatusBadRequest,
+			contentType: "application/json",
+		})
+		if !typed {
+			t.Fatal("a marked response must be trusted even with an unparseable body")
+		}
+		if e.Code != "missing_model" {
+			t.Errorf("code = %q, want missing_model", e.Code)
+		}
+		if _, ok := e.Meta["message"]; ok {
+			t.Error("an unparseable body has no message to carry")
 		}
 	})
 

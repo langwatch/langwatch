@@ -370,7 +370,7 @@ const maxProviderCodeBytes = 128
 // providerCodePattern deliberately admits identifiers rather than arbitrary
 // strings. Provider prose can contain credentials and belongs neither in the
 // handled-error wire contract nor in logs.
-var providerCodePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.:-]{0,127}$`)
+var providerCodePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.:-]*$`)
 
 // providerCodePaths cover the provider JSON dialects observed in production
 // and the common OpenAI/Anthropic/JSON:API variants. Prefer a semantic `code`
@@ -431,8 +431,17 @@ type upstreamResponse struct {
 
 func decodeLLMErrorBody(peeked []byte, resp upstreamResponse) (e herr.E, typed bool) {
 	var envelope herr.ErrorResponse
-	if json.Unmarshal(peeked, &envelope) == nil && isGatewayEnvelope(envelope.Error, resp.handledCode) {
-		return herr.FromBody(envelope.Error), true
+	if err := json.Unmarshal(peeked, &envelope); err == nil {
+		if isGatewayEnvelope(envelope.Error, resp.handledCode) {
+			return herr.FromBody(envelope.Error), true
+		}
+	} else if resp.handledCode != "" {
+		// The marker header is gateway-minted and stripped from anything the
+		// gateway did not author (writeJSONResponse, writeUpstreamError), so
+		// its presence is trustworthy even when the body itself failed to
+		// parse (truncated by a proxy, transport-mangled). Trust the code,
+		// carry nothing else: there is no message to lose.
+		return herr.E{Code: herr.Code(resp.handledCode)}, true
 	}
 	return decodeProviderErrorBody(peeked, resp.status, resp.contentType), false
 }
