@@ -176,6 +176,7 @@ export const APP_ERROR_CODES = [
   "share_read_rate_limited",
   "span_not_found",
   "spend_source_unavailable",
+  "subscription_not_linked",
   "subscription_service_unavailable",
   "subscription_sync_failed",
   "suite_all_scenarios_archived",

@@ -42,7 +42,7 @@ const createMockStripe = () => ({
     },
   },
   invoices: {
-    retrieveUpcoming: vi.fn(),
+    createPreview: vi.fn(),
   },
   billingPortal: {
     sessions: {
@@ -124,7 +124,7 @@ describe("seatEventSubscription", () => {
 
       it("returns formatted proration amount and recurring total for USD", async () => {
         // "with change" invoice has $15 proration, "current" has $5 existing proration
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "usd",
             lines: {
@@ -170,7 +170,7 @@ describe("seatEventSubscription", () => {
           },
         });
 
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "eur",
             lines: { data: [{ proration: true, amount: 2000 }] },
@@ -191,7 +191,7 @@ describe("seatEventSubscription", () => {
       });
 
       it("formats whole-dollar amounts without decimals", async () => {
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "usd",
             lines: { data: [{ proration: true, amount: 5000 }] },
@@ -213,7 +213,7 @@ describe("seatEventSubscription", () => {
       });
 
       it("formats fractional amounts with two decimal places", async () => {
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "usd",
             lines: { data: [{ proration: true, amount: 1550 }] },
@@ -233,7 +233,7 @@ describe("seatEventSubscription", () => {
       });
 
       it("subtracts existing prorations to isolate incremental cost", async () => {
-        stripe.invoices.retrieveUpcoming
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "usd",
             lines: {
@@ -259,8 +259,8 @@ describe("seatEventSubscription", () => {
         expect(result.formattedAmountDue).toBe("$20");
       });
 
-      it("passes correct subscription_items to Stripe upstream invoice", async () => {
-        stripe.invoices.retrieveUpcoming
+      it("previews the seat change through the Create Preview Invoice API", async () => {
+        stripe.invoices.createPreview
           .mockResolvedValueOnce({
             currency: "usd",
             lines: { data: [] },
@@ -275,10 +275,18 @@ describe("seatEventSubscription", () => {
           newTotalSeats: 7,
         });
 
-        expect(stripe.invoices.retrieveUpcoming).toHaveBeenCalledWith({
+        // The old Upcoming Invoice API rejects flexible-billing subscriptions
+        // outright, so the preview must go through create_preview: once with
+        // the proposed change, once as the unmodified baseline.
+        expect(stripe.invoices.createPreview).toHaveBeenNthCalledWith(1, {
           subscription: "sub_stripe_1",
-          subscription_items: [{ id: "si_seat", quantity: 7 }],
-          subscription_proration_behavior: "create_prorations",
+          subscription_details: {
+            items: [{ id: "si_seat", quantity: 7 }],
+            proration_behavior: "create_prorations",
+          },
+        });
+        expect(stripe.invoices.createPreview).toHaveBeenNthCalledWith(2, {
+          subscription: "sub_stripe_1",
         });
       });
     });
@@ -293,6 +301,28 @@ describe("seatEventSubscription", () => {
             newTotalSeats: 3,
           }),
         ).rejects.toMatchObject({ code: "subscription_sync_failed" });
+      });
+    });
+
+    describe("when the subscription row exists but has no billing-provider link", () => {
+      it("raises subscription_not_linked instead of the retryable sync error", async () => {
+        // First query looks for a linked row and finds none; the follow-up
+        // finds the active-but-unlinked row that explains why.
+        db.subscription.findFirst
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({
+            id: "sub_db_1",
+            stripeSubscriptionId: null,
+            status: SubscriptionStatus.ACTIVE,
+          });
+
+        await expect(
+          service.previewProration({
+            organizationId: "org_1",
+            newTotalSeats: 3,
+          }),
+        ).rejects.toMatchObject({ code: "subscription_not_linked" });
+        expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
       });
     });
 
@@ -436,21 +466,42 @@ describe("seatEventSubscription", () => {
     });
 
     describe("when no DB subscription has a stripe ID", () => {
-      it("returns success false", async () => {
+      it("raises subscription_sync_failed instead of resolving as a silent no-op", async () => {
         db.subscription.findFirst.mockResolvedValue(null);
 
-        const result = await service.updateSeatEventItems({
-          organizationId: "org_1",
-          totalMembers: 5,
-        });
-
-        expect(result).toEqual({ success: false });
+        await expect(
+          service.updateSeatEventItems({
+            organizationId: "org_1",
+            totalMembers: 5,
+          }),
+        ).rejects.toMatchObject({ code: "subscription_sync_failed" });
         expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
       });
     });
 
+    describe("when the subscription row exists but has no billing-provider link", () => {
+      it("raises subscription_not_linked so the seat update cannot pass as a success", async () => {
+        db.subscription.findFirst
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({
+            id: "sub_db_1",
+            stripeSubscriptionId: null,
+            status: SubscriptionStatus.ACTIVE,
+          });
+
+        await expect(
+          service.updateSeatEventItems({
+            organizationId: "org_1",
+            totalMembers: 5,
+          }),
+        ).rejects.toMatchObject({ code: "subscription_not_linked" });
+        expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
+        expect(db.subscription.update).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when Stripe subscription status is not active", () => {
-      it("returns success false", async () => {
+      it("raises subscription_sync_failed", async () => {
         db.subscription.findFirst.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
@@ -461,18 +512,18 @@ describe("seatEventSubscription", () => {
           items: { data: [] },
         });
 
-        const result = await service.updateSeatEventItems({
-          organizationId: "org_1",
-          totalMembers: 5,
-        });
-
-        expect(result).toEqual({ success: false });
+        await expect(
+          service.updateSeatEventItems({
+            organizationId: "org_1",
+            totalMembers: 5,
+          }),
+        ).rejects.toMatchObject({ code: "subscription_sync_failed" });
         expect(stripe.subscriptions.update).not.toHaveBeenCalled();
       });
     });
 
     describe("when no seat item found on Stripe subscription", () => {
-      it("returns success false", async () => {
+      it("raises subscription_sync_failed for the missing seat item", async () => {
         db.subscription.findFirst.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
@@ -490,12 +541,12 @@ describe("seatEventSubscription", () => {
           },
         });
 
-        const result = await service.updateSeatEventItems({
-          organizationId: "org_1",
-          totalMembers: 5,
-        });
-
-        expect(result).toEqual({ success: false });
+        await expect(
+          service.updateSeatEventItems({
+            organizationId: "org_1",
+            totalMembers: 5,
+          }),
+        ).rejects.toMatchObject({ code: "subscription_sync_failed" });
         expect(stripe.subscriptions.update).not.toHaveBeenCalled();
       });
     });

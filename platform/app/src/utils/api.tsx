@@ -18,7 +18,6 @@ import {
   httpLink,
   loggerLink,
   splitLink,
-  TRPCClientError,
   wsLink,
 } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
@@ -36,6 +35,7 @@ import {
   invalidateModelProviderQueries,
   subscribeToModelProvidersUpdated,
 } from "./modelProviderSync";
+import { shouldRetryQuery } from "./queryRetryPolicy";
 import { sseLink } from "./sseLink";
 import {
   extractAiCallFailedInfo,
@@ -76,9 +76,6 @@ function getOrCreateWSClient(): ReturnType<typeof createWSClient> | null {
   });
   return cachedWSClient;
 }
-
-const MAX_RETRIES = 4;
-const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404, 422, 431];
 
 function createTRPCLinks() {
   const wsClient = getOrCreateWSClient();
@@ -306,20 +303,7 @@ function createQueryClientConfig() {
           process.env.NODE_ENV !== "production"
             ? ("always" as const)
             : ("online" as const),
-        retry(failureCount: number, error: unknown) {
-          if (failureCount >= MAX_RETRIES) {
-            return false;
-          }
-
-          if (
-            error instanceof TRPCClientError &&
-            HTTP_STATUS_TO_NOT_RETRY.includes(error.data?.httpStatus ?? 0)
-          ) {
-            return false;
-          }
-
-          return true;
-        },
+        retry: shouldRetryQuery,
       },
     },
   };

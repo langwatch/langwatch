@@ -821,6 +821,15 @@ const presentations = {
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  subscription_not_linked: {
+    // fault: platform. The plan is active but our record of it was never
+    // connected to the billing provider's, so seat changes can't be made from
+    // the app. Waiting doesn't fix it — reconnecting is an operator action —
+    // so the copy must not suggest retrying.
+    title: "Seat changes need a hand from us",
+    describe: () =>
+      "Your plan is active, but seat updates aren't available from here yet. Contact support and we'll finish the setup.",
+  },
   subscription_sync_failed: {
     // fault: platform. Our copy of the plan is behind the payment provider's;
     // it usually catches up on its own, so the action is to wait and reload.

@@ -146,6 +146,30 @@ export class NoActiveSubscriptionError extends HandledError {
 }
 
 /**
+ * A live subscription exists in our records but was never linked to its
+ * counterpart at the billing provider, so seat changes cannot be made from
+ * the app at all.
+ *
+ * Deliberately NOT `subscription_sync_failed`: that code's copy promises the
+ * state "usually catches up on its own", and this one never does — linking the
+ * record is an operator action. A subscription lands here when it was set up
+ * by hand at the provider rather than through our checkout, which is the only
+ * flow that writes the link.
+ */
+export class SubscriptionNotLinkedError extends HandledError {
+  declare readonly code: "subscription_not_linked";
+
+  constructor() {
+    super(
+      "subscription_not_linked",
+      "This subscription isn't connected to billing yet",
+      { httpStatus: 409, fault: "platform" },
+    );
+    this.name = "SubscriptionNotLinkedError";
+  }
+}
+
+/**
  * The subscription exists but is missing the line item we needed to change.
  *
  * Same drift as {@link NoActiveSubscriptionError}, one level further in. The
