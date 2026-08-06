@@ -1,5 +1,6 @@
 import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipelines/ingestion-pull-processing";
 import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
+import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import { runIngestionPull } from "@ee/governance/services/pullers/pullerWorker";
 import { PrismaIngestionPullRunProjectionRepository } from "@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository";
@@ -75,6 +76,21 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
 }
 
 /**
+ * The `pulled_usage` write surface (ADR-088).
+ *
+ * A sibling of the ingestion-pull pipeline rather than a part of it: that one
+ * is per-source and per-run, this one is per usage item, and a per-run stream
+ * cannot carry a per-item price. The puller effect dispatches
+ * `recordPulledUsage` in the same loop that writes the OCSF audit row.
+ */
+function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
+  const pipeline = deps.eventSourcing.register(
+    createPulledUsageProcessingPipeline(),
+  );
+  return { commands: mapCommands(pipeline.commands) };
+}
+
+/**
  * Registers the complete enterprise pipeline set with the shared
  * event-sourcing runtime. Domain definitions stay under /ee; their process
  * managers are declared on the pipelines (ADR-052 builder), so the shared
@@ -85,9 +101,13 @@ export function registerEnterprisePipelineSet(
   deps: EnterprisePipelineRuntimeDeps,
 ) {
   const ingestionPull = registerIngestionPullPipeline(deps);
+  const pulledUsage = registerPulledUsagePipeline(deps);
 
   return {
-    commands: { ingestionPull: ingestionPull.commands },
+    commands: {
+      ingestionPull: ingestionPull.commands,
+      pulledUsage: pulledUsage.commands,
+    },
   };
 }
 
@@ -103,6 +123,9 @@ export function createNoopEnterprisePipelineCommands(): EnterprisePipelineComman
       disable: noop,
       recordRunCompleted: noop,
       recordRunFailed: noop,
+    },
+    pulledUsage: {
+      recordPulledUsage: noop,
     },
   } satisfies EnterprisePipelineCommands;
 }
