@@ -32,6 +32,7 @@ import { CodingAgentSessionClickHouseRepository } from "../../coding-agent/repos
 import { NullCodingAgentSessionEventsRepository } from "../../coding-agent/repositories/coding-agent-session-events.repository";
 import { NullCodingAgentTraceSessionRepository } from "../../coding-agent/repositories/coding-agent-trace-session.repository";
 import { NullSessionMetricSeriesRepository } from "../../coding-agent/repositories/session-metric-series.repository";
+import { traced } from "../../tracing";
 import {
   RECHECK_ACTIVE_WITHIN_MS,
   runBranchRecheckPass,
@@ -110,21 +111,30 @@ function servicesWith({
     });
 
   let mapping: GithubPullRequestMappingService | null = null;
-  const installations = new GithubInstallationsService(
-    new PrismaGithubInstallationsRepository(prisma),
-    appTokens,
-    ({ organizationId: orgId }) =>
-      mapping?.runBackfillForOrganization({ organizationId: orgId }),
+  // Wrapped the way the composition root publishes them, so the proxy every
+  // production call goes through, the one `this` is bound to inside these
+  // services, is part of what these tests exercise.
+  const installations = traced(
+    new GithubInstallationsService(
+      new PrismaGithubInstallationsRepository(prisma),
+      appTokens,
+      ({ organizationId: orgId }) =>
+        mapping?.runBackfillForOrganization({ organizationId: orgId }),
+    ),
+    "GithubInstallationsService",
   );
-  mapping = new GithubPullRequestMappingService({
-    repository,
-    installations,
-    appTokens,
-    resolveOrganizationId: async (id) =>
-      id === projectId ? organizationId : undefined,
-    findProjectIds: async () => [projectId],
-    sessions: sessionService,
-  });
+  mapping = traced(
+    new GithubPullRequestMappingService({
+      repository,
+      installations,
+      appTokens,
+      resolveOrganizationId: async (id) =>
+        id === projectId ? organizationId : undefined,
+      findProjectIds: async () => [projectId],
+      sessions: sessionService,
+    }),
+    "GithubPullRequestMappingService",
+  );
 
   return { mapping, installations, appTokens };
 }
