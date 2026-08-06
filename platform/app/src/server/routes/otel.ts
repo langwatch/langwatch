@@ -20,7 +20,7 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import { bodyLimit } from "hono/body-limit";
+import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import { getLangWatchTracer } from "langwatch";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
@@ -426,7 +426,7 @@ export function peekCustomerTraceIds(
 
 secured
   .access(otelIngestAuth)
-  .post("/traces", bodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }), async (c) => {
+  .post("/traces", wireBodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }), async (c) => {
     const tracer = getLangWatchTracer("langwatch.otel.traces");
 
     return tracer.withActiveSpan(
@@ -538,7 +538,7 @@ secured
 
 secured
   .access(otelIngestAuth)
-  .post("/logs", bodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }), async (c) => {
+  .post("/logs", wireBodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }), async (c) => {
     const tracer = getLangWatchTracer("langwatch.otel.logs");
 
     return tracer.withActiveSpan(
@@ -636,7 +636,7 @@ secured
 
 secured
   .access(otelIngestAuth)
-  .post("/metrics", bodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }), async (c) => {
+  .post("/metrics", wireBodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }), async (c) => {
     const tracer = getLangWatchTracer("langwatch.otel.metrics");
 
     return tracer.withActiveSpan(

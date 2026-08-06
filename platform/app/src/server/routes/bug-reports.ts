@@ -11,7 +11,7 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";
-import { bodyLimit } from "hono/body-limit";
+import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import { z } from "zod";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
@@ -65,7 +65,7 @@ secured
       "Agent issue-report intake; reporters may have no working credentials, an API key only enriches the report with a project link",
     ),
   )
-  .post("/", bodyLimit({ maxSize: MAX_BODY_BYTES }), async (c) => {
+  .post("/", wireBodyLimit({ maxSize: MAX_BODY_BYTES }), async (c) => {
     let json: unknown;
     try {
       json = await c.req.json();
