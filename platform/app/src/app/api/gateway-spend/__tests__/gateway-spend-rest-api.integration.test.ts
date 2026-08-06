@@ -312,6 +312,59 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     });
   });
 
+  describe("when the window runs backwards", () => {
+    /** @scenario "An inverted window is refused on both reads" */
+    it("refuses the rollups the same way the events already were", async () => {
+      const inverted = "from=1768046410000&to=1768046400000";
+
+      for (const path of [
+        `/api/gateway/v1/spend-summaries?group_by=virtual_key&${inverted}`,
+        `/api/gateway/v1/spend-events?${inverted}`,
+      ]) {
+        const res = await app.request(path, { headers: headers() });
+        await expectCanonicalError(res, {
+          status: 400,
+          code: "validation_error",
+        });
+      }
+    });
+  });
+
+  describe("when the credential is the wrong class for this surface", () => {
+    /** @scenario "A project key on an organization endpoint is told exactly that" */
+    it("names both the class required and the class presented", async () => {
+      const res = await app.request("/api/gateway/v1/spend-summaries", {
+        headers: { Authorization: `Bearer test-key-${ns}` },
+      });
+
+      const body = await expectCanonicalError(res, {
+        status: 401,
+        type: "unauthenticated",
+        code: "credential_class_mismatch",
+      });
+      expect(body.meta).toMatchObject({
+        required: "organization_api_key",
+        presented: "project_api_key",
+      });
+    });
+
+    /** @scenario "A credential that resolves to nothing is not blamed on its class" */
+    it("says only that a token matching no key was not accepted", async () => {
+      const res = await app.request("/api/gateway/v1/spend-summaries", {
+        headers: { Authorization: `Bearer sk-lw-nosuchkey_${ns}` },
+      });
+
+      const body = await expectCanonicalError(res, {
+        status: 401,
+        type: "unauthenticated",
+        code: "invalid_credentials",
+      });
+      // Naming a credential class here would send someone holding a typo to
+      // swap a key that was never the problem.
+      expect(body.message).not.toContain("roject");
+    });
+  });
+
   describe("canonical error envelope", () => {
     /** @scenario An unauthenticated request answers the canonical error envelope */
     it("answers an unauthenticated request with it", async () => {

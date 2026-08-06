@@ -49,6 +49,7 @@ export const APP_ERROR_CODES = [
   "clickhouse_overloaded",
   "clickhouse_unavailable",
   "codex_auth_failed",
+  "credential_class_mismatch",
   "custom_role_not_found",
   "dataset_column_type_change_unsupported",
   "dataset_name_taken",

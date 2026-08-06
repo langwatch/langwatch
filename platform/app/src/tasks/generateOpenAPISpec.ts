@@ -2,7 +2,6 @@ import deepmerge from "deepmerge";
 import fs from "fs";
 import { generateSpecs } from "hono-openapi";
 import path from "path";
-
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
@@ -19,6 +18,10 @@ import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import rawCurrentSpec from "../app/api/openapiLangWatch.json";
+import {
+  allRegisteredRoutes,
+  type CredentialClass,
+} from "../server/api/security";
 
 // Surfaces whose routes come straight from their Hono apps. Their paths
 // REPLACE on merge, and any path the apps no longer serve is pruned from
@@ -191,8 +194,69 @@ export default async function execute() {
     },
   );
 
+  console.log("Stamping per-operation security...");
+  stampSecurityFromRegistry(mergedSpec as SpecShape);
+
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),
     JSON.stringify(mergedSpec, null, 2),
   );
+}
+
+type SpecShape = {
+  paths?: Record<string, Record<string, unknown>>;
+};
+
+/**
+ * Which security schemes the document offers for each credential class.
+ *
+ * `session` has none: a browser cookie is not something an integrator sends,
+ * so a session-only route publishes an empty requirement rather than pointing
+ * at a scheme nobody can satisfy from a client. `internal` is the same, for
+ * service-to-service routes authenticated by a shared secret.
+ */
+const SECURITY_BY_CREDENTIAL_CLASS: Record<
+  CredentialClass,
+  Array<Record<string, never[]>>
+> = {
+  project_api_key: [{ project_api_key: [] }],
+  organization_api_key: [{ admin_api_key: [] }],
+  session: [],
+  internal: [],
+  none: [],
+};
+
+/**
+ * Give every documented operation the security requirement its route actually
+ * enforces.
+ *
+ * The document declares one top-level default, and a default is a claim about
+ * every operation that does not override it. That claim was `project_api_key`
+ * for the whole API, including the organization-scoped spend and webhook
+ * routes a project key can never reach: an integrator following the document
+ * got a 401 the document said was impossible.
+ *
+ * Read from the route registry rather than written per route, so an operation
+ * cannot publish a credential class nothing enforces, and a route added
+ * tomorrow is stamped without anyone remembering to.
+ */
+function stampSecurityFromRegistry(spec: SpecShape): void {
+  const byOperation = new Map<string, CredentialClass>();
+  for (const route of allRegisteredRoutes()) {
+    // Hono spells params `:id`, the document spells them `{id}`.
+    const documented = route.path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
+    byOperation.set(`${route.method} ${documented}`, route.credentialClass);
+  }
+
+  for (const [routePath, item] of Object.entries(spec.paths ?? {})) {
+    for (const [method, operation] of Object.entries(item)) {
+      if (!operation || typeof operation !== "object") continue;
+      const credentialClass = byOperation.get(
+        `${method.toUpperCase()} ${routePath}`,
+      );
+      if (!credentialClass) continue;
+      (operation as { security?: unknown }).security =
+        SECURITY_BY_CREDENTIAL_CLASS[credentialClass];
+    }
+  }
 }

@@ -73,6 +73,60 @@ export type AccessPolicy =
 export type HandlerCredential = "apiKey" | "session" | "both" | "internal";
 
 /**
+ * Which credential an API consumer presents to reach a route.
+ *
+ * Narrower than {@link HandlerCredential}, and the difference is the point:
+ * this answers "which key do I send", and the two API-key families are not
+ * interchangeable. An organization key reaches organization routes and, with
+ * `X-Project-Id`, project routes too; a project key can never reach an
+ * organization route, because `resolveOrgOnly` rejects it on shape before any
+ * permission is consulted. Getting that wrong costs an afternoon, so it is a
+ * property of the route rather than something to infer from the path.
+ *
+ * A route that also accepts a browser session still publishes its key class:
+ * the session is not something an integrator can send.
+ */
+export type CredentialClass =
+  | "project_api_key"
+  | "organization_api_key"
+  | "session"
+  | "internal"
+  | "none";
+
+/**
+ * The credential class a route reaches by, from the app it is mounted on and
+ * the policy it declares.
+ *
+ * Derived rather than declared per route, because the app already decides it
+ * for every route but one kind: a handler-managed route can opt out of its
+ * app's family, and that is the only thing this has to read from the policy.
+ */
+export function credentialClassFor({
+  scope,
+  policy,
+}: {
+  scope: "project" | "organization" | "service" | "session";
+  policy: AccessPolicy;
+}): CredentialClass {
+  if (policy.kind === "public") return "none";
+  if (policy.kind === "internal") return "internal";
+  if (policy.kind === "handlerManaged") {
+    if (policy.credential === "internal") return "internal";
+    if (policy.credential === "session") return "session";
+  }
+  switch (scope) {
+    case "project":
+      return "project_api_key";
+    case "organization":
+      return "organization_api_key";
+    case "service":
+      return "internal";
+    case "session":
+      return "session";
+  }
+}
+
+/**
  * Require a specific RBAC permission at the app's scope. The secured app
  * resolves it against the caller's role bindings (project scope) or org role
  * bindings (org scope), exactly like the tRPC `checkProjectPermission` path.

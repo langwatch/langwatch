@@ -718,9 +718,24 @@ const presentations = {
       "Send an organization API key as Authorization: Bearer <api-key>.",
   },
   invalid_credentials: {
+    // Deliberately says nothing about which credential class the route
+    // wanted. A key of the wrong class gets `credential_class_mismatch` and
+    // is told so exactly; naming a class here as well would send everyone
+    // holding a typo or a revoked key to swap a working credential.
     title: "That API key was not accepted",
     describe: () =>
-      "Organization endpoints need an admin API key from Settings > API Keys. A project key cannot be used here.",
+      "Check the key is current and copied in full. If it was revoked or rotated, create a new one in Settings > API Keys.",
+  },
+  credential_class_mismatch: {
+    // Both classes are named, because the fix is to swap one for the other
+    // and a caller holding several keys cannot otherwise tell which is which.
+    title: "That's the wrong kind of API key for this endpoint",
+    describe: (error) => {
+      const required = str(error, "required", "");
+      return required === "organization_api_key"
+        ? "This endpoint needs an organization API key, created in Settings > API Keys. The key sent belongs to a single project."
+        : "Send the credential class this endpoint accepts. Organization API keys are created in Settings > API Keys.";
+    },
   },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",

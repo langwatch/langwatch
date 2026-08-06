@@ -2,6 +2,8 @@ export {
   type AccessPolicy,
   anyAuthenticated,
   apiKeyPermission,
+  type CredentialClass,
+  credentialClassFor,
   describeAccessPolicy,
   handlerManagedAuth,
   internalSecret,
