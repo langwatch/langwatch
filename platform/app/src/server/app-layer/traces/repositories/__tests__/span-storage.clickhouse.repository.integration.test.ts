@@ -392,13 +392,16 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
             }),
           ),
         }),
-        // Same trace id shape, different tenant.
+        // Our own half of the shared trace id, so the read has something to
+        // return for it and the isolation assertion is not vacuous.
         rollupRow({
           traceId: otherTenantTraceId,
           spanId: "other-span",
           events: [{ ts: at(10), name: "thumbs_up_down" }],
         }),
       ]);
+      // The neighbour's half: same trace id, different tenant. A read missing
+      // its tenant predicate would fold this in.
       await insertRows([
         makeEventRow(
           "other-tenant-span",
@@ -507,16 +510,22 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
     });
 
     /** @scenario Only the caller's project is read */
-    it("returns nothing for a trace id belonging to another tenant", async () => {
+    it("leaves out the neighbour's events on a trace id both tenants used", async () => {
       const rollups = await repo.getTraceEventRollupsByTraceIds({
         tenantId: rollupTenantId,
         traceIds: [otherTenantTraceId],
         timeRange,
       });
 
-      expect(
-        rollups[otherTenantTraceId]?.names.map((n) => n.name),
-      ).not.toContain("leaked");
+      // Both tenants recorded against this id, so the read returning nothing
+      // would pass a "does not contain" check without proving anything.
+      expect(rollups[otherTenantTraceId]).toEqual({
+        names: [
+          { name: "thumbs_up_down", count: 1, firstTimestamp: at(10).getTime() },
+        ],
+        totalCount: 1,
+        distinctCount: 1,
+      });
     });
 
     /** @scenario The search is confined to the period on screen */
