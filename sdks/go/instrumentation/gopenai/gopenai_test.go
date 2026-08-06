@@ -55,8 +55,9 @@ func TestChatCompletion_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.BoolValue(false), attrs[attribute.Key("gen_ai.request.stream")])
 	assert.NotContains(t, attrs, attribute.Key("gen_ai.response.time_to_first_chunk"))
 
-	// All token kinds, including cached + reasoning.
-	assert.Equal(t, attribute.IntValue(2), attrs[semconv.GenAIUsageInputTokensKey])
+	// All token kinds, including cached + reasoning. prompt_tokens=2 includes
+	// the 1 cached token, so the exclusive split is input=1 / cached=1.
+	assert.Equal(t, attribute.IntValue(1), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(1), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(3), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 	assert.Equal(t, attribute.IntValue(1), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
@@ -126,7 +127,9 @@ data: [DONE]
 	assert.Equal(t, attribute.StringSliceValue([]string{"stop"}), attrs[semconv.GenAIResponseFinishReasonsKey])
 
 	// Usage arrives in the final chunk (stream_options.include_usage).
-	assert.Equal(t, attribute.IntValue(4), attrs[semconv.GenAIUsageInputTokensKey])
+	// prompt_tokens=4 includes the 3 cached tokens, so the exclusive split is
+	// input=1 / cached=3.
+	assert.Equal(t, attribute.IntValue(1), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(2), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(6), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 	assert.Equal(t, attribute.IntValue(3), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])

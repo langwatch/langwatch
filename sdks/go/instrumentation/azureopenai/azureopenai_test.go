@@ -140,7 +140,9 @@ func TestMiddleware_AzureProviderDefault(t *testing.T) {
 	assert.Equal(t, attribute.StringValue("my-gpt4o-deployment"), attrs[semconv.GenAIRequestModelKey])
 	assert.Equal(t, attribute.StringValue("gpt-4o-2024-08-06"), attrs[semconv.GenAIResponseModelKey])
 	assert.Equal(t, attribute.StringValue("chatcmpl-az"), attrs[semconv.GenAIResponseIDKey])
-	assert.Equal(t, attribute.IntValue(9), attrs[semconv.GenAIUsageInputTokensKey])
+	// prompt_tokens=9 includes the 2 cached tokens, so the exclusive split is
+	// input=7 / cached=2.
+	assert.Equal(t, attribute.IntValue(7), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(4), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(2), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
 }

@@ -24,13 +24,23 @@ type usagePayload struct {
 
 // toGenAIUsage maps an OpenAI usage block onto the LangWatch GenAIUsage helper,
 // leaving fields nil (unrecorded) when the wire value is absent / zero.
+//
+// InputTokens carries the NON-CACHED input only. OpenAI reports cached_tokens as
+// a subset of prompt_tokens, whereas LangWatch costs the buckets additively
+// (input at the input rate plus cache-read at the cache-read rate), so the
+// cached portion is subtracted out here. That yields the same exclusive split
+// Anthropic and Bedrock report natively, keeping the convention uniform across
+// instrumentations. Reporting prompt_tokens as-is would bill the cached tokens
+// twice. TotalTokens is left as the provider's reported total.
 func (u *usagePayload) toGenAIUsage() langwatch.GenAIUsage {
 	usage := langwatch.GenAIUsage{}
 	if u == nil {
 		return usage
 	}
-	if u.PromptTokens > 0 {
-		usage.InputTokens = langwatch.Int(u.PromptTokens)
+	// Clamped at zero: a provider reporting cached > prompt is bad data, and the
+	// field stays nil rather than going negative.
+	if nonCached := u.PromptTokens - u.PromptTokensDetails.CachedTokens; nonCached > 0 {
+		usage.InputTokens = langwatch.Int(nonCached)
 	}
 	if u.CompletionTokens > 0 {
 		usage.OutputTokens = langwatch.Int(u.CompletionTokens)

@@ -86,7 +86,9 @@ func TestGenerateContent_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.StringSliceValue([]string{"STOP"}), attrs[semconv.GenAIResponseFinishReasonsKey])
 
 	// ALL usage from usageMetadata, via gen_ai.usage.* attributes.
-	assert.Equal(t, attribute.IntValue(11), attrs[semconv.GenAIUsageInputTokensKey])
+	// promptTokenCount=11 includes the 4 cached tokens, so the exclusive split
+	// is input=7 / cached=4. totalTokenCount stays the reported 21.
+	assert.Equal(t, attribute.IntValue(7), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(7), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(21), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 	assert.Equal(t, attribute.IntValue(4), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])

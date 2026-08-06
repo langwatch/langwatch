@@ -152,7 +152,9 @@ func TestResponsesStreamAccumulator(t *testing.T) {
 	attrs := requireSingleSpanAttrs(t, exporter)
 
 	assert.Equal(t, attribute.StringValue("resp_acc"), attrs[semconvGenAIResponseID])
-	assert.Equal(t, attribute.IntValue(8), attrs[semconvGenAIUsageInputTokens])
+	// input_tokens=8 includes the 2 cached tokens, so the exclusive split is
+	// input=6 / cached=2.
+	assert.Equal(t, attribute.IntValue(6), attrs[semconvGenAIUsageInputTokens])
 	assert.Equal(t, attribute.IntValue(4), attrs[semconvGenAIUsageOutputTokens])
 	assert.Equal(t, attribute.IntValue(2), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
 	assert.Equal(t, attribute.IntValue(1), attrs[attribute.Key("gen_ai.usage.reasoning.output_tokens")])
