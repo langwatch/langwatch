@@ -15,8 +15,10 @@ Feature: Annual subscriptions collect event overage during the year
   # Stripe Checkout cannot set this field at subscription creation (the
   # parameter is rejected), so the platform applies it right after checkout
   # completes, from the webhook that already links the new subscription.
-  # Existing annual subscriptions get the same treatment from a one-time
-  # backfill script.
+  #
+  # This covers new subscriptions only. Existing annual subscriptions need a
+  # one-time backfill over live Stripe billing data, which is SaaS-only
+  # operational work and lives in the langwatch-saas task runner, not here.
 
   Background:
     Given the platform bills Growth plans as a seat item plus a metered events item
@@ -59,16 +61,3 @@ Feature: Annual subscriptions collect event overage during the year
     Given an annual subscription whose threshold resets the billing cycle anchor
     When the threshold is applied
     Then the anchor reset is turned off while the existing amount is kept
-
-  @unit
-  Scenario: The backfill applies the threshold only to annual event subscriptions
-    Given a mix of annual, monthly, and legacy subscriptions in Stripe
-    When the backfill walks the annual subscription candidates
-    Then only subscriptions carrying an annual events price are updated
-
-  @unit
-  Scenario: A failure on one subscription does not stop the backfill
-    Given several annual subscription candidates and one that fails in Stripe
-    When the backfill walks the candidates
-    Then the remaining subscriptions are still processed
-    And the failure is counted so the run exits non-zero
