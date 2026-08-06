@@ -29,6 +29,9 @@ export const modelProviderIcons: Record<
   groq: <Groq />,
   vertex_ai: <GoogleCloud />,
   gemini: <Gemini />,
+  // Deprecated fold-window provider (see registry.ts): stored rows still
+  // render in the providers table until the migration folds them.
+  google_agent_platform: <GoogleCloud />,
   bedrock: <AWS />,
   deepseek: <DeepSeek />,
   custom: <Custom />,

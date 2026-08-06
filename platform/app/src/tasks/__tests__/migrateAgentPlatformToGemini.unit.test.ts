@@ -176,7 +176,7 @@ describe("execute", () => {
 
   describe("given a row whose credential cannot be folded", () => {
     describe("when the migration runs", () => {
-      it("skips the row without flipping it and still folds the rows after it", async () => {
+      it("skips the row without flipping it, folds the rows after it, and fails the task", async () => {
         stubRows([
           {
             id: "row-bad",
@@ -192,7 +192,9 @@ describe("execute", () => {
           },
         ]);
 
-        await execute();
+        // Failing exit, not a quiet log line: automation must not read
+        // "unusable legacy rows remain" as a successful migration.
+        await expect(execute()).rejects.toThrow(/row-bad/);
 
         // The bad row got no update at all — a provider flip without folded
         // keys would strand it as a Gemini row wearing the old field names,

@@ -606,6 +606,16 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
     case "gemini":
     case "google_gemini":
       return geminiCredentials(pick);
+    // Fold-window compatibility: rows stored while Agent Platform was its
+    // own provider carry the retired field names. Same wire shape as a
+    // gemini credential naming the Agent Platform door; goes with the
+    // deprecated registry entry and is deleted after the migration runs.
+    case "google_agent_platform":
+      return {
+        api_key: pick("GOOGLE_AGENT_PLATFORM_API_KEY"),
+        project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT").trim(),
+        region: pick("GOOGLE_AGENT_PLATFORM_LOCATION").trim(),
+      };
     case "openai":
       return { api_key: pick("OPENAI_API_KEY") };
     case "deepseek":

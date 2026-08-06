@@ -46,6 +46,10 @@ type AuthStrategy = "bearer" | "anthropic" | "gemini" | "elevenlabs";
 const PROVIDER_AUTH_OVERRIDES: Partial<Record<string, AuthStrategy>> = {
   anthropic: "anthropic",
   gemini: "gemini",
+  // Fold-window compatibility: legacy rows validate through the same
+  // Agent Platform door as a gemini credential carrying the pair. Goes
+  // with the deprecated registry entry.
+  google_agent_platform: "gemini",
   elevenlabs: "elevenlabs",
 };
 
@@ -984,10 +988,20 @@ export async function validateProviderApiKey(
     return { valid: true };
   }
 
-  const agentPlatform = {
-    project: customKeys.GEMINI_PROJECT?.trim() ?? "",
-    location: customKeys.GEMINI_LOCATION?.trim() ?? "",
-  };
+  // Legacy rows from the fold window read their pair from the retired
+  // field names; new gemini rows carry the GEMINI_* pair. Both validate
+  // through the same Agent Platform door. The legacy branch goes with the
+  // deprecated `google_agent_platform` registry entry.
+  const agentPlatform =
+    provider === "google_agent_platform"
+      ? {
+          project: customKeys.GOOGLE_AGENT_PLATFORM_PROJECT?.trim() ?? "",
+          location: customKeys.GOOGLE_AGENT_PLATFORM_LOCATION?.trim() ?? "",
+        }
+      : {
+          project: customKeys.GEMINI_PROJECT?.trim() ?? "",
+          location: customKeys.GEMINI_LOCATION?.trim() ?? "",
+        };
 
   return runProbeChain({
     candidates: buildProbeCandidates({
@@ -1002,7 +1016,7 @@ export async function validateProviderApiKey(
       provider,
       apiKey,
       hasConfigurableEndpoint: !!endpointField,
-      ...(provider === "gemini"
+      ...(provider === "gemini" || provider === "google_agent_platform"
         ? {
             googleDoor:
               agentPlatform.project && agentPlatform.location

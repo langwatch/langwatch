@@ -67,6 +67,14 @@ type ModelProviderDefinition = {
    * only. Absent = unrestricted. See allowedCodexFeatures.ts.
    */
   restrictedToFeatureKeys?: readonly string[];
+  /**
+   * The provider no longer accepts new rows — the Add menu hides it —
+   * but stored rows stay readable, editable and validatable so a rolling
+   * deployment never strands them. Used for the fold window of a provider
+   * absorbed into another (google_agent_platform → gemini); the entry is
+   * deleted in a later release once its data migration has run.
+   */
+  deprecated?: true;
 };
 
 export type MaybeStoredModelProvider = Omit<
@@ -381,6 +389,27 @@ export const modelProviders = {
       }),
     optionalKeys: ["GEMINI_PROJECT", "GEMINI_LOCATION"],
     enabledSince: new Date("2023-01-01"),
+  },
+  // Rolling-deployment compatibility for rows stored while Agent Platform
+  // was its own provider. Deprecated: hidden from the Add menu, but the
+  // rows stay visible, editable and validatable until `pnpm task
+  // migrateAgentPlatformToGemini` folds them into `gemini` — without this
+  // entry, application pods running this version would treat un-migrated
+  // rows as an unknown provider and hide them mid-rollout. Delete this
+  // entry (and its validation + materialiser branches) in the release
+  // after the migration has run everywhere.
+  google_agent_platform: {
+    name: "Google Agent Platform",
+    type: "llm",
+    apiKey: "GOOGLE_AGENT_PLATFORM_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      GOOGLE_AGENT_PLATFORM_API_KEY: z.string().min(1),
+      GOOGLE_AGENT_PLATFORM_PROJECT: z.string().min(1),
+      GOOGLE_AGENT_PLATFORM_LOCATION: z.string().min(1),
+    }),
+    enabledSince: new Date("2026-07-29"),
+    deprecated: true,
   },
   elevenlabs: {
     name: "ElevenLabs",

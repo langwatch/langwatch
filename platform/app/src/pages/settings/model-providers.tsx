@@ -135,6 +135,16 @@ export default function ModelsPage() {
   // the very multi-instance flow the scope picker exists to support.
   const addableProviders = useMemo(() => {
     return Object.keys(modelProvidersRegistry)
+      .filter(
+        // Deprecated providers accept no new rows — stored rows still
+        // render in the table below until their migration folds them.
+        (providerKey) =>
+          !(
+            modelProvidersRegistry[
+              providerKey as keyof typeof modelProvidersRegistry
+            ] as { deprecated?: true }
+          ).deprecated,
+      )
       .map((providerKey) => ({
         provider: providerKey as keyof typeof modelProvidersRegistry,
         name:

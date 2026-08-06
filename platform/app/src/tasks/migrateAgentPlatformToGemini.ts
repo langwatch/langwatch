@@ -166,8 +166,11 @@ export default async function execute() {
     console.log(`Folded row ${row.id} into gemini`);
   }
 
+  // A skipped row means the fold is NOT done: fail the task so automation
+  // cannot read "some rows remain unusable" as a successful migration.
+  // Thrown after the loop so every foldable row was still folded first.
   if (skipped.length > 0) {
-    console.error(
+    throw new Error(
       `${skipped.length} row(s) skipped and still google_agent_platform: ${skipped.join(", ")} — fix their customKeys and rerun.`,
     );
   }
