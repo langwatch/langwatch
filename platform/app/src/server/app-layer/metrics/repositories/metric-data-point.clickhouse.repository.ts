@@ -45,25 +45,51 @@ const logger = createLogger(
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
 /**
- * How many index seeks one rollup query may fold together. High enough that a
- * full coalesced chunk costs a handful of round trips instead of hundreds, low
- * enough that no single statement grows unbounded with the chunk.
+ * The upper cap on what one rollup query folds together: series per set of
+ * array parameters for the successor read, and — halved — buckets per request
+ * for the affected-bucket read. No statement grows with either number any more,
+ * so this bounds how much one request may *read*, not how large it may be.
+ *
+ * Size is bounded separately, and first, by {@link SUCCESSOR_PARAM_BUDGET_CHARS}:
+ * the successor read splits as soon as the encoded parameters would outgrow
+ * that budget, which on this table's 64-character identifiers happens well
+ * before 64 series. Raising this number therefore widens a read; it cannot make
+ * a request larger than the byte budget allows.
  */
 const SEEKS_PER_QUERY = 64;
+
+/**
+ * The ceiling one successor request's encoded `param_*` entries must stay
+ * under, measured the way `@clickhouse/client` measures it: `formatQueryParams`
+ * per value, then `new URLSearchParams(entries).toString().length`.
+ *
+ * The client has a threshold of its own, `MAX_URL_BIND_PARAM_LENGTH` = 4096,
+ * above which it can route parameters through a multipart body instead of the
+ * URL — but only when `use_multipart_params_auto` is on, and nothing here turns
+ * it on, so `param_*` entries ride the URL at any length. This budget therefore
+ * has to hold on its own, and it sits below the client's with enough headroom
+ * that a longer identifier or an added scalar cannot cross the client's ceiling
+ * without crossing this one first.
+ */
+const SUCCESSOR_PARAM_BUDGET_CHARS = 3500;
 
 /**
  * The successor read's whole statement, emitted once at module load rather than
  * rebuilt per chunk, because nothing in it varies with the chunk any more.
  *
- * Every per-point value now travels as an array parameter, so the request a
- * chunk produces is a fixed ~1 KB of SQL plus nine `param_*` entries whatever
- * the chunk holds. The shape this replaced grew four parameters and a full
- * branch per point: at {@link SEEKS_PER_QUERY} that is 256 parameters and tens
- * of kilobytes, and `@clickhouse/client` carries its own 4096-character ceiling
- * on the encoded `param_*` search string (`MAX_URL_BIND_PARAM_LENGTH`) which
- * the old shape cleared many times over. Keeping the request under that ceiling
- * by construction is the point; a smaller-but-still-unbounded statement would
- * only move the day it is crossed again.
+ * Every per-point value now travels as an array parameter, so the statement is
+ * a fixed ~2.4 KB and the request binds eleven `param_*` entries whatever the
+ * chunk holds. The shape this replaced grew four parameters and a full branch
+ * per point: at {@link SEEKS_PER_QUERY} that is 256 parameters and tens of
+ * kilobytes.
+ *
+ * A fixed statement is not on its own a bound on the request. The arrays' own
+ * contents still grow with the number of series, and they ride the URL as
+ * `param_*` entries, so {@link successorSeekChunks} splits on the encoded bytes
+ * those arrays produce ({@link SUCCESSOR_PARAM_BUDGET_CHARS}) rather than on a
+ * series count. Bounding the quantity that actually travels is the point; a
+ * smaller-but-still-unbounded request would only move the day it is crossed
+ * again.
  *
  * Two branches, and the split is what keeps the reads bounded. Every point in
  * the chunk is already stored when this runs, so within one series the
@@ -81,13 +107,20 @@ const SEEKS_PER_QUERY = 64;
  * comparisons that need the joined span. Correctness therefore does not depend
  * on predicate pushdown; the CTE is already the seek.
  *
+ * Written once, executed twice: ClickHouse substitutes a non-recursive `WITH`
+ * at each reference, and both union operands reference `series_points`, so the
+ * FINAL scan over `metric_data_points` runs once per branch. One scan under a
+ * single `WHERE (span-interior OR past-span)` would halve that, at the cost of
+ * the `LIMIT 1 BY` no longer applying per operand - which is exactly what keeps
+ * the look forward to one row per series. Measure before trading.
+ *
  * Each branch does add the one constant bound its own half can prove, because
  * a bound reached only through the join cannot prune partitions and
  * `metric_data_points` partitions by `toYearWeek(TimeUnixMs)`. A span row sits
- * below its series' far end, so it sits below `spanEnd`, the furthest of them;
- * a row past the far end sits above `spanStart`, the nearest. Both are pure
- * upside: pushed down they prune, left in place they are a cheap filter over
- * rows the branch discards anyway. Range-filtering TimeUnixMs under FINAL is
+ * below its series' far end, so it sits below `latestSpanEnd`, the furthest of
+ * them; a row past the far end sits above `earliestSpanEnd`, the nearest. Both
+ * are pure upside: pushed down they prune, left in place they are a cheap
+ * filter over rows the branch discards anyway. Range-filtering TimeUnixMs under FINAL is
  * safe here because it is part of the dedup key - a different TimeUnixMs is a
  * different row, never a later version of this one, so no version can drift
  * out of the window (the movable-column trap in
@@ -98,6 +131,19 @@ const SEEKS_PER_QUERY = 64;
  * costs nothing to materialise. Do not let it grow a payload, attribute or
  * bucket column - at that point it becomes the anti-pattern and wants the
  * IN-tuple form instead.
+ *
+ * What those three bounds do NOT do is bound the read per series. All three are
+ * chunk-global: one backfilled point in one series lowers `scanFrom` for every
+ * series in the request, and the branch that looks past a span end is
+ * `[earliestSpanEnd, ∞)` per series under FINAL, terminating only on the
+ * `LIMIT 1 BY` rather than on an index range. So a chunk that pairs one late
+ * series with live ones reads more than the live ones needed, and the wider the
+ * chunk the more series pay for it. A per-series bounded lookahead - a join-side
+ * `SpanToTime + <window>` upper bound, with a fallback seek for the series the
+ * bounded branch returns nothing for - would fix both halves. It is left to its
+ * own change deliberately: it needs `EXPLAIN indexes=1` against a real server
+ * and equivalence coverage the parameter-level model in the unit tests cannot
+ * give it, and getting it wrong loses successors rather than costing time.
  */
 const SUCCESSOR_SEEK_QUERY = `
   WITH spans AS (
@@ -127,12 +173,12 @@ const SUCCESSOR_SEEK_QUERY = `
   SELECT * FROM (
     (SELECT series_points.*
      FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
-     WHERE series_points.SeekTime <= fromUnixTimestamp64Milli({spanEnd:Int64})
+     WHERE series_points.SeekTime <= fromUnixTimestamp64Milli({latestSpanEnd:Int64})
        AND ${orderedAfter("From")} AND ${orderedBefore("To")})
     UNION ALL
     (SELECT series_points.*
      FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
-     WHERE series_points.SeekTime >= fromUnixTimestamp64Milli({spanStart:Int64})
+     WHERE series_points.SeekTime >= fromUnixTimestamp64Milli({earliestSpanEnd:Int64})
        AND ${orderedAfter("To")}
      ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC,
        series_points.TimeUnixNano ASC, series_points.PointId ASC
@@ -144,8 +190,13 @@ const SUCCESSOR_SEEK_QUERY = `
  * The table's own row order, (TimeUnixMs, TimeUnixNano, PointId), compared
  * against one end of a joined span. Written out rather than as a tuple
  * comparison so the emitted predicate is the one the per-branch seeks already
- * proved in production, and table-qualified for the reason SEEK_SELECT
- * documents: a bare `TimeUnixMs` resolves to its epoch-milli alias.
+ * proved in production.
+ *
+ * It reads `series_points.SeekTime` and never `TimeUnixMs`, which is why the
+ * CTE keeps the raw `DateTime64` under that second name: SEEK_SELECT already
+ * binds `TimeUnixMs` to its epoch-milli alias, so a comparison written against
+ * that name would compare against the alias instead of the column. Do not
+ * "simplify" `SeekTime` away.
  */
 function orderedAfter(bound: "From" | "To"): string {
   return `(series_points.SeekTime > spans.Span${bound}Time
@@ -267,11 +318,12 @@ function seriesSpans(
  *
  * Three are the constant time bounds the statement prunes partitions with, and
  * they are the widest each scope can prove: `scanFrom` the earliest span start
- * for the shared CTE, `spanEnd` the latest span end for the branch that reads
- * within the spans, `spanStart` the earliest span end for the branch that
- * reads past them. Nanosecond values travel as strings because they exceed
- * what a JSON number carries exactly; the statement casts them back with
- * `toUInt64`.
+ * for the shared CTE, `latestSpanEnd` for the branch that reads within the
+ * spans, `earliestSpanEnd` for the branch that reads past them. The last two
+ * are both derived from span *ends* - the earliest span start is `scanFrom` -
+ * so widening either to a span start is a change of meaning, not a typo fix.
+ * Nanosecond values travel as strings because they exceed what a JSON number
+ * carries exactly; the statement casts them back with `toUInt64`.
  */
 function successorSeekParams({
   tenantId,
@@ -290,9 +342,96 @@ function successorSeekParams({
     toNanos: spans.map((span) => span.last.timeUnixNano),
     toPoints: spans.map((span) => span.last.pointId),
     scanFrom: Math.min(...spans.map((span) => span.first.timeUnixMs)),
-    spanStart: Math.min(...spans.map((span) => span.last.timeUnixMs)),
-    spanEnd: Math.max(...spans.map((span) => span.last.timeUnixMs)),
+    earliestSpanEnd: Math.min(...spans.map((span) => span.last.timeUnixMs)),
+    latestSpanEnd: Math.max(...spans.map((span) => span.last.timeUnixMs)),
   };
+}
+
+/**
+ * `@clickhouse/client`'s `formatQueryParams` for the value shapes this file
+ * binds - strings, numbers, and arrays of either. Mirrored rather than imported
+ * because the client exports it only from a path inside its `dist` tree.
+ *
+ * The unit test re-measures every request this chunker emits with the client's
+ * own `formatQueryParams`, so a divergence that made this under-measure fails
+ * there rather than silently shipping an oversized request. Over-measuring only
+ * costs a smaller chunk.
+ */
+function formatParamValue({
+  value,
+  inArray = false,
+}: {
+  value: unknown;
+  inArray?: boolean;
+}): string {
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") {
+    const escaped = value
+      .replace(/\\/g, "\\\\")
+      .replace(/'/g, "\\'")
+      .replace(/\t/g, "\\t")
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r");
+    return inArray ? `'${escaped}'` : escaped;
+  }
+  if (Array.isArray(value)) {
+    return `[${value
+      .map((element) => formatParamValue({ value: element, inArray: true }))
+      .join(",")}]`;
+  }
+  throw new Error(
+    `Unsupported successor-seek parameter shape: ${typeof value}. Only strings, numbers and arrays of them are measurable against the request budget.`,
+  );
+}
+
+/** How long a request's `param_*` entries encode to, in URL characters. */
+function encodedParamLength(params: Record<string, unknown>): number {
+  return new URLSearchParams(
+    Object.entries(params).map(([name, value]): [string, string] => [
+      `param_${name}`,
+      formatParamValue({ value }),
+    ]),
+  ).toString().length;
+}
+
+/**
+ * Where the successor read splits: encoded parameter bytes first,
+ * {@link SEEKS_PER_QUERY} series as the upper cap.
+ *
+ * Series count is the wrong quantity to bound a request by. A series
+ * contributes seven values, three of them 64-character identifiers, so what
+ * fits in one request depends on the identifiers rather than on the count -
+ * which is how a shape that looked bounded at 64 series produced a request
+ * larger than the per-point shape it replaced. Measuring what actually travels
+ * keeps the request bounded whatever the batch holds.
+ *
+ * A single series whose own parameters exceed the budget is still sent alone:
+ * correctness first, and this table's identifier widths cannot reach that.
+ */
+function successorSeekChunks({
+  tenantId,
+  spans,
+}: {
+  tenantId: string;
+  spans: readonly SeriesSpan[];
+}): SeriesSpan[][] {
+  const chunks: SeriesSpan[][] = [];
+  let current: SeriesSpan[] = [];
+  for (const span of spans) {
+    const candidate = [...current, span];
+    const outgrown =
+      candidate.length > SEEKS_PER_QUERY ||
+      encodedParamLength(successorSeekParams({ tenantId, spans: candidate })) >
+        SUCCESSOR_PARAM_BUDGET_CHARS;
+    if (outgrown && current.length > 0) {
+      chunks.push(current);
+      current = [span];
+    } else {
+      current = candidate;
+    }
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
 }
 
 /** The first point ordering strictly after `point`, from a sorted array. */
@@ -587,8 +726,10 @@ export class MetricDataPointClickHouseRepository
    * fetched each point's predecessor and then discarded it.
    *
    * The statement is {@link SUCCESSOR_SEEK_QUERY}, which does not vary with the
-   * chunk; chunking here bounds how many series one set of array parameters
-   * describes, not how large the statement grows.
+   * chunk. What chunking bounds is the request: {@link successorSeekChunks}
+   * splits the series so the encoded parameters stay inside
+   * {@link SUCCESSOR_PARAM_BUDGET_CHARS}, since the statement travels in the
+   * body but the parameters travel in the URL.
    *
    * The read stays payload-free (SEEK_SELECT, never the full row): running
    * FINAL over a series while materialising the megabyte-scale payload column
@@ -603,7 +744,10 @@ export class MetricDataPointClickHouseRepository
     const client = await this.resolveClient(tenantId);
     const found: MetricSequencePoint[] = [];
 
-    for (const spans of chunked(seriesSpans(points), SEEKS_PER_QUERY)) {
+    for (const spans of successorSeekChunks({
+      tenantId,
+      spans: seriesSpans(points),
+    })) {
       const result = await client.query({
         query: SUCCESSOR_SEEK_QUERY,
         query_params: successorSeekParams({ tenantId, spans }),
@@ -654,8 +798,13 @@ export class MetricDataPointClickHouseRepository
     // a point id is only ever unique within its own.
     const unique = new Map<string, CanonicalMetricDataPoint>();
 
-    // Each seek contributes two statements, so half the budget keeps a single
-    // query's statement count at the same ceiling the successor seeks use.
+    // Half the cap, and the divisor is a size bound rather than a
+    // statement-count one: the successor read emits one statement whatever its
+    // chunk holds, so there is no statement ceiling left here to match. What
+    // there is: this read binds two parameters per bucket, one of them a
+    // 64-character series identifier, so 32 buckets encode to roughly 3.5k
+    // characters of `param_*` entries - inside the client's own 4096-character
+    // ceiling on them, where 64 buckets would be half as far outside it again.
     for (const chunk of chunked(seeks, Math.floor(SEEKS_PER_QUERY / 2))) {
       // Two shared scalars replace the per-seek end and cutoff bounds: both
       // were derived from the bucket start, so the server can derive them too

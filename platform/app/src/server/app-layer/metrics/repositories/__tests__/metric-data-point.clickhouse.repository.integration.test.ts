@@ -15,7 +15,11 @@
  *   the dedup pattern migration 00049 mandates for metric_time_rollups);
  * - folding a chunk in one pass lands on exactly the rollups the per-point
  *   path produces, using a number of reads set by the affected buckets rather
- *   than by how many points the chunk carries.
+ *   than by how many points the chunk carries;
+ * - a chunk carrying more than one series resolves each series' own successors,
+ *   which is the shape `bulkAppend` actually hands this lane and the only shape
+ *   in which the folded read's `arrayZip` pairing and its `LIMIT 1 BY SeriesId`
+ *   can be wrong at all.
  *
  * Fixtures come from the shared metric-point builder the rollup unit tests
  * use, so expectations here mirror rollupScalar.unit.test.ts semantics: the
@@ -406,20 +410,27 @@ describe("given a series whose chunk points have stored points between them", ()
   }
 
   beforeAll(async () => {
-    // Both series start from the same stored half, so the only difference is
-    // how the other half arrives.
-    for (const seriesId of [foldedSeriesId, perPointSeriesId]) {
-      await repo.recomputeAffectedRollupsMany({
-        points: preStored.map((index) => sample({ seriesId, index })),
-      });
-    }
+    await repo.recomputeAffectedRollupsMany({
+      points: preStored.map((index) =>
+        sample({ seriesId: foldedSeriesId, index }),
+      ),
+    });
     await repo.recomputeAffectedRollupsMany({
       points: folded.map((index) =>
         sample({ seriesId: foldedSeriesId, index }),
       ),
     });
-    // Reverse order on purpose: every sample is late relative to the one
-    // before it, which is the arrival pattern a chunk collapses.
+    // The reference series never touches the folded entry point, for either
+    // half. Seeding its pre-stored half with a chunk would have let a
+    // folded-read defect affecting those points cancel out of the comparison,
+    // since both sides would carry it. Reverse order on purpose: every sample
+    // is late relative to the one before it, which is the arrival pattern a
+    // chunk collapses.
+    for (const index of [...preStored].reverse()) {
+      await repo.recomputeAffectedRollups({
+        point: sample({ seriesId: perPointSeriesId, index }),
+      });
+    }
     for (const index of [...folded].reverse()) {
       await repo.recomputeAffectedRollups({
         point: sample({ seriesId: perPointSeriesId, index }),
@@ -442,5 +453,128 @@ describe("given a series whose chunk points have stored points between them", ()
     expect(
       chunked.reduce((total, row) => total + row.sourcePointCount, 0),
     ).toBe(values.length);
+  });
+});
+
+/**
+ * The one shape the rest of this file never folds: a chunk carrying more than
+ * one series. With a single series the folded read degenerates — one `arrayZip`
+ * span row, so a mis-paired tuple index cannot show; one join candidate; and
+ * `LIMIT 1 BY SeriesId` indistinguishable from `LIMIT 1`. `bulkAppend` hands
+ * this lane coalesced multi-series batches, where a defect pairing one series'
+ * id with another's bounds would drop successors for every series but one and
+ * leave their rollups stale. The unit tier mocks the server, so only this tier
+ * can see it.
+ *
+ * The two series are staggered in time so their spans do not coincide: that is
+ * what makes the three chunk-global bounds three different values, and a bound
+ * taken from the wrong series observable as a missing successor.
+ */
+describe("given one chunk carrying two series staggered in time", () => {
+  const earlySeriesId = "2".repeat(64);
+  const lateSeriesId = "3".repeat(64);
+  const earlyReferenceId = "4".repeat(64);
+  const lateReferenceId = "5".repeat(64);
+  // A counter reset in each series, so every sample's dependency on its
+  // predecessor is live rather than incidental.
+  const values = [10, 15, 18, 26, 4, 9, 14, 22];
+  // The late series starts a full bucket after the early one ends, so neither
+  // series' span can stand in for the other's.
+  const offsets = {
+    early: 0,
+    late: values.length * 5_000 + METRIC_ROLLUP_INTERVAL_MS,
+  };
+
+  function sample({
+    seriesId,
+    index,
+    offsetMs,
+  }: {
+    seriesId: string;
+    index: number;
+    offsetMs: number;
+  }): CanonicalMetricDataPoint {
+    return point({
+      tenantId,
+      organizationId,
+      seriesId,
+      timeUnixMs: bucket0 + offsetMs + index * 5_000,
+      metricKind: "sum",
+      aggregationTemporality: "cumulative",
+      isMonotonic: true,
+      valueDouble: values[index]!,
+      acceptedAt,
+    });
+  }
+
+  const indices = values.map((_, index) => index);
+  const preStored = indices.filter((index) => index % 2 === 1);
+  const arriving = indices.filter((index) => index % 2 === 0);
+
+  beforeAll(async () => {
+    // Each series already holds points between the chunk's own points, so the
+    // within-span branch has interior successors to supply, and the chunk's
+    // newest point in each series needs the look past its own span end.
+    await repo.recomputeAffectedRollupsMany({
+      points: [
+        ...preStored.map((index) =>
+          sample({ seriesId: earlySeriesId, index, offsetMs: offsets.early }),
+        ),
+        ...preStored.map((index) =>
+          sample({ seriesId: lateSeriesId, index, offsetMs: offsets.late }),
+        ),
+      ],
+    });
+    // The one chunk under test: both series, in one call, exactly as
+    // bulkAppend coalesces them.
+    await repo.recomputeAffectedRollupsMany({
+      points: [
+        ...arriving.map((index) =>
+          sample({ seriesId: earlySeriesId, index, offsetMs: offsets.early }),
+        ),
+        ...arriving.map((index) =>
+          sample({ seriesId: lateSeriesId, index, offsetMs: offsets.late }),
+        ),
+      ],
+    });
+    // References rebuilt one point at a time, never through the folded entry
+    // point, in the same late-arrival order.
+    for (const [referenceId, offsetMs] of [
+      [earlyReferenceId, offsets.early],
+      [lateReferenceId, offsets.late],
+    ] as const) {
+      for (const index of [...preStored, ...arriving].reverse()) {
+        await repo.recomputeAffectedRollups({
+          point: sample({ seriesId: referenceId, index, offsetMs }),
+        });
+      }
+    }
+  }, 120_000);
+
+  /** @scenario "A batch carrying several series folds each of them correctly" */
+  it("folds the early series to the rollups its point-at-a-time rebuild produces", async () => {
+    const folded = await readRollups(earlySeriesId);
+
+    expect(folded).toEqual(await readRollups(earlyReferenceId));
+    expect(folded.length).toBeGreaterThan(1);
+  });
+
+  /** @scenario "A batch carrying several series folds each of them correctly" */
+  it("folds the late series to the rollups its point-at-a-time rebuild produces", async () => {
+    const folded = await readRollups(lateSeriesId);
+
+    expect(folded).toEqual(await readRollups(lateReferenceId));
+    expect(folded.length).toBeGreaterThan(1);
+  });
+
+  /** @scenario "A batch carrying several series folds each of them correctly" */
+  it("counts every sample of both series exactly once", async () => {
+    for (const seriesId of [earlySeriesId, lateSeriesId]) {
+      const folded = await readRollups(seriesId);
+
+      expect(
+        folded.reduce((total, row) => total + row.sourcePointCount, 0),
+      ).toBe(values.length);
+    }
   });
 });
