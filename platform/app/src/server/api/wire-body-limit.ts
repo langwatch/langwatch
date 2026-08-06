@@ -25,6 +25,41 @@ const reject = (): never => {
   throw new HTTPException(413, { res });
 };
 
+/**
+ * True when the declared Content-Length is authoritative. A request carrying
+ * both headers is framed by Transfer-Encoding, so its Content-Length says
+ * nothing about the bytes actually arriving and has to be counted instead.
+ */
+const declaresItsOwnLength = (headers: Headers): boolean =>
+  headers.has("content-length") && !headers.has("transfer-encoding");
+
+/** Reads the stream, rejecting the moment the running total passes the cap. */
+const readCapped = async (
+  body: ReadableStream<Uint8Array>,
+  maxSize: number,
+  // `Uint8Array<ArrayBuffer>` rather than a bare `Uint8Array`: the latter
+  // widens to `ArrayBufferLike`, which `BodyInit` does not accept.
+): Promise<Uint8Array<ArrayBuffer>> => {
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > maxSize) reject();
+    chunks.push(value);
+  }
+
+  const buffered = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffered.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return buffered;
+};
+
 export const wireBodyLimit = ({
   maxSize,
 }: {
@@ -32,38 +67,18 @@ export const wireBodyLimit = ({
 }): MiddlewareHandler => {
   return async function wireBodyLimitMiddleware(c: Context, next: Next) {
     const body = c.req.raw.body;
-    if (!body) {
-      return next();
-    }
+    if (!body) return next();
 
-    const hasTransferEncoding = c.req.raw.headers.has("transfer-encoding");
-    const hasContentLength = c.req.raw.headers.has("content-length");
-    if (hasContentLength && !hasTransferEncoding) {
-      const contentLength = parseInt(
+    if (declaresItsOwnLength(c.req.raw.headers)) {
+      const declared = parseInt(
         c.req.raw.headers.get("content-length") ?? "0",
         10,
       );
-      if (contentLength > maxSize) reject();
+      if (declared > maxSize) reject();
       return next();
     }
 
-    let size = 0;
-    const chunks: Uint8Array[] = [];
-    const reader = body.getReader();
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.length;
-      if (size > maxSize) reject();
-      chunks.push(value);
-    }
-
-    const buffered = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-      buffered.set(chunk, offset);
-      offset += chunk.length;
-    }
+    const buffered = await readCapped(body, maxSize);
 
     // The rebuilt request carries a fixed body, so the chunked framing header
     // no longer describes it; undici derives Content-Length from the buffer.
