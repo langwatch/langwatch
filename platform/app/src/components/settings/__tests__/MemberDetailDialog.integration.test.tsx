@@ -253,26 +253,33 @@ describe("<MemberDetailDialog/>", () => {
     });
   });
 
-  describe("when the server answers without the affected-teams field", () => {
-    it("still reports the save as done", async () => {
+  describe("given the server answers without the affected-teams field", () => {
+    beforeEach(() => {
       // A rollout window: this build reads a field an older server does not
       // send, and by the time it reads it the save has already happened.
       // Telling somebody their successful save failed is the worse outcome, so
       // the field is optional to the client even though it is not to the API.
-      mockUpdateMemberRole.mockResolvedValueOnce({ success: true });
+      mockUpdateMemberRole.mockResolvedValue({ success: true });
+    });
 
-      renderDialog();
+    describe("when the organization role is saved", () => {
+      it("still reports the save as done", async () => {
+        renderDialog();
 
-      fireEvent.click(screen.getByTestId("org-role-field"));
-      fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+        fireEvent.click(screen.getByTestId("org-role-field"));
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
-      await vi.waitFor(() => {
-        expect(mockToasterCreate).toHaveBeenCalled();
+        await vi.waitFor(() => {
+          expect(mockToasterCreate).toHaveBeenCalled();
+        });
+        const toast = mockToasterCreate.mock.calls.at(-1)?.[0];
+        expect(toast).toMatchObject({
+          title: "Member updated",
+          type: "success",
+        });
+        // Nothing to disclose, so nothing is claimed about any team.
+        expect(toast?.description).toBeUndefined();
       });
-      const toast = mockToasterCreate.mock.calls.at(-1)?.[0];
-      expect(toast).toMatchObject({ title: "Member updated", type: "success" });
-      // Nothing to disclose, so nothing is claimed about any team.
-      expect(toast?.description).toBeUndefined();
     });
   });
 
