@@ -6,6 +6,7 @@ import { cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TraceListItem } from "../../../../../../types/trace";
+import { NO_TRACE_EVENTS } from "../../../../../../types/trace";
 import {
   TraceStatisticsProvider,
   useTraceStatistics,
@@ -31,7 +32,7 @@ function makeTrace(overrides: Partial<TraceListItem> = {}): TraceListItem {
     output: null,
     origin: "application",
     evaluations: [],
-    events: [],
+    events: NO_TRACE_EVENTS,
     sizeBytes: 0,
     ...overrides,
   };

@@ -19,6 +19,8 @@ import type {
   SpanSummaryPage,
   SpanSummaryPageCursor,
   SpanSummaryRow,
+  TraceEventRollup,
+  TraceEventRollupParams,
 } from "./repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { SpanInsertData } from "./types";
@@ -191,6 +193,19 @@ export class SpanStorageService {
     params: ByTraceId,
   ): Promise<DerivedTraceEvent[]> {
     return this.repository.getTraceEventsByTraceId(params);
+  }
+
+  /**
+   * Event rollups for the trace list's Events column, one query per page.
+   *
+   * Names and counts only, so unlike the per-trace detail read there is no
+   * captured content to gate: redaction blanks event *attributes*, and this
+   * read never asks for them.
+   */
+  async getTraceEventRollupsByTraceIds(
+    params: TraceEventRollupParams,
+  ): Promise<Record<string, TraceEventRollup>> {
+    return this.repository.getTraceEventRollupsByTraceIds(params);
   }
 
   async getEventsByTraceId(params: ByTraceId): Promise<ElasticSearchEvent[]> {

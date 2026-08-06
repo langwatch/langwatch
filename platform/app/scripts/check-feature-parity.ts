@@ -594,7 +594,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/conversation-turn-ledger.feature",
   "specs/traces-v2/data-layer.feature",
   "specs/traces-v2/editable-trace-name-alignment.feature",
-  "specs/traces-v2/evaluations.feature",
   "specs/traces-v2/facet-perspectives.feature",
   "specs/traces-v2/flame-graph.feature",
   "specs/traces-v2/grouping-engine.feature",
