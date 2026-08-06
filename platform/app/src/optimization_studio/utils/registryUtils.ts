@@ -1,8 +1,6 @@
 import type { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
-import {
-  type EvaluatorTypes,
-  evaluatorDisplayName,
-} from "../../server/evaluations/evaluators";
+import { evaluatorDisplayName } from "../../server/evaluations/evaluatorDisplayNames";
+import type { EvaluatorTypes } from "../../server/evaluations/evaluators";
 import type { Evaluator, Field } from "../types/dsl";
 
 export { DEFAULT_MAX_TOKENS } from "~/utils/constants";

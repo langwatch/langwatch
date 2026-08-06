@@ -23,10 +23,10 @@ import {
   useDrawer,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { evaluatorDisplayName } from "~/server/evaluations/evaluatorDisplayNames";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-  evaluatorDisplayName,
 } from "~/server/evaluations/evaluators";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";

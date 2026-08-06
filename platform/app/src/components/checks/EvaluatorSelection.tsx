@@ -15,11 +15,11 @@ import type { UseFormReturn } from "react-hook-form";
 import NextLink from "~/utils/compat/next-link";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { evaluatorDisplayName } from "../../server/evaluations/evaluatorDisplayNames";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
-  evaluatorDisplayName,
 } from "../../server/evaluations/evaluators";
 import { api } from "../../utils/api";
 import { isFeatureEnabled } from "../../utils/featureFlags";

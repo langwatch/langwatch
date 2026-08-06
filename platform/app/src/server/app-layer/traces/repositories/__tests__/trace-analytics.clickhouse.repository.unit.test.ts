@@ -231,7 +231,17 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           table: TABLE,
           outcome: "hit",
         });
-        const { repository } = makeOrderingRepository([]);
+        // A row, so this is a genuine hit. The empty case is its own outcome
+        // (see below) — asserting `hit` off an empty read would pin the wrong
+        // half of the contract.
+        const { repository } = makeOrderingRepository([
+          tiedVersion({
+            lastEventOccurredAt: "1750000000001",
+            spanCount: 1,
+            appliedEventIds: ["a"],
+            occurredAt: "2026-07-24 12:00:00.000",
+          }),
+        ]);
 
         await repository.findByTraceIdWithApplied({
           tenantId: TENANT_ID,
@@ -241,6 +251,37 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
 
         expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(
           before + 1,
+        );
+      });
+
+      /**
+       * This read declares its window authoritative, so a miss never widens and
+       * has no widen outcome to appear as. It gets counted as a miss instead of
+       * folded into `hit`.
+       */
+      /** @scenario a bounded miss is recorded as a miss, not as an answer */
+      it("counts an empty window as a miss, not as a hit", async () => {
+        const beforeEmpty = await windowedReadCount({
+          table: TABLE,
+          outcome: "windowed_empty",
+        });
+        const beforeHit = await windowedReadCount({
+          table: TABLE,
+          outcome: "hit",
+        });
+        const { repository } = makeOrderingRepository([]);
+
+        await repository.findByTraceIdWithApplied({
+          tenantId: TENANT_ID,
+          traceId: TRACE_ID,
+          window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
+        });
+
+        expect(
+          await windowedReadCount({ table: TABLE, outcome: "windowed_empty" }),
+        ).toBe(beforeEmpty + 1);
+        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(
+          beforeHit,
         );
       });
 

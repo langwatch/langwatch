@@ -5,9 +5,9 @@ export {
   initializeApp,
   resetApp,
 } from "./app";
-export type { ClickHouseFactoryOptions } from "./clients/clickhouse.factory";
-// Client factories
-export { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
+// Client factories. ClickHouse is deliberately absent: it is reached through a
+// repository on the App, never by constructing a client. See
+// ~/server/clickhouse/managedClient.ts.
 export type { PrismaFactoryOptions } from "./clients/prisma.factory";
 export { createPrismaClient } from "./clients/prisma.factory";
 export type { RedisFactoryOptions } from "./clients/redis.factory";

@@ -48,12 +48,12 @@ import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
 import { prisma } from "~/server/db";
+import { evaluatorDisplayName } from "~/server/evaluations/evaluatorDisplayNames";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluationResult,
   type EvaluatorDefinition,
   type EvaluatorTypes,
-  evaluatorDisplayName,
   evaluatorsSchema,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";

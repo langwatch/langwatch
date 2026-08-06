@@ -18,7 +18,10 @@ import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/re
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { trackServerEvent } from "~/server/posthog";
 import { RoleService } from "~/server/role/role.service";
-import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
+import {
+  assertNoPersonalTeamScope,
+  findSharedTeamIds,
+} from "~/server/role-bindings/personal-team-scope";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { decrypt } from "~/utils/encryption";
 import {
@@ -1324,9 +1327,12 @@ export const organizationRouter = createTRPCRouter({
     .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
-      await assertNoPersonalTeamScope(prisma, [
-        { scopeType: RoleBindingScopeType.TEAM, scopeId: input.teamId },
-      ]);
+      await assertNoPersonalTeamScope({
+        client: prisma,
+        scopes: [
+          { scopeType: RoleBindingScopeType.TEAM, scopeId: input.teamId },
+        ],
+      });
       const inputIsCustomRole = isCustomRole(input.role);
 
       if (inputIsCustomRole && input.customRoleId) {
@@ -1482,12 +1488,27 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      // Get current member's custom role permissions (if any) for license change detection
-      const organizationTeams = await prisma.team.findMany({
-        where: { organizationId: input.organizationId },
-        select: { id: true },
+      // A caller who names a personal workspace outright is told so. Without
+      // this the shared-teams-only set below would answer "that team is not in
+      // the organization", which is both wrong and no help. No UI sends these
+      // updates today; the procedure accepts them, so it has to answer them.
+      await assertNoPersonalTeamScope({
+        client: prisma,
+        scopes: (input.teamRoleUpdates ?? []).map((update) => ({
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: update.teamId,
+        })),
       });
-      const organizationTeamIds = organizationTeams.map((team) => team.id);
+
+      // Only the teams the organization shares. A seat decision is about the
+      // person, so it applies to the teams they work in with other people and
+      // leaves the workspace that is only theirs alone. Including it would ask
+      // the organization to demote a team's last admin, which is refused, and
+      // the whole role change would go down with the refusal.
+      const organizationTeamIds = await findSharedTeamIds({
+        client: prisma,
+        organizationId: input.organizationId,
+      });
 
       const currentTeamBindings = await prisma.roleBinding.findMany({
         where: {

@@ -28,7 +28,10 @@ import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
 import { createChildProcessLogger } from "./child-logger";
-import { createModelFromParams } from "./model.factory";
+import {
+  createJudgeModelFromParams,
+  createModelFromParams,
+} from "./model.factory";
 import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
 import { createAdapter } from "./serialized-adapter.registry";
 import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
@@ -118,14 +121,14 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   // scenario override or the DEFAULT-role scenarios.* defaults). Older jobs
   // only carried modelParams, so fall back to it when the split params are
   // absent — preserves the previous single-model behavior during rollout.
-  const simulatorModel = createModelFromParams(
-    simulatorModelParams ?? modelParams,
+  const simulatorModel = createModelFromParams({
+    litellmParams: simulatorModelParams ?? modelParams,
     nlpServiceUrl,
-  );
-  const judgeModel = createModelFromParams(
-    judgeModelParams ?? modelParams,
+  });
+  const judgeModel = createJudgeModelFromParams({
+    litellmParams: judgeModelParams ?? modelParams,
     nlpServiceUrl,
-  );
+  });
 
   // For HTTP targets, use a remote span judge that queries spans from
   // the platform API before evaluation. The trace ID will be captured

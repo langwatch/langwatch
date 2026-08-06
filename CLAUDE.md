@@ -176,6 +176,23 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
+**Whole-repo checks take a machine-wide slot.** A tsgo run peaks around 3 to 4
+GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds in 4
+seconds of wall clock. That is fine once and ruinous four times over, so
+`typecheck`, `typecheck:tests`, `typecheck:legacy`, `lint`, `lint:fix`,
+`lint:plugins` and `format` all go through `dev/scripts/check-queue.mjs`. It
+counts the runs live across every worktree, terminal and agent on the machine
+against **one** counter (they compete for the same cores), and a run past the
+limit waits its turn instead of piling on. With a slot free it prints nothing
+and is otherwise transparent (same stdio, same exit code). Queued, it says so on
+stderr, which is what tells you a slow run was waiting rather than hung.
+`CHECK_SLOTS=N` overrides the limit and `CHECK_SLOTS=0` turns the queue off;
+unset, the limit comes from the machine (one per 6 GiB of RAM, capped at one per
+4 cores) and CI does not queue at all. `node dev/scripts/check-queue.mjs
+--explain` shows the limit and who currently holds a slot. Don't cap the tools'
+own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
+CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
+
 When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `platform/app/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `platform/app/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
@@ -218,7 +235,7 @@ specs/               # BDD feature specs
 | Shared types in `types.ts` | Colocate unless truly shared |
 | Duplicating Zod + TS types | When you need both validation AND types, use Zod only with `infer`. For internal constants (no external input), `as const` is sufficient |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
-| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmThreads"`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmForks"` + `isolate: false`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
 | Hand-rolling a throwaway `vitest.*.config.ts` (in `/tmp` or a worktree) | Never. A bare config inherits none of the guardrails above, so vitest defaults to the `forks` pool at `availableParallelism - 1` workers (10 on an 11-core laptop) at ~200-500MB each — several GB per run, multiplied by every parallel agent worktree. Use an existing config |
 | Writing a jsdom config because the repo "has no jsdom environment" | It is per-file on purpose — neither config declares a global `environment`; 515 test files set `// @vitest-environment jsdom` in a docblock. Add the docblock to your test file |
 | Reaching for `--maxWorkers=1` to be gentle on RAM | It serializes the run so it stays resident far longer, overlapping every other agent's run. Scope the run down instead — pass a narrower path |
@@ -259,6 +276,7 @@ specs/               # BDD feature specs
 | Adding a security `override` to a single project's `package.json` | pnpm honours `overrides` only at the workspace root, so put it in the root `pnpm-workspace.yaml`. A `pnpm` block in a member package.json is silently ignored — it looks active and does nothing. This is why the pins used to drift when the repo had six install roots |
 | Referring to the app as the `langwatch` package | The app is `@langwatch/web` (in `langwatch/`). `langwatch` is the published TypeScript SDK, in `typescript-sdk/`. They collided until ADR-076; `pnpm --filter langwatch` now unambiguously means the SDK |
 | `cd langwatch` before every command | The repo root proxies the common ones, so `pnpm dev`, `pnpm test:unit`, `pnpm typecheck`, `pnpm lint`, `pnpm prisma:migrate` and friends work from wherever you are. `cd` only when you want a script the root does not proxy — `pnpm --filter @langwatch/web <script>` reaches any of them |
+| Importing a component into server code to reuse a constant it happens to export | **Enforced:** no *value*-import chain from server code may reach a browser-only package (React, Chakra, Ark, Emotion, react-router, lucide-react, browser OTel) — `src/server/__tests__/frontend-boundary.unit.test.ts` walks the real graph transitively and fails the build. One such import pulled 2,020 modules / 212 MB RSS into every backend process. `src/server/mailer/**` is the one exception, since react-email renders templates server-side. **Convention on top (not enforced):** don't value-import a `**/components/**` file at all, even a framework-free one — it invites exactly that chain later. A few such imports predate the guard (`server/datasets/upload-utils.ts`, `server/app-layer/langy/streaming/langyTurnRelay.ts`, `server/scenarios/execution/data-prefetcher.ts`); don't add more. Move the shared value into a framework-free module both sides import (`import type` is always fine — types are erased) |
 
 ## TypeScript
 

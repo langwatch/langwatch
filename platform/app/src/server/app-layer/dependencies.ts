@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import type { FilterService } from "~/server/filters/filter.service";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
@@ -120,6 +121,10 @@ export interface AppDependencies {
   topicClustering: {
     status: TopicClusteringStatusService;
     topics: TopicService;
+  };
+  /** The values a filter can offer, read from the trace store. */
+  filters: {
+    options: FilterService;
   };
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {

@@ -224,6 +224,38 @@ function makeSummary(
   } as TraceSummaryData;
 }
 
+describe("mapTraceSummaryToTrace — the trace's reported start", () => {
+  describe("when the trace has spans", () => {
+    it("reports the earliest span start, not the time the summary is filed under", () => {
+      const summary = makeSummary({
+        occurredAt: 1_760_000_055_000,
+        storageAnchorMs: 1_760_000_060_000,
+      });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.timestamps.started_at).toBe(1_760_000_055_000);
+    });
+  });
+
+  describe("when the trace's only signal is a log record", () => {
+    /** @scenario "A trace with no spans reports the time its first signal arrived rather than 1970" */
+    it("reports the time its first signal was accepted", () => {
+      // No span ever seeded the timing baseline, so before the storage anchor
+      // existed this rendered as 1970 in the list and the drawer.
+      const summary = makeSummary({
+        spanCount: 0,
+        occurredAt: 0,
+        storageAnchorMs: 1_760_000_060_000,
+      });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.timestamps.started_at).toBe(1_760_000_060_000);
+    });
+  });
+});
+
 describe("mapTraceSummaryToTrace — display-side single-key wrapper recursion", () => {
   describe("when computedOutput is a structured json wrapper with a single unknown key", () => {
     it("drills into the wrapper and returns the inner content as trace.output.value", () => {

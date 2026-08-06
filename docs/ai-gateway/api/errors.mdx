@@ -90,7 +90,7 @@ Errors (like successes) always carry:
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
 | `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
 | `unsupported_parameter` | `400` | The parameter policy refused a request parameter for the target lane: either the request depends on it functionally and the lane cannot honor it, or `drop_tuning_params` is `false` and the lane has no mapping for it. The message names the parameter, the lane, and why. See [Parameter mapping](/ai-gateway/parameter-mapping). |
-| `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
+| `payload_too_large` | `413` | Request body exceeded `SERVER_MAX_REQUEST_BODY_BYTES` (default 32 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
 | `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Gateway-Request-Id` is how we trace it. |
 
 ## Control-plane codes

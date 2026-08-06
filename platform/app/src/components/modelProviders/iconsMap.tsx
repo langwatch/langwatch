@@ -1,21 +1,21 @@
 import { Box } from "@chakra-ui/react";
 // biome-ignore lint/style/useImportType: React is needed at runtime for JSX in non-jsdom test environments
 import React from "react";
-import { Anthropic } from "../../components/icons/Anthropic";
-import { AWS } from "../../components/icons/AWS";
-import { Azure } from "../../components/icons/Azure";
-import { Cerebras } from "../../components/icons/Cerebras";
-import { Codex } from "../../components/icons/Codex";
-import { Custom } from "../../components/icons/Custom";
-import { DeepSeek } from "../../components/icons/DeepSeek";
-import { ElevenLabs } from "../../components/icons/ElevenLabs";
-import { Gemini } from "../../components/icons/Gemini";
-import { GoogleCloud } from "../../components/icons/GoogleCloud";
-import { Groq } from "../../components/icons/Groq";
-import { OpenAI } from "../../components/icons/OpenAI";
-import { Voyage } from "../../components/icons/Voyage";
-import { Xai } from "../../components/icons/Xai";
-import type { modelProviders } from "./registry";
+import type { modelProviders } from "~/server/modelProviders/registry";
+import { Anthropic } from "../icons/Anthropic";
+import { AWS } from "../icons/AWS";
+import { Azure } from "../icons/Azure";
+import { Cerebras } from "../icons/Cerebras";
+import { Codex } from "../icons/Codex";
+import { Custom } from "../icons/Custom";
+import { DeepSeek } from "../icons/DeepSeek";
+import { ElevenLabs } from "../icons/ElevenLabs";
+import { Gemini } from "../icons/Gemini";
+import { GoogleCloud } from "../icons/GoogleCloud";
+import { Groq } from "../icons/Groq";
+import { OpenAI } from "../icons/OpenAI";
+import { Voyage } from "../icons/Voyage";
+import { Xai } from "../icons/Xai";
 
 export const modelProviderIcons: Record<
   keyof typeof modelProviders,

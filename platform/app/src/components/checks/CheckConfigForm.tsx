@@ -31,10 +31,10 @@ import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
 } from "../../server/evaluations/evaluationMappings";
+import { evaluatorDisplayName } from "../../server/evaluations/evaluatorDisplayNames";
 import {
   type Evaluators,
   type EvaluatorTypes,
-  evaluatorDisplayName,
   evaluatorsSchema,
   evaluatorTypesSchema,
 } from "../../server/evaluations/evaluators";
