@@ -65,8 +65,16 @@ type Authenticate = (args: {
 function readBearerToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
   if (!authHeader) return null;
-  const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
-  return match?.[1]?.trim() || null;
+
+  // Split on the first space rather than matching a pattern. The header is
+  // attacker controlled and can be kilobytes long, and a scheme-then-token
+  // regex backtracks over runs of whitespace.
+  const header = authHeader.trim();
+  const separator = header.indexOf(" ");
+  if (separator === -1) return null;
+  if (header.slice(0, separator).toLowerCase() !== "bearer") return null;
+
+  return header.slice(separator + 1).trim() || null;
 }
 
 /** Generates an opaque access token. */

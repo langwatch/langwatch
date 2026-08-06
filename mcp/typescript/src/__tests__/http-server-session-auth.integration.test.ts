@@ -156,6 +156,42 @@ describe("Session id is not a credential", () => {
     await response.text();
   });
 
+  it("tolerates extra spaces between the scheme and the token", async () => {
+    const sessionId = await openSession({ baseUrl: harness.baseUrl });
+
+    const response = await fetch(`${harness.baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        ...MCP_POST_HEADERS,
+        "mcp-session-id": sessionId,
+        Authorization: `Bearer    ${VALID_KEY}`,
+      },
+      body: toolsListBody(),
+    });
+
+    expect(response.status).toBe(200);
+    await response.text();
+  });
+
+  it("rejects an Authorization header carrying no token", async () => {
+    const sessionId = await openSession({ baseUrl: harness.baseUrl });
+
+    for (const header of ["Bearer", `Basic ${VALID_KEY}`, `Bearer${VALID_KEY}`]) {
+      const response = await fetch(`${harness.baseUrl}/mcp`, {
+        method: "POST",
+        headers: {
+          ...MCP_POST_HEADERS,
+          "mcp-session-id": sessionId,
+          Authorization: header,
+        },
+        body: toolsListBody(),
+      });
+
+      expect(response.status).toBe(401);
+      await response.text();
+    }
+  });
+
   it("does not reveal whether another key's session exists", async () => {
     const sessionId = await openSession({ baseUrl: harness.baseUrl, apiKey: VALID_KEY });
 
