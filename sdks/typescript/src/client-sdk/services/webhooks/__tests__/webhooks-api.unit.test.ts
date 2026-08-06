@@ -209,7 +209,7 @@ describe("WebhooksApiService", () => {
   });
 
   /** The created range the events log requires on every read. */
-  const WINDOW = { from: 1_750_000_000_000, to: 1_750_086_400_000 };
+  const WINDOW = { from: 1_750_000_000_000, to: 1_750_086_400_000 } as const;
 
   describe("eventsPage()", () => {
     it("takes exactly one page and hands back the cursor for the next", async () => {

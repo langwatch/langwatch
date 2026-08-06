@@ -45,8 +45,12 @@ describe("Feature: Webhook endpoints REST API", () => {
   });
 
   /** The created range the events log requires, as query-string params. */
-  const eventsWindow = () =>
-    `from=${Date.now() - 24 * 60 * 60 * 1000}&to=${Date.now()}`;
+  const eventsWindow = () => {
+    // One clock read: two would let a backward step invert the range and turn
+    // an assertion about the page into a 422 about the window.
+    const now = Date.now();
+    return `from=${now - 24 * 60 * 60 * 1000}&to=${now}`;
+  };
 
   beforeAll(async () => {
     organization = await prisma.organization.create({
