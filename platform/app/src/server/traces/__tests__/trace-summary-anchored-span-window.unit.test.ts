@@ -94,7 +94,9 @@ function summaryRow(traceId: string, occurredAtMs: number) {
  *
  * Routed by query shape rather than by call order, so a read gained or dropped
  * upstream surfaces here as an unmatched query rather than as the wrong payload
- * handed to the wrong read two frames away.
+ * handed to the wrong read two frames away. Every shape is matched explicitly
+ * and anything else throws: a default payload would hand a new read a valid-
+ * looking fixture and hide exactly the break this routing exists to expose.
  */
 function mockReads({
   resolved,
@@ -105,13 +107,26 @@ function mockReads({
 }) {
   mockClickHouseQuery.mockReset();
   mockClickHouseQuery.mockImplementation(({ query }: { query: string }) => {
-    const rows = query.includes("AS fromMs")
-      ? [resolved]
-      : query.includes("FROM stored_spans AS t")
-        ? []
-        : summaries;
+    const rows = matchRows({ query, resolved, summaries });
     return Promise.resolve({ json: () => Promise.resolve(rows) });
   });
+}
+
+function matchRows({
+  query,
+  resolved,
+  summaries,
+}: {
+  query: string;
+  resolved: { fromMs: number | null; toMs: number | null };
+  summaries: ReturnType<typeof summaryRow>[];
+}) {
+  if (query.includes("AS fromMs")) return [resolved];
+  if (query.includes("FROM trace_summaries AS t")) return summaries;
+  if (query.includes("FROM stored_spans AS t")) return [];
+  throw new Error(
+    `fixture: fetchTracesWithSpansJoined issued a read this fixture does not know: ${query}`,
+  );
 }
 
 /**
