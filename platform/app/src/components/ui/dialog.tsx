@@ -68,7 +68,7 @@ export const DialogContent = React.forwardRef<
     <Portal disabled={!portalled} container={portalRef}>
       {backdrop && (
         <ChakraDialog.Backdrop
-          backdropFilter="var(--lw-backdrop-blur, blur(8px))"
+          backdropFilter="blur(8px)"
           {...safeBackdropProps}
           bg="transparent"
           // Stable DOM signal that the wrapper's transparency contract is
