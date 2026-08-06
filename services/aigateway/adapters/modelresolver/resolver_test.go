@@ -159,7 +159,7 @@ func TestResolve_EmptyModelNamesTheCallersOwnSurface(t *testing.T) {
 			name:        "the responses surface",
 			requestType: domain.RequestTypeResponses,
 			mustSay:     []string{`"model"`, "JSON request body", "/v1/responses"},
-			mustNotSay:  []string{"multipart", "URL path"},
+			mustNotSay:  []string{"/v1/chat/completions", "multipart", "URL path"},
 		},
 		{
 			name:        "embeddings",

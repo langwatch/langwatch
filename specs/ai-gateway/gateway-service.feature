@@ -225,7 +225,7 @@ Feature: Gateway service — public HTTP surface and operational basics
     # clock, retrying against a rejection that read, in full, "missing model
     # field". That names no field, no body and no endpoint, so the operator on
     # the other end had nothing to correct and the loop never stopped. The
-    # The handled error therefore carries a stable `missing_model` code plus
+    # handled error therefore carries a stable `missing_model` code plus
     # the request surface in metadata; operators and clients need not infer
     # this high-volume rejection from prose. Resolution still runs before the
     # request is labeled with a model, so the request counter records
@@ -237,6 +237,9 @@ Feature: Gateway service — public HTTP surface and operational basics
     # part, and the Gemini passthrough reads the URL path. A single message
     # naming the JSON endpoints is not merely vague at the other four, it is
     # wrong: it sends a caller to fix a request shape they are not using.
+    #
+    # See dev/docs/adr/045-domain-errors-handled-boundary.md for the handled-
+    # error contract this rule follows.
     #
     # Bindings: services/aigateway/adapters/modelresolver/resolver_test.go
 

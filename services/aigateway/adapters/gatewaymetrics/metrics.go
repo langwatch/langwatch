@@ -238,7 +238,7 @@ func New() *Recorder {
 
 	r.clientRejects = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_client_rejects_total",
-		Help: "Requests rejected as the caller's fault, by gateway error code and virtual key. gateway_http_requests_total cannot answer this: a request rejected before model resolution is counted with model=unknown and carries no caller identity at all, so one client looping on a malformed body is invisible per tenant. Deliberately carries no project or model label; see the package comment on cardinality.",
+		Help: "Requests the gateway itself rejected as the caller's fault, by gateway error code and virtual key.",
 	}, []string{"code", "vk_id"})
 
 	r.register(

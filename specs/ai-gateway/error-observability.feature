@@ -55,21 +55,24 @@ Feature: Gateway errors are logged with fault attribution
   # watches. gateway_http_requests_total cannot answer "who", either — a
   # request rejected before model resolution is counted with model=unknown and
   # no caller identity at all.
+  #
+  # Bindings: services/aigateway/adapters/gatewaymetrics/metrics_test.go,
+  # services/aigateway/adapters/httpapi/metrics_route_test.go
   @unit
   Scenario: A customer-fault rejection is counted against the key that sent it
     Given an authenticated request is rejected as the caller's fault
     When the error response is written
     Then the rejection is counted against its error code and virtual key
     And a missing-model rejection is counted as "missing_model", not generic "bad_request"
-    And the count carries no project or model label, because those are
-      redundant with the key and caller-controlled respectively
+    # Project is redundant with the key; model is caller-controlled.
+    And the count carries no project or model label
 
+  # The counter exists to name a misbehaving client, not to double-count outages.
   @unit
   Scenario: A provider or platform failure is not counted as a client rejection
     Given a request fails upstream or through a gateway bug
     When the error response is written
     Then the client-rejection counter does not move
-    Because it exists to name a misbehaving client, not to double-count outages
 
   @unit
   Scenario: A rejection on an unmetered path is still written

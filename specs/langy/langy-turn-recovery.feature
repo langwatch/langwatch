@@ -91,6 +91,9 @@ Feature: Langy recovers from a failed turn without making the user re-ask
   # there is no code, the HTTP status supplies a stable handled reason and the
   # body contributes only its kind (json, html, text, binary, or empty).
   #
+  # See dev/docs/adr/045-domain-errors-handled-boundary.md for the handled-
+  # error contract this block follows.
+  #
   # Bindings: services/langyagent/adapters/otelrelay/llmproxy_body_test.go
 
   @unit
