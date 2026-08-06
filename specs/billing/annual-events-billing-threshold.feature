@@ -49,7 +49,26 @@ Feature: Annual subscriptions collect event overage during the year
     Then no Stripe update call is made
 
   @unit
+  Scenario: A manually configured threshold amount is never replaced
+    Given an annual subscription whose threshold was set by hand to a different amount
+    When the threshold is applied
+    Then the existing amount is preserved and no Stripe update call is made
+
+  @unit
+  Scenario: A threshold configured to move the billing anniversary is corrected
+    Given an annual subscription whose threshold resets the billing cycle anchor
+    When the threshold is applied
+    Then the anchor reset is turned off while the existing amount is kept
+
+  @unit
   Scenario: The backfill applies the threshold only to annual event subscriptions
     Given a mix of annual, monthly, and legacy subscriptions in Stripe
-    When the threshold is applied to each subscription
+    When the backfill walks the annual subscription candidates
     Then only subscriptions carrying an annual events price are updated
+
+  @unit
+  Scenario: A failure on one subscription does not stop the backfill
+    Given several annual subscription candidates and one that fails in Stripe
+    When the backfill walks the candidates
+    Then the remaining subscriptions are still processed
+    And the failure is counted so the run exits non-zero

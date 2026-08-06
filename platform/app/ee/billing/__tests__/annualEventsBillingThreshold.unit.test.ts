@@ -32,7 +32,10 @@ const makeStripeSubscription = ({
   billingThresholds = null,
 }: {
   priceIds: string[];
-  billingThresholds?: { amount_gte: number } | null;
+  billingThresholds?: {
+    amount_gte: number;
+    reset_billing_cycle_anchor?: boolean;
+  } | null;
 }) => ({
   id: "sub_stripe_1",
   billing_thresholds: billingThresholds,
@@ -120,8 +123,76 @@ describe("applyAnnualEventsBillingThreshold", () => {
     });
   });
 
+  describe("when the threshold was set by hand to a different amount", () => {
+    /** @scenario A manually configured threshold amount is never replaced */
+    it("preserves the existing amount and makes no update call", async () => {
+      const stripe = makeStripe(
+        makeStripeSubscription({
+          priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
+          billingThresholds: { amount_gte: 120_000 },
+        }),
+      );
+
+      const result = await applyAnnualEventsBillingThreshold({
+        stripe,
+        stripeSubscriptionId: "sub_stripe_1",
+      });
+
+      expect(result).toBe("already_set");
+      expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the threshold resets the billing cycle anchor", () => {
+    /** @scenario A threshold configured to move the billing anniversary is corrected */
+    it("pins the anchor while keeping the existing amount", async () => {
+      const stripe = makeStripe(
+        makeStripeSubscription({
+          priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
+          billingThresholds: {
+            amount_gte: 120_000,
+            reset_billing_cycle_anchor: true,
+          },
+        }),
+      );
+
+      const result = await applyAnnualEventsBillingThreshold({
+        stripe,
+        stripeSubscriptionId: "sub_stripe_1",
+      });
+
+      expect(result).toBe("anchor_pinned");
+      expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
+        billing_thresholds: {
+          amount_gte: 120_000,
+          reset_billing_cycle_anchor: false,
+        },
+      });
+    });
+
+    it("reports without updating in dry-run mode", async () => {
+      const stripe = makeStripe(
+        makeStripeSubscription({
+          priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
+          billingThresholds: {
+            amount_gte: 120_000,
+            reset_billing_cycle_anchor: true,
+          },
+        }),
+      );
+
+      const result = await applyAnnualEventsBillingThreshold({
+        stripe,
+        stripeSubscriptionId: "sub_stripe_1",
+        isDryRun: true,
+      });
+
+      expect(result).toBe("anchor_pinned");
+      expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the subscription has no annual events price", () => {
-    /** @scenario The backfill applies the threshold only to annual event subscriptions */
     it("skips monthly and non-Growth subscriptions untouched", async () => {
       const monthly = makeStripe(
         makeStripeSubscription({

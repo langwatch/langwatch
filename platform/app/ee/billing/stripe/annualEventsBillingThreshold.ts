@@ -7,16 +7,33 @@ import { isAnnualGrowthEventsPrice } from "../utils/growthSeatEvent";
  * charges the customer, instead of letting a year of event overage pile
  * up into one renewal invoice. Threshold invoices keep the cumulative
  * annual included-events quota intact; only collection timing changes.
+ *
+ * Changing this constant only affects subscriptions that have no
+ * threshold yet: an existing threshold — whatever its amount — is
+ * preserved (see below), so already-configured subscriptions keep their
+ * value until someone deliberately changes it in Stripe.
  */
 export const ANNUAL_EVENTS_BILLING_THRESHOLD = 75_000;
 
-export type ThresholdResult = "applied" | "already_set" | "not_annual_events";
+export type ThresholdResult =
+  | "applied"
+  | "already_set"
+  | "anchor_pinned"
+  | "not_annual_events";
 
 /**
  * Sets the billing threshold on a Stripe subscription that carries an
- * annually-billed events price. Idempotent: re-applying an already-set
- * threshold makes no update call. Monthly subscriptions (and anything
+ * annually-billed events price. Monthly subscriptions (and anything
  * without a Growth annual events item) are left untouched.
+ *
+ * Preserve-over-normalize: a subscription that already carries a
+ * threshold keeps its amount, even when it differs from the default —
+ * a value someone set by hand (e.g. negotiated per customer) is never
+ * silently replaced. The one exception is `reset_billing_cycle_anchor:
+ * true`, which would move the billing anniversary on every threshold
+ * invoice: that contradicts what the customer was sold, so it is
+ * corrected to `false` while keeping the existing amount
+ * (`anchor_pinned`).
  *
  * This cannot happen at checkout — Stripe Checkout rejects
  * `subscription_data[billing_thresholds]` — so callers apply it right
@@ -42,11 +59,24 @@ export const applyAnnualEventsBillingThreshold = async ({
     return "not_annual_events";
   }
 
-  if (
-    subscription.billing_thresholds?.amount_gte ===
-    ANNUAL_EVENTS_BILLING_THRESHOLD
-  ) {
-    return "already_set";
+  const existingThreshold = subscription.billing_thresholds;
+  const existingAmount = existingThreshold?.amount_gte;
+
+  if (existingAmount != null) {
+    if (existingThreshold?.reset_billing_cycle_anchor !== true) {
+      return "already_set";
+    }
+    // The amount was chosen deliberately — keep it. The anchor reset was
+    // not: it would move the renewal date on every threshold invoice.
+    if (!isDryRun) {
+      await stripe.subscriptions.update(stripeSubscriptionId, {
+        billing_thresholds: {
+          amount_gte: existingAmount,
+          reset_billing_cycle_anchor: false,
+        },
+      });
+    }
+    return "anchor_pinned";
   }
 
   if (!isDryRun) {
