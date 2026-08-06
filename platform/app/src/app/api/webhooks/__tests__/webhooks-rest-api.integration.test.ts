@@ -677,11 +677,11 @@ describe("Feature: Webhook endpoints REST API", () => {
       // on every page, so the range is part of the contract rather than a
       // filter. Half a range is refused for the same reason as none.
       const now = Date.now();
-      const cases: Array<{ query: string; missing: string }> = [
+      const cases = [
         { query: "", missing: "from" },
         { query: `?from=${now - 60_000}`, missing: "to" },
         { query: `?to=${now}`, missing: "from" },
-      ];
+      ] as const;
       for (const { query, missing } of cases) {
         const res = await app.request(`/api/webhooks/v1/events${query}`, {
           headers: headers(),
@@ -704,11 +704,14 @@ describe("Feature: Webhook endpoints REST API", () => {
         `/api/webhooks/v1/events?from=${now}&to=${now - 60_000}`,
         { headers: headers() },
       );
-      await expectCanonicalError(res, {
+      const error = await expectCanonicalError(res, {
         status: 400,
         type: "bad_request",
         code: "validation_error",
       });
+      // Without this the case passes for a validation error about anything at
+      // all, including a body the route does not take.
+      expect(error.meta?.target).toBe("query");
     });
   });
 });
