@@ -228,6 +228,48 @@ Feature: haven answers an agent's tool call before it runs
     And it names work that is safe to do instead
 
   @unit @unimplemented
+  Scenario: A refusal says where the caller is in the queue and when to come back
+    Given a refused command whose queue depth can be estimated
+    When the reason is written
+    Then it gives the caller's position and a time to try again
+    And the time leads, because it is what decides what the caller does next
+
+  # The cap is the invariant the whole idea rests on. The wait ceiling already
+  # sits under the caller's prompt-cache floor, so a time quoted inside the
+  # ceiling is always a time the caller can afford to honour.
+  @unit @unimplemented
+  Scenario: A quoted retry time is never later than the caller's cache window
+    Given a refused command
+    When a retry time is quoted
+    Then it is inside the cache window that caller is in
+
+  @unit @unimplemented
+  Scenario: A queue too deep to quote honestly is backgrounded instead
+    Given a queue deeper than the caller's cache window
+    When the command is gated
+    Then no retry time is quoted
+    And the run is handed back to run in the background
+    Because sending a caller away past its own window is a comfortable lie
+
+  @unit @unimplemented
+  Scenario: A command with nothing observed gets no invented estimate
+    Given a command haven has never timed
+    When it is refused
+    Then no retry time is quoted
+    And the refusal says so rather than guessing
+
+  # This counter is what decides whether haven ever HOLDS a caller's place
+  # rather than just describing it. Holding it fixes starvation and costs a
+  # store, an expiry, a reclaim, and a client that cooperates — so it is
+  # measured before it is built.
+  @unit @unimplemented
+  Scenario: Repeated refusals of the same command are counted
+    Given the same command refused several times in a row
+    When the doctor reports
+    Then it names that command as starving
+    And one or two refusals are reported as ordinary contention, not starvation
+
+  @unit @unimplemented
   Scenario: A refusal never invites the caller to sleep or poll
     When the gate denies a heavy command
     Then the reason explicitly tells the caller not to sleep, poll or wait for it

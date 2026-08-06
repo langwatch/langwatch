@@ -31,8 +31,13 @@ const (
 	Admit Admission = iota
 	// Narrow runs it now with fewer workers, consuming a slot like any other run.
 	Narrow
-	// Queue waits for a slot, blocking the caller. Correct when the wait fits
-	// inside the caller's ceiling.
+	// Queue waits for a slot, blocking the caller.
+	//
+	// This is the right answer whenever the wait fits inside the caller's
+	// ceiling, agent or not: blocking for forty seconds is cheaper than a round
+	// trip, and it keeps the tool call meaning what it says. Returning control
+	// early only earns its keep once the wait no longer fits — and then the
+	// answer is to background the run, not to hand back a number.
 	Queue
 	// Background hands the run back to run detached, so the caller keeps working
 	// and is notified when it finishes.
