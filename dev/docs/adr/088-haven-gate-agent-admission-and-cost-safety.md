@@ -78,12 +78,14 @@ Narrowing reaches only auto-approving sessions. Under `default` permission mode 
 
 `haven doctor` gains admission counters shared with ADR-087.
 
+The rewrap has to carry the caller's identity to `haven run`, since that is what decides the wait ceiling — and **it must not be spelled `--agent`.** That flag already exists across the haven CLI meaning "produce plain, token-free output", and ADR-064's second rule is one meaning per flag everywhere. A new spelling is needed for "this run belongs to a sub-agent, so give it the five-minute ceiling". `haven run` and `haven gate` are themselves free: neither name is taken by the current surface.
+
 Two contract questions remain open and are marked in the specs rather than assumed: whether `/model` raises any hook at all, and where `CLAUDE.md` sits in the cached prefix. The highest-variance unknown is still the 20-block lookback window — a turn producing more content blocks than a breakpoint can walk back over causes a silent miss on every subsequent request, which would be continuous rather than per-event cost. It remains a measurement.
 
 ## References
 
 - [specs/setup/heavy-run-admission.feature](../../../specs/setup/heavy-run-admission.feature) — what the gate admits into, and the once-only handoff
-- [specs/claude/telemetry-turn-bounding.feature](../../../specs/claude/telemetry-turn-bounding.feature) — the existing Claude-side telemetry contract
+- [specs/claude/telemetry-turn-bounding.feature](../../../specs/claude/telemetry-turn-bounding.feature) — adjacent but not the same thing: that spec governs how LangWatch *ingests* Claude Code logs (and describes a mechanism ADR-055 retired, preserved for porting). This ADR is about what Claude Code *exports* and what a hook observes locally. Neither constrains the other; the pairing is named so the overlap in title is not mistaken for overlap in scope.
 - Measured against a headless session with a scratch settings file: the matcher shape above fires; `updatedInput` applies with `allow` and not with `defer`; the payload carries no `agent_id` in a main session; a compiled Go panic exits 2
 - Measured across 40 real transcripts (14,121 cache-writing requests, ~53M cache-write tokens): sub-agents write `ephemeral_5m` 100% of the time, main sessions write `ephemeral_1h` 100% of the time, no request writes both
 - Published rates: cache read 0.1× base input, write 1.25× (5m TTL) / 2× (1h); minimum cacheable prefix 512 tokens on Opus 5; breakpoints walk back at most 20 content blocks; an entry is readable only once the first response using it begins streaming
