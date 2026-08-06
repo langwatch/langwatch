@@ -11,6 +11,7 @@ import {
   ModelProviderNotFoundError,
   ModelProviderScopesRequiredError,
 } from "./errors";
+import { rowCannotServeEmbeddings } from "./geminiDoor";
 import {
   assertCanManageAllScopes,
   canReadAnyScope,
@@ -296,6 +297,10 @@ export class ModelProviderService {
         ...provider_,
         isSystem: true,
         scopes: [],
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: providerKey,
+          customKeys: null,
+        }),
       });
     }
 
@@ -307,6 +312,13 @@ export class ModelProviderService {
         extraHeaders: this.maskExtraHeaders(
           mp.extraHeaders as { key: string; value: string }[] | null,
         ),
+        // Derived before masking: the door depends on the API key's
+        // presence, which the masked shape still shows, but deriving it
+        // here keeps the rule reading one row shape.
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: mp.provider,
+          customKeys: mp.customKeys,
+        }),
       }));
     return [...storedRows, ...systemRows];
   }
@@ -361,7 +373,15 @@ export class ModelProviderService {
     for (const [providerKey, provider_] of Object.entries(defaultProviders)) {
       if (savedProviderKeys.has(providerKey)) continue;
       if (!provider_.enabled) continue;
-      systemRows.push({ ...provider_, isSystem: true, scopes: [] });
+      systemRows.push({
+        ...provider_,
+        isSystem: true,
+        scopes: [],
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: providerKey,
+          customKeys: null,
+        }),
+      });
     }
     // Managed bedrock: env var MANAGED_BEDROCK__<label>__<orgId> sets
     // up cross-account credentials for a specific org. Surface a SYSTEM
@@ -389,6 +409,10 @@ export class ModelProviderService {
         extraHeaders: this.maskExtraHeaders(
           mp.extraHeaders as { key: string; value: string }[] | null,
         ),
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: mp.provider,
+          customKeys: mp.customKeys,
+        }),
       }));
     return [...storedRows, ...systemRows];
   }

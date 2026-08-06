@@ -58,6 +58,30 @@ const stubRows = (rows: object[]) => {
   }) as never);
 };
 
+/**
+ * Same tenancy contract as `stubRows`, but the legacy row belongs to named
+ * organizations — which is what makes a walk that stops early observable.
+ */
+const stubRowsOwnedBy = (ownerIds: string[]) => {
+  const owners = new Set(ownerIds);
+  findMany.mockImplementation((async (args: {
+    where: { provider?: string; organizationId?: string };
+  }) => {
+    const { provider, organizationId } = args.where;
+    if (provider !== "google_agent_platform") return [];
+    if (!organizationId) throw new Error("tenancy guard: organizationId");
+    if (!owners.has(organizationId)) return [];
+    return [
+      {
+        id: `row-${organizationId}`,
+        name: "Google Agent Platform",
+        organizationId,
+        customKeys: null,
+      },
+    ];
+  }) as never);
+};
+
 describe("foldAgentPlatformKeys", () => {
   describe("given an Agent Platform credential", () => {
     /** @scenario A stored Google Agent Platform row becomes a Gemini row with the same credential */
@@ -242,6 +266,69 @@ describe("execute", () => {
         const { data } = update.mock.calls[0]![0];
         expect(data.provider).toBe("gemini");
         expect("customKeys" in data).toBe(false);
+      });
+    });
+  });
+
+  /**
+   * The scan is one query per organization — ModelProvider's tenancy guard
+   * takes `organizationId` as a string, never an `in` list — so on a
+   * production-sized installation an unpaged, unbounded walk opens a
+   * connection per organization at once and holds every matching row in
+   * memory. These pin the two bounds that stop it.
+   */
+  describe("given more organizations than fit in one page", () => {
+    const pageOf = (start: number, count: number) =>
+      Array.from({ length: count }, (_, i) => ({ id: `org-${start + i}` }));
+
+    describe("when the migration runs", () => {
+      it("walks page by page from the last id and folds every page's rows", async () => {
+        // A full page must be followed by another read; the short page
+        // that follows ends the walk.
+        orgFindMany
+          .mockResolvedValueOnce(pageOf(1, 200) as never)
+          .mockResolvedValueOnce(pageOf(201, 3) as never);
+        // Only the last organization of each page owns a row, so a walk
+        // that stops after page one folds one row instead of two.
+        stubRowsOwnedBy(["org-200", "org-203"]);
+
+        await execute();
+
+        expect(orgFindMany).toHaveBeenCalledTimes(2);
+        expect(orgFindMany.mock.calls[0]![0]).toMatchObject({
+          take: 200,
+          orderBy: { id: "asc" },
+        });
+        expect(orgFindMany.mock.calls[0]![0]).not.toHaveProperty("cursor");
+        expect(orgFindMany.mock.calls[1]![0]).toMatchObject({
+          cursor: { id: "org-200" },
+          skip: 1,
+        });
+        expect(update.mock.calls.map((c) => c[0].where)).toEqual([
+          { id: "row-org-200" },
+          { id: "row-org-203" },
+        ]);
+      });
+
+      it("keeps the per-organization scans bounded rather than one per organization at once", async () => {
+        orgFindMany
+          .mockResolvedValueOnce(pageOf(1, 200) as never)
+          .mockResolvedValueOnce([] as never);
+
+        let inFlight = 0;
+        let peak = 0;
+        findMany.mockImplementation((async () => {
+          inFlight += 1;
+          peak = Math.max(peak, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          inFlight -= 1;
+          return [];
+        }) as never);
+
+        await execute();
+
+        expect(findMany).toHaveBeenCalledTimes(200);
+        expect(peak).toBeLessThanOrEqual(5);
       });
     });
   });

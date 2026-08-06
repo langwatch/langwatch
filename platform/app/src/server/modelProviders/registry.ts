@@ -154,6 +154,15 @@ export type MaybeStoredModelProvider = Omit<
    */
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;
+  /**
+   * True when this row's credential cannot serve embedding models, so a
+   * picker must not offer them. Derived server-side (see
+   * `modelProviders/geminiDoor.ts`) because the answer can depend on the
+   * server's own env, which the frontend cannot read, and on the API key,
+   * which it must never receive. Only Gemini's Agent Platform door has
+   * this shape today.
+   */
+  embeddingsUnsupported?: boolean;
 };
 
 // ============================================================================

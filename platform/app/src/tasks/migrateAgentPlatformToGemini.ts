@@ -111,6 +111,125 @@ export function foldedRowName({
 // Task entry point
 // ============================================================================
 
+/**
+ * How many organizations one page of the walk loads. The scan is one query
+ * per organization — `ModelProvider`'s tenancy guard takes `organizationId`
+ * as a string only, never an `in` list — so the page bounds how many rows
+ * are ever held at once, and the concurrency below bounds how many of those
+ * queries are in flight against the connection pool.
+ */
+const ORG_PAGE_SIZE = 200;
+const SCAN_CONCURRENCY = 5;
+
+/** Run `worker` over `items`, at most `limit` in flight. */
+async function mapWithLimit<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, () =>
+    (async () => {
+      while (next < items.length) {
+        const index = next++;
+        results[index] = await worker(items[index]!);
+      }
+    })(),
+  );
+  await Promise.all(runners);
+  return results;
+}
+
+type FoldableRow = {
+  id: string;
+  name: string;
+  organizationId: string;
+  customKeys: unknown;
+};
+
+/** Fold one row, returning its id when it had to be skipped. */
+async function foldRow(row: FoldableRow): Promise<string | null> {
+  // The credential folds first, and a row whose credential cannot be
+  // folded is skipped entirely: flipping its provider while the blob
+  // still wears the old field names would present a Gemini row that
+  // dispatches nothing, and the rerun could never find it again. A bad
+  // row costs itself, not the rows after it.
+  let foldedKeys: string | null;
+  try {
+    foldedKeys = foldStoredCustomKeys(row.customKeys);
+  } catch (error) {
+    console.error(
+      `Skipping row ${row.id}: credential could not be folded (${String(error)})`,
+    );
+    return row.id;
+  }
+
+  const siblings = await prisma.modelProvider.findMany({
+    where: {
+      organizationId: row.organizationId,
+      provider: "gemini",
+    },
+    select: { name: true },
+  });
+
+  await prisma.modelProvider.update({
+    where: { id: row.id },
+    data: {
+      provider: "gemini",
+      name: foldedRowName({
+        currentName: row.name,
+        takenNames: siblings.map((s) => s.name),
+      }),
+      ...(foldedKeys === null ? {} : { customKeys: foldedKeys }),
+    },
+  });
+
+  console.log(`Folded row ${row.id} into gemini`);
+  return null;
+}
+
+/** Every organization, in id order, one bounded page at a time. */
+async function* organizationPages(): AsyncGenerator<{ id: string }[]> {
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await prisma.organization.findMany({
+      select: { id: true },
+      orderBy: { id: "asc" },
+      take: ORG_PAGE_SIZE,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    if (page.length === 0) return;
+    yield page;
+    if (page.length < ORG_PAGE_SIZE) return;
+    cursor = page[page.length - 1]!.id;
+  }
+}
+
+/** The legacy rows owned by one page of organizations. */
+async function scanPage(
+  organizations: { id: string }[],
+): Promise<FoldableRow[]> {
+  const perOrganization = await mapWithLimit(
+    organizations,
+    SCAN_CONCURRENCY,
+    (org) =>
+      prisma.modelProvider.findMany({
+        where: {
+          organizationId: org.id,
+          provider: "google_agent_platform",
+        },
+        select: {
+          id: true,
+          name: true,
+          organizationId: true,
+          customKeys: true,
+        },
+      }),
+  );
+  return perOrganization.flat();
+}
+
 export default async function execute() {
   // ModelProvider is a tenancy-scoped model: the multitenancy middleware
   // rejects a where-clause carrying neither a row id, an organizationId,
@@ -119,76 +238,29 @@ export default async function execute() {
   // organizations satisfies the guard with the ADR-021 single-org anchor
   // every row carries — and unlike a per-project walk it also reaches
   // rows granted at ORG and TEAM scope.
-  const organizations = await prisma.organization.findMany({
-    select: { id: true },
-  });
-
-  const rows = (
-    await Promise.all(
-      organizations.map((org) =>
-        prisma.modelProvider.findMany({
-          where: {
-            organizationId: org.id,
-            provider: "google_agent_platform",
-          },
-          select: {
-            id: true,
-            name: true,
-            organizationId: true,
-            customKeys: true,
-          },
-        }),
-      ),
-    )
-  ).flat();
-
-  console.log(`Found ${rows.length} google_agent_platform row(s) to fold`);
-
+  //
+  // The walk is paged and each page folds before the next loads, so an
+  // installation with many organizations neither opens a connection per
+  // organization at once nor holds every matching row in memory.
   const skipped: string[] = [];
+  let folded = 0;
 
-  for (const row of rows) {
-    // The credential folds first, and a row whose credential cannot be
-    // folded is skipped entirely: flipping its provider while the blob
-    // still wears the old field names would present a Gemini row that
-    // dispatches nothing, and the rerun could never find it again. A bad
-    // row costs itself, not the rows after it.
-    let foldedKeys: string | null;
-    try {
-      foldedKeys = foldStoredCustomKeys(row.customKeys);
-    } catch (error) {
-      skipped.push(row.id);
-      console.error(
-        `Skipping row ${row.id}: credential could not be folded (${String(error)})`,
-      );
-      continue;
+  for await (const organizations of organizationPages()) {
+    for (const row of await scanPage(organizations)) {
+      const skippedId = await foldRow(row);
+      if (skippedId) {
+        skipped.push(skippedId);
+      } else {
+        folded += 1;
+      }
     }
-
-    const siblings = await prisma.modelProvider.findMany({
-      where: {
-        organizationId: row.organizationId,
-        provider: "gemini",
-      },
-      select: { name: true },
-    });
-
-    await prisma.modelProvider.update({
-      where: { id: row.id },
-      data: {
-        provider: "gemini",
-        name: foldedRowName({
-          currentName: row.name,
-          takenNames: siblings.map((s) => s.name),
-        }),
-        ...(foldedKeys === null ? {} : { customKeys: foldedKeys }),
-      },
-    });
-
-    console.log(`Folded row ${row.id} into gemini`);
   }
+
+  console.log(`Folded ${folded} google_agent_platform row(s) into gemini`);
 
   // A skipped row means the fold is NOT done: fail the task so automation
   // cannot read "some rows remain unusable" as a successful migration.
-  // Thrown after the loop so every foldable row was still folded first.
+  // Thrown after the walk so every foldable row was still folded first.
   if (skipped.length > 0) {
     throw new Error(
       `${skipped.length} row(s) skipped and still google_agent_platform: ${skipped.join(", ")} — fix their customKeys and rerun.`,

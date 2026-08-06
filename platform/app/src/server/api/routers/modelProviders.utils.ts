@@ -3,6 +3,7 @@ import { getSchemaShape } from "../../../utils/modelProviderHelpers";
 import { prisma } from "../../db";
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../../modelProviders/codexRefusalMessage";
 import { isCodexModel } from "../../modelProviders/codexRestrictions";
+import { geminiAgentPlatformPair } from "../../modelProviders/geminiDoor";
 import type {
   LLMModelEntry,
   ReasoningConfig,
@@ -403,26 +404,10 @@ export const prepareLitellmParams = async ({
   // API. Emitted together or not at all — one without the other names no
   // door. See specs/model-providers/google-agent-platform.feature.
   if (modelProvider.provider === "gemini") {
-    // The credential travels as a unit: a stored key only ever pairs with
-    // a stored project/location, and the env pair applies only to an
-    // env-fed key. Mixing sources would let an operator exporting
-    // GEMINI_PROJECT/GEMINI_LOCATION silently reroute every stored AI
-    // Studio key through the Agent Platform door it cannot open. Trimmed
-    // so a whitespace-only value never names the door on its own.
-    const storedKeys = modelProvider.customKeys as Record<
-      string,
-      string
-    > | null;
-    const keyIsStored = !!storedKeys?.GEMINI_API_KEY;
-    const project = keyIsStored
-      ? storedKeys?.GEMINI_PROJECT?.trim()
-      : process.env.GEMINI_PROJECT?.trim();
-    const location = keyIsStored
-      ? storedKeys?.GEMINI_LOCATION?.trim()
-      : process.env.GEMINI_LOCATION?.trim();
-    if (project && location) {
-      params.project_id = project;
-      params.region = location;
+    const pair = geminiAgentPlatformPair(modelProvider.customKeys);
+    if (pair) {
+      params.project_id = pair.project;
+      params.region = pair.location;
     }
   }
 

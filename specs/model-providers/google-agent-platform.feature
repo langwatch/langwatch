@@ -109,6 +109,19 @@ Feature: Gemini credentials work through either Google door
     Then the Gemini embedding models are not offered
     And a Gemini credential without the pair makes them available again
 
+  # Availability follows the credential that will actually run the model,
+  # not the set of credentials the project can see. A catalog model is
+  # listed in no credential's own model list, so it runs against the
+  # narrowest one — which is how "some Gemini credential can do embeddings"
+  # still ends in a failed request.
+  @unit
+  Scenario: A wider-scope AI Studio row does not rescue a narrower Agent Platform row
+    Given a Gemini credential with a project and location shared with one project
+    And another Gemini credential without them shared with the whole organization
+    When the customer opens an embedding model picker in that project
+    Then the Gemini embedding models are not offered
+    And they are offered again when the project's own credential has no pair
+
   # ── The old separate provider folds in ──────────────────────────────────
 
   @unit
