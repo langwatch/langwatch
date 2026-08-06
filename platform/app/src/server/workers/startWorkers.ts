@@ -48,14 +48,12 @@ async function verifyDatabaseReady(): Promise<void> {
 async function bootStorageStatsCollection(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getSharedClickHouseClient } = await import(
-    "~/server/clickhouse/clickhouseClient"
-  );
-  const { startStorageStatsCollection, stopStorageStatsCollection } =
-    await import("~/server/clickhouse/metrics");
-  const clickHouseClient = getSharedClickHouseClient();
-  if (clickHouseClient) {
-    startStorageStatsCollection(clickHouseClient);
+  const {
+    startStorageStatsCollectionFromSharedClient,
+    stopStorageStatsCollection,
+  } = await import("~/server/clickhouse/metrics");
+  const hasStarted = startStorageStatsCollectionFromSharedClient();
+  if (hasStarted) {
     shutdownHandles.push(() => stopStorageStatsCollection());
     logger.info("storage stats collection ready");
   }

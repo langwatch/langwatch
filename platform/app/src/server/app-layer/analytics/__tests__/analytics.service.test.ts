@@ -13,11 +13,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import { featureFlagService } from "~/server/featureFlag";
-import {
-  AnalyticsService,
-  getAnalyticsService,
-  resetAnalyticsService,
-} from "../analytics.service";
+import { AnalyticsService } from "../analytics.service";
 
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: {
@@ -253,18 +249,5 @@ describe("AnalyticsService", () => {
       expect(result.events).toHaveLength(1);
       expect(spies.getFeedbacks).toHaveBeenCalledTimes(1);
     });
-  });
-});
-
-describe("getAnalyticsService", () => {
-  beforeEach(() => {
-    resetAnalyticsService();
-  });
-
-  it("returns a singleton instance", () => {
-    const service1 = getAnalyticsService();
-    const service2 = getAnalyticsService();
-
-    expect(service1).toBe(service2);
   });
 });
