@@ -9,10 +9,20 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const findUnique = vi.fn();
-const insertEvent = vi.fn();
-const runOnce = vi.fn();
+// `vi.hoisted` so the mock factories can close over these — `vi.mock` is
+// lifted above every declaration in the file, which is what forces the dynamic
+// import this replaces. With the doubles declared up here, `runIngestionPull`
+// is an ordinary top-level import.
+const { findUnique, insertEvent, runOnce, isEnabled } = vi.hoisted(() => ({
+  findUnique: vi.fn(),
+  insertEvent: vi.fn(),
+  runOnce: vi.fn(),
+  isEnabled: vi.fn(),
+}));
 
+vi.mock("~/server/featureFlag", () => ({
+  featureFlagService: { isEnabled: (...a: unknown[]) => isEnabled(...a) },
+}));
 vi.mock("~/server/db", () => ({
   prisma: {
     ingestionSource: { findUnique: (...a: unknown[]) => findUnique(...a) },
@@ -52,7 +62,7 @@ vi.mock("../index", async (importOriginal) => {
   };
 });
 
-const { runIngestionPull } = await import("../pullerWorker");
+import { runIngestionPull } from "../pullerWorker";
 
 const SOURCE_ROW = {
   id: "src_1",
@@ -91,6 +101,8 @@ beforeEach(() => {
   findUnique.mockReset().mockResolvedValue(SOURCE_ROW);
   insertEvent.mockReset().mockResolvedValue(undefined);
   runOnce.mockReset();
+  // The ADR-088 gate, on for every case except the one that asserts it.
+  isEnabled.mockReset().mockResolvedValue(true);
 });
 
 describe("the pull effect's pulled-usage emit seam", () => {
@@ -177,6 +189,67 @@ describe("the pull effect's pulled-usage emit seam", () => {
 
       expect(recordPulledUsage).not.toHaveBeenCalled();
       expect(insertEvent).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the ADR-088 feature flag is off for the organization", () => {
+    it("writes the audit row and records no cost at all", async () => {
+      isEnabled.mockResolvedValue(false);
+      runOnce.mockResolvedValue({
+        events: [usageEvent()],
+        cursor: null,
+        errorCount: 0,
+      });
+      const recordPulledUsage = vi.fn();
+
+      await runIngestionPull({
+        sourceId: "src_1",
+        cursor: null,
+        pulledUsage: { recordPulledUsage },
+      });
+
+      expect(recordPulledUsage).not.toHaveBeenCalled();
+      expect(insertEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it("resolves the flag once per run, not once per usage item", async () => {
+      runOnce.mockResolvedValue({
+        events: [usageEvent(), usageEvent({ dimensions: { w: "2" } })],
+        cursor: null,
+        errorCount: 0,
+      });
+
+      await runIngestionPull({
+        sourceId: "src_1",
+        cursor: null,
+        pulledUsage: { recordPulledUsage: vi.fn().mockResolvedValue(undefined) },
+      });
+
+      // The answer cannot change mid-batch, so a lookup per row would put
+      // cost on the money path to decide nothing.
+      expect(isEnabled).toHaveBeenCalledTimes(1);
+    });
+
+    it("fails closed when the flag cannot be resolved", async () => {
+      isEnabled.mockRejectedValue(new Error("flag store unreachable"));
+      runOnce.mockResolvedValue({
+        events: [usageEvent()],
+        cursor: null,
+        errorCount: 0,
+      });
+      const recordPulledUsage = vi.fn();
+
+      const result = await runIngestionPull({
+        sourceId: "src_1",
+        cursor: null,
+        pulledUsage: { recordPulledUsage },
+      });
+
+      // A flag outage must not fail an otherwise healthy pull, and must not
+      // silently start writing money either.
+      expect(result.eventCount).toBe(1);
+      expect(insertEvent).toHaveBeenCalledTimes(1);
+      expect(recordPulledUsage).not.toHaveBeenCalled();
     });
   });
 

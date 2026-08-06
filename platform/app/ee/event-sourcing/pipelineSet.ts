@@ -124,10 +124,10 @@ export function registerEnterprisePipelineSet(
   const pulledUsage = registerPulledUsagePipeline(deps);
   const ingestionPull = registerIngestionPullPipeline({
     ...deps,
-    pulledUsage: {
-      recordPulledUsage: (args) =>
-        pulledUsage.commands.recordPulledUsage(args as never),
-    },
+    // No cast. The dispatcher's argument type IS the command's, so renaming a
+    // field on the event schema breaks this line at compile time instead of
+    // surfacing as an outbox parse failure in production.
+    pulledUsage: { recordPulledUsage: pulledUsage.commands.recordPulledUsage },
   });
 
   return {

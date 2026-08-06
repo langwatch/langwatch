@@ -76,6 +76,9 @@ const pulledUsageHintSchema = z
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
+        // Without the path the issue is reported against the whole hint, so an
+        // adapter author reading the error cannot see which field to add.
+        path: ["costStatus"],
         message:
           "a provider-reported cost must declare costStatus: only the adapter knows whether the provider's figure is the invoice or an approximation of one",
       });

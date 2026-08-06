@@ -25,13 +25,13 @@ import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/
 import { createLogger } from "@langwatch/observability";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   captureException,
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
-
 import {
   type GovernanceOcsfEventInput,
   OCSF_ACTIVITY,
@@ -279,6 +279,13 @@ async function writePulledEvents({
     prisma,
     source.organizationId,
   );
+  // ADR-088's stated gate for the new event + ledger write. Resolved ONCE per
+  // run rather than per item: the answer cannot change mid-batch, and a flag
+  // read per usage row would put a lookup on the money path for no decision.
+  // Off → the loop below writes audit rows only, exactly as it did before.
+  const costRecordingEnabled = await pulledUsageCostEnabled(
+    source.organizationId,
+  );
   // Taken from the App rather than constructed here: #6622 made `getApp()` the
   // only way this file may reach ClickHouse, enforced by the client-access
   // boundary test. Constructing a repository inline would put this file back on
@@ -308,8 +315,36 @@ async function writePulledEvents({
       source,
       govProjectId: govProject.id,
       observedAt,
-      pulledUsage,
+      pulledUsage: costRecordingEnabled ? pulledUsage : undefined,
     });
+  }
+}
+
+/**
+ * Whether this organization records pulled provider cost yet.
+ *
+ * Read through the layered service rather than the raw store, so the full
+ * layering applies (env force-on → operator row → PostHog rule → registry
+ * default). Keyed on the organization because pulled usage is attributed at
+ * org/team and has no project of its own until ADR-088's Decision 4 lands.
+ *
+ * A flag lookup that throws must not fail a pull run that was otherwise fine,
+ * and it must not silently start writing money either — so it fails CLOSED.
+ */
+async function pulledUsageCostEnabled(
+  organizationId: string,
+): Promise<boolean> {
+  try {
+    return await featureFlagService.isEnabled(
+      "release_pulled_usage_cost_enabled",
+      { distinctId: organizationId, organizationId },
+    );
+  } catch (error) {
+    logger.warn(
+      { organizationId, error },
+      "could not resolve the pulled-usage cost flag; recording no cost this run",
+    );
+    return false;
   }
 }
 
