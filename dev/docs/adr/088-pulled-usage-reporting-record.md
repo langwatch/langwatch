@@ -20,7 +20,7 @@ The pull framework already shipped and is event-sourced for **orchestration** (c
 - Personal / Claude-Code usage (`/me/usage`) → `gateway_budget_ledger_events` **UNION** `trace_summaries` (`personalUsage.service.ts:171,282`).
 - Analytics cost dashboard (`metrics.total_cost`) → `trace_summaries` (`analytics/.../field-mappings.ts:222-225`).
 
-And the pattern for *ingestion* cost already exists: the Claude Code OTLP receiver writes into `gateway_budget_ledger_events` under `Scope='principal'`, and `/me/usage` reads pulled cost from there (`personalUsage.service.ts:87-90`). So "reporting" and "enforcement" are **not separate tables** — they are the same ledger, and enforcement acts only on certain scopes. Any design that lands pulled cost in a brand-new isolated table is read by nobody and fails its own visibility goal.
+And the pattern for *ingestion* cost already exists: the Claude Code OTLP receiver writes into `gateway_budget_ledger_events`, and `/me/usage` reads that cost through a scope-filtered query (`personalUsage.service.ts:87-90,163-178`). So "reporting" and "enforcement" are **not separate tables** — they are the same ledger; enforcement is driven by which rows a *real budget* resolves to, not by a scope flag. Any design that lands pulled cost in a brand-new isolated table is read by nobody and fails its own visibility goal.
 
 **Forcing function.** Databricks Genie on Azure is the first provider we want to connect.
 
@@ -32,13 +32,13 @@ And the pattern for *ingestion* cost already exists: the Claude Code OTLP receiv
 
 **1. One priced event per pulled usage item, keyed by stable provider coordinates.** A provider-agnostic aggregate (`pulled_usage`), one event per usage chunk. The item's identity is the provider's **stable natural key**: for bucketed admin APIs (Anthropic usage/cost report) that is `(tenant, period, granularity, model, workspace, …group-by dims)` — there is no message id; for per-message providers (Genie) it is the message id. We reject bolting usage onto `RUN_COMPLETED` (per-run grain) and reject "aggregateId = message id" as universal (bucket APIs have none — the v1 error the red-team caught).
 
-**2. Price once, at the ingest seam.** The command that mints the event stamps cost as an integer `cost_nano_usd` + `rate_version`; downstream copies it, never recomputes (as `gateway-spend-processing/schemas/commands.ts:120-155` does). Where the provider returns an exact cost (Anthropic `cost_report`) we carry it; where it returns only quantities (Anthropic `usage_report` tokens) we price once with `estimateCost()` (`tracer/collector/cost.ts`). The two-ways-to-get-Anthropic-cost seam is handled in Decision 6.
+**2. Price once, at the ingest seam.** The command that mints the event stamps cost as an integer `costNanoUsd` (plus a `rateVersion` for the *computed* path only; `null` when the provider reported an exact cost); downstream copies it, never recomputes (as `gateway-spend-processing/schemas/commands.ts:120-155` does). Where the provider returns an exact cost (Anthropic `cost_report`) we carry it; where it returns only quantities (Anthropic `usage_report` tokens) we price once with `estimateCost()` (`tracer/collector/cost.ts`). The two-ways-to-get-Anthropic-cost seam is handled in Decision 6.
 
-**3. Write cost to the shared usage ledger under a dedicated non-enforcing scope.** Pulled cost is written to `gateway_budget_ledger_events` (the table `/me/usage` already reads) under a **new non-enforcing scope** for pulled usage — mirroring how Claude Code cost lands under `Scope='principal'`. The enforcement/budget resolvers **never act on that scope**, so it shows in reporting and can never trip a limit. We reject a separate isolated rollup (invisible — the #1 red-team kill) and reject writing under any enforcing scope (would block, and would double-count gateway users). This preserves the "report, don't enforce" intent as a *scope*, which is how the codebase already models it.
+**3. Write cost to the shared usage ledger through a dedicated writer, under a structurally non-enforcing scope `"pulled"`.** Pulled cost is written to `gateway_budget_ledger_events` (the table `/me/usage` already reads) through a **dedicated writer** (`insertPulledUsageRows`) with a constant `Scope = "pulled"` and a **synthetic budget id** (the ledger's storage key requires one). Non-enforcement is **structural, not a flag**: enforcement resolves real `GatewayBudget` rows and sums only ledger rows whose `BudgetId`/`Scope` match a real budget — and no budget can carry `"pulled"` (it is not a `GatewayBudgetScopeType`), so no resolver ever reaches these rows. A **dedicated read** — mirroring the *read* shape of the existing principal-usage query (filter by `Scope`+`ScopeId`+tenant, **not** `BudgetId`) — surfaces pulled cost in `/me/usage`. Pulled rows are **excluded from the spend-rollup materialized view** so they can never leak into a budget total. We reject extending `GatewayBudgetScopeType` (a budget could then be created under `"pulled"`, breaking non-enforcement by construction), a separate isolated rollup table (invisible — the #1 red-team kill), and any enforcing-scope write. *(The earlier draft's `Scope='principal'` analogy was imprecise: principal rows carry real budgets and do enforce; only the read filter is what we mirror.)*
 
-**4. Attribute to the customer's real org/team/project.** `IngestionSource` today carries `organizationId` (required) + `teamId` (optional) but **no `projectId`**, and all writers currently land under the hidden governance project (`pullerWorker.ts:204-208`). So this decision *requires named schema work*: (a) add a project scope to `IngestionSource`, and (b) reconcile the hidden-governance-project routing every writer uses. Until (a)+(b) land, attribute at **org/team** (which the model supports today) and treat project as unattributed rather than silently the governance project. Named-person attribution (Genie object-id) is deferred behind #6551.
+**4. Attribute to the customer's real org/team/project.** `IngestionSource` today carries `organizationId` (required) + `teamId` (optional) but **no `projectId`**, and all writers currently land under the hidden governance project (`pullerWorker.ts:204-208`). So this decision *requires explicit schema work*: (a) add a project scope to `IngestionSource`, and (b) reconcile the hidden-governance-project routing every writer uses. Until (a)+(b) land, attribute at **org/team** (which the model supports today) and treat project as unattributed rather than silently the governance project. Named-person attribution (Genie object-id) is deferred behind #6551.
 
-**5. Corrections are a fresh record; newest wins; the key excludes cost.** A restated bucket is a new event whose identity key is the **stable coordinates from Decision 1 with cost and quantities excluded** — a dimension-only hash (the same shape PostHog's connector uses, and the shape our own research recommended). An unchanged re-pull produces the identical key → no-op; a corrected bucket produces the *same* key with a later `occurredAt` → the fold takes latest and replaces. We reject hashing cost into the key (the v1 error: a corrected cost would mint a new key and double-count) and reject relying on storage-engine merge order.
+**5. Corrections are a fresh record; newest wins; the key excludes cost.** A restated bucket is a new event whose identity key is the **stable coordinates from Decision 1 with cost and quantities excluded** — a dimension-only hash (the same shape PostHog's connector uses, and the shape our own research recommended). An unchanged re-pull produces the identical key → no-op; a corrected bucket produces the *same* key with a later **`observedAt`** (the monotonic time we pulled it) → latest-by-`observedAt` replaces. Ordering must be `observedAt`, **not** the bucket's business `occurredAt`: a restatement of period P keeps P's `occurredAt`, so versions cannot be ordered by it. We reject hashing cost into the key (the v1 error: a corrected cost would mint a new key and double-count) and reject relying on storage-engine merge order.
 
 **6. Each record is flagged `exact` or `estimate`, and same-money supersede is a named reconciliation.** Anthropic `cost_report` → `exact`; Anthropic `usage_report`-priced and Databricks DBU → `estimate`. Two reconciliations, both deferred but named here (not Databricks-only, as v1 wrongly implied): (i) an `estimate` trued up to the invoiced number; (ii) the **same Anthropic spend arriving via both `usage_report` and `cost_report`** — per provider we either pull usage XOR cost, or define a supersede rule where `provider_reported` replaces `computed` for the same coordinates. Until a supersede rule ships, a provider adapter pulls **one** of the two, never both.
 
@@ -50,11 +50,13 @@ And the pattern for *ingestion* cost already exists: the Claude Code OTLP receiv
 |---|---|---|
 | Aggregate | `pulled_usage` | one stream per usage item |
 | Item identity | provider stable coordinates (bucket dims) or message id | dedup + restatement key |
-| Ledger scope | a new **non-enforcing** scope (sibling to `Scope='principal'`) | visible to reporting, ignored by enforcement |
-| Cost unit | integer `cost_nano_usd` | summed money; display `Decimal` derived, never summed |
-| `cost_basis` | `provider_reported` \| `computed` | did the provider give cost, or did we price it |
-| `cost_status` | `exact` \| `estimate` | final vs pre-invoice |
+| Ledger scope | constant `Scope = "pulled"` + synthetic `BudgetId` | structurally non-enforcing — no budget can carry it |
+| Cost unit | integer `costNanoUsd` | summed money; display `Decimal` derived, never summed |
+| `rateVersion` | string, **null for `provider_reported`** | which price table produced a *computed* cost |
+| `costBasis` | `provider_reported` \| `computed` | did the provider give cost, or did we price it |
+| `costStatus` | `exact` \| `estimate` | final vs pre-invoice |
 | Restatement key | dimension-only hash (**cost/quantities excluded**) | unchanged re-pull = no-op; correction = replace |
+| Version / ordering | `observedAt` (monotonic pull time) | latest version wins; **not** bucket `occurredAt` |
 
 ## Invariants
 
@@ -79,37 +81,41 @@ And the pattern for *ingestion* cost already exists: the Claude Code OTLP receiv
 
 | Path | Reversible? | Blast radius | Gate |
 |---|---|---|---|
+| Owner alignment before implementation | — | — | **hard gate** — pipeline-owner sign-off on the sibling-`pulled_usage` shape. **Satisfied 2026-08-06.** |
 | New `pulled_usage` event + ledger write | reversible | medium | automated — types + tests + feature flag |
-| The non-enforcing-scope boundary | effectively irreversible (money) | large | human review + a test asserting enforcement never acts on the pulled scope |
-| Migration: new scope + `projectId` on `IngestionSource` | irreversible | large | tested, commented-out down migration (house rule) |
+| The `"pulled"`-scope non-enforcement boundary | effectively irreversible (money) | large | human review + a resolver test asserting no budget/enforcement path ever reaches `Scope="pulled"` |
+| Migration: exclude `Scope="pulled"` from the spend-rollup MV | irreversible | large | tested; commented-out down (house rule) |
+| `projectId` on `IngestionSource` (deferred) | irreversible | large | when built: tested, commented-out down |
 | Estimate→invoice & usage↔cost supersede | — | — | deferred; named in Open questions |
 
 ## Schema (shape, not final)
 
-```
+```text
 event PulledUsageObserved {
-  itemKey        string   // stable coordinates (bucket dims) or provider message id
-  restatementKey string   // dimension-only hash — cost & quantities EXCLUDED
-  source         string   // "anthropic_admin" | "databricks_genie" | ...
+  itemKey        string    // stable coordinates (bucket dims) or provider message id
+  restatementKey string    // dimension-only hash — cost & quantities EXCLUDED
+  source         string    // "anthropic_admin" | "databricks_genie" | ...
   organizationId string
   teamId         string?
-  projectId      string?  // requires new IngestionSource.projectId; null = unattributed, never the governance project
+  projectId      string?   // requires new IngestionSource.projectId; null = unattributed, never the governance project
   model          string
-  tokens*        uint     // where applicable
-  costNanoUsd    int64    // priced ONCE
-  rateVersion    string
+  tokens*        uint      // where applicable
+  costNanoUsd    int64     // priced ONCE
+  rateVersion    string?   // null for provider_reported; set for computed
   costBasis      enum(provider_reported, computed)
   costStatus     enum(exact, estimate)
-  occurredAt     datetime
+  occurredAt     datetime  // provider business bucket time
+  observedAt     datetime  // monotonic pull time — the restatement ordering field
 }
-// → gateway_budget_ledger_events under the new non-enforcing scope (the table /me/usage reads).
-// New: IngestionSource.projectId; a new non-enforcing Scope value; migration numbers assigned at build.
+// → gateway_budget_ledger_events via insertPulledUsageRows: constant Scope="pulled",
+//   synthetic BudgetId, EXCLUDED from the spend-rollup MV. Read by a dedicated scope-filtered query.
+// New: IngestionSource.projectId (deferred); migration numbers assigned at build.
 ```
 
 ## Rejected alternatives
 
 - **Separate isolated `pulled_usage_rollup` table** — read by none of the three spend surfaces; invisible. (The #1 red-team kill of v1.)
-- **Write under an enforcing scope / debit budgets** — blocks money spent outside the gateway; double-counts gateway users.
+- **Write under an enforcing scope / debit budgets, or extend `GatewayBudgetScopeType`** — blocks money spent outside the gateway, double-counts gateway users, and (the enum route) lets a budget be created under the pulled scope, breaking non-enforcement by construction.
 - **`aggregateId` = message id for all providers** — bucketed admin APIs have no message id.
 - **Hash cost into the restatement key** — a corrected cost mints a new key → double-count instead of replace.
 - **Report under the hidden governance project** — invisible to the customer.
@@ -126,7 +132,7 @@ event PulledUsageObserved {
 
 ## Open questions
 
-- **Owner alignment (do first, not a gate).** The shipped `eventCount`-only `RUN_COMPLETED` may be a deliberate first step; align with the pull-pipeline owner before implementing. *Offered as a hard constraint in framing and deliberately not locked as one.*
+- **Owner alignment — a hard pre-implementation gate, satisfied 2026-08-06.** The pipeline owner signed off on the sibling-`pulled_usage` shape (the shipped `eventCount`-only `RUN_COMPLETED` is per-run and stays; pulled usage is its own aggregate). Promoted from a framing note to an explicit gate per review.
 - **Single source vs two writers.** Should `PulledUsageObserved` become the single source that also feeds the OCSF audit projection, retiring the direct write? Recommended yes; decide with the owner.
 - **`IngestionSource.projectId` + governance-tenant reconciliation** (Decision 4) — schema + routing work, named but not designed here.
 - **Reconciliation** — estimate→invoice true-up, and the Anthropic usage↔cost supersede rule (Decision 6).
@@ -137,6 +143,7 @@ event PulledUsageObserved {
 
 - **v1 (2026-08-06)** — initial proposal. Framing: make pulled usage/cost first-class (reporting), Databricks first, real-money blast radius. Phase-3 rounds: per-item event; reuse the gateway spend shape; fresh-record-newest-wins; team/project attribution now, named-people later; exact/estimate flag. Mid-round correction: routing pulled cost through *budget enforcement* was wrong (pull observes, cannot block), moving Decision 3 to "reporting only."
 - **v2 (2026-08-06)** — folded a mandatory red-team pass (money/data blast radius). **Two v1 claims died:** (#1) "separate reporting table" was invisible — no single spend view exists; three surfaces read three tables, and Claude Code ingestion cost already surfaces via `gateway_budget_ledger_events` under a non-enforcing scope — so Decision 3 changed from "new table, never the ledger" to "**the shared ledger under a non-enforcing scope**." (#4) the restatement key hashed cost and assumed a message id — Decision 1/5 changed to **stable bucket coordinates with cost excluded**. Narrowed and named: (#3) `IngestionSource` has no `projectId` and writers use the governance tenant — Decision 4 now names that schema work; (#2) pulled↔gateway double-count stated as a hard limit; (#5) the Anthropic usage↔cost supersede folded into reconciliation, no longer mislabeled Databricks-only.
+- **v4 (2026-08-06) — mechanism refinement (still Accepted).** Folded the implementation surface map + a CodeRabbit review. **Decision 3's mechanism corrected:** non-enforcement is *structural*, not a scope flag — pulled rows use a dedicated writer (`insertPulledUsageRows`) under constant `Scope="pulled"` + a synthetic budget id, are surfaced by a dedicated scope-filtered read (mirroring the principal *read*, not its write), and are excluded from the spend-rollup MV; `GatewayBudgetScopeType` is **not** extended. The `Scope='principal'`-as-non-enforcing analogy was imprecise and is corrected. **Decision 5's ordering fixed:** latest-by-`observedAt` (monotonic pull time), not bucket `occurredAt` (unchanged across a same-period restatement). Field naming unified to `costNanoUsd`/`rateVersion`, with `rateVersion` null for `provider_reported`. Owner alignment promoted to an explicit pre-implementation gate, **satisfied**. Doc-lint nits (fenced-block language, wording) fixed. Decision *intent* unchanged. Captain: *(decision owner)*.
 - **v3 (2026-08-06) — Accepted / locked.** The decision owner chose to lock the *direction* now. Implementation still gates on the owner-alignment open item: the pipeline-owner conversation happens before any code, and if it reveals the shipped `eventCount`-only shape is a deliberate step this ADR should extend, that becomes a v4 revision — not a quiet edit. Captain: *(decision owner)*.
 
 ## References
