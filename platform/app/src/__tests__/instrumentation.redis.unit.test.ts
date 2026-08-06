@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isRedisCommandTracingEnabled,
+  MAX_DB_STATEMENT_CHARS,
   redisInstrumentationConfig,
   redisStatementSerializer,
 } from "../instrumentation.redis";
@@ -79,6 +80,40 @@ describe("redisStatementSerializer", () => {
     expect(redisStatementSerializer("expire", [42])).toBe("expire");
     expect(redisStatementSerializer("mset", [["a", "b"]])).toBe("mset");
     expect(redisStatementSerializer("get", [Buffer.from("key")])).toBe("get");
+  });
+
+  // Dropping the values is not enough on its own: the key is caller-controlled,
+  // so an unbounded one would reintroduce the large attribute this exists to
+  // prevent.
+  describe("when the key would exceed the cap", () => {
+    const hugeKey = "k".repeat(MAX_DB_STATEMENT_CHARS * 2);
+
+    it("caps the statement at the maximum, marker included", () => {
+      const statement = redisStatementSerializer("get", [hugeKey]);
+
+      expect(statement).toHaveLength(MAX_DB_STATEMENT_CHARS);
+    });
+
+    it("marks the truncation, so a shortened key cannot pass for a real one", () => {
+      expect(redisStatementSerializer("get", [hugeKey])).toMatch(/\.\.\.$/);
+      expect(redisStatementSerializer("get", [hugeKey])).toMatch(
+        /^get k+\.\.\.$/,
+      );
+    });
+
+    it("leaves a statement exactly at the cap untouched", () => {
+      const exactKey = "k".repeat(MAX_DB_STATEMENT_CHARS - "get ".length);
+      const statement = redisStatementSerializer("get", [exactKey]);
+
+      expect(statement).toHaveLength(MAX_DB_STATEMENT_CHARS);
+      expect(statement).not.toMatch(/\.\.\.$/);
+    });
+
+    it("leaves a statement one under the cap untouched", () => {
+      const nearKey = "k".repeat(MAX_DB_STATEMENT_CHARS - "get ".length - 1);
+
+      expect(redisStatementSerializer("get", [nearKey])).toBe(`get ${nearKey}`);
+    });
   });
 
   it("returns the bare command for an empty-string key", () => {

@@ -26,6 +26,19 @@ export const isRedisCommandTracingEnabled = (
 ): boolean => env.OTEL_TRACE_REDIS_COMMANDS === "true";
 
 /**
+ * Upper bound on the serialized statement, marker included.
+ *
+ * Dropping the values is not enough on its own: a key is caller-controlled and
+ * can be arbitrarily long, so an unbounded key would reintroduce exactly the
+ * large attribute this serializer exists to prevent. 256 characters is far
+ * beyond any key this codebase constructs, so truncation should be a symptom
+ * worth noticing rather than routine.
+ */
+export const MAX_DB_STATEMENT_CHARS = 256;
+
+const TRUNCATION_MARKER = "...";
+
+/**
  * Records the command and its first key, never the values, so a span cannot
  * carry secrets or grow an unbounded attribute.
  */
@@ -34,7 +47,18 @@ export const redisStatementSerializer = (
   cmdArgs: Array<string | Buffer | number | unknown[]>,
 ): string => {
   const key = typeof cmdArgs[0] === "string" ? cmdArgs[0] : "";
-  return key ? `${cmdName} ${key}` : cmdName;
+  const statement = key ? `${cmdName} ${key}` : cmdName;
+
+  if (statement.length <= MAX_DB_STATEMENT_CHARS) {
+    return statement;
+  }
+
+  // Truncation is visible on purpose: a silently shortened key reads as a real
+  // key and sends whoever is debugging after a span that never existed.
+  return `${statement.slice(
+    0,
+    MAX_DB_STATEMENT_CHARS - TRUNCATION_MARKER.length,
+  )}${TRUNCATION_MARKER}`;
 };
 
 export const redisInstrumentationConfig = {
@@ -44,4 +68,4 @@ export const redisInstrumentationConfig = {
   // became a root span, burying real traces in noise.
   requireParentSpan: true,
   dbStatementSerializer: redisStatementSerializer,
-};
+} as const;
