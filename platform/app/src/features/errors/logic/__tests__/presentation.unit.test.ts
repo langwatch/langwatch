@@ -99,6 +99,50 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("when a seat allowance is what ran out", () => {
+    /** @scenario Running out of Lite Member seats names that allowance */
+    it("names which seats ran out and the reversible way to free one", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "membersLite", current: 3, max: 3 },
+        }),
+      );
+
+      // An admin reaching this is reconciling down to their plan, so "upgrade"
+      // on its own is the one answer they came here to avoid.
+      expect(description).toContain("Lite Member seats");
+      expect(description).toContain("disable a membership");
+      expect(description).toContain("reversible");
+    });
+
+    /** @scenario Running out of Lite Member seats names that allowance */
+    it("names the full member seats when those are the ones in use", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "members", current: 15, max: 15 },
+        }),
+      );
+
+      expect(description).toContain("full member seats");
+    });
+
+    it("keeps the generic plan-limit line for every other allowance", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "messagesPerMonth" },
+        }),
+      );
+
+      expect(description).toBe("Upgrade your plan to raise it.");
+    });
+  });
+
   describe("given a code the registry has never seen", () => {
     /**
      * The fallback used to be `FAULT_TITLES[fault]`, which is a guess dressed

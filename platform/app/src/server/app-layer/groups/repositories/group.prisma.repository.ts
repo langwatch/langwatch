@@ -260,7 +260,7 @@ export class PrismaGroupRepository implements GroupRepository {
   ): Promise<boolean> {
     // One definition of "this scope reaches a personal workspace", shared with
     // the role-binding paths.
-    return scopesTouchPersonalTeam(this.prisma, scopes);
+    return scopesTouchPersonalTeam({ client: this.prisma, scopes });
   }
 
   async validateScopeInOrganization({
