@@ -2,7 +2,10 @@ import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipeli
 import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
 import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
-import { runIngestionPull } from "@ee/governance/services/pullers/pullerWorker";
+import {
+  type PulledUsageDispatcher,
+  runIngestionPull,
+} from "@ee/governance/services/pullers/pullerWorker";
 import { PrismaIngestionPullRunProjectionRepository } from "@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -21,7 +24,12 @@ type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
   eventSourcing: EventSourcing;
 };
 
-function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
+function registerIngestionPullPipeline(
+  deps: EnterprisePipelineRuntimeDeps & {
+    /** The pulled-usage write surface the pull effect emits cost through. */
+    pulledUsage: PulledUsageDispatcher;
+  },
+) {
   // Late-bind the outcome commands: they are this same pipeline's own write
   // surface and exist only after `.build()`; dispatch happens long after that.
   let outcomeCommands: IngestionPullOutcomeCommands | null = null;
@@ -31,7 +39,10 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
         deps.prisma,
       ),
       dispatch: {
-        runPort: { run: runIngestionPull },
+        runPort: {
+          run: (params) =>
+            runIngestionPull({ ...params, pulledUsage: deps.pulledUsage }),
+        },
         commands: () => {
           if (!outcomeCommands) {
             throw new Error(
@@ -100,8 +111,18 @@ function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
 export function registerEnterprisePipelineSet(
   deps: EnterprisePipelineRuntimeDeps,
 ) {
-  const ingestionPull = registerIngestionPullPipeline(deps);
+  // Pulled usage registers first because the pull effect emits through it.
+  // Its commands exist the moment its own pipeline is built, so this one
+  // needs no late-binding getter — only the ingestion-pull pipeline's own
+  // outcome commands do, and those are its own write surface.
   const pulledUsage = registerPulledUsagePipeline(deps);
+  const ingestionPull = registerIngestionPullPipeline({
+    ...deps,
+    pulledUsage: {
+      recordPulledUsage: (args) =>
+        pulledUsage.commands.recordPulledUsage(args as never),
+    },
+  });
 
   return {
     commands: {
