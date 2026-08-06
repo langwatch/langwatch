@@ -455,7 +455,6 @@ describe("prefetchScenarioData", () => {
         });
       });
     });
-
   });
 
   describe("error handling", () => {
