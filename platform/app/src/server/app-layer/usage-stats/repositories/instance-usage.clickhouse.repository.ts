@@ -10,7 +10,6 @@
  */
 
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 
 export interface InstanceUsageCountsInput {
   organizationId: string;
@@ -79,14 +78,4 @@ export class InstanceUsageStatsClickHouseRepository
     const rows = (await result.json()) as Array<{ Total: string }>;
     return parseInt(rows[0]?.Total ?? "0", 10);
   }
-}
-
-/**
- * Production default: resolves the organization's shared/private ClickHouse
- * client the same way `collectUsageStats.ts` always has.
- */
-export function createDefaultInstanceUsageStatsRepository(): InstanceUsageStatsClickHouseRepository {
-  return new InstanceUsageStatsClickHouseRepository(
-    getClickHouseClientForOrganization,
-  );
 }

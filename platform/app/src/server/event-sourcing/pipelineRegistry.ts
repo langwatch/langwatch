@@ -1351,8 +1351,7 @@ export class PipelineRegistry {
     ): Promise<string | null> => {
       try {
         return await this.deps.repositories.experimentIdLookup.findExperimentId(
-          tenantId,
-          runId,
+          { tenantId, runId },
         );
       } catch (error) {
         logger.warn(

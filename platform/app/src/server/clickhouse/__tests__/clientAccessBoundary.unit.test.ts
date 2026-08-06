@@ -76,9 +76,22 @@ const CLIENT_MODULE_VALUE_EXPORTS = new Set([
   "getPrivateClickHouseUrls",
 ]);
 
-/** `export function x`, `export const x`, and `export { a as b } from "..."`. */
+/**
+ * Every value-export form, named so the allowlist can be compared against it.
+ *
+ * `export default` and `export * from` cannot carry a name the list could
+ * hold, so they are reported as themselves and always fail - which is the
+ * right answer for this module either way: both are ways to re-export a
+ * resolver that no by-name list can see.
+ */
 function valueExportsOf(source: string): string[] {
   const names: string[] = [];
+  if (/^export\s+default\b/m.test(source)) names.push("default");
+  for (const star of source.matchAll(
+    /^export\s*\*\s*(?:as\s+[A-Za-z_$][\w$]*\s*)?from\s*["']([^"']+)["']/gm,
+  )) {
+    names.push(`* from "${star[1]}"`);
+  }
   for (const match of source.matchAll(
     /^export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm,
   )) {

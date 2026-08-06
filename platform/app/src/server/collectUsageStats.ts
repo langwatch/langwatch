@@ -1,14 +1,13 @@
-import {
-  createDefaultInstanceUsageStatsRepository,
-  type InstanceUsageStatsRepository,
-} from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
+import { getApp } from "~/server/app-layer/app";
+import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import { prisma } from "~/server/db";
 
 export async function collectUsageStats({
   instanceId,
-  repository = createDefaultInstanceUsageStatsRepository(),
+  repository = getApp().usageStats.instance,
 }: {
   instanceId: string;
+  /** Defaults to the repository the composition root built. */
   repository?: InstanceUsageStatsRepository;
 }) {
   const organizationId = instanceId.split("__")[1];

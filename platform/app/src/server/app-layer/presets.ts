@@ -24,6 +24,7 @@ import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langy
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
+import { InstanceUsageStatsClickHouseRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import {
   type ClickHouseClientResolver,
   clearCustomClientCache,
@@ -1425,6 +1426,11 @@ export function initializeDefaultApp(options?: {
         getClickHouseClientForOrganization,
       ),
     },
+    usageStats: {
+      instance: new InstanceUsageStatsClickHouseRepository(
+        getClickHouseClientForOrganization,
+      ),
+    },
     scenarios: {
       // Boot-sweep-only: the two orphaned-run reconciliation sweeps read the
       // shared (cross-tenant) client directly rather than a per-tenant
@@ -1696,6 +1702,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     billing: {
       events: new BillableEventsMeterClickHouseRepository(async () => null),
+    },
+    usageStats: {
+      instance: new InstanceUsageStatsClickHouseRepository(async () => null),
     },
     scenarios: {
       orphanReconciliation: { client: null, finder: null },

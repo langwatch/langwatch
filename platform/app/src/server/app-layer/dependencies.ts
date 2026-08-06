@@ -2,6 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import type Stripe from "stripe";
 import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
+import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import type { BillableEventsRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
 import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -203,6 +204,11 @@ export interface AppDependencies {
   /** Deduplicated usage counters written to ClickHouse for billing. */
   billing: {
     events: BillableEventsRepository;
+  };
+  /** Org-wide counts for the self-hosted daily usage telemetry sender.
+   *  Organization-keyed rather than tenant-keyed, like `billing.events`. */
+  usageStats: {
+    instance: InstanceUsageStatsRepository;
   };
   /**
    * Cross-tenant boot-sweep dependencies for the two orphaned-run

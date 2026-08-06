@@ -23,7 +23,10 @@ describe("ExperimentIdLookupClickHouseRepository", () => {
           resolveClient,
         );
 
-        const result = await repository.findExperimentId("tenant-1", "run-1");
+        const result = await repository.findExperimentId({
+          tenantId: "tenant-1",
+          runId: "run-1",
+        });
 
         expect(result).toBe("exp-1");
         expect(resolveClient).toHaveBeenCalledWith("tenant-1");
@@ -46,7 +49,10 @@ describe("ExperimentIdLookupClickHouseRepository", () => {
           resolveClient,
         );
 
-        const result = await repository.findExperimentId("tenant-1", "run-1");
+        const result = await repository.findExperimentId({
+          tenantId: "tenant-1",
+          runId: "run-1",
+        });
 
         expect(result).toBeNull();
       });
@@ -59,7 +65,7 @@ describe("NullExperimentIdLookupRepository", () => {
     const repository = new NullExperimentIdLookupRepository();
 
     await expect(
-      repository.findExperimentId("tenant-1", "run-1"),
+      repository.findExperimentId({ tenantId: "tenant-1", runId: "run-1" }),
     ).resolves.toBeNull();
   });
 });

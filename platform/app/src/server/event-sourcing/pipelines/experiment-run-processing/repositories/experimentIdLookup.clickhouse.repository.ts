@@ -5,7 +5,10 @@ const TABLE_NAME = "experiment_runs" as const;
 /** Looks up the experiment a run belongs to, for cross-pipeline wiring. */
 export interface ExperimentIdLookup {
   /** The run's ExperimentId, or null if the run has no row yet. */
-  findExperimentId(tenantId: string, runId: string): Promise<string | null>;
+  findExperimentId(input: {
+    tenantId: string;
+    runId: string;
+  }): Promise<string | null>;
 }
 
 /**
@@ -19,10 +22,13 @@ export class ExperimentIdLookupClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async findExperimentId(
-    tenantId: string,
-    runId: string,
-  ): Promise<string | null> {
+  async findExperimentId({
+    tenantId,
+    runId,
+  }: {
+    tenantId: string;
+    runId: string;
+  }): Promise<string | null> {
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `
@@ -44,13 +50,13 @@ export class ExperimentIdLookupClickHouseRepository
 
 /** No-op lookup for deployments without ClickHouse. */
 export class NullExperimentIdLookupRepository implements ExperimentIdLookup {
-  // Parameters declared though unused: a caller holding this type still passes
-  // them, and a zero-arity signature makes that a type error even though it
+  // Parameter declared though unused: a caller holding this type still passes
+  // it, and a zero-arity signature makes that a type error even though it
   // satisfies the interface.
-  async findExperimentId(
-    _tenantId: string,
-    _runId: string,
-  ): Promise<string | null> {
+  async findExperimentId(_input: {
+    tenantId: string;
+    runId: string;
+  }): Promise<string | null> {
     return null;
   }
 }
