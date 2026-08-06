@@ -5,7 +5,11 @@ import {
   GovernanceCliError,
   mintIngestionKey,
 } from "@/cli/utils/governance/cli-api";
-import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
+import {
+  isLoggedIn,
+  loadConfig,
+  saveConfig,
+} from "@/cli/utils/governance/config";
 import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
 
 /**
@@ -120,6 +124,22 @@ async function runInstall(
   // expects (claude_code / codex / gemini / opencode).
   const { token, prefix, endpoint } = await mintIngestionKey(cfg, tool);
   const envBlock = buildEnvBlock(tool, endpoint, token);
+
+  // Minting revokes the tool's previous key, so the config cache is now stale
+  // and everything reading it (the wrapper's reuse path, the session-context
+  // hook's fallback target) would authenticate with a dead key. Best-effort:
+  // a config we cannot write is not a reason to fail an install that worked.
+  try {
+    saveConfig({
+      ...cfg,
+      default_personal_ingest_keys: {
+        ...(cfg.default_personal_ingest_keys ?? {}),
+        [tool]: { secret: token, prefix },
+      },
+    });
+  } catch {
+    // The env block above is still valid; only the cache went unwritten.
+  }
 
   const report: InstallReport = {
     tool,

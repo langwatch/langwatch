@@ -80,6 +80,9 @@ const unreachableCollector: typeof fetch = (async () => {
   throw new Error("connect ECONNREFUSED");
 }) as unknown as typeof fetch;
 
+/** A CLI that was never signed in, so the config fallback names no collector. */
+const NO_CLI_CONFIG = () => ({});
+
 const runHook = async ({
   input = { session_id: SESSION_ID, cwd: "/repo/worktrees/review" },
   env = {},
@@ -87,6 +90,7 @@ const runHook = async ({
   fetchImpl = collector(),
   now = 1_700_000_000_000,
   tool = "claude-code",
+  readCliConfig = NO_CLI_CONFIG,
 }: {
   input?: Record<string, unknown> | string;
   env?: NodeJS.ProcessEnv;
@@ -94,6 +98,7 @@ const runHook = async ({
   fetchImpl?: typeof fetch;
   now?: number;
   tool?: string;
+  readCliConfig?: Parameters<typeof hookCommand>[0]["readCliConfig"];
 } = {}): Promise<void> => {
   await hookCommand({
     tool,
@@ -104,6 +109,7 @@ const runHook = async ({
     fetchImpl,
     now: () => now,
     stateDir,
+    readCliConfig,
   });
 };
 
@@ -292,6 +298,53 @@ describe("the claude-code session context hook", () => {
         fetchImpl: collector(),
         now: () => 1_700_000_000_000,
         stateDir,
+        readCliConfig: NO_CLI_CONFIG,
+      });
+
+      expect(posted).toEqual([]);
+      expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An agent that strips the exporter variables still reports" */
+    it("falls back to the control plane and ingest key the CLI is signed in with", async () => {
+      await hookCommand({
+        tool: "claude-code",
+        env: { CLAUDE_PROJECT_DIR: "/repo/worktrees/review" },
+        readInput: () =>
+          Promise.resolve(JSON.stringify({ session_id: SESSION_ID })),
+        runGit: gitRunner(WORKTREE_GIT),
+        fetchImpl: collector(),
+        now: () => 1_700_000_000_000,
+        stateDir,
+        readCliConfig: () => ({
+          control_plane_url: "http://app.example.com/",
+          default_personal_ingest_keys: {
+            claude_code: { secret: "ik-lw-abc_def" },
+          },
+        }),
+      });
+
+      expect(posted).toHaveLength(1);
+      expect(posted[0]!.url).toBe("http://app.example.com/api/otel/v1/logs");
+      expect(posted[0]!.headers.Authorization).toBe("Bearer ik-lw-abc_def");
+      expect(attributesOf(posted[0]!)["vcs.repository.name"]).toBe("langwatch");
+    });
+
+    /** @scenario "A signed-in CLI with no key for this agent sends nothing" */
+    it("posts nothing when the config carries no ingest key for the agent", async () => {
+      await hookCommand({
+        tool: "claude-code",
+        env: {},
+        readInput: () =>
+          Promise.resolve(JSON.stringify({ session_id: SESSION_ID })),
+        runGit: gitRunner(WORKTREE_GIT),
+        fetchImpl: collector(),
+        now: () => 1_700_000_000_000,
+        stateDir,
+        readCliConfig: () => ({
+          control_plane_url: "http://app.example.com",
+          default_personal_ingest_keys: { codex: { secret: "ik-lw-other" } },
+        }),
       });
 
       expect(posted).toEqual([]);
@@ -306,6 +359,19 @@ describe("the claude-code session context hook", () => {
       });
 
       expect(posted[0]!.url).toBe("http://collector.example.com/logs");
+    });
+
+    it("prefers the environment over the CLI config when both name a collector", async () => {
+      await runHook({
+        readCliConfig: () => ({
+          control_plane_url: "http://fallback.example.com",
+          default_personal_ingest_keys: {
+            claude_code: { secret: "ik-lw-fallback" },
+          },
+        }),
+      });
+
+      expect(posted[0]!.url).toBe(`${ENDPOINT}/v1/logs`);
     });
   });
 

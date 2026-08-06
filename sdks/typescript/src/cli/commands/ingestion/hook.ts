@@ -7,9 +7,13 @@
  * way in: it fires in every mode including print and SDK sessions, it hands
  * the hook the session id and working directory on stdin, and on Stop the
  * process inherits the session's live trace context. So this command runs
- * git itself and posts one small OTLP log record to the endpoint the agent
- * is already exporting to, which is what lets a session's traces be joined
- * to the code they were working on.
+ * git itself and posts one small OTLP log record, which is what lets a
+ * session's traces be joined to the code they were working on.
+ *
+ * Where that record goes is `resolveTarget` below, and it is deliberately not
+ * the environment alone: Claude Code hands its child processes an environment
+ * with every `OTEL_*` variable removed, so a hook that trusted the exporter
+ * variables would never send anything from a real session.
  *
  * Two constraints shape every branch below.
  *
@@ -33,6 +37,10 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { resolveLogsEndpoint } from "@/cli/telemetry/events";
+import {
+  type GovernanceConfig,
+  loadConfig,
+} from "@/cli/utils/governance/config";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
 import {
@@ -73,6 +81,24 @@ export interface HookCommandOptions {
   now?: () => number;
   /** Where per-session fingerprints live. Defaults under the config home. */
   stateDir?: string;
+  /** Reads the CLI's device config, the fallback telemetry target. */
+  readCliConfig?: () => CliTelemetryConfig;
+}
+
+/**
+ * The part of the device config the hook needs to reach a collector. Both
+ * fields are optional here even though the config type requires the control
+ * plane: a CLI that was never signed in has neither, and that is the
+ * "no telemetry configured" case rather than an error.
+ */
+type CliTelemetryConfig = Partial<
+  Pick<GovernanceConfig, "control_plane_url" | "default_personal_ingest_keys">
+>;
+
+/** Where one record goes and what authenticates it. */
+interface TelemetryTarget {
+  endpoint: string;
+  headers: Record<string, string>;
 }
 
 interface HookInput {
@@ -93,9 +119,19 @@ export async function hookCommand({
   fetchImpl = fetch,
   now = Date.now,
   stateDir = defaultStateDir(),
+  readCliConfig = loadConfig,
 }: HookCommandOptions): Promise<void> {
   try {
-    await runHook({ tool, env, readInput, runGit, fetchImpl, now, stateDir });
+    await runHook({
+      tool,
+      env,
+      readInput,
+      runGit,
+      fetchImpl,
+      now,
+      stateDir,
+      readCliConfig,
+    });
   } catch (error) {
     debug(`hook failed: ${(error as Error).message}`, env);
   }
@@ -109,6 +145,7 @@ async function runHook({
   fetchImpl,
   now,
   stateDir,
+  readCliConfig,
 }: {
   tool: string;
   env: NodeJS.ProcessEnv;
@@ -117,6 +154,7 @@ async function runHook({
   fetchImpl: typeof fetch;
   now: () => number;
   stateDir: string;
+  readCliConfig: () => CliTelemetryConfig;
 }): Promise<void> {
   const agent = AGENT_BY_TOOL[tool.trim().toLowerCase().replace(/-/g, "_")];
   if (!agent) {
@@ -134,9 +172,9 @@ async function runHook({
 
   // Checked before any git work: an agent with no telemetry configured is
   // the common case, and it must cost nothing but this lookup.
-  const endpoint = resolveLogsEndpoint(env);
-  if (!endpoint) {
-    debug("no OTLP logs endpoint configured", env);
+  const target = resolveTarget({ env, agent, readCliConfig });
+  if (!target) {
+    debug("no telemetry target in the environment or the CLI config", env);
     return;
   }
 
@@ -171,7 +209,7 @@ async function runHook({
   });
 
   const posted = await postSessionContext({
-    endpoint,
+    target,
     env,
     payload,
     fetchImpl,
@@ -180,6 +218,49 @@ async function runHook({
 
   writeFingerprint({ stateFile, fingerprint, now, env });
   debug(`posted ${fingerprint}`, env);
+}
+
+/**
+ * Where to post the record, and what to authenticate it with.
+ *
+ * The environment is the first source, per the OTel exporter spec, and the
+ * only one when the hook is driven by something other than an agent the CLI
+ * signed in. It cannot be the only one: Claude Code strips every `OTEL_*`
+ * variable from the processes it spawns, hooks included, so a session
+ * exporting perfectly well hands its hooks an environment with no endpoint in
+ * it at all.
+ *
+ * The fallback is the CLI's own device config, written by `langwatch login`
+ * and `langwatch ingest install`: the control plane the CLI is signed in to,
+ * and the ingest key minted for this agent. Null when neither source can name
+ * a collector, which is the "no telemetry configured" no-op.
+ */
+function resolveTarget({
+  env,
+  agent,
+  readCliConfig,
+}: {
+  env: NodeJS.ProcessEnv;
+  agent: string;
+  readCliConfig: () => CliTelemetryConfig;
+}): TelemetryTarget | null {
+  const fromEnv = resolveLogsEndpoint(env);
+  if (fromEnv) {
+    return {
+      endpoint: fromEnv,
+      headers: parseOtlpHeaders(env.OTEL_EXPORTER_OTLP_HEADERS),
+    };
+  }
+
+  const config = readCliConfig();
+  const base = config.control_plane_url?.trim().replace(/\/+$/, "");
+  const secret = config.default_personal_ingest_keys?.[agent]?.secret?.trim();
+  if (!base || !secret) return null;
+
+  return {
+    endpoint: `${base}/api/otel/v1/logs`,
+    headers: { Authorization: `Bearer ${secret}` },
+  };
 }
 
 /** The git identity of `directory`, or null when it is not a repository we can name. */
@@ -234,12 +315,12 @@ function readWorktreeName({
 }
 
 async function postSessionContext({
-  endpoint,
+  target,
   env,
   payload,
   fetchImpl,
 }: {
-  endpoint: string;
+  target: TelemetryTarget;
   env: NodeJS.ProcessEnv;
   payload: unknown;
   fetchImpl: typeof fetch;
@@ -247,10 +328,10 @@ async function postSessionContext({
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
   try {
-    const response = await fetchImpl(endpoint, {
+    const response = await fetchImpl(target.endpoint, {
       method: "POST",
       headers: {
-        ...parseOtlpHeaders(env.OTEL_EXPORTER_OTLP_HEADERS),
+        ...target.headers,
         // Last, so a headers variable carrying its own content-type cannot
         // mislabel a body we know the encoding of.
         "content-type": "application/json",

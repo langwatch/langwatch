@@ -83,6 +83,22 @@ Rule: The hook never disturbs the session
   @unit
   Scenario: Without telemetry configuration the hook sends nothing and exits zero
     Given a hook invocation without an OTLP endpoint in the environment
+    And a CLI that is not signed in
+    When the hook runs
+    Then nothing is posted and the exit code is zero
+
+  @unit
+  Scenario: An agent that strips the exporter variables still reports
+    Given a hook invocation whose environment carries no OTLP variables
+    And a CLI signed in to a control plane with an ingest key for this agent
+    When the hook runs
+    Then the record is posted to that control plane
+    And it is authorized with that ingest key
+
+  @unit
+  Scenario: A signed-in CLI with no key for this agent sends nothing
+    Given a hook invocation whose environment carries no OTLP variables
+    And a CLI signed in with an ingest key for a different agent
     When the hook runs
     Then nothing is posted and the exit code is zero
 
