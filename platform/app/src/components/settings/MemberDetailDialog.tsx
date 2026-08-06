@@ -121,7 +121,12 @@ export function MemberDetailDialog({
           userId: member.userId,
           role: pendingRole,
         });
-        teamsLeftWithoutAdmin = roleResult.teamsLeftWithoutAdmin;
+        // Defaulted rather than read straight off: during a rollout this code
+        // can reach a server that answers without the field, and the save has
+        // already succeeded by then. Losing the disclosure line is a worse
+        // outcome than nothing only in theory; telling somebody their
+        // successful save failed is one in practice.
+        teamsLeftWithoutAdmin = roleResult?.teamsLeftWithoutAdmin ?? [];
       }
 
       if (hasBindingChangesNow) {

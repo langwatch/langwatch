@@ -29,7 +29,10 @@ const {
   mockListForUserData,
   mockListForMemberData,
 } = vi.hoisted(() => ({
-  mockUpdateMemberRole: vi.fn(),
+  mockUpdateMemberRole: vi.fn().mockResolvedValue({
+    success: true,
+    teamsLeftWithoutAdmin: [],
+  }),
   mockApplyMemberBindings: vi.fn(),
   mockInvalidateListForUser: vi.fn().mockResolvedValue(undefined),
   mockInvalidateOrgWithMembers: vi.fn().mockResolvedValue(undefined),
