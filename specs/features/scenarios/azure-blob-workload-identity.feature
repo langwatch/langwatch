@@ -470,9 +470,9 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # VERIFIED 2026-07-26 against a real Azure account with
   # allowSharedKeyAccess=false: shared key returned 403
   # KeyBasedAuthenticationNotPermitted, the same operations succeeded on a
-  # bearer token. Stays @manual because it needs a subscription and cannot
-  # run in CI; bound to a test that self-skips without credentials.
-  @manual
+  # bearer token. Needs a real subscription, so the bound test self-skips
+  # in CI and runs only where LANGWATCH_TEST_AZURE_* credentials are set.
+  @integration
   Scenario: Blobs round-trip against a real storage account with shared-key access disabled
     Given a real Azure storage account that forbids shared-key access
     And an identity holding the blob data role on that account
