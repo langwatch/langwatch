@@ -1,7 +1,7 @@
 import type { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import {
   type EvaluatorTypes,
-  evaluatorTempNameMap,
+  evaluatorDisplayName,
 } from "../../server/evaluations/evaluators";
 import type { Evaluator, Field } from "../types/dsl";
 
@@ -100,9 +100,7 @@ export const buildEvaluatorFromType = (
   return {
     cls: "LangWatchEvaluator",
     evaluator: evaluatorType,
-    name: (evaluatorTempNameMap[definition.name] ?? definition.name)
-      .replace("Evaluator", "")
-      .trim(),
+    name: evaluatorDisplayName(definition.name).replace("Evaluator", "").trim(),
     description: definition.description,
     inputs,
     outputs,

@@ -412,6 +412,15 @@ secured.access(experimentsManageAuth).post(
           },
         },
       },
+      500: {
+        description:
+          "A step could not be stored. The cause is on our side and is logged with the run and step ids; retrying the batch is safe.",
+        content: {
+          "application/json": {
+            schema: resolver(legacySentenceErrorSchema),
+          },
+        },
+      },
     },
   }),
   bodyLimit({ maxSize: 20 * 1024 * 1024 }),
@@ -681,6 +690,11 @@ secured.access(experimentsManageAuth).post(
     try {
       experiment = await findOrCreateExperiment({
         project,
+        // The body accepts either identifier and this handler used to forward
+        // only the slug, so an id-only request passed validation and then hit
+        // "Either experiment_id or experiment_slug is required" as a 500.
+        // Every other caller of this function forwards both.
+        experiment_id: params.experiment_id,
         experiment_slug: params.experiment_slug,
         experiment_type: params.experiment_type as ExperimentType,
         experiment_name: params.experiment_name,

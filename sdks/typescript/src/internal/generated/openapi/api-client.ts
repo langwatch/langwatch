@@ -7899,6 +7899,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description A step could not be stored. The cause is on our side and is logged with the run and step ids; retrying the batch is safe. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
         };
     };
     postApiExperimentInit: {

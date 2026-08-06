@@ -68,14 +68,18 @@ export const AVAILABLE_EVALUATORS = {
  *
  * Temporary, pending support for grouping evaluators together.
  */
-export const evaluatorTempNameMap: Record<string, string> = {
+const evaluatorTempNameMap = {
   "Azure Content Safety": "Content Safety",
   "OpenAI Moderation": "Moderation",
   "Azure Jailbreak Detection": "Jailbreak Detection",
   "Presidio PII Detection": "PII Detection",
   "Lingua Language Detection": "Language Detection",
   "Azure Prompt Shield": "Prompt Injection Detection",
-};
+} as const satisfies Record<string, string>;
+
+/** The catalog name to show, which for most evaluators is the catalog name. */
+export const evaluatorDisplayName = (name: string): string =>
+  (evaluatorTempNameMap as Record<string, string | undefined>)[name] ?? name;
 
 export type {
   BatchEvaluationResult,

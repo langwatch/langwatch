@@ -26,7 +26,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-  evaluatorTempNameMap,
+  evaluatorDisplayName,
 } from "~/server/evaluations/evaluators";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
@@ -314,9 +314,7 @@ const getEvaluatorDisplayName = (evaluatorType: string): string => {
     AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
   if (!evaluatorDefinition) return evaluatorType;
 
-  return (
-    evaluatorTempNameMap[evaluatorDefinition.name] ?? evaluatorDefinition.name
-  );
+  return evaluatorDisplayName(evaluatorDefinition.name);
 };
 
 function EvaluatorCard({

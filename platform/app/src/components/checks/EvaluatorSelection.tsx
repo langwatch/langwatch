@@ -19,7 +19,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
-  evaluatorTempNameMap,
+  evaluatorDisplayName,
 } from "../../server/evaluations/evaluators";
 import { api } from "../../utils/api";
 import { isFeatureEnabled } from "../../utils/featureFlags";
@@ -233,8 +233,7 @@ export function EvaluatorSelection({
                           </Tag.Root>
                         )}
                         <Heading as="h2" size="sm">
-                          {evaluatorTempNameMap[evaluator.name] ??
-                            evaluator.name}
+                          {evaluatorDisplayName(evaluator.name)}
                         </Heading>
                       </HStack>
                       {evaluator.unavailable && (

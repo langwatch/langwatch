@@ -12345,6 +12345,26 @@
                 }
               }
             }
+          },
+          "500": {
+            "description": "A step could not be stored. The cause is on our side and is logged with the run and step ids; retrying the batch is safe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Set when the request was rejected before validation"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Set when the body parsed and then failed validation"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "operationId": "postApiDspyLog_steps",

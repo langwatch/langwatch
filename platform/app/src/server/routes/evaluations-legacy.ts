@@ -53,8 +53,8 @@ import {
   type EvaluationResult,
   type EvaluatorDefinition,
   type EvaluatorTypes,
+  evaluatorDisplayName,
   evaluatorsSchema,
-  evaluatorTempNameMap,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
@@ -218,7 +218,7 @@ const buildEvaluatorCatalogue = (): Record<string, unknown> =>
         key,
         {
           ...value,
-          name: evaluatorTempNameMap[value.name] ?? value.name,
+          name: evaluatorDisplayName(value.name),
           settings_json_schema: zodToJsonSchema(
             // @ts-expect-error `key` indexes the union of every evaluator
             // type, so `.shape.settings` resolves to a heterogeneous union
