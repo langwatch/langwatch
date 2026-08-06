@@ -26,6 +26,7 @@ import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
@@ -322,8 +323,15 @@ describe("evaluation inputs offload (integration)", () => {
       // The v1 read service resolves the marker at the read boundary. Inject
       // the same stored-objects service the write used (its client is the test
       // client via the getClickHouseClientForProject mock).
-      const service = new EvaluationService(({ projectId, inputs }) =>
-        resolveInputsMarker({ projectId, inputs, storedObjects }),
+      // The repository is injected rather than left to its default. The
+      // default builds one over `defaultClickHouseClientResolver`, which lives
+      // inside clickhouseClient.ts and calls `getClickHouseClientForProject`
+      // as a local binding - so the module mock above does NOT intercept it,
+      // and the read would quietly go to the real resolver and answer null.
+      const service = new EvaluationService(
+        ({ projectId, inputs }) =>
+          resolveInputsMarker({ projectId, inputs, storedObjects }),
+        new TraceEvaluationsClickHouseRepository(async () => ch),
       );
       const readInputs = await service.getEvaluationInputs({
         projectId: tenantId,

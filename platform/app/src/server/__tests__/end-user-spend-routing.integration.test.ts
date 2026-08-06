@@ -18,6 +18,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
@@ -26,13 +27,29 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 
 // Same environment shims the app-direct suite uses: the billing plan gate
 // and the ClickHouse resolution, both pointed at the test substrate.
 vi.mock("~/server/app-layer/app", () => ({
+  // Built per call rather than once: the routes now take their ClickHouse
+  // repositories from the App, and `chClient` is only assigned once the test
+  // containers are up - after this factory runs.
   getApp: () => ({
     planProvider: {
       getActivePlan: async () => ({ webhookEndpointsEnabled: true }),
+    },
+    gateway: {
+      budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
+      virtualKeySpend: new GatewayVirtualKeySpendRepository(
+        async () => chClient,
+      ),
+      spendEvents: new GatewaySpendEventsRepository(async () => chClient),
+      webhookEvents: new WebhookEventsClickHouseRepository(
+        async () => chClient,
+      ),
     },
   }),
 }));
@@ -51,14 +68,9 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import {
-  getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import {
-  clearClickHouseTestApp,
-  installClickHouseTestApp,
-} from "~/test-utils/clickhouseTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const suffix = nanoid(8);
@@ -77,12 +89,6 @@ describe("end-user spend on the composed router", () => {
 
   beforeAll(async () => {
     await startTestContainers();
-    // The routes and workers under test take their ClickHouse repositories
-    // from the App rather than resolving a client, so the fixture has to
-    // provide one or they fail with "App not initialized".
-    installClickHouseTestApp({
-      resolveClient: async () => getTestClickHouseClient(),
-    });
     const { getTestClickHouseClient } = await import(
       "~/server/event-sourcing/__tests__/integration/testContainers"
     );
@@ -156,7 +162,6 @@ describe("end-user spend on the composed router", () => {
   }, 120_000);
 
   afterAll(async () => {
-    await clearClickHouseTestApp();
     if (!ORG_ID) return;
     await prisma.roleBinding.deleteMany({
       where: { organizationId: ORG_ID },
