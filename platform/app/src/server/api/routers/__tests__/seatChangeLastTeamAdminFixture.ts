@@ -79,44 +79,53 @@ export async function createSeatChangeFixture({
     },
   });
 
-  const createTeam = async (label: string) => {
-    const team = await prisma.team.create({
+  // Returns the row rather than the id: the guard suite asserts on the name the
+  // refusal carries, and a second copy of this template would drift from it
+  // silently and fail pointing at the wrong file.
+  const createTeam = (label: string) =>
+    prisma.team.create({
       data: {
         id: generate(KSUID_RESOURCES.TEAM).toString(),
         name: `${label} ${ns}`,
         slug: `${ns}-${label}`,
         organizationId,
       },
+      select: { id: true, name: true },
     });
-    return team.id;
+
+  const onlyAdminTeam = await createTeam("solo-one");
+  const alsoOnlyAdminTeam = await createTeam("solo-two");
+  const sharedWithAnotherAdminTeam = await createTeam("shared");
+  const onlyAdminTeamId = onlyAdminTeam.id;
+  const alsoOnlyAdminTeamId = alsoOnlyAdminTeam.id;
+  const sharedWithAnotherAdminTeamId = sharedWithAnotherAdminTeam.id;
+
+  const installApp = async () => {
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      // FREE_PLAN gives away no Lite Member seats, so without this a seat change
+      // is refused for the allowance rather than for anything these suites are
+      // about.
+      planProvider: PlanProviderService.create({
+        getActivePlan: vi.fn().mockResolvedValue({
+          ...FREE_PLAN,
+          overrideAddingLimitations: false,
+          maxMembers: 100,
+          maxMembersLite: 100,
+        }),
+      }),
+      organizations: new OrganizationService(
+        new PrismaOrganizationRepository(prisma),
+        new PromptTagRepository(prisma),
+      ),
+      usageLimits: {
+        notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
+        checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
+      } as any,
+    });
   };
 
-  const onlyAdminTeamId = await createTeam("solo-one");
-  const alsoOnlyAdminTeamId = await createTeam("solo-two");
-  const sharedWithAnotherAdminTeamId = await createTeam("shared");
-
-  await resetApp();
-  globalForApp.__langwatch_app = createTestApp({
-    // FREE_PLAN gives away no Lite Member seats, so without this a seat change
-    // is refused for the allowance rather than for anything these suites are
-    // about.
-    planProvider: PlanProviderService.create({
-      getActivePlan: vi.fn().mockResolvedValue({
-        ...FREE_PLAN,
-        overrideAddingLimitations: false,
-        maxMembers: 100,
-        maxMembersLite: 100,
-      }),
-    }),
-    organizations: new OrganizationService(
-      new PrismaOrganizationRepository(prisma),
-      new PromptTagRepository(prisma),
-    ),
-    usageLimits: {
-      notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
-      checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
-    } as any,
-  });
+  await installApp();
 
   const bindTeamRole = ({
     userId,
@@ -147,7 +156,7 @@ export async function createSeatChangeFixture({
     onlyAdminTeamId,
     alsoOnlyAdminTeamId,
     sharedWithAnotherAdminTeamId,
-    onlyAdminTeamName: `solo-one ${ns}`,
+    onlyAdminTeamName: onlyAdminTeam.name,
 
     callerAsAdmin: () =>
       appRouter.createCaller(
@@ -200,6 +209,11 @@ export async function createSeatChangeFixture({
      * unanchored `deleteMany` matches every row rather than none.
      */
     resetMemberships: async () => {
+      // Reinstalled per test rather than once per file: the app is a process
+      // singleton, so a neighbouring suite's teardown resetting it between two
+      // of these tests would otherwise leave the null repository in place and
+      // every assertion here would hold on a mutation that wrote nothing.
+      await installApp();
       await cleanupTestRows(prisma, [
         [
           "roleBinding",
