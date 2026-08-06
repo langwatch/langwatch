@@ -95,9 +95,73 @@ export class TraceEvaluationsClickHouseRepository
 
     const client = await this.resolveClient(tenantId);
 
-    const runQuery = async (columns: string) => {
-      const result = await client.query({
-        query: `
+    try {
+      const rows = await this.#read({
+        client,
+        tenantId,
+        traceIds,
+        columns: EVAL_COLUMNS_WITH_INPUTS,
+      });
+      return this.#groupByTrace(rows, traceIds);
+    } catch (error) {
+      // Only the memory ceiling earns a second attempt. Anything else - a
+      // syntax error, a dead connection - fails now, exactly as before:
+      // retrying it would just spend the same budget to fail identically.
+      if (!isMemoryLimitError(error)) {
+        this.#reportReadFailure({ tenantId, traceIds, error });
+        throw new Error("Failed to fetch evaluations for multiple traces");
+      }
+      return this.#retryWithoutInputs({ client, tenantId, traceIds });
+    }
+  }
+
+  /**
+   * The same read with only the light columns.
+   *
+   * `Inputs` is the heavy one, and dropping it is what brings a read that hit
+   * the server's memory ceiling back inside it. Split out so the first attempt
+   * reads as one statement rather than a try nested in a catch.
+   */
+  async #retryWithoutInputs({
+    client,
+    tenantId,
+    traceIds,
+  }: {
+    client: Awaited<ReturnType<ClickHouseClientResolver>>;
+    tenantId: string;
+    traceIds: string[];
+  }): Promise<Record<string, TraceEvaluation[]>> {
+    logger.warn(
+      { tenantId, traceIdCount: traceIds.length },
+      "Evaluations read hit the ClickHouse memory limit; retrying without Inputs",
+    );
+    try {
+      const rows = await this.#read({
+        client,
+        tenantId,
+        traceIds,
+        columns: EVAL_COLUMNS_LIGHT,
+      });
+      return this.#groupByTrace(rows, traceIds);
+    } catch (error) {
+      this.#reportReadFailure({ tenantId, traceIds, error, retried: true });
+      throw new Error("Failed to fetch evaluations for multiple traces");
+    }
+  }
+
+  async #read({
+    client,
+    tenantId,
+    traceIds,
+    columns,
+  }: {
+    client: Awaited<ReturnType<ClickHouseClientResolver>>;
+    tenantId: string;
+    traceIds: string[];
+    columns: string;
+  }): Promise<ClickHouseEvaluationRunRow[]> {
+    const result = await client.query({
+      query: `
           SELECT ${columns}
           FROM evaluation_runs
           WHERE TenantId = {tenantId:String}
@@ -110,64 +174,52 @@ export class TraceEvaluationsClickHouseRepository
               GROUP BY TenantId, EvaluationId
             )
         `,
-        query_params: { tenantId, traceIds },
-        format: "JSONEachRow",
-      });
-      return (await result.json()) as ClickHouseEvaluationRunRow[];
-    };
+      query_params: { tenantId, traceIds },
+      format: "JSONEachRow",
+    });
+    return (await result.json()) as ClickHouseEvaluationRunRow[];
+  }
 
-    const groupByTrace = (
-      rows: ClickHouseEvaluationRunRow[],
-    ): Record<string, TraceEvaluation[]> => {
-      const grouped: Record<string, TraceEvaluation[]> = {};
-      for (const traceId of traceIds) {
-        grouped[traceId] = [];
-      }
-      for (const row of rows) {
-        const traceId = row.TraceId;
-        if (traceId) {
-          if (!grouped[traceId]) {
-            grouped[traceId] = [];
-          }
-          grouped[traceId]!.push(mapClickHouseEvaluationToTraceEvaluation(row));
-        }
-      }
-      return grouped;
-    };
-
-    try {
-      return groupByTrace(await runQuery(EVAL_COLUMNS_WITH_INPUTS));
-    } catch (error) {
-      if (isMemoryLimitError(error)) {
-        logger.warn(
-          { tenantId, traceIdCount: traceIds.length },
-          "Evaluations read hit the ClickHouse memory limit; retrying without Inputs",
-        );
-        try {
-          return groupByTrace(await runQuery(EVAL_COLUMNS_LIGHT));
-        } catch (retryError) {
-          logger.error(
-            {
-              tenantId,
-              traceIdCount: traceIds.length,
-              error:
-                retryError instanceof Error ? retryError.message : retryError,
-            },
-            "Failed to fetch evaluations for multiple traces from ClickHouse after light-projection retry",
-          );
-          throw new Error("Failed to fetch evaluations for multiple traces");
-        }
-      }
-      logger.error(
-        {
-          tenantId,
-          traceIdCount: traceIds.length,
-          error: error instanceof Error ? error.message : error,
-        },
-        "Failed to fetch evaluations for multiple traces from ClickHouse",
-      );
-      throw new Error("Failed to fetch evaluations for multiple traces");
+  /** Every requested trace gets a key, so a caller can index without a guard. */
+  #groupByTrace(
+    rows: ClickHouseEvaluationRunRow[],
+    traceIds: string[],
+  ): Record<string, TraceEvaluation[]> {
+    const grouped: Record<string, TraceEvaluation[]> = {};
+    for (const traceId of traceIds) {
+      grouped[traceId] = [];
     }
+    for (const row of rows) {
+      const traceId = row.TraceId;
+      if (!traceId) continue;
+      (grouped[traceId] ??= []).push(
+        mapClickHouseEvaluationToTraceEvaluation(row),
+      );
+    }
+    return grouped;
+  }
+
+  #reportReadFailure({
+    tenantId,
+    traceIds,
+    error,
+    retried = false,
+  }: {
+    tenantId: string;
+    traceIds: string[];
+    error: unknown;
+    retried?: boolean;
+  }): void {
+    logger.error(
+      {
+        tenantId,
+        traceIdCount: traceIds.length,
+        error: error instanceof Error ? error.message : error,
+      },
+      retried
+        ? "Failed to fetch evaluations for multiple traces from ClickHouse after light-projection retry"
+        : "Failed to fetch evaluations for multiple traces from ClickHouse",
+    );
   }
 
   /**
@@ -183,20 +235,8 @@ export class TraceEvaluationsClickHouseRepository
     tenantId,
     evaluationId,
   }: FindInputsByEvaluationIdInput): Promise<Record<string, unknown> | null> {
-    let client;
-    try {
-      client = await this.resolveClient(tenantId);
-    } catch (error) {
-      logger.warn(
-        {
-          tenantId,
-          evaluationId,
-          error: error instanceof Error ? error.message : error,
-        },
-        "ClickHouse client unavailable for evaluation inputs read",
-      );
-      return null;
-    }
+    const client = await this.#resolveOrNull({ tenantId, evaluationId });
+    if (!client) return null;
 
     try {
       const result = await client.query({
@@ -210,10 +250,7 @@ export class TraceEvaluationsClickHouseRepository
         format: "JSONEachRow",
       });
       const rows = (await result.json()) as { Inputs: string | null }[];
-      const parsed = safeJsonParse(rows[0]?.Inputs ?? null);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>)
-        : null;
+      return asPlainObject(safeJsonParse(rows[0]?.Inputs ?? null));
     } catch (error) {
       if (isMemoryLimitError(error)) {
         logger.warn(
@@ -233,6 +270,38 @@ export class TraceEvaluationsClickHouseRepository
       throw new Error("Failed to fetch evaluation inputs");
     }
   }
+
+  /**
+   * An unreachable ClickHouse means "nothing to show" for this read, not a
+   * failure worth surfacing - the caller renders an empty inputs panel.
+   */
+  async #resolveOrNull({
+    tenantId,
+    evaluationId,
+  }: FindInputsByEvaluationIdInput): Promise<Awaited<
+    ReturnType<ClickHouseClientResolver>
+  > | null> {
+    try {
+      return await this.resolveClient(tenantId);
+    } catch (error) {
+      logger.warn(
+        {
+          tenantId,
+          evaluationId,
+          error: error instanceof Error ? error.message : error,
+        },
+        "ClickHouse client unavailable for evaluation inputs read",
+      );
+      return null;
+    }
+  }
+}
+
+/** A JSON object, or null for anything else - an array, a scalar, a parse failure. */
+function asPlainObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 /** Production default: the standard per-project resolver. */

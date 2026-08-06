@@ -699,47 +699,7 @@ export async function startScenarioProcessor(
   // because the scan is intentionally cross-tenant. `deps.orphanReconciliation`
   // is undefined exactly when ClickHouse is not configured (see
   // `getApp().scenarios.orphanReconciliation`), which both sweeps below skip.
-  if (deps.orphanReconciliation) {
-    const { sharedClickHouseClient, orphanedRunFinder } =
-      deps.orphanReconciliation;
-    const reconcilerNow = Date.now();
-    void reconcileOrphanedQueuedRuns({
-      findCandidates: () =>
-        findQueuedRunCandidates({
-          client: sharedClickHouseClient,
-          lookbackMs: LOOKBACK_MS,
-          now: reconcilerNow,
-          orphanThresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
-        }),
-      emitFailure: (candidate) =>
-        deps.failureEmitter.ensureFailureEventsEmitted({
-          projectId: candidate.projectId,
-          scenarioId: candidate.scenarioId,
-          setId: candidate.setId,
-          batchRunId: candidate.batchRunId,
-          scenarioRunId: candidate.scenarioRunId,
-          error:
-            "Reconciled: orphaned QUEUED run with no live worker (worker restart/crash)",
-        }),
-      now: reconcilerNow,
-      thresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
-    }).catch((err) => logger.warn({ err }, "orphan reconciler failed"));
-
-    // The sweep above only takes QUEUED runs terminal — a run nobody ever
-    // picked up. A run a dead worker had already STARTED is invisible to it
-    // and spins in the UI forever (#3195), so this second sweep takes the
-    // IN_PROGRESS orphans terminal. The two are disjoint by status and never
-    // touch the same run: queue wait cannot be read as worker death (nothing
-    // bounds it), while an idle IN_PROGRESS run past 2× the child timeout
-    // provably has no live worker. Fire-and-forget so a large/slow sweep
-    // never blocks worker startup.
-    void reconcileOrphanedRunsOnBoot({
-      failureEmitter: deps.failureEmitter,
-      finder: orphanedRunFinder,
-    }).catch((err: unknown) =>
-      logger.error({ err }, "Orphaned-run reconciliation failed on boot"),
-    );
-  }
+  startOrphanedRunSweeps(deps);
 
   return {
     close: async () => {
@@ -753,4 +713,55 @@ export async function startScenarioProcessor(
       );
     },
   };
+}
+
+/**
+ * The two boot-time orphan sweeps, lifted out of `startScenarioProcessor`
+ * so that function stays inside the house line limit.
+ *
+ * Both are cross-tenant by design and use the shared client; both are
+ * fire-and-forget, because a reconciliation sweep must never wedge worker
+ * startup.
+ */
+function startOrphanedRunSweeps(deps: ProcessorDependencies): void {
+  if (!deps.orphanReconciliation) return;
+  const { sharedClickHouseClient, orphanedRunFinder } =
+    deps.orphanReconciliation;
+  const reconcilerNow = Date.now();
+  void reconcileOrphanedQueuedRuns({
+    findCandidates: () =>
+      findQueuedRunCandidates({
+        client: sharedClickHouseClient,
+        lookbackMs: LOOKBACK_MS,
+        now: reconcilerNow,
+        orphanThresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
+      }),
+    emitFailure: (candidate) =>
+      deps.failureEmitter.ensureFailureEventsEmitted({
+        projectId: candidate.projectId,
+        scenarioId: candidate.scenarioId,
+        setId: candidate.setId,
+        batchRunId: candidate.batchRunId,
+        scenarioRunId: candidate.scenarioRunId,
+        error:
+          "Reconciled: orphaned QUEUED run with no live worker (worker restart/crash)",
+      }),
+    now: reconcilerNow,
+    thresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
+  }).catch((err) => logger.warn({ err }, "orphan reconciler failed"));
+
+  // The sweep above only takes QUEUED runs terminal — a run nobody ever
+  // picked up. A run a dead worker had already STARTED is invisible to it
+  // and spins in the UI forever (#3195), so this second sweep takes the
+  // IN_PROGRESS orphans terminal. The two are disjoint by status and never
+  // touch the same run: queue wait cannot be read as worker death (nothing
+  // bounds it), while an idle IN_PROGRESS run past 2× the child timeout
+  // provably has no live worker. Fire-and-forget so a large/slow sweep
+  // never blocks worker startup.
+  void reconcileOrphanedRunsOnBoot({
+    failureEmitter: deps.failureEmitter,
+    finder: orphanedRunFinder,
+  }).catch((err: unknown) =>
+    logger.error({ err }, "Orphaned-run reconciliation failed on boot"),
+  );
 }

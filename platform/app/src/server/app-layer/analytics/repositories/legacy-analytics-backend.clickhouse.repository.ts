@@ -241,50 +241,9 @@ export class LegacyAnalyticsBackendClickHouseRepository
         attributes: Record<string, string>;
       }>;
 
-      // Convert to ElasticSearchEvent format
-      const events: ElasticSearchEvent[] = rows.map((row) => {
-        const startedAt =
-          typeof row.started_at === "string"
-            ? parseInt(row.started_at, 10)
-            : row.started_at;
-
-        // Parse attributes into metrics and event_details
-        // Handle both plain keys (vote, score) and namespaced keys (event.metrics.vote, metrics.vote)
-        const metrics: Array<{ key: string; value: number }> = [];
-        const eventDetails: Array<{ key: string; value: string }> = [];
-
-        for (const [key, value] of Object.entries(row.attributes)) {
-          const isVoteKey =
-            key === "vote" ||
-            key === "metrics.vote" ||
-            key === "event.metrics.vote";
-          const isScoreKey =
-            key === "score" ||
-            key === "metrics.score" ||
-            key === "event.metrics.score";
-
-          if (isVoteKey || isScoreKey) {
-            const metricKey = isVoteKey ? "vote" : "score";
-            metrics.push({ key: metricKey, value: parseFloat(value) || 0 });
-          } else {
-            eventDetails.push({ key, value });
-          }
-        }
-
-        return {
-          event_id: row.event_id,
-          event_type: row.event_type,
-          project_id: projectId,
-          trace_id: row.trace_id,
-          timestamps: {
-            started_at: startedAt,
-            inserted_at: startedAt,
-            updated_at: startedAt,
-          },
-          metrics,
-          event_details: eventDetails,
-        };
-      });
+      const events: ElasticSearchEvent[] = rows.map((row) =>
+        toElasticSearchEvent(row, projectId),
+      );
 
       return { events };
     } catch (error) {
@@ -295,4 +254,68 @@ export class LegacyAnalyticsBackendClickHouseRepository
       throw error;
     }
   }
+}
+
+/**
+ * The vote/score attributes arrive under three spellings - plain, `metrics.`
+ * prefixed, and `event.metrics.` prefixed - because they have been written by
+ * three generations of the ingest path. Everything else is an event detail.
+ */
+function splitAttributes(attributes: Record<string, string>): {
+  metrics: Array<{ key: string; value: number }>;
+  eventDetails: Array<{ key: string; value: string }>;
+} {
+  const metrics: Array<{ key: string; value: number }> = [];
+  const eventDetails: Array<{ key: string; value: string }> = [];
+
+  const METRIC_KEYS: Record<string, "vote" | "score"> = {
+    vote: "vote",
+    "metrics.vote": "vote",
+    "event.metrics.vote": "vote",
+    score: "score",
+    "metrics.score": "score",
+    "event.metrics.score": "score",
+  };
+
+  for (const [key, value] of Object.entries(attributes)) {
+    const metricKey = METRIC_KEYS[key];
+    if (metricKey) {
+      metrics.push({ key: metricKey, value: parseFloat(value) || 0 });
+    } else {
+      eventDetails.push({ key, value });
+    }
+  }
+
+  return { metrics, eventDetails };
+}
+
+function toElasticSearchEvent(
+  row: {
+    event_id: string;
+    trace_id: string;
+    started_at: number | string;
+    event_type: string;
+    attributes: Record<string, string>;
+  },
+  projectId: string,
+): ElasticSearchEvent {
+  const startedAt =
+    typeof row.started_at === "string"
+      ? parseInt(row.started_at, 10)
+      : row.started_at;
+  const { metrics, eventDetails } = splitAttributes(row.attributes);
+
+  return {
+    event_id: row.event_id,
+    event_type: row.event_type,
+    project_id: projectId,
+    trace_id: row.trace_id,
+    timestamps: {
+      started_at: startedAt,
+      inserted_at: startedAt,
+      updated_at: startedAt,
+    },
+    metrics,
+    event_details: eventDetails,
+  };
 }
