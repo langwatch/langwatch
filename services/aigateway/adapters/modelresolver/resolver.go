@@ -30,9 +30,12 @@ var missingModelMessages = map[domain.RequestType]string{
 	domain.RequestTypeTranscription: `POST /v1/audio/transcriptions sends a multipart/form-data body ` +
 		`and takes the model from a form field, not from JSON. Add a "model" part naming the ` +
 		`model or the virtual key's alias for it, alongside the "file" part`,
+	// Deliberately names the URL-path convention rather than one specific
+	// action: cachedContents and tuning operations also encode the model in
+	// the path, under a different action than generateContent.
 	domain.RequestTypePassthrough: `the Gemini surface takes the model from the URL path, not from the ` +
-		`request body. Request POST /v1beta/models/{model}:generateContent (or ` +
-		`:streamGenerateContent), for example /v1beta/models/gemini-2.5-flash:generateContent`,
+		`request body. Name the model in the request path the way this endpoint expects, for example ` +
+		`/v1beta/models/gemini-2.5-flash:generateContent`,
 }
 
 // jsonBodyMessage is the wording shared by the surfaces that read a top-level
