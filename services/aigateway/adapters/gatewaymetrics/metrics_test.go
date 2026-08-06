@@ -169,15 +169,17 @@ func TestRecorder_ClientRejects(t *testing.T) {
 			for range tt.times {
 				r.RecordClientReject(tt.code, tt.vkID)
 			}
+			vkID := tt.vkID
+			if vkID == "" {
+				// The placeholder is a fixed constant, never the caller's
+				// input, so even a keyless reject folds onto one series
+				// rather than minting one.
+				vkID = unknownLabel
+			}
+			assert.Equal(t, tt.want, testutil.ToFloat64(r.clientRejects.WithLabelValues(tt.code, vkID)))
 		})
 	}
 
-	assert.Equal(t, 3.0, testutil.ToFloat64(r.clientRejects.WithLabelValues("bad_request", "vk_flooder")))
-	assert.Equal(t, 1.0, testutil.ToFloat64(r.clientRejects.WithLabelValues("model_not_allowed", "vk_flooder")))
-	assert.Equal(t, 1.0, testutil.ToFloat64(r.clientRejects.WithLabelValues("bad_request", "vk_quiet")))
-	// The placeholder is a fixed constant, never the caller's input, so even
-	// a keyless reject folds onto one series rather than minting one.
-	assert.Equal(t, 1.0, testutil.ToFloat64(r.clientRejects.WithLabelValues("bad_request", unknownLabel)))
 	assert.Equal(t, 4, testutil.CollectAndCount(r.clientRejects))
 }
 

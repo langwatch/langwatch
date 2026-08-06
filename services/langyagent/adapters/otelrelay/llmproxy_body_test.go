@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -84,6 +85,57 @@ func TestProviderErrorCode_KnownJSONDialects(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := providerErrorCode([]byte(tt.body)); got != tt.want {
 				t.Fatalf("providerErrorCode() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// @scenario "Every upstream HTTP status maps to a stable reason code"
+func TestUpstreamHTTPReasonCode_AllBranches(t *testing.T) {
+	tests := []struct {
+		status int
+		want   herr.Code
+	}{
+		{http.StatusUnauthorized, "upstream_unauthorized"},
+		{http.StatusNotFound, "upstream_not_found"},
+		{http.StatusRequestTimeout, "upstream_timeout"},
+		{http.StatusConflict, "upstream_conflict"},
+		{http.StatusTeapot, "upstream_http_error"},
+		{http.StatusUnprocessableEntity, "upstream_unprocessable_entity"},
+		{http.StatusTooManyRequests, "upstream_rate_limited"},
+		{http.StatusGatewayTimeout, "upstream_timeout"},
+		{http.StatusBadRequest, "upstream_bad_request"},
+		{http.StatusForbidden, "upstream_forbidden"},
+		{http.StatusBadGateway, "upstream_unavailable"},
+	}
+	for _, tt := range tests {
+		t.Run(strconv.Itoa(tt.status), func(t *testing.T) {
+			if got := upstreamHTTPReasonCode(tt.status); got != tt.want {
+				t.Errorf("upstreamHTTPReasonCode(%d) = %q, want %q", tt.status, got, tt.want)
+			}
+		})
+	}
+}
+
+// @scenario "A provider body's shape is classified for safe logging"
+func TestProviderBodyKind_Classification(t *testing.T) {
+	tests := []struct {
+		name        string
+		body        string
+		contentType string
+		want        string
+	}{
+		{"empty body", "", "application/json", "empty"},
+		{"whitespace-only body", "   \n", "application/json", "empty"},
+		{"valid json", `{"error":"nope"}`, "application/json", "json"},
+		{"html content-type without a doctype", "Sign in required", "text/html", "html"},
+		{"body starting with the html tag", "<html><body>nope</body></html>", "text/plain", "html"},
+		{"plain text", "internal server error", "text/plain", "text"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := providerBodyKind([]byte(tt.body), tt.contentType); got != tt.want {
+				t.Errorf("providerBodyKind() = %q, want %q", got, tt.want)
 			}
 		})
 	}
