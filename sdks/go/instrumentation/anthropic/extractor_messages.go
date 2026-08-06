@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
 	"github.com/langwatch/langwatch/sdks/go/instrumentation/otelhttp"

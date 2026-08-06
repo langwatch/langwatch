@@ -3,7 +3,7 @@ package langwatch
 import (
 	"go.opentelemetry.io/otel/attribute"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 )
 
 // GenAIRequestParams holds common LLM request parameters, recorded under the
@@ -56,6 +56,8 @@ func (s *Span) SetGenAIRequestParams(p GenAIRequestParams) *Span {
 		attrs = append(attrs, semconv.GenAIRequestStopSequences(p.StopSequences...))
 	}
 	if p.ReasoningEffort != "" {
+		// No semconv constructor as of v1.41 — the conventions have no
+		// gen_ai.request.reasoning_effort attribute yet.
 		attrs = append(attrs, attribute.String("gen_ai.request.reasoning_effort", p.ReasoningEffort))
 	}
 	if len(attrs) > 0 {
@@ -87,16 +89,23 @@ func (s *Span) SetGenAIUsage(u GenAIUsage) *Span {
 		attrs = append(attrs, semconv.GenAIUsageOutputTokens(*u.OutputTokens))
 	}
 	if u.TotalTokens != nil {
+		// gen_ai.usage.total_tokens has no semconv constructor — the conventions
+		// treat the total as derivable from input + output.
 		attrs = append(attrs, attribute.Int("gen_ai.usage.total_tokens", *u.TotalTokens))
 	}
 	if u.CachedInputTokens != nil {
+		// Deliberately NOT semconv.GenAIUsageCacheReadInputTokens: that constructor
+		// emits the dotted gen_ai.usage.cache_read.input_tokens, whereas every
+		// LangWatch SDK emits the flat gen_ai.usage.cached_input_tokens and the
+		// server's ingestion maps flat → dotted. Switching the key here is a wire
+		// change that has to land with the backend, not a refactor.
 		attrs = append(attrs, attribute.Int("gen_ai.usage.cached_input_tokens", *u.CachedInputTokens))
 	}
 	if u.CacheCreationInputTokens != nil {
-		attrs = append(attrs, attribute.Int("gen_ai.usage.cache_creation.input_tokens", *u.CacheCreationInputTokens))
+		attrs = append(attrs, semconv.GenAIUsageCacheCreationInputTokens(*u.CacheCreationInputTokens))
 	}
 	if u.ReasoningTokens != nil {
-		attrs = append(attrs, attribute.Int("gen_ai.usage.reasoning.output_tokens", *u.ReasoningTokens))
+		attrs = append(attrs, semconv.GenAIUsageReasoningOutputTokens(*u.ReasoningTokens))
 	}
 	if len(attrs) > 0 {
 		s.SetAttributes(attrs...)
@@ -145,7 +154,7 @@ func (s *Span) SetGenAISystemInstructions(instructions string) *Span {
 // SetGenAIRequestStream records whether the request was made in streaming mode
 // (gen_ai.request.stream, OTel GenAI semconv v1.41+).
 func (s *Span) SetGenAIRequestStream(streaming bool) *Span {
-	s.SetAttributes(attribute.Bool("gen_ai.request.stream", streaming))
+	s.SetAttributes(semconv.GenAIRequestStream(streaming))
 	return s
 }
 
@@ -153,6 +162,6 @@ func (s *Span) SetGenAIRequestStream(streaming bool) *Span {
 // chunk, in seconds (gen_ai.response.time_to_first_chunk, OTel GenAI semconv
 // v1.41+). Meaningful only for streaming responses.
 func (s *Span) SetGenAITimeToFirstChunk(seconds float64) *Span {
-	s.SetAttributes(attribute.Float64("gen_ai.response.time_to_first_chunk", seconds))
+	s.SetAttributes(semconv.GenAIResponseTimeToFirstChunk(seconds))
 	return s
 }

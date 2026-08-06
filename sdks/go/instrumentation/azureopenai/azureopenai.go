@@ -18,7 +18,7 @@ package azureopenai
 import (
 	oaioption "github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 
 	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 )
