@@ -62,5 +62,28 @@ describe("buildCredentials for gemini", () => {
         ),
       ).toEqual({ api_key: "k" });
     });
+
+    // Whitespace-only is absent: rows stored before the schema trimmed
+    // could carry it, and it must not pick the Agent Platform door.
+    it("treats a whitespace-only project or location as absent", () => {
+      expect(
+        buildCredentials(
+          geminiRow({
+            GEMINI_API_KEY: "k",
+            GEMINI_PROJECT: "   ",
+            GEMINI_LOCATION: "global",
+          }),
+        ),
+      ).toEqual({ api_key: "k" });
+      expect(
+        buildCredentials(
+          geminiRow({
+            GEMINI_API_KEY: "k",
+            GEMINI_PROJECT: "acme-123",
+            GEMINI_LOCATION: "  ",
+          }),
+        ),
+      ).toEqual({ api_key: "k" });
+    });
   });
 });
