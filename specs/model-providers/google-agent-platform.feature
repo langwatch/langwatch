@@ -122,15 +122,13 @@ Feature: Gemini credentials work through either Google door
     Then the Gemini embedding models are not offered
     And they are offered again when the project's own credential has no pair
 
-  # ── The old separate provider folds in ──────────────────────────────────
-
-  @unit
-  Scenario: A stored Google Agent Platform row becomes a Gemini row with the same credential
-    Given a stored model provider row for Google Agent Platform with a key, project and location
-    When the fold-in migration runs
-    Then the row's provider is Gemini
-    And its key, project and location are preserved under the Gemini field names
-    And its scope and enabled state are unchanged
+  # ── Rows stored under the old provider keep working ─────────────────────
+  #
+  # Rows already stored under the retired provider name keep their name for
+  # now: it stays a known provider, validates through the Agent Platform
+  # door, and dispatches. Converting them to Gemini rows is a one-off data
+  # migration, run per deployment, and it is not part of this change — so
+  # nothing here may assume it has happened.
 
   # A green check on a key that was never probed is worse than no check:
   # the fold-window row keeps its retired provider name, and nothing about

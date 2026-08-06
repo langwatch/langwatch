@@ -69,10 +69,10 @@ type ModelProviderDefinition = {
   restrictedToFeatureKeys?: readonly string[];
   /**
    * The provider no longer accepts new rows — the Add menu hides it —
-   * but stored rows stay readable, editable and validatable so a rolling
-   * deployment never strands them. Used for the fold window of a provider
-   * absorbed into another (google_agent_platform → gemini); the entry is
-   * deleted in a later release once its data migration has run.
+   * but stored rows stay readable, editable and validatable so no
+   * deployment ever strands them. Used for a provider absorbed into
+   * another (google_agent_platform → gemini); the entry is deleted in a
+   * later release, once the rows have been converted.
    */
   deprecated?: true;
 };
@@ -406,14 +406,14 @@ export const modelProviders = {
     optionalKeys: ["GEMINI_PROJECT", "GEMINI_LOCATION"],
     enabledSince: new Date("2023-01-01"),
   },
-  // Rolling-deployment compatibility for rows stored while Agent Platform
-  // was its own provider. Deprecated: hidden from the Add menu, but the
-  // rows stay visible, editable and validatable until `pnpm task
-  // migrateAgentPlatformToGemini` folds them into `gemini` — without this
-  // entry, application pods running this version would treat un-migrated
-  // rows as an unknown provider and hide them mid-rollout. Delete this
-  // entry (and its validation + materialiser branches) in the release
-  // after the migration has run everywhere.
+  // Compatibility for rows stored while Agent Platform was its own
+  // provider. Deprecated: hidden from the Add menu, but the rows stay
+  // visible, editable, validatable and dispatchable — without this entry,
+  // application pods running this version would treat them as an unknown
+  // provider and hide them. Converting them into `gemini` rows is a
+  // separate, per-deployment data migration; delete this entry (and its
+  // validation + materialiser branches) only in a release after that
+  // migration has run everywhere.
   google_agent_platform: {
     name: "Google Agent Platform",
     type: "llm",
