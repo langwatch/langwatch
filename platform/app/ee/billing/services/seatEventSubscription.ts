@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   Currency,
   type OrganizationUserRole,
@@ -23,6 +24,8 @@ import {
   resolveCheckoutCurrency,
 } from "../utils/stripeCustomerCurrency";
 
+const logger = createLogger("langwatch:billing:seatEventSubscription");
+
 type InviteInput = {
   email: string;
   role: OrganizationUserRole;
@@ -40,45 +43,120 @@ export const createSeatEventSubscriptionFns = ({
   stripe: Stripe;
   db: PrismaClient;
 }) => {
-  // The most recent subscription we can act on at the billing provider
-  // (ACTIVE, or CANCELLED-but-still-active-in-Stripe). When none exists, the
-  // failure is classified before throwing: an ACTIVE row with no provider link
-  // is a permanent state only an operator can fix (`subscription_not_linked`),
-  // not the transient drift `subscription_sync_failed` tells customers will
-  // catch up on its own.
-  const findLinkedSubscription = async (organizationId: string) => {
-    const lastSubscription = await db.subscription.findFirst({
+  /**
+   * The subscription a seat change should act on, or a named reason there
+   * isn't one.
+   *
+   * Reads the candidates once and ranks them, rather than querying for a
+   * linked row first: `cancel()` keeps `stripeSubscriptionId` on a CANCELLED
+   * row deliberately, so a churned subscription is a permanent tombstone. A
+   * "most recent row that has an id" lookup therefore returns that tombstone
+   * forever — beating a live ACTIVE row that happens to be older, and hiding
+   * an ACTIVE-but-never-linked row behind `subscription_sync_failed`, whose
+   * copy promises the customer it catches up on its own. It never does.
+   */
+  const findSeatSubscription = async (organizationId: string) => {
+    const candidates = await db.subscription.findMany({
       where: {
         organizationId,
         status: {
           in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED],
         },
-        stripeSubscriptionId: { not: null },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    if (lastSubscription?.stripeSubscriptionId) {
+    const linked = (subscription: (typeof candidates)[number]) =>
+      subscription.stripeSubscriptionId !== null;
+
+    // A live subscription we can act on beats everything.
+    const activeLinked = candidates.find(
+      (s) => s.status === SubscriptionStatus.ACTIVE && linked(s),
+    );
+    if (activeLinked?.stripeSubscriptionId) {
       return {
-        ...lastSubscription,
-        stripeSubscriptionId: lastSubscription.stripeSubscriptionId,
+        ...activeLinked,
+        stripeSubscriptionId: activeLinked.stripeSubscriptionId,
       };
     }
 
-    const unlinked = await db.subscription.findFirst({
-      where: {
-        organizationId,
-        status: SubscriptionStatus.ACTIVE,
-        stripeSubscriptionId: null,
-      },
-    });
-
-    if (unlinked) {
+    // An ACTIVE row with no link outranks any cancelled one: it is the
+    // organization's current plan, and it is the state only an operator can
+    // clear (nothing but the checkout webhook ever writes the link).
+    const activeUnlinked = candidates.find(
+      (s) => s.status === SubscriptionStatus.ACTIVE && !linked(s),
+    );
+    if (activeUnlinked) {
+      logger.error(
+        { organizationId, subscriptionId: activeUnlinked.id },
+        "[billing] Active subscription has no billing-provider link; seat changes need one to be connected by hand",
+      );
       throw new SubscriptionNotLinkedError();
+    }
+
+    // Cancelled in our records but possibly still live at the provider —
+    // updating seats is how a customer reverses a scheduled cancellation.
+    const cancelledLinked = candidates.find((s) => linked(s));
+    if (cancelledLinked?.stripeSubscriptionId) {
+      return {
+        ...cancelledLinked,
+        stripeSubscriptionId: cancelledLinked.stripeSubscriptionId,
+      };
     }
 
     throw new NoActiveSubscriptionError();
   };
+
+  /** The subscription, its provider record, and the seat line to change. */
+  const loadSeatChangeTarget = async (organizationId: string) => {
+    const subscription = await findSeatSubscription(organizationId);
+
+    const stripeSubscription = await stripe.subscriptions.retrieve(
+      subscription.stripeSubscriptionId,
+    );
+
+    // Must still be live at the provider, even if scheduled for cancellation.
+    if (stripeSubscription.status !== "active") {
+      throw new NoActiveSubscriptionError();
+    }
+
+    const seatItem = stripeSubscription.items.data.find((item) =>
+      isGrowthSeatPrice(item.price.id),
+    );
+
+    if (!seatItem) {
+      throw new SubscriptionItemNotFoundError("seat");
+    }
+
+    return { subscription, stripeSubscription, seatItem };
+  };
+
+  /**
+   * The seat change itself — read by BOTH the preview and the update, so the
+   * quote cannot describe a different operation from the one performed.
+   *
+   * They diverged before: the update reverses a scheduled cancellation (the
+   * customer buying a seat is choosing to keep the plan), while the preview
+   * modelled the subscription as still cancelling. On an annual plan billed
+   * alongside a monthly meter, cancellation truncates the seat line to the
+   * monthly boundary, so the same 6→8 seat change quoted €54.25 and charged
+   * €639.91. `always_invoice` matters for the same reason: it bills every
+   * pending proration immediately, including any the subscription already
+   * carried, so the preview must count those rather than net them out.
+   */
+  const seatChangeParams = ({
+    stripeSubscription,
+    seatItem,
+    quantity,
+  }: {
+    stripeSubscription: Stripe.Subscription;
+    seatItem: Stripe.SubscriptionItem;
+    quantity: number;
+  }) => ({
+    ...(stripeSubscription.canceled_at ? { cancel_at_period_end: false } : {}),
+    items: [{ id: seatItem.id, quantity }],
+    proration_behavior: "always_invoice" as const,
+  });
 
   return {
     async createSeatEventCheckout({
@@ -259,38 +337,24 @@ export const createSeatEventSubscriptionFns = ({
       // Every failure below throws rather than returning `{ success: false }`:
       // a silent false used to resolve the mutation as a success, so the UI
       // toasted "Seats updated successfully" over a seat count that never moved.
-      const lastSubscription = await findLinkedSubscription(organizationId);
+      const { subscription, stripeSubscription, seatItem } =
+        await loadSeatChangeTarget(organizationId);
 
-      const stripeSubscription = await stripe.subscriptions.retrieve(
-        lastSubscription.stripeSubscriptionId,
+      // Charges the proration immediately, and reactivates the subscription if
+      // it was scheduled for cancellation — the customer buying a seat is
+      // choosing to keep it.
+      await stripe.subscriptions.update(
+        subscription.stripeSubscriptionId,
+        seatChangeParams({
+          stripeSubscription,
+          seatItem,
+          quantity: totalMembers,
+        }),
       );
-
-      // Stripe sub must still be active (even if scheduled for cancellation)
-      if (stripeSubscription.status !== "active") {
-        throw new NoActiveSubscriptionError();
-      }
-
-      const seatItem = stripeSubscription.items.data.find((item) =>
-        isGrowthSeatPrice(item.price.id),
-      );
-
-      if (!seatItem) {
-        throw new SubscriptionItemNotFoundError("seat");
-      }
-
-      // Update seats (and reactivate if scheduled for cancellation — the user
-      // is choosing to keep their subscription by updating seats).
-      await stripe.subscriptions.update(lastSubscription.stripeSubscriptionId, {
-        ...(stripeSubscription.canceled_at
-          ? { cancel_at_period_end: false }
-          : {}),
-        items: [{ id: seatItem.id, quantity: totalMembers }],
-        proration_behavior: "always_invoice",
-      });
 
       // Restore DB record to ACTIVE with updated seat count
       await db.subscription.update({
-        where: { id: lastSubscription.id },
+        where: { id: subscription.id },
         data: {
           status: SubscriptionStatus.ACTIVE,
           maxMembers: totalMembers,
@@ -308,62 +372,40 @@ export const createSeatEventSubscriptionFns = ({
       organizationId: string;
       newTotalSeats: number;
     }) {
-      const lastSubscription = await findLinkedSubscription(organizationId);
+      const { subscription, stripeSubscription, seatItem } =
+        await loadSeatChangeTarget(organizationId);
 
-      const stripeSubscription = await stripe.subscriptions.retrieve(
-        lastSubscription.stripeSubscriptionId,
-      );
-
-      // Guard: Stripe sub must still be active (even if scheduled for cancellation)
-      if (stripeSubscription.status !== "active") {
-        throw new NoActiveSubscriptionError();
-      }
-
-      const seatItem = stripeSubscription.items.data.find((item) =>
-        isGrowthSeatPrice(item.price.id),
-      );
-
-      if (!seatItem) {
-        throw new SubscriptionItemNotFoundError("seat");
-      }
-
-      // Preview the invoice WITH the proposed seat change. This goes through the
-      // Create Preview Invoice API, not the Upcoming Invoice API: Stripe rejects
-      // `retrieveUpcoming` for subscriptions on flexible billing mode on every
-      // API version, and subscriptions migrated to flexible billing are live
-      // customer state.
-      const upcomingWithChange = await stripe.invoices.createPreview({
-        subscription: lastSubscription.stripeSubscriptionId,
-        subscription_details: {
-          items: [{ id: seatItem.id, quantity: newTotalSeats }],
-          proration_behavior: "create_prorations",
-        },
+      // Preview the exact change the confirm button performs. This goes through
+      // the Create Preview Invoice API, not the Upcoming Invoice API: Stripe
+      // rejects `retrieveUpcoming` for subscriptions on flexible billing mode on
+      // every API version, and subscriptions migrated to flexible billing are
+      // live customer state.
+      const preview = await stripe.invoices.createPreview({
+        subscription: subscription.stripeSubscriptionId,
+        subscription_details: seatChangeParams({
+          stripeSubscription,
+          seatItem,
+          quantity: newTotalSeats,
+        }),
       });
 
-      // Preview the current invoice WITHOUT changes to isolate pre-existing
-      // prorations (e.g. from mid-month signup with billing_cycle_anchor)
-      const upcomingCurrent = await stripe.invoices.createPreview({
-        subscription: lastSubscription.stripeSubscriptionId,
-      });
-
-      const currency = (upcomingWithChange.currency?.toUpperCase() ??
+      const currency = (preview.currency?.toUpperCase() ??
         Currency.USD) as Currency;
       const billingInterval = seatItem.price.recurring?.interval ?? "month";
 
-      // Subtract existing prorations from changed prorations to get ONLY
-      // the incremental cost of adding/removing seats.
-      const sumProrations = (
-        lines: { proration: boolean; amount: number }[],
-      ) => {
-        let total = 0;
-        for (const line of lines) {
-          if (line.proration) total += line.amount;
-        }
-        return total;
-      };
-      const prorationCents =
-        sumProrations(upcomingWithChange.lines.data) -
-        sumProrations(upcomingCurrent.lines.data);
+      // What `always_invoice` bills on confirmation: every proration line on the
+      // previewed invoice. The rest of the preview is next cycle's recurring and
+      // metered usage, which this change does not charge for now.
+      //
+      // Deliberately NOT netted against a second, unchanged preview. That
+      // subtraction isolated the incremental seat cost, which is not the number
+      // charged: `always_invoice` also bills prorations the subscription was
+      // already carrying (from a mid-cycle billing anchor, say), so netting them
+      // out quoted less than the card is debited.
+      let prorationCents = 0;
+      for (const line of preview.lines.data) {
+        if (line.proration) prorationCents += line.amount;
+      }
 
       // Recurring total: new seat count × per-seat price
       const unitAmountCents = seatItem.price.unit_amount ?? 0;
@@ -383,6 +425,9 @@ export const createSeatEventSubscriptionFns = ({
       };
 
       return {
+        // Signed, so the dialog can tell a charge from a credit: removing
+        // seats previews a negative amount.
+        amountDueCents: prorationCents,
         formattedAmountDue: format(prorationCents),
         formattedRecurringTotal: format(recurringTotalCents),
         billingInterval,

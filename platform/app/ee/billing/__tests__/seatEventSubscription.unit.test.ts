@@ -96,89 +96,83 @@ describe("seatEventSubscription", () => {
 
   // ── previewProration ────────────────────────────────────────────────────
 
+  /** An ACTIVE, linked row — the ordinary case. */
+  const linkedActive = {
+    id: "sub_db_1",
+    stripeSubscriptionId: "sub_stripe_1",
+    status: SubscriptionStatus.ACTIVE,
+  };
+
+  const seatSubscription = ({
+    canceledAt = null,
+    interval = "month",
+    unitAmount = 2500,
+    priceId = "price_seat_usd_monthly",
+  }: {
+    canceledAt?: number | null;
+    interval?: string;
+    unitAmount?: number;
+    priceId?: string;
+  } = {}) => ({
+    status: "active",
+    canceled_at: canceledAt,
+    items: {
+      data: [
+        {
+          id: "si_seat",
+          price: {
+            id: priceId,
+            unit_amount: unitAmount,
+            recurring: { interval },
+          },
+        },
+      ],
+    },
+  });
+
   describe("previewProration()", () => {
     describe("when active subscription exists with a seat item", () => {
       beforeEach(() => {
-        db.subscription.findFirst.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-          status: SubscriptionStatus.ACTIVE,
-        });
-
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          status: "active",
-          items: {
-            data: [
-              {
-                id: "si_seat",
-                price: {
-                  id: "price_seat_usd_monthly",
-                  unit_amount: 2500,
-                  recurring: { interval: "month" },
-                },
-              },
-            ],
-          },
-        });
+        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
       });
 
       it("returns formatted proration amount and recurring total for USD", async () => {
-        // "with change" invoice has $15 proration, "current" has $5 existing proration
-        stripe.invoices.createPreview
-          .mockResolvedValueOnce({
-            currency: "usd",
-            lines: {
-              data: [
-                { proration: true, amount: 1500 },
-                { proration: false, amount: 5000 },
-              ],
-            },
-          })
-          .mockResolvedValueOnce({
-            currency: "usd",
-            lines: {
-              data: [{ proration: true, amount: 500 }],
-            },
-          });
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          lines: {
+            data: [
+              { proration: true, amount: 1500 },
+              { proration: false, amount: 5000 },
+            ],
+          },
+        });
 
         const result = await service.previewProration({
           organizationId: "org_1",
           newTotalSeats: 4,
         });
 
-        // 1000 cents = $10 (whole number, no decimals)
-        expect(result.formattedAmountDue).toBe("$10");
+        // Only the proration line counts; the recurring line is next cycle.
+        expect(result.formattedAmountDue).toBe("$15");
+        expect(result.amountDueCents).toBe(1500);
         // 4 seats * $25 = $100 (whole number, no decimals)
         expect(result.formattedRecurringTotal).toBe("$100");
         expect(result.billingInterval).toBe("month");
       });
 
       it("returns formatted proration amount and recurring total for EUR", async () => {
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          status: "active",
-          items: {
-            data: [
-              {
-                id: "si_seat",
-                price: {
-                  id: "price_seat_eur_monthly",
-                  unit_amount: 2000,
-                  recurring: { interval: "month" },
-                },
-              },
-            ],
-          },
-        });
+        stripe.subscriptions.retrieve.mockResolvedValue(
+          seatSubscription({
+            priceId: "price_seat_eur_monthly",
+            unitAmount: 2000,
+          }),
+        );
 
-        stripe.invoices.createPreview
-          .mockResolvedValueOnce({
-            currency: "eur",
-            lines: { data: [{ proration: true, amount: 2000 }] },
-          })
-          .mockResolvedValueOnce({
-            currency: "eur",
-            lines: { data: [] },
-          });
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "eur",
+          lines: { data: [{ proration: true, amount: 2000 }] },
+        });
 
         const result = await service.previewProration({
           organizationId: "org_1",
@@ -186,114 +180,158 @@ describe("seatEventSubscription", () => {
         });
 
         // EUR uses en-IE locale
-        expect(result.formattedAmountDue).toBe("\u20AC20");
-        expect(result.formattedRecurringTotal).toBe("\u20AC100");
+        expect(result.formattedAmountDue).toBe("€20");
+        expect(result.formattedRecurringTotal).toBe("€100");
       });
 
-      it("formats whole-dollar amounts without decimals", async () => {
-        stripe.invoices.createPreview
-          .mockResolvedValueOnce({
-            currency: "usd",
-            lines: { data: [{ proration: true, amount: 5000 }] },
-          })
-          .mockResolvedValueOnce({
-            currency: "usd",
-            lines: { data: [] },
-          });
+      it("formats whole amounts without decimals", async () => {
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          lines: { data: [{ proration: true, amount: 5000 }] },
+        });
 
         const result = await service.previewProration({
           organizationId: "org_1",
           newTotalSeats: 2,
         });
 
-        // 5000 cents = $50, whole number => no decimals
         expect(result.formattedAmountDue).toBe("$50");
         // 2 * 2500 = 5000 cents = $50
         expect(result.formattedRecurringTotal).toBe("$50");
       });
 
       it("formats fractional amounts with two decimal places", async () => {
-        stripe.invoices.createPreview
-          .mockResolvedValueOnce({
-            currency: "usd",
-            lines: { data: [{ proration: true, amount: 1550 }] },
-          })
-          .mockResolvedValueOnce({
-            currency: "usd",
-            lines: { data: [{ proration: true, amount: 100 }] },
-          });
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          lines: { data: [{ proration: true, amount: 1450 }] },
+        });
 
         const result = await service.previewProration({
           organizationId: "org_1",
           newTotalSeats: 1,
         });
 
-        // (1550 - 100) = 1450 cents = $14.50
         expect(result.formattedAmountDue).toBe("$14.50");
       });
 
-      it("subtracts existing prorations to isolate incremental cost", async () => {
-        stripe.invoices.createPreview
-          .mockResolvedValueOnce({
-            currency: "usd",
-            lines: {
-              data: [
-                { proration: true, amount: 3000 },
-                { proration: true, amount: 1000 },
-              ],
-            },
-          })
-          .mockResolvedValueOnce({
-            currency: "usd",
-            lines: {
-              data: [{ proration: true, amount: 2000 }],
-            },
-          });
+      /** @scenario "Amount due counts prorations the subscription already carried" */
+      it("counts prorations the subscription already carried, because confirming bills those too", async () => {
+        // A mid-cycle billing anchor leaves pending prorations on the
+        // subscription. `always_invoice` charges them alongside the seat
+        // change, so netting them out under-quotes what the card is debited.
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          lines: {
+            data: [
+              { proration: true, amount: 3000 },
+              { proration: true, amount: 1000 },
+              { proration: false, amount: 9900 },
+            ],
+          },
+        });
 
         const result = await service.previewProration({
           organizationId: "org_1",
           newTotalSeats: 3,
         });
 
-        // (3000 + 1000) - 2000 = 2000 cents = $20
-        expect(result.formattedAmountDue).toBe("$20");
+        expect(result.amountDueCents).toBe(4000);
       });
 
-      it("previews the seat change through the Create Preview Invoice API", async () => {
-        stripe.invoices.createPreview
-          .mockResolvedValueOnce({
-            currency: "usd",
-            lines: { data: [] },
-          })
-          .mockResolvedValueOnce({
-            currency: "usd",
-            lines: { data: [] },
-          });
+      /** @scenario "Reducing seats previews a credit rather than an amount owed" */
+      it("reports a seat reduction as a signed credit", async () => {
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          lines: { data: [{ proration: true, amount: -2500 }] },
+        });
+
+        const result = await service.previewProration({
+          organizationId: "org_1",
+          newTotalSeats: 1,
+        });
+
+        expect(result.amountDueCents).toBe(-2500);
+      });
+
+      /** @scenario "Preview works for subscriptions on flexible billing" */
+      it("previews the seat change through the Create Preview Invoice API, in one call", async () => {
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          lines: { data: [] },
+        });
 
         await service.previewProration({
           organizationId: "org_1",
           newTotalSeats: 7,
         });
 
-        // The old Upcoming Invoice API rejects flexible-billing subscriptions
-        // outright, so the preview must go through create_preview: once with
-        // the proposed change, once as the unmodified baseline.
-        expect(stripe.invoices.createPreview).toHaveBeenNthCalledWith(1, {
+        // The Upcoming Invoice API rejects flexible-billing subscriptions
+        // outright, so the preview must go through create_preview.
+        expect(stripe.invoices.createPreview).toHaveBeenCalledTimes(1);
+        expect(stripe.invoices.createPreview).toHaveBeenCalledWith({
           subscription: "sub_stripe_1",
           subscription_details: {
             items: [{ id: "si_seat", quantity: 7 }],
-            proration_behavior: "create_prorations",
+            proration_behavior: "always_invoice",
           },
-        });
-        expect(stripe.invoices.createPreview).toHaveBeenNthCalledWith(2, {
-          subscription: "sub_stripe_1",
         });
       });
     });
 
-    describe("when no active subscription exists", () => {
+    describe("when the subscription is scheduled for cancellation", () => {
+      beforeEach(() => {
+        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        stripe.subscriptions.retrieve.mockResolvedValue(
+          seatSubscription({ canceledAt: 1700000000, interval: "year" }),
+        );
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "eur",
+          lines: { data: [{ proration: true, amount: 63991 }] },
+        });
+        stripe.subscriptions.update.mockResolvedValue({});
+      });
+
+      it("previews the reactivation the update performs, not the cancellation", async () => {
+        await service.previewProration({
+          organizationId: "org_1",
+          newTotalSeats: 8,
+        });
+
+        // Without this, an annual plan billed next to a monthly meter is
+        // quoted against a seat line truncated to the monthly boundary — the
+        // same change quoted 54.25 and charged 639.91.
+        expect(stripe.invoices.createPreview).toHaveBeenCalledWith({
+          subscription: "sub_stripe_1",
+          subscription_details: {
+            cancel_at_period_end: false,
+            items: [{ id: "si_seat", quantity: 8 }],
+            proration_behavior: "always_invoice",
+          },
+        });
+      });
+
+      /** @scenario "Preview quotes the same change the confirmation applies" */
+      it("quotes the same change the update applies", async () => {
+        await service.previewProration({
+          organizationId: "org_1",
+          newTotalSeats: 8,
+        });
+        await service.updateSeatEventItems({
+          organizationId: "org_1",
+          totalMembers: 8,
+        });
+
+        const previewed =
+          stripe.invoices.createPreview.mock.calls[0]![0].subscription_details;
+        const applied = stripe.subscriptions.update.mock.calls[0]![1];
+
+        expect(previewed).toEqual(applied);
+      });
+    });
+
+    describe("when no subscription exists at all", () => {
       it("raises subscription_sync_failed", async () => {
-        db.subscription.findFirst.mockResolvedValue(null);
+        db.subscription.findMany.mockResolvedValue([]);
 
         await expect(
           service.previewProration({
@@ -304,17 +342,35 @@ describe("seatEventSubscription", () => {
       });
     });
 
-    describe("when the subscription row exists but has no billing-provider link", () => {
+    describe("when the active subscription has no billing-provider link", () => {
+      /** @scenario "An active subscription with no billing-provider link is named as such" */
       it("raises subscription_not_linked instead of the retryable sync error", async () => {
-        // First query looks for a linked row and finds none; the follow-up
-        // finds the active-but-unlinked row that explains why.
-        db.subscription.findFirst
-          .mockResolvedValueOnce(null)
-          .mockResolvedValueOnce({
-            id: "sub_db_1",
-            stripeSubscriptionId: null,
-            status: SubscriptionStatus.ACTIVE,
-          });
+        db.subscription.findMany.mockResolvedValue([
+          { id: "sub_db_1", stripeSubscriptionId: null, status: "ACTIVE" },
+        ]);
+
+        await expect(
+          service.previewProration({
+            organizationId: "org_1",
+            newTotalSeats: 3,
+          }),
+        ).rejects.toMatchObject({ code: "subscription_not_linked" });
+        expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A cancelled subscription does not mask an unlinked active one" */
+      it("is not masked by a cancelled subscription that kept its link", async () => {
+        // `cancel()` keeps stripeSubscriptionId, so a churned subscription is a
+        // permanent tombstone. Ranking by recency alone let it answer for an
+        // organization whose live plan was never linked.
+        db.subscription.findMany.mockResolvedValue([
+          {
+            id: "sub_db_tombstone",
+            stripeSubscriptionId: "sub_stripe_dead",
+            status: "CANCELLED",
+          },
+          { id: "sub_db_live", stripeSubscriptionId: null, status: "ACTIVE" },
+        ]);
 
         await expect(
           service.previewProration({
@@ -326,13 +382,68 @@ describe("seatEventSubscription", () => {
       });
     });
 
-    describe("when Stripe subscription is not active", () => {
-      it("raises subscription_sync_failed", async () => {
-        db.subscription.findFirst.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
+    describe("when a newer cancelled subscription sits above a live one", () => {
+      /** @scenario "A live subscription outranks a more recent cancelled one" */
+      it("acts on the live subscription", async () => {
+        db.subscription.findMany.mockResolvedValue([
+          {
+            id: "sub_db_new",
+            stripeSubscriptionId: "sub_stripe_dead",
+            status: "CANCELLED",
+          },
+          {
+            id: "sub_db_old",
+            stripeSubscriptionId: "sub_stripe_live",
+            status: "ACTIVE",
+          },
+        ]);
+        stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          lines: { data: [] },
         });
 
+        await service.previewProration({
+          organizationId: "org_1",
+          newTotalSeats: 3,
+        });
+
+        expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith(
+          "sub_stripe_live",
+        );
+      });
+    });
+
+    describe("when only a cancelled subscription remains", () => {
+      /** @scenario "Seat updates can reverse a scheduled cancellation" */
+      it("acts on it, so a scheduled cancellation can be reversed", async () => {
+        db.subscription.findMany.mockResolvedValue([
+          {
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: "CANCELLED",
+          },
+        ]);
+        stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          lines: { data: [] },
+        });
+
+        await service.previewProration({
+          organizationId: "org_1",
+          newTotalSeats: 3,
+        });
+
+        expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith(
+          "sub_stripe_1",
+        );
+      });
+    });
+
+    describe("when Stripe subscription is not active", () => {
+      it("raises subscription_sync_failed", async () => {
+        db.subscription.findMany.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue({
           status: "canceled",
           items: { data: [] },
@@ -349,19 +460,12 @@ describe("seatEventSubscription", () => {
 
     describe("when no seat item found on subscription", () => {
       it("raises subscription_sync_failed for a missing seat item", async () => {
-        db.subscription.findFirst.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-        });
-
+        db.subscription.findMany.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue({
           status: "active",
           items: {
             data: [
-              {
-                id: "si_events",
-                price: { id: "price_events_usd_monthly" },
-              },
+              { id: "si_events", price: { id: "price_events_usd_monthly" } },
             ],
           },
         });
@@ -381,20 +485,8 @@ describe("seatEventSubscription", () => {
   describe("updateSeatEventItems()", () => {
     describe("when active subscription exists with a seat item", () => {
       beforeEach(() => {
-        db.subscription.findFirst.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-          status: SubscriptionStatus.ACTIVE,
-        });
-
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          status: "active",
-          canceled_at: null,
-          items: {
-            data: [{ id: "si_seat", price: { id: "price_seat_usd_monthly" } }],
-          },
-        });
-
+        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
         stripe.subscriptions.update.mockResolvedValue({});
       });
 
@@ -433,20 +525,10 @@ describe("seatEventSubscription", () => {
 
     describe("when subscription is scheduled for cancellation", () => {
       it("reactivates by setting cancel_at_period_end to false", async () => {
-        db.subscription.findFirst.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-          status: SubscriptionStatus.ACTIVE,
-        });
-
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          status: "active",
-          canceled_at: 1700000000,
-          items: {
-            data: [{ id: "si_seat", price: { id: "price_seat_usd_monthly" } }],
-          },
-        });
-
+        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        stripe.subscriptions.retrieve.mockResolvedValue(
+          seatSubscription({ canceledAt: 1700000000 }),
+        );
         stripe.subscriptions.update.mockResolvedValue({});
 
         await service.updateSeatEventItems({
@@ -465,9 +547,10 @@ describe("seatEventSubscription", () => {
       });
     });
 
-    describe("when no DB subscription has a stripe ID", () => {
+    describe("when no subscription exists at all", () => {
+      /** @scenario "A seat update that cannot proceed fails instead of resolving quietly" */
       it("raises subscription_sync_failed instead of resolving as a silent no-op", async () => {
-        db.subscription.findFirst.mockResolvedValue(null);
+        db.subscription.findMany.mockResolvedValue([]);
 
         await expect(
           service.updateSeatEventItems({
@@ -479,15 +562,12 @@ describe("seatEventSubscription", () => {
       });
     });
 
-    describe("when the subscription row exists but has no billing-provider link", () => {
+    describe("when the active subscription has no billing-provider link", () => {
+      /** @scenario "An unlinked subscription blocks the seat update itself" */
       it("raises subscription_not_linked so the seat update cannot pass as a success", async () => {
-        db.subscription.findFirst
-          .mockResolvedValueOnce(null)
-          .mockResolvedValueOnce({
-            id: "sub_db_1",
-            stripeSubscriptionId: null,
-            status: SubscriptionStatus.ACTIVE,
-          });
+        db.subscription.findMany.mockResolvedValue([
+          { id: "sub_db_1", stripeSubscriptionId: null, status: "ACTIVE" },
+        ]);
 
         await expect(
           service.updateSeatEventItems({
@@ -502,11 +582,7 @@ describe("seatEventSubscription", () => {
 
     describe("when Stripe subscription status is not active", () => {
       it("raises subscription_sync_failed", async () => {
-        db.subscription.findFirst.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-        });
-
+        db.subscription.findMany.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue({
           status: "canceled",
           items: { data: [] },
@@ -524,19 +600,12 @@ describe("seatEventSubscription", () => {
 
     describe("when no seat item found on Stripe subscription", () => {
       it("raises subscription_sync_failed for the missing seat item", async () => {
-        db.subscription.findFirst.mockResolvedValue({
-          id: "sub_db_1",
-          stripeSubscriptionId: "sub_stripe_1",
-        });
-
+        db.subscription.findMany.mockResolvedValue([linkedActive]);
         stripe.subscriptions.retrieve.mockResolvedValue({
           status: "active",
           items: {
             data: [
-              {
-                id: "si_events",
-                price: { id: "price_events_usd_monthly" },
-              },
+              { id: "si_events", price: { id: "price_events_usd_monthly" } },
             ],
           },
         });

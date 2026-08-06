@@ -16,6 +16,8 @@ import { Dialog } from "../ui/dialog";
 type ProrationQueryResult =
   | {
       data?: {
+        amountDueCents: number;
+        formattedAmountDue: string;
         formattedRecurringTotal: string;
         billingInterval: string;
       };
@@ -90,14 +92,29 @@ function SeatsProrationPreview({
       <Separator />
 
       {data && (
-        <HStack justify="space-between" paddingX={2}>
-          <Text fontWeight="normal" fontSize="md" color="gray.500">
-            New billing amount
-          </Text>
-          <Text fontWeight="normal" fontSize="md" color="gray.500">
-            {data.formattedRecurringTotal}
-          </Text>
-        </HStack>
+        <VStack gap={3} align="stretch">
+          {/* Confirming charges this immediately, so it is the headline number
+              rather than a footnote — the recurring total below is what the
+              plan costs from the next invoice onwards. */}
+          <HStack justify="space-between" paddingX={2}>
+            <Text fontWeight="semibold" fontSize="md">
+              {data.amountDueCents < 0 ? "Credit applied today" : "Due today"}
+            </Text>
+            <Text fontWeight="semibold" fontSize="md">
+              {data.formattedAmountDue}
+            </Text>
+          </HStack>
+
+          <HStack justify="space-between" paddingX={2}>
+            <Text fontWeight="normal" fontSize="md" color="gray.500">
+              New billing amount
+            </Text>
+            <Text fontWeight="normal" fontSize="md" color="gray.500">
+              {data.formattedRecurringTotal}
+              {data.billingInterval === "year" ? " per year" : " per month"}
+            </Text>
+          </HStack>
+        </VStack>
       )}
     </VStack>
   );

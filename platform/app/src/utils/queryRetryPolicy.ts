@@ -1,21 +1,31 @@
 import { TRPCClientError } from "@trpc/client";
 
+import { isPermanentFailure } from "~/features/errors/logic/retryability";
+
 export const MAX_QUERY_RETRIES = 4;
 
 /**
  * Statuses where an automatic replay cannot change the answer: the request was
- * malformed, unauthorized, missing — or, for 409, in conflict with server
- * state that only a deliberate action (reload, operator fix) resolves.
- * Retrying a conflict just replays the same refusal with backoff, which the
- * user experiences as a hung spinner before the real error finally shows.
+ * malformed, unauthorized, or aimed at something that is not there.
+ *
+ * 409 is deliberately absent. A conflict is the one 4xx that regularly IS
+ * transient — a resource being written concurrently, a provider record that
+ * settles a second later, a link written by a webhook that has not arrived
+ * yet. Permanent conflicts are excluded by `isPermanentFailure`, which reads
+ * the handled error's code, because that is where the distinction actually
+ * lives.
  */
-const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404, 409, 422, 431];
+const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404, 422, 431];
 
 export function shouldRetryQuery(
   failureCount: number,
   error: unknown,
 ): boolean {
   if (failureCount >= MAX_QUERY_RETRIES) {
+    return false;
+  }
+
+  if (isPermanentFailure(error)) {
     return false;
   }
 

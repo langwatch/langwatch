@@ -292,6 +292,7 @@ export class EESubscriptionService implements SubscriptionService {
     organizationId: string;
     newTotalSeats: number;
   }): Promise<{
+    amountDueCents: number;
     formattedAmountDue: string;
     formattedRecurringTotal: string;
     billingInterval: string;
