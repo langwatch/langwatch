@@ -430,7 +430,14 @@ describe("given a connected provider source that pulls usage on a schedule", () 
       // because migration 00073 keeps the fold from ever admitting these rows.
       const rollup = await rollupRows();
       expect(rollup.some((r) => r.Scope === PULLED_USAGE_SCOPE)).toBe(false);
-      expect(rollup.some((r) => r.BudgetId === TEAM_BUDGET_ID)).toBe(true);
+
+      // The gateway's own row is present AND its nano aggregate is populated.
+      // "No pulled row in the rollup" is trivially true of a rollup that
+      // folded nothing at all, so the exclusion is only meaningful next to
+      // proof that the view is still doing its job for real budgets.
+      const teamRow = rollup.find((r) => r.BudgetId === TEAM_BUDGET_ID);
+      expect(teamRow).toBeDefined();
+      expect(Number(teamRow?.SpendNanoUSD)).toBe(NEARLY_SPENT_NANO);
     });
   });
 
@@ -441,10 +448,18 @@ describe("given a connected provider source that pulls usage on a schedule", () 
       await writeGatewayDebit(gatewayNano);
 
       const rollup = await rollupRows();
+      const gatewayNanoInRollup = rollup
+        .filter((r) => r.BudgetId === TEAM_BUDGET_ID)
+        .reduce((sum, r) => sum + Number(r.SpendNanoUSD), 0);
       const gatewayUsd = rollup
         .filter((r) => r.BudgetId === TEAM_BUDGET_ID)
         .reduce((sum, r) => sum + Number(r.SpendUSD), 0);
       const pulled = await pulledTotalsFor([TEAM_ID]);
+
+      // The column enforcement actually sums. Asserting only on SpendUSD
+      // below would pass with an empty SpendNanoUSD aggregate, which is
+      // exactly what "every budget silently stops enforcing" looks like.
+      expect(gatewayNanoInRollup).toBe(NEARLY_SPENT_NANO + gatewayNano);
 
       // Two surfaces, two figures, neither containing the other. There is no
       // request id shared between a provider's bucket and a gateway request,
@@ -465,21 +480,29 @@ describe("given a connected provider source that pulls usage on a schedule", () 
 /**
  * The spend-rollup aggregate as enforcement sees it.
  *
- * Read straight out of the materialised view's target table rather than
- * through `getSpendForBudgetsAcrossTenants`, deliberately: that read matches a
- * period floor it computes itself, and on a ClickHouse server whose timezone
- * is not UTC the stored `PeriodStart` and the computed floor disagree, so it
- * returns zero locally for reasons that have nothing to do with this feature
- * (the pre-existing `budgetNanoExactSpend.integration.test.ts` fails the same
- * way on the same machine). What this ADR has to prove is which ROWS reach the
- * aggregate, and that is exactly what this reads.
+ * `SpendNanoUSD` is the column that matters and the reason this helper exists
+ * in this shape. `getSpendForBudgets*` reads `sumMerge(SpendNanoUSD)` and
+ * nothing else, so a materialised view that stopped populating it would leave
+ * every calendar-window budget reading zero — enforcement silently off — while
+ * `SpendUSD`, the Decimal audit column, kept looking perfectly healthy. An
+ * earlier version of this test asserted only on `SpendUSD` and was blind to
+ * exactly that break in migration 00073. Both are read here; the nano one is
+ * what any future test touching this view must assert on.
  */
 async function rollupRows(): Promise<
-  Array<{ Scope: string; BudgetId: string; SpendUSD: string }>
+  Array<{
+    Scope: string;
+    BudgetId: string;
+    SpendUSD: string;
+    SpendNanoUSD: string;
+  }>
 > {
   const client = await getClickHouseClientForProject(APP_PROJECT_ID);
   const result = await client!.query({
-    query: `SELECT Scope, BudgetId, toString(sumMerge(SpendUSD)) AS SpendUSD
+    query: `SELECT Scope,
+                   BudgetId,
+                   toString(sumMerge(SpendUSD))     AS SpendUSD,
+                   toString(sumMerge(SpendNanoUSD)) AS SpendNanoUSD
             FROM gateway_budget_scope_totals
             WHERE TenantId IN ({app:String}, {gov:String})
             GROUP BY Scope, BudgetId`,
@@ -490,6 +513,7 @@ async function rollupRows(): Promise<
     Scope: string;
     BudgetId: string;
     SpendUSD: string;
+    SpendNanoUSD: string;
   }>;
 }
 
