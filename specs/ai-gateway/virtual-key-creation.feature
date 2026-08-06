@@ -77,6 +77,17 @@ Feature: AI Gateway virtual key creation
     # is the one answer that is certainly wrong.
 
   @integration
+  Scenario: A destination that is named has to be one that exists
+    Given organization "acme" and a project belonging to another organization
+    When I create a key naming that project for its traces
+    Then the key is refused because the project is not in this organization
+    And no key is written
+    # Resolution falls through when the named project does not answer, so
+    # without this the key would be saved with its traffic attributed to
+    # whichever later rule picked up, while its own stated destination said
+    # otherwise. The two would disagree forever and nothing would say so.
+
+  @integration
   Scenario: A key says which rule decides where its traces land
     Given keys that name a project, take one from their scope, and name none
     When each is read back

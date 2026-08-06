@@ -842,58 +842,63 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       const ownerTeamId = `team-nxn-owner-${suffix}`;
       const ownerBudgetId = `budget-nxn-owner-${suffix}`;
       const ownerKeyId = `vk_nxn_owner_${suffix}`;
-      await prisma.team.create({
-        data: {
-          id: ownerTeamId,
-          name: `Owner ${suffix}`,
-          slug: `owner-${suffix}`,
-          organizationId: ORG_ID,
-        },
-      });
-      await prisma.gatewayBudget.create({
-        data: {
-          id: ownerBudgetId,
-          name: `Owner team cap ${suffix}`,
-          organizationId: ORG_ID,
-          scopeType: "TEAM",
-          scopeId: ownerTeamId,
-          window: "MONTH",
-          limitUsd: "25.00",
-          onBreach: "BLOCK",
-          createdById: USER_ID,
-          resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        },
-      });
-      await prisma.virtualKey.create({
-        data: {
-          id: ownerKeyId,
-          organizationId: ORG_ID,
-          name: `owner-key-${suffix}`,
-          hashedSecret: `hash-owner-${suffix}`,
-          displayPrefix: "vk-lw-own",
-          createdById: USER_ID,
-          scopes: { create: [{ scopeType: "TEAM", scopeId: ownerTeamId }] },
-        },
-      });
+      // Cleanup runs whatever happens: this leaves an ACTIVE key behind, and
+      // every later reachability assertion reads the organization's active
+      // keys, so one failure here would cascade into unrelated ones.
+      try {
+        await prisma.team.create({
+          data: {
+            id: ownerTeamId,
+            name: `Owner ${suffix}`,
+            slug: `owner-${suffix}`,
+            organizationId: ORG_ID,
+          },
+        });
+        await prisma.gatewayBudget.create({
+          data: {
+            id: ownerBudgetId,
+            name: `Owner team cap ${suffix}`,
+            organizationId: ORG_ID,
+            scopeType: "TEAM",
+            scopeId: ownerTeamId,
+            window: "MONTH",
+            limitUsd: "25.00",
+            onBreach: "BLOCK",
+            createdById: USER_ID,
+            resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          },
+        });
+        await prisma.virtualKey.create({
+          data: {
+            id: ownerKeyId,
+            organizationId: ORG_ID,
+            name: `owner-key-${suffix}`,
+            hashedSecret: `hash-owner-${suffix}`,
+            displayPrefix: "vk-lw-own",
+            createdById: USER_ID,
+            scopes: { create: [{ scopeType: "TEAM", scopeId: ownerTeamId }] },
+          },
+        });
 
-      // teamId is the team the key's traces land in, which for a key not
-      // scoped to exactly one project is the governance team, never the
-      // team that owns the key. Passing a different team here is the whole
-      // point: the budget must still resolve, from the key's own scope.
-      const resolved = await resolveApplicableBudgets(prisma, {
-        organizationId: ORG_ID,
-        virtualKeyId: ownerKeyId,
-        teamId: TEAM_ID,
-        projectId: PROJECT_ID,
-      });
-      expect(resolved.map((r) => r.budget.id)).toContain(ownerBudgetId);
-
-      await prisma.virtualKeyScope.deleteMany({
-        where: { virtualKeyId: ownerKeyId },
-      });
-      await prisma.virtualKey.deleteMany({ where: { id: ownerKeyId } });
-      await prisma.gatewayBudget.deleteMany({ where: { id: ownerBudgetId } });
-      await prisma.team.deleteMany({ where: { id: ownerTeamId } });
+        // teamId is the team the key's traces land in, which for a key not
+        // scoped to exactly one project is the governance team, never the
+        // team that owns the key. Passing a different team here is the whole
+        // point: the budget must still resolve, from the key's own scope.
+        const resolved = await resolveApplicableBudgets(prisma, {
+          organizationId: ORG_ID,
+          virtualKeyId: ownerKeyId,
+          teamId: TEAM_ID,
+          projectId: PROJECT_ID,
+        });
+        expect(resolved.map((r) => r.budget.id)).toContain(ownerBudgetId);
+      } finally {
+        await prisma.virtualKeyScope.deleteMany({
+          where: { virtualKeyId: ownerKeyId },
+        });
+        await prisma.virtualKey.deleteMany({ where: { id: ownerKeyId } });
+        await prisma.gatewayBudget.deleteMany({ where: { id: ownerBudgetId } });
+        await prisma.team.deleteMany({ where: { id: ownerTeamId } });
+      }
     });
   });
 

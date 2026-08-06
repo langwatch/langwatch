@@ -79,9 +79,10 @@ export type HandlerCredential = "apiKey" | "session" | "both" | "internal";
  * this answers "which key do I send", and the two API-key families are not
  * interchangeable. An organization key reaches organization routes and, with
  * `X-Project-Id`, project routes too; a project key can never reach an
- * organization route, because `resolveOrgOnly` rejects it on shape before any
- * permission is consulted. Getting that wrong costs an afternoon, so it is a
- * property of the route rather than something to infer from the path.
+ * organization route: `resolveOrgOnly` never resolves one, so authentication
+ * fails before any permission is consulted and no grant on the key makes a
+ * difference. Getting that wrong costs an afternoon, so it is a property of
+ * the route rather than something to infer from the path.
  *
  * A route that also accepts a browser session still publishes its key class:
  * the session is not something an integrator can send.

@@ -1391,6 +1391,14 @@ const presentations = {
         : "Pick the project where its traces and costs land. Without one they go to a hidden governance project, and every budget on the project you had in mind counts nothing.";
     },
   },
+  gateway_trace_project_unknown: {
+    // Says the destination is the problem, not the key, because the form
+    // shows a picker and the natural reading of a refusal there is that the
+    // whole key was rejected.
+    title: "That project isn't in this organization",
+    describe: () =>
+      "Pick a project this organization owns for its traces and costs to land in. The one saved on this key no longer resolves.",
+  },
   gateway_budget_scope_unreachable: {
     // Says what would have gone wrong rather than what was rejected: a budget
     // that never fires looks identical to one that was never breached, so the

@@ -12,6 +12,10 @@ export {
   requiresOnProject,
 } from "./access-policy";
 export {
+  type SecurityRequirement,
+  securityForCredentialClass,
+} from "./openapi-security";
+export {
   allRegisteredRoutes,
   getRoutePolicy,
   type RegisteredRoute,

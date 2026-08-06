@@ -21,6 +21,7 @@ import rawCurrentSpec from "../app/api/openapiLangWatch.json";
 import {
   allRegisteredRoutes,
   type CredentialClass,
+  securityForCredentialClass,
 } from "../server/api/security";
 
 // Surfaces whose routes come straight from their Hono apps. Their paths
@@ -208,25 +209,6 @@ type SpecShape = {
 };
 
 /**
- * Which security schemes the document offers for each credential class.
- *
- * `session` has none: a browser cookie is not something an integrator sends,
- * so a session-only route publishes an empty requirement rather than pointing
- * at a scheme nobody can satisfy from a client. `internal` is the same, for
- * service-to-service routes authenticated by a shared secret.
- */
-const SECURITY_BY_CREDENTIAL_CLASS: Record<
-  CredentialClass,
-  Array<Record<string, never[]>>
-> = {
-  project_api_key: [{ project_api_key: [] }],
-  organization_api_key: [{ admin_api_key: [] }],
-  session: [],
-  internal: [],
-  none: [],
-};
-
-/**
  * Give every documented operation the security requirement its route actually
  * enforces.
  *
@@ -242,21 +224,31 @@ const SECURITY_BY_CREDENTIAL_CLASS: Record<
  */
 function stampSecurityFromRegistry(spec: SpecShape): void {
   const byOperation = new Map<string, CredentialClass>();
+  // An any-method route answers for every verb the document gives its path.
+  // Kept apart so a specific registration on the same path still wins, and
+  // so a documented verb of an `.all(...)` route is stamped rather than left
+  // inheriting the document default, which is the one outcome this whole
+  // function exists to prevent.
+  const byAnyMethodPath = new Map<string, CredentialClass>();
   for (const route of allRegisteredRoutes()) {
     // Hono spells params `:id`, the document spells them `{id}`.
     const documented = route.path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
+    if (route.method === "ALL") {
+      byAnyMethodPath.set(documented, route.credentialClass);
+      continue;
+    }
     byOperation.set(`${route.method} ${documented}`, route.credentialClass);
   }
 
   for (const [routePath, item] of Object.entries(spec.paths ?? {})) {
     for (const [method, operation] of Object.entries(item)) {
       if (!operation || typeof operation !== "object") continue;
-      const credentialClass = byOperation.get(
-        `${method.toUpperCase()} ${routePath}`,
-      );
+      const operationKey = `${method.toUpperCase()} ${routePath}`;
+      const credentialClass =
+        byOperation.get(operationKey) ?? byAnyMethodPath.get(routePath);
       if (!credentialClass) continue;
       (operation as { security?: unknown }).security =
-        SECURITY_BY_CREDENTIAL_CLASS[credentialClass];
+        securityForCredentialClass({ operationKey, credentialClass });
     }
   }
 }

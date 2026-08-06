@@ -55,7 +55,7 @@ async function createProjectBudget(options: {
   });
 }
 
-async function createProject(id: string, teamId: string) {
+async function createProject({ id, teamId }: { id: string; teamId: string }) {
   await prisma.project.create({
     data: {
       id,
@@ -94,9 +94,9 @@ describe("given an organization whose keys all send traffic to one project", () 
       });
     }
 
-    await createProject(LIVE_PROJECT_ID, TEAM_ID);
-    await createProject(IDLE_PROJECT_ID, TEAM_ID);
-    await createProject(EMPTY_PROJECT_ID, EMPTY_TEAM_ID);
+    await createProject({ id: LIVE_PROJECT_ID, teamId: TEAM_ID });
+    await createProject({ id: IDLE_PROJECT_ID, teamId: TEAM_ID });
+    await createProject({ id: EMPTY_PROJECT_ID, teamId: EMPTY_TEAM_ID });
 
     await prisma.virtualKey.create({
       data: {

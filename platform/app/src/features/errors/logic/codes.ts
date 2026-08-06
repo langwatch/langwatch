@@ -77,6 +77,7 @@ export const APP_ERROR_CODES = [
   "gateway_scope_org_mismatch",
   "gateway_spend_unavailable",
   "gateway_trace_project_ambiguous",
+  "gateway_trace_project_unknown",
   "guardrail_attach_forbidden",
   "idempotency_error",
   "ingestion_source_cap_reached",

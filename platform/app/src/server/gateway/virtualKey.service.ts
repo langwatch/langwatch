@@ -29,6 +29,7 @@ import { ChangeEventRepository } from "./changeEvent.repository";
 import {
   GatewayTraceProjectAmbiguousError,
   GatewayTraceProjectRequiredError,
+  GatewayTraceProjectUnknownError,
   translateExternalIdConflict,
 } from "./errors";
 import {
@@ -911,12 +912,16 @@ export class VirtualKeyService {
    * project budget the creator had in mind matches nothing, because the
    * traffic is attributed to a project they never named.
    *
-   * So two shapes are refused. No destination at all, in an organization
+   * So three shapes are refused. No destination at all, in an organization
    * with no governance project either, is `trace_project_required`. A
    * destination only the fallback could supply, while the organization has
-   * real projects to choose from, is `gateway_trace_project_ambiguous`. An
-   * organization whose only project IS the governance one is left alone,
-   * since there would be nothing else to pick.
+   * real projects to choose from, is `gateway_trace_project_ambiguous`. A
+   * destination that is named but does not resolve in this organization,
+   * deleted or belonging to somebody else, is
+   * `gateway_trace_project_unknown`: resolution would otherwise fall through
+   * to a later stage and save the key with its traffic going somewhere its
+   * own `trace_project_id` denies. An organization whose only project IS the
+   * governance one is left alone, since there would be nothing else to pick.
    *
    * The app has always required the destination for organization and team
    * ownership; this is the API agreeing with it.
@@ -936,6 +941,9 @@ export class VirtualKeyService {
     const traceProject = await resolveTraceProject(this.prisma, vk, tx);
     if (!traceProject) {
       throw new GatewayTraceProjectRequiredError();
+    }
+    if (vk.traceProjectId && traceProject.source !== "explicit") {
+      throw new GatewayTraceProjectUnknownError();
     }
     if (traceProject.source !== "governance_fallback") return;
 

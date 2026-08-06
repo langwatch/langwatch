@@ -258,6 +258,36 @@ export class GatewayTraceProjectRequiredError extends HandledError {
 }
 
 /**
+ * A key names a trace destination this organization does not have.
+ *
+ * Resolution tries the explicit destination, then the key's single project
+ * scope, then the governance project, and each stage only answers for the
+ * keys the previous one left. That is right on the read path, where an
+ * outlived destination should degrade rather than break dispatch, and wrong
+ * on the write path: a key naming a deleted or foreign project would be
+ * accepted with its traffic quietly attributed to whichever later stage
+ * answered, while the saved `trace_project_id` went on claiming otherwise.
+ * The two would then disagree forever, and nothing would say so.
+ *
+ * So a destination that is named has to be one that resolves. The id is
+ * never echoed: it belongs to a record in another organization, if it names
+ * a record at all, and confirming which of the two would be a small
+ * disclosure of somebody else's data.
+ */
+export class GatewayTraceProjectUnknownError extends HandledError {
+  declare readonly code: "gateway_trace_project_unknown";
+
+  constructor() {
+    super(
+      "gateway_trace_project_unknown",
+      "That project is not in this organization, so traces could not land there",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "GatewayTraceProjectUnknownError";
+  }
+}
+
+/**
  * A key was written whose traces would land somewhere it never named.
  *
  * A key resolves its trace destination from an explicit one it carries, or

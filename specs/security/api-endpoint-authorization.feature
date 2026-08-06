@@ -85,8 +85,8 @@ Feature: Hono API endpoint authorization and tenant isolation
     A project API key and an organization API key are not interchangeable, and
     the difference is invisible until a call is refused. An organization key
     reaches organization routes and, with X-Project-Id, project routes too; a
-    project key can never reach an organization route, because the resolver
-    rejects it on shape before any permission is consulted.
+    valid project key cannot authenticate to an organization route at all, so
+    no permission it holds makes any difference.
 
     So the credential class is a property of the route, derived from the app it
     is mounted on rather than declared by hand, and it is what the published
@@ -111,6 +111,16 @@ Feature: Hono API endpoint authorization and tenant isolation
       # not override it, and it claimed the project key for the
       # organization-scoped spend and webhook routes. An integrator following
       # the description got a refusal the description said was impossible.
+
+    @unit
+    Scenario: An operation no API client can authenticate is never published
+      Given a route that authenticates a browser session or an internal secret
+      When the API description is generated for it
+      Then generation fails and names the operation
+      # There is no scheme for either credential, because neither is something
+      # a consumer of the public API holds. Publishing an empty requirement
+      # would read as "no credential needed" and every generated client would
+      # then emit an unauthenticated call.
 
     @integration
     Scenario: A project key on an organization endpoint is told exactly that

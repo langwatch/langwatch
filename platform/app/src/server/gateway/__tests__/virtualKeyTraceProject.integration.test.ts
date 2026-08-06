@@ -282,6 +282,55 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
     });
   });
 
+  describe("when the destination a key names is not one of this organization's", () => {
+    /** @scenario "A destination that is named has to be one that exists" */
+    it("refuses a project belonging to another organization, and writes nothing", async () => {
+      const service = VirtualKeyService.create(prisma);
+      const before = await prisma.virtualKey.count({
+        where: { organizationId: ORG_CHOICE_ID },
+      });
+
+      const refusal = await service
+        .create({
+          organizationId: ORG_CHOICE_ID,
+          name: `foreign-destination-${suffix}`,
+          actorUserId: USER_ID,
+          // A real project, of a different organization. Resolution would
+          // otherwise fall through to this key's single project scope and
+          // save it attributing traffic to CHOICE_PROJECT_A_ID while the
+          // stored destination went on naming somebody else's project.
+          scopes: [{ scopeType: "PROJECT", scopeId: CHOICE_PROJECT_A_ID }],
+          traceProjectId: PROJECT_BARE_ID,
+        })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({ code: "gateway_trace_project_unknown" });
+      expect(
+        await prisma.virtualKey.count({
+          where: { organizationId: ORG_CHOICE_ID },
+        }),
+      ).toBe(before);
+    });
+
+    it("refuses a project that does not exist at all", async () => {
+      const service = VirtualKeyService.create(prisma);
+
+      const refusal = await service
+        .create({
+          organizationId: ORG_CHOICE_ID,
+          name: `deleted-destination-${suffix}`,
+          actorUserId: USER_ID,
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_CHOICE_ID }],
+          traceProjectId: `proj-vktp-gone-${suffix}`,
+        })
+        .catch((error: unknown) => error);
+
+      // Same refusal as a foreign project on purpose: telling the two apart
+      // would confirm which project ids exist somewhere else.
+      expect(refusal).toMatchObject({ code: "gateway_trace_project_unknown" });
+    });
+  });
+
   /** @scenario "The governance inbox is a home for a shared key's traces" */
   it("resolves org- and team-owned keys to the governance project", async () => {
     const service = VirtualKeyService.create(prisma);
