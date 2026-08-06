@@ -49,6 +49,10 @@ const DENIED_COMMANDS = new Set([
   "cursor",
   "gemini",
   "opencode",
+  // interactive tool launchers: spawning them from the detached daemon
+  // (stdio /dev/null, no DISPLAY) breaks them silently.
+  "copilot",
+  "code",
   "init-shell",
   "report",
   "push",
