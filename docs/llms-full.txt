@@ -59557,6 +59557,15 @@ openapi: "DELETE /api/dataset/{slugOrId}/records"
 
 ---
 
+# FILE: ./api-reference/datasets/evaluate-a-dataset.mdx
+
+---
+title: "Evaluate a dataset"
+openapi: "POST /api/dataset/evaluate"
+---
+
+---
+
 # FILE: ./api-reference/datasets/get-dataset.mdx
 
 ---
@@ -59666,6 +59675,15 @@ The `{evaluator}` segment takes any of three things:
 ## Guardrails
 
 `POST /api/guardrails/{evaluator}/evaluate` is the same call in gating mode. Every outcome carries `passed`, including a skip and an evaluator error, so a request you are guarding is never blocked by the guard itself failing. Check `passed` and let the request through when it is true.
+
+---
+
+# FILE: ./api-reference/evaluations/report-batch-evaluation-results.mdx
+
+---
+title: "Report batch evaluation results"
+openapi: "POST /api/evaluations/batch/log_results"
+---
 
 ---
 

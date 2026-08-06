@@ -67,15 +67,22 @@ export const HANDLER_ROOTS = [
 
 /**
  * Why a route is absent from the published document. The category is not
- * decoration: `internal` and `alias` are permanent answers, `gap` is a debt
- * that should shrink, and keeping them apart is what stops the list from
- * quietly becoming a place to put anything inconvenient.
+ * decoration: `internal`, `alias` and `elsewhere` are permanent answers, `gap`
+ * is a debt that should shrink, and keeping them apart is what stops the list
+ * from quietly becoming a place to put anything inconvenient.
  */
 export type AbsenceCategory =
   /** Not a customer-callable API. It must never appear in the reference. */
   | "internal"
   /** A retired or aliased path kept alive for older clients. */
   | "alias"
+  /**
+   * Public and deliberately documented somewhere other than the API
+   * reference, because an OpenAPI operation is the wrong shape for it: the
+   * contract belongs to someone else (OTLP), or the useful documentation is a
+   * guide rather than a request schema.
+   */
+  | "elsewhere"
   /** A public endpoint that genuinely should be documented and is not yet. */
   | "gap";
 
@@ -240,6 +247,16 @@ export const UNPUBLISHED = [
     why: "the stop button next to execute, session authenticated for the same reason",
   },
 
+  {
+    match: "POST /api/export/traces/download",
+    category: "internal",
+    why: "the dashboard's download button, authenticated by a browser session rather than an API key. An API-key holder cannot reach it; /api/traces/search is the programmatic equivalent",
+  },
+  {
+    match: "POST /api/export/scenario-runs/download",
+    category: "internal",
+    why: "the dashboard's download button for scenario runs, session-authenticated in the same way as the trace export",
+  },
   // ── Aliases: older paths kept working ──────────────────────────────────
   {
     match: "/api/evaluations/v3",
@@ -252,46 +269,28 @@ export const UNPUBLISHED = [
     why: "superseded by the trace endpoints under /api/traces",
   },
 
-  // ── Gaps: public endpoints that should be documented ───────────────────
+  // ── Elsewhere: public, documented outside the API reference ────────────
   {
     match: "POST /api/collector",
-    category: "gap",
-    why: "the SDK trace ingestion endpoint. Its body is the full span payload, so publishing it means describing the span schema itself rather than annotating one handler",
+    category: "elsewhere",
+    why: "the SDK trace ingestion path. Its contract is the span payload the SDKs build for you, and the integration guides are where a reader needs to meet it; an operation listing 40 span fields answers a question nobody asks here",
   },
   {
     match: "/api/otel/v1",
-    category: "gap",
+    category: "elsewhere",
     why: "OTLP/HTTP receivers. The contract is OpenTelemetry's protobuf, which an OpenAPI operation describes poorly; the integration docs point at the OTLP spec instead",
   },
   {
     match: "/api/ingest",
-    category: "gap",
+    category: "elsewhere",
     why: "AI Governance source receivers, addressed with a per-source ingestion key. Documented today in the governance sources guide rather than the API reference",
   },
-  {
-    match: "POST /api/evaluations/batch/log_results",
-    category: "gap",
-    why: "how an SDK batch evaluation reports its rows back after POST /api/experiment/init; the payload is the batch result schema",
-  },
-  {
-    match: "POST /api/dataset/evaluate",
-    category: "gap",
-    why: "runs an evaluator across a dataset; shares the evaluator body shape above",
-  },
-  {
-    match: "POST /api/export/traces/download",
-    category: "gap",
-    why: "returns a file stream rather than JSON, so it needs a documented binary response",
-  },
-  {
-    match: "POST /api/export/scenario-runs/download",
-    category: "gap",
-    why: "same file-stream response as the trace export",
-  },
+
+  // ── Gaps: public endpoints that should be documented ───────────────────
   {
     match: "/api/scim/v2",
     category: "gap",
-    why: "SCIM 2.0 user and group provisioning for enterprise directories. The wire contract is RFC 7644 rather than ours, but enterprise buyers do look for it in the reference",
+    why: "SCIM 2.0 user and group provisioning for enterprise directories. Enterprise buyers do look for it in the reference; it lands with the management API work, where the rest of the provisioning surface is",
   },
   {
     match: "GET /api/projects/{id}/api-key",
@@ -302,11 +301,6 @@ export const UNPUBLISHED = [
     match: "POST /api/projects/{id}/regenerate-api-key",
     category: "gap",
     why: "same prerequisite as reading the project API key",
-  },
-  {
-    match: "/api/annotations/trace/{trace}",
-    category: "gap",
-    why: "documented at /api/annotations/trace/{id} while the handler names the segment :trace; the endpoint is published, the placeholder names disagree",
   },
 ] as const satisfies readonly Exclusion[];
 

@@ -1399,6 +1399,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evaluations/batch/log_results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report batch evaluation results
+         * @description Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.
+         */
+        post: operations["postApiEvaluationsBatchLog_results"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/evaluations/{evaluator}/evaluate": {
         parameters: {
             query?: never;
@@ -1453,6 +1473,26 @@ export interface paths {
          * @description Run an evaluator inline and gate on one boolean. Same call as the evaluate path with `as_guardrail` set: every outcome carries `passed`, so an evaluator that skips or fails does not block the request it was guarding. Check `passed` and let the request through when it is true.
          */
         post: operations["postApiGuardrailsByEvaluatorEvaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dataset/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evaluate a dataset
+         * @description Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it.
+         */
+        post: operations["postApiDatasetEvaluate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6245,6 +6285,143 @@ export interface operations {
             };
         };
     };
+    postApiEvaluationsBatchLog_results: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    run_id?: string;
+                    workflow_version_id?: string | null;
+                    progress?: number | null;
+                    total?: number | null;
+                    dataset?: {
+                        index: number;
+                        target_id?: string | null;
+                        entry: {
+                            [key: string]: unknown;
+                        };
+                        predicted?: {
+                            [key: string]: unknown;
+                        };
+                        cost?: number | null;
+                        duration?: number | null;
+                        error?: string | null;
+                        trace_id?: string | null;
+                    }[];
+                    evaluations?: {
+                        evaluator: string;
+                        name?: string | null;
+                        target_id?: string | null;
+                        status: "processed" | "skipped" | "error";
+                        index: number;
+                        duration?: number | null;
+                        inputs?: {
+                            [key: string]: unknown;
+                        };
+                        score?: number | null;
+                        label?: string | null;
+                        passed?: boolean | null;
+                        details?: string | null;
+                        cost?: number | null;
+                    }[];
+                } & {
+                    experiment_id?: string | null;
+                    experiment_slug?: string | null;
+                    run_id: string | null;
+                    workflow_id?: string | null;
+                    name?: string | null;
+                    targets?: ({
+                        id: string;
+                        name: string;
+                        prompt_id?: string | null;
+                        prompt_version?: number | null;
+                        agent_id?: string | null;
+                        evaluator_id?: string | null;
+                        model?: string | null;
+                        metadata?: {
+                            [key: string]: string | number | boolean;
+                        } | null;
+                    } & {
+                        type?: "prompt" | "agent" | "evaluator" | "workflow" | "custom";
+                    })[] | null;
+                    timestamps?: {
+                        created_at?: number | null;
+                        finished_at?: number | null;
+                        stopped_at?: number | null;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The rows were recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Human-readable confirmation */
+                        message: string;
+                    };
+                };
+            };
+            /** @description The request was not sent as application/json, failed validation, named neither experiment_id nor experiment_slug, or carried timestamps in seconds rather than milliseconds */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description The API key lacks evaluations:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
     postApiEvaluationsByEvaluatorEvaluate: {
         parameters: {
             query?: never;
@@ -6675,6 +6852,143 @@ export interface operations {
                 };
             };
             /** @description No evaluator answers to that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiDatasetEvaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Which evaluator to run, addressed the same way the evaluate endpoints address it */
+                    evaluation: string;
+                    /** @description The saved dataset to evaluate */
+                    datasetSlug: string;
+                    /** @description Groups the results under an experiment. Omit it and a batch id is generated instead. */
+                    experimentSlug?: string;
+                    /** @description Older name for experimentSlug, used when that is absent */
+                    batchId?: string;
+                    /** @description Extra fields merged into every row before evaluating */
+                    data?: {
+                        [key: string]: unknown;
+                    } | null;
+                    /** @description Per-call overrides of the evaluator's settings */
+                    settings?: {
+                        [key: string]: unknown;
+                    } | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The evaluator ran; branch on `status` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "processed";
+                        score?: number;
+                        passed?: boolean;
+                        label?: string;
+                        details?: string;
+                        /** @description What running the evaluator cost */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
+                        /** @description The evaluator's own output, unprocessed */
+                        raw_response?: unknown;
+                    } | {
+                        /** @constant */
+                        status: "skipped";
+                        /** @description Why the evaluator declined to score this input */
+                        details?: string;
+                        /** @description Always true in guardrail mode, so a skip does not block */
+                        passed?: boolean;
+                    } | {
+                        /** @constant */
+                        status: "error";
+                        /**
+                         * @description Constant: the evaluator's own type is not exposed
+                         * @constant
+                         */
+                        error_type: "EVALUATOR_ERROR";
+                        details: string;
+                        /** @description Always true in guardrail mode, so a failure does not block */
+                        passed?: boolean;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, failed validation, or named an evaluator that does not exist */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description The API key lacks evaluations:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description No dataset with that slug */
             404: {
                 headers: {
                     [name: string]: unknown;

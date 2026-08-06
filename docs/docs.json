@@ -903,6 +903,7 @@
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
               "api-reference/datasets/create-direct-upload",
+              "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-upload",
               "api-reference/datasets/get-dataset",
               "api-reference/datasets/get-records",
@@ -1007,7 +1008,8 @@
               "api-reference/evaluations/list-the-built-in-evaluators",
               "api-reference/evaluations/run-an-evaluator",
               "api-reference/evaluations/run-a-namespaced-evaluator",
-              "api-reference/evaluations/run-an-evaluator-as-a-guardrail"
+              "api-reference/evaluations/run-an-evaluator-as-a-guardrail",
+              "api-reference/evaluations/report-batch-evaluation-results"
             ]
           },
           {

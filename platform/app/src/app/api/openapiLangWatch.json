@@ -7649,6 +7649,412 @@
         "security": []
       }
     },
+    "/api/evaluations/batch/log_results": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "The rows were recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable confirmation"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was not sent as application/json, failed validation, named neither experiment_id nor experiment_slug, or carried timestamps in seconds rather than milliseconds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Set when the request was rejected before validation"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Set when the body parsed and then failed validation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks evaluations:manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiEvaluationsBatchLog_results",
+        "tags": [
+          "Evaluations"
+        ],
+        "parameters": [],
+        "summary": "Report batch evaluation results",
+        "description": "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "run_id": {
+                        "type": "string"
+                      },
+                      "workflow_version_id": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "progress": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "total": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "dataset": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "index": {
+                              "type": "number"
+                            },
+                            "target_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "entry": {
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "predicted": {
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "cost": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "duration": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "error": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "trace_id": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "index",
+                            "entry"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "evaluations": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "evaluator": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "target_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "processed"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "skipped"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "error"
+                                  ]
+                                }
+                              ]
+                            },
+                            "index": {
+                              "type": "number"
+                            },
+                            "duration": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "inputs": {
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "score": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "label": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "passed": {
+                              "type": "boolean",
+                              "nullable": true
+                            },
+                            "details": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "cost": {
+                              "type": "number",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "evaluator",
+                            "status",
+                            "index"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "experiment_id": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "experiment_slug": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "run_id": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "workflow_id": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "name": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "targets": {
+                        "type": "array",
+                        "items": {
+                          "allOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "prompt_id": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "prompt_version": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "agent_id": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "evaluator_id": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "metadata": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      }
+                                    ]
+                                  },
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "prompt"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "agent"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "evaluator"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "workflow"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "custom"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "nullable": true
+                      },
+                      "timestamps": {
+                        "type": "object",
+                        "properties": {
+                          "created_at": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "finished_at": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "stopped_at": {
+                            "type": "number",
+                            "nullable": true
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "run_id"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/evaluations/{evaluator}/evaluate": {
       "post": {
         "responses": {
@@ -8505,6 +8911,260 @@
                 },
                 "required": [
                   "data"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dataset/evaluate": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "The evaluator ran; branch on `status`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "processed"
+                        },
+                        "score": {
+                          "type": "number"
+                        },
+                        "passed": {
+                          "type": "boolean"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "string"
+                        },
+                        "cost": {
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "amount"
+                          ],
+                          "description": "What running the evaluator cost"
+                        },
+                        "raw_response": {
+                          "description": "The evaluator's own output, unprocessed"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "skipped"
+                        },
+                        "details": {
+                          "type": "string",
+                          "description": "Why the evaluator declined to score this input"
+                        },
+                        "passed": {
+                          "type": "boolean",
+                          "description": "Always true in guardrail mode, so a skip does not block"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "error"
+                        },
+                        "error_type": {
+                          "type": "string",
+                          "const": "EVALUATOR_ERROR",
+                          "description": "Constant: the evaluator's own type is not exposed"
+                        },
+                        "details": {
+                          "type": "string"
+                        },
+                        "passed": {
+                          "type": "boolean",
+                          "description": "Always true in guardrail mode, so a failure does not block"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "error_type",
+                        "details"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body was not valid JSON, failed validation, or named an evaluator that does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Set when the request was rejected before validation"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Set when the body parsed and then failed validation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Set when the request was rejected before validation"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Set when the body parsed and then failed validation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks evaluations:manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No dataset with that slug",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiDatasetEvaluate",
+        "tags": [
+          "Datasets"
+        ],
+        "parameters": [],
+        "summary": "Evaluate a dataset",
+        "description": "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "evaluation": {
+                    "type": "string",
+                    "description": "Which evaluator to run, addressed the same way the evaluate endpoints address it"
+                  },
+                  "datasetSlug": {
+                    "type": "string",
+                    "description": "The saved dataset to evaluate"
+                  },
+                  "experimentSlug": {
+                    "type": "string",
+                    "description": "Groups the results under an experiment. Omit it and a batch id is generated instead."
+                  },
+                  "batchId": {
+                    "type": "string",
+                    "description": "Older name for experimentSlug, used when that is absent"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "nullable": true,
+                    "description": "Extra fields merged into every row before evaluating"
+                  },
+                  "settings": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "nullable": true,
+                    "description": "Per-call overrides of the evaluator's settings"
+                  }
+                },
+                "required": [
+                  "evaluation",
+                  "datasetSlug"
                 ],
                 "additionalProperties": false
               }

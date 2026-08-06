@@ -157,3 +157,39 @@ export const evaluatorCatalogueResponseSchema = z.object({
     .record(z.string(), evaluatorSettingsSchema)
     .describe("Keyed by evaluator id, the value you put in the evaluate path"),
 });
+
+/**
+ * The body `POST /api/dataset/evaluate` parses.
+ *
+ * Written here rather than reused from the handler's own schema because that
+ * one is declared below the route it serves; documenting it at the route means
+ * naming it where a reader of the reference will look for it.
+ */
+export const datasetEvaluateRequestSchema = z.object({
+  evaluation: z
+    .string()
+    .describe(
+      "Which evaluator to run, addressed the same way the evaluate endpoints address it",
+    ),
+  datasetSlug: z.string().describe("The saved dataset to evaluate"),
+  experimentSlug: z
+    .string()
+    .optional()
+    .describe(
+      "Groups the results under an experiment. Omit it and a batch id is generated instead.",
+    ),
+  batchId: z
+    .string()
+    .optional()
+    .describe("Older name for experimentSlug, used when that is absent"),
+  data: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .nullable()
+    .describe("Extra fields merged into every row before evaluating"),
+  settings: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .nullable()
+    .describe("Per-call overrides of the evaluator's settings"),
+});
