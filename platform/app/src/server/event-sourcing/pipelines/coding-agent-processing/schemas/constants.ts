@@ -18,26 +18,27 @@ export const SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST = "2026-07-21";
  * claim-check's read-back raced the sibling spanStorage write and parked 22
  * groups in `:blocked` on 2026-08-05.
  *
- * This is a bounded derivation, not a payload: `data` is
- * `spanFactsContributionSchema`, whose facts come from the closed
- * `CODING_AGENT_CONTRIBUTION_KEYS` list and hold scalars only, so the staged
- * size is bounded by that list rather than by the span it came from. Content
- * stays in `stored_spans`.
+ * The derivation is bounded: `data` is `spanFactsContributionSchema`, whose
+ * facts come from the closed `CODING_AGENT_CONTRIBUTION_KEYS` list and hold
+ * scalars only, so the staged size is bounded by that list rather than by the
+ * span it came from. Content stays in `stored_spans`.
  *
- * Like `span_referenced` it is NEVER appended to the event log — it exists only
- * between the routing seam and the subscriber — which is why it is absent from
- * CODING_AGENT_PROCESSING_EVENT_TYPES.
+ * This is a plain versioned JOB PAYLOAD, not an event: it exists only between
+ * the routing seam and the subscriber's queue and is NEVER appended to the
+ * event log — which is why it appears in no event-type registry
+ * (CODING_AGENT_PROCESSING_EVENT_TYPES or otherwise). The durable record of
+ * the contribution is `span_facts_contributed`.
  *
  * The versions array is load-bearing: a version this build does not know fails
  * loudly into the queue's retry rather than half-parsing. Bump and append on any
  * incompatible change to the lifted shape.
  */
-export const SPAN_FACTS_LIFTED_EVENT_TYPE =
+export const SPAN_FACTS_LIFTED_PAYLOAD_TYPE =
   "lw.obs.coding_agent_session.span_facts_lifted";
-export const SPAN_FACTS_LIFTED_EVENT_VERSION_LATEST = "2026-08-05";
+export const SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST = "2026-08-05";
 
-export const SPAN_FACTS_LIFTED_EVENT_VERSIONS = [
-  SPAN_FACTS_LIFTED_EVENT_VERSION_LATEST,
+export const SPAN_FACTS_LIFTED_PAYLOAD_VERSIONS = [
+  SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST,
 ] as const;
 
 export const LOG_FACTS_CONTRIBUTED_EVENT_TYPE =

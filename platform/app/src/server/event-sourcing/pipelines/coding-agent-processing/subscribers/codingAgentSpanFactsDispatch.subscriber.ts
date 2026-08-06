@@ -4,15 +4,15 @@ import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscr
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../trace-processing/schemas/constants";
 import {
   isSpanReceivedEvent,
-  makeSpanReferencedEvent,
-  parseSpanReferencedEvent,
+  makeSpanReferencedPayload,
+  parseSpanReferencedPayload,
   type SpanReceivedEvent,
-  type SpanReferencedEvent,
+  type SpanReferencedPayload,
   type TraceProcessingEvent,
 } from "../../trace-processing/schemas/events";
 import type { NormalizedSpan } from "../../trace-processing/schemas/spans";
 import type { ContributeSpanFactsCommandData } from "../schemas/commands";
-import { parseSpanFactsLiftedEvent } from "../schemas/events";
+import { parseSpanFactsLiftedPayload } from "../schemas/events";
 import {
   CODING_AGENT_CONTRIBUTION_KEYS,
   detectCodingAgent,
@@ -88,7 +88,7 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
         // event; the stage hook is a total field-pick that swaps the staged
         // payload for its claim-check (or returns the event unchanged when
         // the span has no id to reference).
-        stage: (event) => makeSpanReferencedEvent(event as SpanReceivedEvent),
+        stage: (event) => makeSpanReferencedPayload(event as SpanReceivedEvent),
       },
       // Debounce past the spanStorage sibling write: the reference resolves
       // against the span store, and both jobs are staged by the same fan-out.
@@ -113,7 +113,7 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
     handle: async (event) => {
       // Staged bounded derivation: the facts already rode in on the job, so
       // there is nothing to read back and nothing to race.
-      const lifted = parseSpanFactsLiftedEvent(event);
+      const lifted = parseSpanFactsLiftedPayload(event);
       if (lifted) {
         await deps.contributeSpanFacts({
           ...lifted.data,
@@ -128,7 +128,7 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
 
       // Claim-check: still the shape this build stages, and the shape earlier
       // releases staged. Resolve it through the span store.
-      const ref = parseSpanReferencedEvent(event);
+      const ref = parseSpanReferencedPayload(event);
       if (ref) {
         await deps.contributeSpanFacts(await resolveClaimCheck(ref, deps));
         return;
@@ -207,7 +207,7 @@ function hasReadableSpanBody(event: SpanReceivedEvent): boolean {
  * already staged in Redis drain.
  */
 async function resolveClaimCheck(
-  ref: SpanReferencedEvent,
+  ref: SpanReferencedPayload,
   deps: {
     getNormalizedSpanById: (params: {
       tenantId: string;
@@ -311,14 +311,14 @@ function liftContribution({
  *
  * A span with no usable wire id keys on the event's own CORRELATION id — the
  * envelope KSUID — instead of on an empty string. That case is real, not
- * theoretical: `makeSpanReferencedEvent` refuses to reference an id-less span
+ * theoretical: `makeSpanReferencedPayload` refuses to reference an id-less span
  * and stages it whole. Keying it on `""` would collapse every id-less
  * coding-agent span in a trace onto one `…:<tenant>:<trace>:` key, so the
  * second one inside the TTL would dedup away and its facts would be silently
  * dropped.
  *
  * The correlation id is the right fallback precisely because it is what ties a
- * claim-check back to the event it was lifted from: `makeSpanReferencedEvent`
+ * claim-check back to the event it was lifted from: `makeSpanReferencedPayload`
  * copies `event.id` verbatim, so the key stays stable across the reference
  * upgrade while dedup degrades to per-event — the weakest form that still
  * loses nothing. The event's `idempotencyKey` is NOT usable here: it is

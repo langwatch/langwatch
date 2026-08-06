@@ -18,17 +18,20 @@ import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span
 import { createTenantId } from "~/server/event-sourcing";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../../trace-processing/schemas/constants";
 import {
-  makeSpanReferencedEvent,
+  makeSpanReferencedPayload,
   type SpanReceivedEvent,
   type TraceProcessingEvent,
 } from "../../../trace-processing/schemas/events";
 import type { NormalizedSpan } from "../../../trace-processing/schemas/spans";
 import type { ContributeSpanFactsCommandData } from "../../schemas/commands";
 import {
-  SPAN_FACTS_LIFTED_EVENT_TYPE,
-  SPAN_FACTS_LIFTED_EVENT_VERSION_LATEST,
+  SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
+  SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST,
 } from "../../schemas/constants";
-import type { SpanFactsLiftedEvent } from "../../schemas/events";
+import {
+  parseSpanFactsLiftedPayload,
+  type SpanFactsLiftedPayload,
+} from "../../schemas/events";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "../codingAgentSpanFactsDispatch.subscriber";
 
 const TRACE_ID = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
@@ -166,7 +169,7 @@ function storeReadBackFrom(event: SpanReceivedEvent): NormalizedSpan {
  * producer half ships. Built against the real constant and version so a bump
  * that forgets this suite fails here rather than in production.
  */
-function liftedEvent({
+function liftedPayload({
   spanId,
   traceId = TRACE_ID,
   startMs = 1_000,
@@ -174,16 +177,16 @@ function liftedEvent({
   spanId: string;
   traceId?: string;
   startMs?: number;
-}): SpanFactsLiftedEvent {
+}): SpanFactsLiftedPayload {
   return {
     id: `evt-${spanId}`,
-    version: SPAN_FACTS_LIFTED_EVENT_VERSION_LATEST,
+    version: SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST,
     aggregateId: traceId,
     aggregateType: "trace",
     tenantId: createTenantId("tenant-1"),
     createdAt: startMs,
     occurredAt: startMs,
-    type: SPAN_FACTS_LIFTED_EVENT_TYPE,
+    type: SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
     data: {
       tenantId: "tenant-1",
       sessionId: "session-1",
@@ -199,17 +202,17 @@ function liftedEvent({
       facts: { tool_name: "Bash" },
       scopeName: "claude_code",
     },
-  } as unknown as SpanFactsLiftedEvent;
+  } as unknown as SpanFactsLiftedPayload;
 }
 
 /**
  * Widens a staged payload to what `handle` accepts.
  *
- * `span_facts_lifted` is deliberately NOT a member of `TraceProcessingEvent`:
- * the seam stages it in a trace event's place, and it never reaches the event
- * log. So the handler's own parameter type cannot name it, and driving the
- * handler with one needs this cast. Kept in one named place rather than
- * scattered inline, so the reason survives.
+ * `span_facts_lifted` is a plain job payload, deliberately NOT a member of
+ * `TraceProcessingEvent`: the seam stages it in a trace event's place, and it
+ * never reaches the event log. So the handler's own parameter type cannot
+ * name it, and driving the handler with one needs this cast. Kept in one
+ * named place rather than scattered inline, so the reason survives.
  */
 function staged(event: unknown): TraceProcessingEvent {
   return event as TraceProcessingEvent;
@@ -423,13 +426,15 @@ describe("codingAgentSpanFactsDispatch", () => {
         }
 
         expect(
-          dedup.makeId(makeSpanReferencedEvent(event) as TraceProcessingEvent),
+          dedup.makeId(
+            makeSpanReferencedPayload(event) as TraceProcessingEvent,
+          ),
         ).toBe(dedup.makeId(event));
       });
     });
 
     describe("when two spans in one trace carry no wire span id", () => {
-      // The id-less span is the shape `makeSpanReferencedEvent` refuses to
+      // The id-less span is the shape `makeSpanReferencedPayload` refuses to
       // reference and stages whole, so this is a reachable production path,
       // not a hypothetical. Keying it on an empty span id would make both
       // spans share `…:<tenant>:<trace>:`, and the second one inside the 60s
@@ -462,7 +467,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         // shape the seam happened to stage.
         expect(
           dedup.makeId(
-            makeSpanReferencedEvent(
+            makeSpanReferencedPayload(
               first as SpanReceivedEvent,
             ) as TraceProcessingEvent,
           ),
@@ -490,7 +495,7 @@ describe("codingAgentSpanFactsDispatch", () => {
 
         const refPath = makeSubscriber(async () => storeReadBackFrom(event));
         await refPath.subscriber.handle(
-          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          makeSpanReferencedPayload(event) as TraceProcessingEvent,
           context,
         );
 
@@ -527,7 +532,7 @@ describe("codingAgentSpanFactsDispatch", () => {
           normalizedFrom(event),
         );
         await subscriber.handle(
-          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          makeSpanReferencedPayload(event) as TraceProcessingEvent,
           context,
         );
 
@@ -554,7 +559,7 @@ describe("codingAgentSpanFactsDispatch", () => {
 
         const refPath = makeSubscriber(async () => storeReadBackFrom(event));
         await refPath.subscriber.handle(
-          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          makeSpanReferencedPayload(event) as TraceProcessingEvent,
           context,
         );
 
@@ -591,7 +596,7 @@ describe("codingAgentSpanFactsDispatch", () => {
           normalizedFrom(event),
         );
         await subscriber.handle(
-          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          makeSpanReferencedPayload(event) as TraceProcessingEvent,
           context,
         );
 
@@ -630,7 +635,7 @@ describe("codingAgentSpanFactsDispatch", () => {
           normalizedFrom(event),
         );
         await subscriber.handle(
-          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          makeSpanReferencedPayload(event) as TraceProcessingEvent,
           context,
         );
 
@@ -656,7 +661,7 @@ describe("codingAgentSpanFactsDispatch", () => {
           async () => null,
         );
         await subscriber.handle(
-          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          makeSpanReferencedPayload(event) as TraceProcessingEvent,
           context,
         );
 
@@ -679,7 +684,7 @@ describe("codingAgentSpanFactsDispatch", () => {
 
         await expect(
           subscriber.handle(
-            makeSpanReferencedEvent(event) as TraceProcessingEvent,
+            makeSpanReferencedPayload(event) as TraceProcessingEvent,
             context,
           ),
         ).rejects.toThrow(/not readable in the span store/);
@@ -703,7 +708,7 @@ describe("codingAgentSpanFactsDispatch", () => {
 
         const failure: unknown = await subscriber
           .handle(
-            makeSpanReferencedEvent(event) as TraceProcessingEvent,
+            makeSpanReferencedPayload(event) as TraceProcessingEvent,
             context,
           )
           .then(
@@ -727,7 +732,7 @@ describe("codingAgentSpanFactsDispatch", () => {
           attributes: { tool_name: "Bash" },
         }) as SpanReceivedEvent;
         const future = {
-          ...makeSpanReferencedEvent(event),
+          ...makeSpanReferencedPayload(event),
           version: "2199-01-01",
         };
         const { subscriber, dispatched } = makeSubscriber(async () =>
@@ -760,7 +765,7 @@ describe("codingAgentSpanFactsDispatch", () => {
           attributes: { tool_name: "Bash" },
         }) as SpanReceivedEvent;
 
-        const staged = makeSpanReferencedEvent(event);
+        const staged = makeSpanReferencedPayload(event);
         expect(staged).toBe(event);
 
         const { subscriber, dispatched, reads } = makeSubscriber();
@@ -780,7 +785,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         });
 
         await subscriber.handle(
-          staged(liftedEvent({ spanId: "tool-lifted" })),
+          staged(liftedPayload({ spanId: "tool-lifted" })),
           context,
         );
 
@@ -800,7 +805,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         const { subscriber, dispatched } = makeSubscriber(async () => null);
 
         await subscriber.handle(
-          staged(liftedEvent({ spanId: "tool-never-stored" })),
+          staged(liftedPayload({ spanId: "tool-never-stored" })),
           context,
         );
 
@@ -808,11 +813,67 @@ describe("codingAgentSpanFactsDispatch", () => {
       });
     });
 
+    describe("when a job arrives in the exact staged wire shape", () => {
+      /**
+       * The schema is a plain DTO now, but the bytes on the queue are a
+       * contract — with the producer flip a release later, and with jobs
+       * already staged mid-rollout. This fixture is deliberately ALL
+       * literals, no shared constants, so any drift in the wire strings or
+       * the envelope fields fails here rather than on a live queue.
+       */
+      const pinnedWireJob = () => ({
+        id: "evt-wire-pinned",
+        aggregateId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+        aggregateType: "trace",
+        tenantId: "tenant-1",
+        createdAt: 1_000,
+        occurredAt: 1_000,
+        type: "lw.obs.coding_agent_session.span_facts_lifted",
+        version: "2026-08-05",
+        data: {
+          tenantId: "tenant-1",
+          sessionId: "sess-wire",
+          sessionKeySource: "provider",
+          agent: "claude_code",
+          occurredAt: 1_000,
+          traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+          spanId: "wire-span-1",
+          name: "claude_code.tool",
+          startTimeUnixMs: 1_000,
+          endTimeUnixMs: 2_000,
+          statusCode: 0,
+          facts: { tool_name: "Bash" },
+          scopeName: "claude_code",
+        },
+      });
+
+      it("round-trips the pinned fixture through the parse unchanged", () => {
+        expect(parseSpanFactsLiftedPayload(pinnedWireJob())).toEqual(
+          pinnedWireJob(),
+        );
+      });
+
+      /** @scenario work carrying its finished result completes without reading anything back */
+      it("contributes the pinned fixture's facts without a store read", async () => {
+        const { subscriber, dispatched, reads } = makeSubscriber(async () => {
+          throw new Error("the store must not be read for a lifted job");
+        });
+
+        await subscriber.handle(staged(pinnedWireJob()), context);
+
+        expect(reads).toHaveLength(0);
+        expect(dispatched).toHaveLength(1);
+        expect(dispatched[0]!.sessionId).toBe("sess-wire");
+        expect(dispatched[0]!.spanId).toBe("wire-span-1");
+        expect(dispatched[0]!.facts.tool_name).toBe("Bash");
+      });
+    });
+
     describe("when the staged body names a different tenant than the envelope", () => {
       /** @scenario work carrying its finished result completes without reading anything back */
       it("contributes under the envelope's tenant, never the body's", async () => {
         const { subscriber, dispatched } = makeSubscriber();
-        const lifted = liftedEvent({ spanId: "tool-x-tenant" });
+        const lifted = liftedPayload({ spanId: "tool-x-tenant" });
 
         await subscriber.handle(
           staged({
@@ -832,7 +893,7 @@ describe("codingAgentSpanFactsDispatch", () => {
       it("throws into the queue's retry instead of no-opping as another shape", async () => {
         const { subscriber, dispatched } = makeSubscriber();
         const future = {
-          ...liftedEvent({ spanId: "tool-vnext-lifted" }),
+          ...liftedPayload({ spanId: "tool-vnext-lifted" }),
           version: "2199-01-01",
         };
 
@@ -870,10 +931,10 @@ describe("codingAgentSpanFactsDispatch", () => {
 
         const fromFull = makeId.makeId(event);
         const fromReference = makeId.makeId(
-          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          makeSpanReferencedPayload(event) as TraceProcessingEvent,
         );
         const fromLifted = makeId.makeId(
-          staged(liftedEvent({ spanId: "tool-key" })),
+          staged(liftedPayload({ spanId: "tool-key" })),
         );
 
         expect(fromReference).toBe(fromFull);
@@ -934,7 +995,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         await expect(
           subscriber.handle(
             staged({
-              ...liftedEvent({ spanId: "tool-future" }),
+              ...liftedPayload({ spanId: "tool-future" }),
               type: "lw.obs.coding_agent_session.span_facts_from_2099",
             }),
             context,
