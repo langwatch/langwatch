@@ -26,6 +26,29 @@ The API key is required for observability and prompt tools. Documentation tools 
 |---------|---------|-------------|
 | `LANGWATCH_API_KEY` | `--apiKey` | API key for authentication |
 | `LANGWATCH_ENDPOINT` | `--endpoint` | API endpoint (default: `https://app.langwatch.ai`) |
+| | `--http` | Serve over HTTP and SSE instead of stdio |
+| | `--port` | HTTP port (default: `3000`) |
+| `LANGWATCH_MCP_HTTP_HOST` | `--host` | HTTP listen address (default: `127.0.0.1`) |
+| `LANGWATCH_MCP_ALLOWED_ORIGINS` | `--allowedOrigin` | Browser origins allowed to call the HTTP server |
+
+### HTTP mode
+
+In HTTP mode each client brings its own API key in an `Authorization: Bearer <key>`
+header. The key is checked against the LangWatch API before a session is created
+and re-checked on every request, so a session id by itself grants no access. The
+API key is never read from a query parameter.
+
+The server listens on `127.0.0.1` by default, per the MCP transport guidance for
+local servers. Pass `--host 0.0.0.0` to accept connections from other machines,
+and only behind a network boundary you trust.
+
+Requests carrying a browser `Origin` header are checked against an allowlist.
+Loopback origins are always allowed; anything else has to be listed:
+
+```bash
+npx @langwatch/mcp-server --http --port 3000 \
+  --allowedOrigin https://your-app.example.com
+```
 
 ## Tools
 

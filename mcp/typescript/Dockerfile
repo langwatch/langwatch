@@ -43,4 +43,8 @@ COPY services/langevals/ ./services/langevals/
 EXPOSE 3000
 
 WORKDIR /app/mcp/typescript
-CMD ["node", "--import", "tsx/esm", "src/index.ts", "--http", "--port", "3000"]
+# The HTTP server binds loopback by default. A container has to bind every
+# interface to be reachable from outside itself, so that is opted into here.
+# Publish the port only to a network you trust, and pass --allowedOrigin for
+# any browser origin that needs to reach it.
+CMD ["node", "--import", "tsx/esm", "src/index.ts", "--http", "--port", "3000", "--host", "0.0.0.0"]
