@@ -31,11 +31,11 @@ import { decrypt, encrypt } from "../utils/encryption";
  * Field-name mapping from the retired provider's credential shape to
  * Gemini's. Values pass through untouched — only the names change.
  */
-const KEY_RENAMES: Record<string, string> = {
+const KEY_RENAMES = {
   GOOGLE_AGENT_PLATFORM_API_KEY: "GEMINI_API_KEY",
   GOOGLE_AGENT_PLATFORM_PROJECT: "GEMINI_PROJECT",
   GOOGLE_AGENT_PLATFORM_LOCATION: "GEMINI_LOCATION",
-};
+} as const satisfies Record<string, string>;
 
 /**
  * Rename an Agent Platform credential's fields to the Gemini names.
@@ -49,9 +49,41 @@ export function foldAgentPlatformKeys(
 ): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(customKeys).map(([key, value]) => [
-      KEY_RENAMES[key] ?? key,
+      KEY_RENAMES[key as keyof typeof KEY_RENAMES] ?? key,
       value,
     ]),
+  );
+}
+
+/**
+ * Fold a stored customKeys value into its re-encrypted Gemini shape.
+ *
+ * Handles both storage forms: the encrypted string blob (the norm — see
+ * ModelProviderRepository.encryptCustomKeys) and a plain object (the
+ * pre-encryption transition shape the repository's decrypt path still
+ * tolerates). `null` means the row carries no credential — nothing to
+ * fold. Anything else, or a blob that fails to decrypt or parse, throws:
+ * the caller must skip the row rather than flip a provider whose
+ * credential still wears the old field names.
+ */
+export function foldStoredCustomKeys(customKeys: unknown): string | null {
+  if (customKeys === null || customKeys === undefined) return null;
+
+  let decrypted: unknown;
+  if (typeof customKeys === "string") {
+    decrypted = JSON.parse(decrypt(customKeys));
+  } else if (typeof customKeys === "object") {
+    decrypted = customKeys;
+  } else {
+    throw new Error(`unexpected customKeys type: ${typeof customKeys}`);
+  }
+
+  if (!decrypted || typeof decrypted !== "object" || Array.isArray(decrypted)) {
+    throw new Error("customKeys did not resolve to an object");
+  }
+
+  return encrypt(
+    JSON.stringify(foldAgentPlatformKeys(decrypted as Record<string, unknown>)),
   );
 }
 
@@ -92,20 +124,23 @@ export default async function execute() {
 
   console.log(`Found ${rows.length} google_agent_platform row(s) to fold`);
 
+  const skipped: string[] = [];
+
   for (const row of rows) {
-    // customKeys is encrypted as a whole JSON blob (see
-    // ModelProviderRepository.encryptCustomKeys), so the rename has to
-    // happen through decrypt/encrypt rather than in SQL.
-    let foldedKeys: string | null = null;
-    if (typeof row.customKeys === "string") {
-      const decrypted: unknown = JSON.parse(decrypt(row.customKeys));
-      if (decrypted && typeof decrypted === "object") {
-        foldedKeys = encrypt(
-          JSON.stringify(
-            foldAgentPlatformKeys(decrypted as Record<string, unknown>),
-          ),
-        );
-      }
+    // The credential folds first, and a row whose credential cannot be
+    // folded is skipped entirely: flipping its provider while the blob
+    // still wears the old field names would present a Gemini row that
+    // dispatches nothing, and the rerun could never find it again. A bad
+    // row costs itself, not the rows after it.
+    let foldedKeys: string | null;
+    try {
+      foldedKeys = foldStoredCustomKeys(row.customKeys);
+    } catch (error) {
+      skipped.push(row.id);
+      console.error(
+        `Skipping row ${row.id}: credential could not be folded (${String(error)})`,
+      );
+      continue;
     }
 
     const siblings = await prisma.modelProvider.findMany({
@@ -131,5 +166,10 @@ export default async function execute() {
     console.log(`Folded row ${row.id} into gemini`);
   }
 
+  if (skipped.length > 0) {
+    console.error(
+      `${skipped.length} row(s) skipped and still google_agent_platform: ${skipped.join(", ")} — fix their customKeys and rerun.`,
+    );
+  }
   console.log("Done");
 }

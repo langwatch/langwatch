@@ -530,8 +530,11 @@ function resolvePolicySideOfBundle(
 function geminiCredentials(
   pick: (k: string) => string,
 ): Record<string, unknown> {
-  const project = pick("GEMINI_PROJECT");
-  const location = pick("GEMINI_LOCATION");
+  // Trimmed here as well as at the schema: rows stored before the schema
+  // trimmed could carry whitespace, and a whitespace-only "pair" must not
+  // pick the Agent Platform door.
+  const project = pick("GEMINI_PROJECT").trim();
+  const location = pick("GEMINI_LOCATION").trim();
   return {
     api_key: pick("GEMINI_API_KEY") || pick("GOOGLE_API_KEY"),
     ...(project && location

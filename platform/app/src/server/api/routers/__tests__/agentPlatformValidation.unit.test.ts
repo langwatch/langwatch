@@ -156,13 +156,15 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
       expect(url).not.toContain(AGENT_PLATFORM_CREDENTIALS.GEMINI_API_KEY);
       expect(url).not.toContain("key=");
     });
+  });
 
+  describe("given a credential carrying only half the pair", () => {
     /**
      * A lone project (or lone location) names no door. The walk falls back
      * to the Gemini API rather than probing a path it cannot build —
      * where a restricted key still gets its named, actionable refusal.
      */
-    it("asks the Gemini API when only half the pair is present", async () => {
+    it("asks the Gemini API rather than a path it cannot build", async () => {
       mockFetch.mockResolvedValue(generated());
 
       await validateProviderApiKey("gemini", {

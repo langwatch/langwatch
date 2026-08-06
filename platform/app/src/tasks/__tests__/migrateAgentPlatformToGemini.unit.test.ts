@@ -6,11 +6,38 @@
  * Covers @unit scenarios from
  * specs/model-providers/google-agent-platform.feature.
  */
-import { describe, expect, it } from "vitest";
-import {
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { prisma } from "../../server/db";
+import execute, {
   foldAgentPlatformKeys,
   foldedRowName,
 } from "../migrateAgentPlatformToGemini";
+
+vi.mock("../../server/db", () => ({
+  prisma: { modelProvider: { findMany: vi.fn(), update: vi.fn() } },
+}));
+
+// Reversible stand-in for AES so the tests can assert on what was stored
+// without carrying a CREDENTIALS_SECRET.
+vi.mock("../../utils/encryption", () => ({
+  encrypt: (s: string) => `enc:${s}`,
+  decrypt: (s: string) => {
+    if (!s.startsWith("enc:")) throw new Error("bad ciphertext");
+    return s.slice(4);
+  },
+}));
+
+const findMany = vi.mocked(prisma.modelProvider.findMany);
+const update = vi.mocked(prisma.modelProvider.update);
+
+/** findMany serves the row scan first, then per-row sibling-name queries. */
+const stubRows = (rows: object[]) => {
+  findMany.mockImplementation(
+    // eslint-disable-next-line @typescript-eslint/require-await
+    (async (args: { where: { provider: string } }) =>
+      args.where.provider === "google_agent_platform" ? rows : []) as never,
+  );
+};
 
 describe("foldAgentPlatformKeys", () => {
   describe("given an Agent Platform credential", () => {
@@ -69,6 +96,96 @@ describe("foldedRowName", () => {
           takenNames: ["Gemini"],
         }),
       ).toBe("Our Google account");
+    });
+  });
+});
+
+describe("execute", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("given a stored Agent Platform row with an encrypted credential", () => {
+    /** @scenario A stored Google Agent Platform row becomes a Gemini row with the same credential */
+    it("flips the provider, folds the credential, and touches nothing else on the row", async () => {
+      stubRows([
+        {
+          id: "row-1",
+          name: "Google Agent Platform",
+          organizationId: "org-1",
+          customKeys: `enc:${JSON.stringify({
+            GOOGLE_AGENT_PLATFORM_API_KEY: "AQ.key",
+            GOOGLE_AGENT_PLATFORM_PROJECT: "acme-123",
+            GOOGLE_AGENT_PLATFORM_LOCATION: "global",
+          })}`,
+        },
+      ]);
+
+      await execute();
+
+      expect(update).toHaveBeenCalledTimes(1);
+      const { where, data } = update.mock.calls[0]![0];
+      expect(where).toEqual({ id: "row-1" });
+      expect(data.provider).toBe("gemini");
+      expect(JSON.parse(String(data.customKeys).slice(4))).toEqual({
+        GEMINI_API_KEY: "AQ.key",
+        GEMINI_PROJECT: "acme-123",
+        GEMINI_LOCATION: "global",
+      });
+      // Scopes and enabled state are not part of the update payload, so
+      // they stay exactly as stored.
+      expect(Object.keys(data).sort()).toEqual([
+        "customKeys",
+        "name",
+        "provider",
+      ]);
+    });
+  });
+
+  describe("given a row whose credential cannot be folded", () => {
+    it("skips the row without flipping it and still folds the rows after it", async () => {
+      stubRows([
+        {
+          id: "row-bad",
+          name: "Google Agent Platform",
+          organizationId: "org-1",
+          customKeys: "not-a-ciphertext",
+        },
+        {
+          id: "row-good",
+          name: "Google Agent Platform",
+          organizationId: "org-1",
+          customKeys: `enc:${JSON.stringify({ GOOGLE_AGENT_PLATFORM_API_KEY: "k" })}`,
+        },
+      ]);
+
+      await execute();
+
+      // The bad row got no update at all — a provider flip without folded
+      // keys would strand it as a Gemini row wearing the old field names,
+      // invisible to a rerun.
+      expect(update).toHaveBeenCalledTimes(1);
+      expect(update.mock.calls[0]![0].where).toEqual({ id: "row-good" });
+    });
+  });
+
+  describe("given a row that never had a credential", () => {
+    it("flips the provider and stores no credential", async () => {
+      stubRows([
+        {
+          id: "row-keyless",
+          name: "Google Agent Platform",
+          organizationId: "org-1",
+          customKeys: null,
+        },
+      ]);
+
+      await execute();
+
+      expect(update).toHaveBeenCalledTimes(1);
+      const { data } = update.mock.calls[0]![0];
+      expect(data.provider).toBe("gemini");
+      expect("customKeys" in data).toBe(false);
     });
   });
 });

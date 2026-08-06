@@ -357,11 +357,14 @@ export const modelProviders = {
     keysSchema: z
       .object({
         GEMINI_API_KEY: z.string().min(1),
-        GEMINI_PROJECT: z.string().nullable().optional(),
+        // Trimmed at the schema so a whitespace-only value stores as ""
+        // and every layer (validation, materialiser, Go header parser)
+        // agrees on whether the pair is present — they all test emptiness.
+        GEMINI_PROJECT: z.string().trim().nullable().optional(),
         // Both `global` and a region such as `us-central1` resolve; the
         // Agent Platform path requires one either way, so it is asked for
         // rather than guessed.
-        GEMINI_LOCATION: z.string().nullable().optional(),
+        GEMINI_LOCATION: z.string().trim().nullable().optional(),
       })
       .superRefine((data, ctx) => {
         // The Agent Platform path needs both or neither: a project without

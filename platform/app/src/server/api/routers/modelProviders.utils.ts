@@ -403,8 +403,16 @@ export const prepareLitellmParams = async ({
   // API. Emitted together or not at all — one without the other names no
   // door. See specs/model-providers/google-agent-platform.feature.
   if (modelProvider.provider === "gemini") {
-    const project = getModelOrDefaultEnvKey(modelProvider, "GEMINI_PROJECT");
-    const location = getModelOrDefaultEnvKey(modelProvider, "GEMINI_LOCATION");
+    // Trimmed so a whitespace-only value (pre-trim stored rows, env vars)
+    // never names the Agent Platform door on its own.
+    const project = getModelOrDefaultEnvKey(
+      modelProvider,
+      "GEMINI_PROJECT",
+    )?.trim();
+    const location = getModelOrDefaultEnvKey(
+      modelProvider,
+      "GEMINI_LOCATION",
+    )?.trim();
     if (project && location) {
       params.project_id = project;
       params.region = location;
