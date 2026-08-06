@@ -100,13 +100,22 @@ describe("prefetchScenarioData", () => {
     };
 
     const modelResolver = {
-      // Distinguish the three feature keys so simulator/judge selection can be
-      // asserted independently of the adapter (scenarios.generator) model.
+      // Distinguish every feature key so simulator/judge/agent-under-test
+      // selection can be asserted independently of one another.
+      // "scenarios.generator" (the FAST-role authoring assist, used only by
+      // scenario generation, not by a run) is deliberately given its OWN
+      // distinguishable value so a resolver call against the WRONG key
+      // (the pre-#6634 bug) is observable rather than accidentally
+      // matching the agent-under-test value.
       resolve: vi.fn().mockImplementation(async (featureKey: string) => {
         if (featureKey === "scenarios.user_simulator")
           return "openai/sim-default";
         if (featureKey === "scenarios.judge") return "openai/judge-default";
-        return "anthropic/claude-3-sonnet";
+        if (featureKey === "scenarios.agent_under_test")
+          return "anthropic/claude-3-sonnet";
+        if (featureKey === "scenarios.generator")
+          return "anthropic/wrong-key-generator";
+        throw new Error(`unexpected feature key resolved: "${featureKey}"`);
       }),
     };
 
@@ -160,6 +169,25 @@ describe("prefetchScenarioData", () => {
             "openai/gpt-4",
           );
         });
+
+        /** @scenario "A prompt with its own model never consults the agent-under-test default" */
+        it("never calls the agent-under-test resolver", async () => {
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+            },
+          });
+
+          await prefetchScenarioData(defaultContext, {
+            type: "prompt",
+            referenceId: "prompt_123",
+          }, deps);
+
+          expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
+            "scenarios.agent_under_test",
+            expect.anything(),
+          );
+        });
       });
     });
 
@@ -174,7 +202,11 @@ describe("prefetchScenarioData", () => {
       };
 
       describe("when prefetching scenario data", () => {
-        it("falls back to project defaultModel", async () => {
+        /**
+         * @scenario "A prompt without a model resolves the agent-under-test default"
+         * @scenario "A FAST-only-codex project still resolves the DEFAULT-role agent-under-test key for prompts"
+         */
+        it("resolves the agent-under-test model, not the scenario-generator model", async () => {
           const mockModelParamsProvider: ModelParamsProvider = {
             prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
           };
@@ -195,19 +227,76 @@ describe("prefetchScenarioData", () => {
 
           await prefetchScenarioData(defaultContext, target, deps);
 
+          expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
+            "scenarios.agent_under_test",
+            "proj_123",
+          );
+          expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
+            "scenarios.generator",
+            expect.anything(),
+          );
+          // The mock resolver maps this key to its OWN distinguishable
+          // value ("anthropic/claude-3-sonnet") — the old
+          // "scenarios.generator" key resolves to a different value
+          // ("anthropic/wrong-key-generator"), so this assertion fails if
+          // the wrong key is resolved even though a model does come back.
           expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
             "proj_123",
             "anthropic/claude-3-sonnet",
           );
         });
+
+        /** @scenario "A prompt without a model resolves the agent-under-test default" */
+        it("calls the agent-under-test resolver exactly once", async () => {
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi
+                .fn()
+                .mockResolvedValue(promptWithoutModel),
+            },
+          });
+
+          await prefetchScenarioData(
+            defaultContext,
+            { type: "prompt", referenceId: "prompt_123" },
+            deps,
+          );
+
+          const agentUnderTestCalls = (
+            deps.modelResolver.resolve as ReturnType<typeof vi.fn>
+          ).mock.calls.filter(
+            ([featureKey]) => featureKey === "scenarios.agent_under_test",
+          );
+          expect(agentUnderTestCalls).toHaveLength(1);
+        });
+
+        /** @scenario "A prompt without a model resolves the agent-under-test default" */
+        it("prepares model params exactly three times — agent, simulator, and judge", async () => {
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi
+                .fn()
+                .mockResolvedValue(promptWithoutModel),
+            },
+          });
+
+          const result = await prefetchScenarioData(
+            defaultContext,
+            { type: "prompt", referenceId: "prompt_123" },
+            deps,
+          );
+
+          expect(result.success).toBe(true);
+          expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(3);
+        });
       });
     });
 
-    describe("given an HTTP agent target", () => {
+    describe("given a workflow, code, or HTTP target", () => {
       const httpAgent = {
-        id: "agent_123",
+        id: "agent_http",
         type: "http" as const,
-        name: "Test Agent",
+        name: "Test HTTP Agent",
         projectId: "proj_123",
         config: {
           url: "https://api.example.com/chat",
@@ -219,30 +308,96 @@ describe("prefetchScenarioData", () => {
         updatedAt: new Date(),
         archivedAt: null,
       };
+      const codeAgent = {
+        id: "agent_code",
+        type: "code" as const,
+        name: "Test Code Agent",
+        projectId: "proj_123",
+        config: {
+          parameters: [
+            { identifier: "code", type: "code", value: "def execute(input):\n    return input" },
+          ],
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+        },
+        workflowId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        archivedAt: null,
+      };
+      const workflowAgent = {
+        id: "agent_workflow",
+        type: "workflow" as const,
+        name: "Test Workflow Agent",
+        projectId: "proj_123",
+        config: { workflow_id: "wf_123" },
+        workflowId: "wf_123",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        archivedAt: null,
+      };
+      const emptyWorkflowDsl = {
+        workflowId: "wf_123",
+        dsl: { spec_version: "1.5", nodes: [], edges: [] },
+      };
 
-      describe("when prefetching scenario data", () => {
-        it("uses project defaultModel (agents have no model)", async () => {
-          const mockModelParamsProvider: ModelParamsProvider = {
-            prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
-          };
+      const cases: Array<{
+        label: "http" | "code" | "workflow";
+        target: TargetConfig;
+        agent: typeof httpAgent | typeof codeAgent | typeof workflowAgent;
+      }> = [
+        { label: "http", target: { type: "http", referenceId: "agent_http" }, agent: httpAgent },
+        { label: "code", target: { type: "code", referenceId: "agent_code" }, agent: codeAgent },
+        {
+          label: "workflow",
+          target: { type: "workflow", referenceId: "agent_workflow" },
+          agent: workflowAgent,
+        },
+      ];
 
-          const deps = createMockDeps({
-            agentFetcher: {
-              findById: vi.fn().mockResolvedValue(httpAgent),
+      describe.each(cases)("when the target is $label", ({ target, agent }) => {
+        function depsFor(): DataPrefetcherDependencies {
+          return createMockDeps({
+            agentFetcher: { findById: vi.fn().mockResolvedValue(agent) },
+            workflowVersionFetcher: {
+              getLatestDsl: vi.fn().mockResolvedValue(emptyWorkflowDsl),
             },
-            modelParamsProvider: mockModelParamsProvider,
           });
+        }
 
-          const target: TargetConfig = {
-            type: "http",
-            referenceId: "agent_123",
-          };
+        /** @scenario "A workflow target resolves no adapter-role model" */
+        /** @scenario "A code target resolves no adapter-role model" */
+        /** @scenario "An HTTP target resolves no adapter-role model and consumes no project key" */
+        it("never calls the agent-under-test resolver", async () => {
+          const deps = depsFor();
 
           await prefetchScenarioData(defaultContext, target, deps);
 
-          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
+          expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
+            "scenarios.agent_under_test",
+            expect.anything(),
+          );
+          expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
+            "scenarios.generator",
+            expect.anything(),
+          );
+        });
+
+        /** @scenario "The user-simulator and judge always resolve their own models" */
+        it("prepares model params exactly twice — simulator and judge only", async () => {
+          const deps = depsFor();
+
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(true);
+          expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(2);
+          expect(deps.modelParamsProvider.prepare).toHaveBeenCalledWith(
             "proj_123",
-            "anthropic/claude-3-sonnet",
+            "openai/sim-default",
+          );
+          expect(deps.modelParamsProvider.prepare).toHaveBeenCalledWith(
+            "proj_123",
+            "openai/judge-default",
           );
         });
       });
@@ -1090,6 +1245,7 @@ describe("prefetchScenarioData", () => {
         ],
       };
 
+      /** @scenario "Per-node workflow model credentials are untouched by the platform-key fix" */
       it("hydrates the llm parameter value with litellm_params from the project's model providers", async () => {
         const hydratedApiKey = "sk-real-project-key-abc123";
 
@@ -1210,6 +1366,67 @@ describe("prefetchScenarioData", () => {
         if (!result.success) {
           expect(result.reason).toBe("provider_not_enabled");
           expect(result.error).toContain("not enabled");
+        }
+      });
+    });
+
+    describe("when a workflow node's llm parameter is pinned to a codex model", () => {
+      // Issue #6634, AC7(b): the platform-key fix for workflow.api_key must
+      // not touch per-node credentials — a node that was ALREADY correctly
+      // refused for using a restricted model outside its allowed surface
+      // must still be refused, and the refusal must name that node's
+      // model, not a generic failure.
+      const codexNodeDsl = {
+        workflow_id: "wf_1",
+        nodes: [
+          {
+            id: "llm_call",
+            type: "signature",
+            data: {
+              name: "LLM Call",
+              parameters: [
+                {
+                  identifier: "llm",
+                  type: "llm",
+                  value: { model: "openai_codex/gpt-5.6-terra" },
+                },
+              ],
+            },
+          },
+        ],
+        edges: [],
+      };
+
+      it("returns a structured failure naming the codex model, not a silent pass", async () => {
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(workflowAgent),
+          },
+          workflowVersionFetcher: {
+            getLatestDsl: vi.fn().mockResolvedValue({
+              workflowId: "wf_1",
+              dsl: codexNodeDsl,
+            }),
+          },
+          modelParamsProvider: {
+            prepare: vi.fn().mockResolvedValue({
+              success: false as const,
+              reason: "preparation_error",
+              message:
+                '"openai_codex/gpt-5.6-terra" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.',
+            }),
+          },
+        });
+
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toContain("openai_codex/gpt-5.6-terra");
         }
       });
     });

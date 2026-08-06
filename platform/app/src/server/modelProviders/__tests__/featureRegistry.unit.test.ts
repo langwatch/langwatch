@@ -43,6 +43,32 @@ describe("feature registry", () => {
     expect(defaultKeys).toContain("scenarios.judge");
   });
 
+  /** @scenario "A prompt without a model resolves the agent-under-test default" */
+  it("registers the run-time agent-under-test key as DEFAULT-role, with customer-safe copy", () => {
+    const feature = featureByKey("scenarios.agent_under_test");
+    expect(feature, 'feature "scenarios.agent_under_test" must exist').toBeTruthy();
+    expect(feature?.role).toBe("DEFAULT");
+    expect(feature?.displayName.length).toBeGreaterThan(0);
+    expect(feature?.description.length).toBeGreaterThan(0);
+
+    // Copy rules (dev/docs/best_practices/copywriting.md): no internal
+    // service names, no abbreviations, no code-shaped identifiers.
+    const copy = `${feature?.displayName} ${feature?.description}`.toLowerCase();
+    for (const forbidden of [
+      "prefetch",
+      "adapter",
+      "litellm",
+      "nlpgo",
+      "resolver",
+      "codex",
+    ]) {
+      expect(
+        copy,
+        `copy must not mention internal term "${forbidden}"`,
+      ).not.toContain(forbidden);
+    }
+  });
+
   it("returns undefined for an unknown key", () => {
     expect(featureByKey("not-a-real-key")).toBeUndefined();
   });

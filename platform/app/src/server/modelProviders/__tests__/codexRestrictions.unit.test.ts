@@ -52,6 +52,7 @@ describe("codexRestrictions", () => {
       "workflows.create_default",
       "scenarios.judge",
       "scenarios.user_simulator",
+      "scenarios.agent_under_test",
       "analytics.topic_clustering_embeddings",
     ]) {
       expect(
@@ -78,6 +79,36 @@ describe("codexRestrictions", () => {
     expect(isModelAllowedAsRoleDefault("openai/gpt-5-mini", "DEFAULT")).toBe(
       true,
     );
+  });
+
+  it("registers the run-time agent-under-test key as DEFAULT-role and codex-forbidden", () => {
+    // The scenario run's agent-under-test resolution (issue #6634) is a
+    // NEW, separate feature key from "scenarios.generator" (the FAST-role
+    // authoring assist used by scenario generation, not by a run) — see
+    // specs/scenarios/simulation-run-model-resolution.feature. It must be
+    // DEFAULT-role (never codex-eligible) so a project whose FAST/coding
+    // default is codex still resolves a real inference model for the
+    // agent under test.
+    const feature = featureByKey("scenarios.agent_under_test");
+    expect(feature, 'feature "scenarios.agent_under_test" must exist').toBeTruthy();
+    expect(feature?.role).toBe("DEFAULT");
+    expect(
+      isModelAllowedForFeature({
+        modelId: CODEX_DEFAULT_MODEL,
+        featureKey: "scenarios.agent_under_test",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps scenarios.generator FAST and codex-allowed, unaffected by the new run-time key", () => {
+    const generator = featureByKey("scenarios.generator");
+    expect(generator?.role).toBe("FAST");
+    expect(
+      isModelAllowedForFeature({
+        modelId: CODEX_DEFAULT_MODEL,
+        featureKey: "scenarios.generator",
+      }),
+    ).toBe(true);
   });
 
   it("leaves unrestricted providers untouched on every feature", () => {
