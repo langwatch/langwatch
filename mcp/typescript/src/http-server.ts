@@ -9,6 +9,7 @@ import type { Server } from "node:http";
 import { getConfig, runWithConfig } from "./config.js";
 import { createMcpServer } from "./create-mcp-server.js";
 import {
+  admitOAuthToken,
   apiKeysMatch,
   createApiKeyVerifier,
   createRateLimiter,
@@ -17,6 +18,7 @@ import {
   isOriginAllowed,
   parseAllowedOrigins,
   type ApiKeyVerifier,
+  type OAuthTokenEntry,
   type RateLimiter,
   type SessionStore,
 } from "./http-security.js";
@@ -32,12 +34,7 @@ const MAX_SESSIONS_PER_KEY = 20;
 
 /** OAuth access token lifetime. */
 const OAUTH_TOKEN_TTL_SECONDS = 3600;
-
-/** An OAuth access token and the API key it was minted from. */
-interface OAuthTokenEntry {
-  apiKey: string;
-  expiresAt: number;
-}
+const MAX_OAUTH_TOKENS_PER_KEY = 10;
 
 /** Per-server state that the route handlers operate on. */
 interface ServerRuntime {
@@ -116,7 +113,13 @@ function resolveApiKey({
   return null;
 }
 
-function sendUnauthorized(res: Response, error: string): void {
+function sendUnauthorized({
+  res,
+  error,
+}: {
+  res: Response;
+  error: string;
+}): void {
   res.status(401).json({ error });
 }
 
@@ -194,17 +197,14 @@ function createAuthenticator(runtime: ServerRuntime): Authenticate {
 
     const token = readBearerToken(req);
     if (!token) {
-      sendUnauthorized(
-        res,
-        "Authorization: Bearer <LANGWATCH_API_KEY> header required"
-      );
+      sendUnauthorized({ res, error: "Authorization: Bearer <LANGWATCH_API_KEY> header required" });
       return null;
     }
 
     const apiKey = resolveApiKey({ token, oauthTokens });
     if (!apiKey) {
       authFailRateLimiter.track(ip);
-      sendUnauthorized(res, "Invalid or expired token");
+      sendUnauthorized({ res, error: "Invalid or expired token" });
       return null;
     }
 
@@ -213,7 +213,7 @@ function createAuthenticator(runtime: ServerRuntime): Authenticate {
       !apiKeysMatch({ presentedKey: apiKey, expectedKey: expectedApiKey })
     ) {
       authFailRateLimiter.track(ip);
-      sendUnauthorized(res, "Bearer token does not match session");
+      sendUnauthorized({ res, error: "Bearer token does not match session" });
       return null;
     }
 
@@ -221,7 +221,7 @@ function createAuthenticator(runtime: ServerRuntime): Authenticate {
     // within the verifier's cache window rather than at the session TTL.
     if (!(await verifier.verify(apiKey))) {
       authFailRateLimiter.track(ip);
-      sendUnauthorized(res, "Invalid API key");
+      sendUnauthorized({ res, error: "Invalid API key" });
       return null;
     }
 
@@ -319,6 +319,11 @@ function registerOAuthRoutes({
       }
 
       const accessToken = generateAccessToken();
+      admitOAuthToken({
+        apiKey: clientSecret,
+        tokens: oauthTokens,
+        maxPerKey: MAX_OAUTH_TOKENS_PER_KEY,
+      });
       oauthTokens.set(accessToken, {
         apiKey: clientSecret,
         expiresAt: Date.now() + OAUTH_TOKEN_TTL_SECONDS * 1000,
@@ -377,10 +382,14 @@ function registerStreamableHttpRoutes({
         return;
       }
 
+      // Claimed before the first await. The session id only exists once
+      // initialize completes, so without holding the slot from here concurrent
+      // requests for one key would all pass the check above at a count of zero.
+      const reservation = sessions.reserve(apiKey);
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id) => {
-          sessions.add({ sessionId: id, transport, apiKey });
+          reservation.commit({ sessionId: id, transport });
         },
       });
       transport.onclose = () => {
@@ -399,6 +408,10 @@ function registerStreamableHttpRoutes({
         if (transport.sessionId) sessions.remove(transport.sessionId);
         await transport.close().catch(() => undefined);
         throw error;
+      } finally {
+        // A no-op once the session took the slot, so this only returns it when
+        // initialization never produced one.
+        reservation.release();
       }
       return;
     }
@@ -406,7 +419,7 @@ function registerStreamableHttpRoutes({
     // An unknown session id gets the same answer as a missing token, so the
     // response does not reveal whether the session exists.
     if (sessionId) {
-      sendUnauthorized(res, "Session expired or not found");
+      sendUnauthorized({ res, error: "Session expired or not found" });
       return;
     }
 
@@ -435,7 +448,7 @@ function registerStreamableHttpRoutes({
     }
 
     if (sessionId) {
-      sendUnauthorized(res, "Session expired or not found");
+      sendUnauthorized({ res, error: "Session expired or not found" });
       return;
     }
 

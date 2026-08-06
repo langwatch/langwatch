@@ -311,8 +311,22 @@ export interface SessionRecord<TTransport> {
   lastActivityAt: number;
 }
 
+export interface SessionReservation<TTransport> {
+  /** Hands the reserved slot to the session that was just created. */
+  commit(args: { sessionId: string; transport: TTransport }): void;
+  /** Returns the slot when the session never came up. */
+  release(): void;
+}
+
 export interface SessionStore<TTransport> {
   get(sessionId: string): SessionRecord<TTransport> | undefined;
+  /**
+   * Claims a slot against the per-key cap before a session id exists. Session
+   * setup is asynchronous, so without a reservation concurrent requests for
+   * one key all pass the cap check while the count is still zero.
+   */
+  reserve(apiKey: string): SessionReservation<TTransport>;
+  /** Reserves and commits in one step, for callers with a session id in hand. */
   add(args: { sessionId: string; transport: TTransport; apiKey: string }): void;
   /** Marks a session as active so the reaper leaves it alone. */
   touch(sessionId: string): void;
@@ -351,17 +365,41 @@ export function createSessionStore<TTransport>({
     decrement(record.apiKey);
   }
 
+  function reserve(apiKey: string): SessionReservation<TTransport> {
+    const hashed = hashApiKey(apiKey);
+    countByKey.set(hashed, (countByKey.get(hashed) ?? 0) + 1);
+    let settled = false;
+
+    return {
+      commit({ sessionId, transport }) {
+        if (settled) return;
+        settled = true;
+
+        const existing = sessions.get(sessionId);
+        if (existing) drop(sessionId, existing);
+
+        // The count already carries this slot from the reservation.
+        sessions.set(sessionId, {
+          transport,
+          apiKey,
+          lastActivityAt: Date.now(),
+        });
+      },
+      release() {
+        if (settled) return;
+        settled = true;
+        decrement(apiKey);
+      },
+    };
+  }
+
   return {
     get(sessionId) {
       return sessions.get(sessionId);
     },
+    reserve,
     add({ sessionId, transport, apiKey }) {
-      const existing = sessions.get(sessionId);
-      if (existing) drop(sessionId, existing);
-
-      sessions.set(sessionId, { transport, apiKey, lastActivityAt: Date.now() });
-      const hashed = hashApiKey(apiKey);
-      countByKey.set(hashed, (countByKey.get(hashed) ?? 0) + 1);
+      reserve(apiKey).commit({ sessionId, transport });
     },
     touch(sessionId) {
       const record = sessions.get(sessionId);
@@ -393,4 +431,48 @@ export function createSessionStore<TTransport>({
       return sessions.size;
     },
   };
+}
+
+/** An OAuth access token and the API key it was minted from. */
+export interface OAuthTokenEntry {
+  apiKey: string;
+  expiresAt: number;
+}
+
+/**
+ * Makes room for one more token before it is issued.
+ *
+ * Tokens outlive the requests that created them, so a key asking for them in a
+ * loop would otherwise retain entries until each expired. The per-address rate
+ * limit does not bound this on its own, because one key can be presented from
+ * many addresses. Expired entries anywhere in the map are dropped on the way
+ * past.
+ */
+export function admitOAuthToken({
+  apiKey,
+  tokens,
+  maxPerKey,
+}: {
+  apiKey: string;
+  tokens: Map<string, OAuthTokenEntry>;
+  maxPerKey: number;
+}): void {
+  const now = Date.now();
+  const held: { token: string; expiresAt: number }[] = [];
+
+  for (const [token, entry] of tokens) {
+    if (now >= entry.expiresAt) {
+      tokens.delete(token);
+      continue;
+    }
+    if (entry.apiKey === apiKey) {
+      held.push({ token, expiresAt: entry.expiresAt });
+    }
+  }
+
+  // Oldest first, so the longest-standing tokens give way to the new one.
+  held.sort((a, b) => a.expiresAt - b.expiresAt);
+  for (let i = 0; i <= held.length - maxPerKey; i += 1) {
+    tokens.delete(held[i]!.token);
+  }
 }

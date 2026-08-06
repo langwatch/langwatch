@@ -19,6 +19,9 @@ import {
   VALID_KEY,
 } from "./support/http-server-harness.js";
 
+/** Mirrors MAX_SESSIONS_PER_KEY in http-server.ts. */
+const MAX_SESSIONS_PER_KEY = 20;
+
 beforeEach(() => {
   initConfig({ endpoint: "https://app.langwatch.ai" });
 });
@@ -59,7 +62,7 @@ describe("Key verification before allocation", () => {
 
       // A rejected initialize leaves nothing behind, so a later valid
       // initialize is the first session this key gets.
-      const sessionId = await openSession(harness.baseUrl);
+      const sessionId = await openSession({ baseUrl: harness.baseUrl });
       expect(sessionId).toBeTruthy();
       expect(verify).toHaveBeenCalledTimes(2);
     } finally {
@@ -143,6 +146,39 @@ describe("Limits", () => {
       if (previous !== undefined) {
         process.env.LANGWATCH_MCP_TRUST_PROXY = previous;
       }
+    }
+  });
+
+  it("holds the cap when initialize requests arrive together", async () => {
+    const { verifier } = countingVerifier([VALID_KEY]);
+    const harness = await startHarness({ port: 0, apiKeyVerifier: verifier });
+
+    try {
+      // The cap has to hold when the requests overlap, not just in sequence.
+      // Admission reserves the slot before initialize is awaited, so this does
+      // not depend on when the transport reports the session as initialized.
+      const responses = await Promise.all(
+        Array.from({ length: 40 }, () =>
+          fetch(`${harness.baseUrl}/mcp`, {
+            method: "POST",
+            headers: {
+              ...MCP_POST_HEADERS,
+              Authorization: `Bearer ${VALID_KEY}`,
+            },
+            body: initializeBody(),
+          })
+        )
+      );
+
+      const opened = responses.filter((response) => response.status === 200);
+      const refused = responses.filter((response) => response.status === 429);
+      await Promise.all(responses.map((response) => response.text()));
+
+      expect(opened.length).toBeLessThanOrEqual(MAX_SESSIONS_PER_KEY);
+      expect(opened.length).toBeGreaterThan(0);
+      expect(refused.length).toBe(responses.length - opened.length);
+    } finally {
+      await harness.close();
     }
   });
 

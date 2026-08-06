@@ -77,10 +77,13 @@ export function toolsListBody(): string {
 }
 
 /** Opens a Streamable HTTP session and returns its id. */
-export async function openSession(
-  baseUrl: string,
-  apiKey: string = VALID_KEY
-): Promise<string> {
+export async function openSession({
+  baseUrl,
+  apiKey = VALID_KEY,
+}: {
+  baseUrl: string;
+  apiKey?: string;
+}): Promise<string> {
   const response = await fetch(`${baseUrl}/mcp`, {
     method: "POST",
     headers: { ...MCP_POST_HEADERS, Authorization: `Bearer ${apiKey}` },

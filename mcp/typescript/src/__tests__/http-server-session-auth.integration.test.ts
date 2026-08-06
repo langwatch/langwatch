@@ -94,7 +94,7 @@ describe("Session id is not a credential", () => {
   });
 
   it("rejects tools/list carrying only a valid session id", async () => {
-    const sessionId = await openSession(harness.baseUrl);
+    const sessionId = await openSession({ baseUrl: harness.baseUrl });
 
     const response = await fetch(`${harness.baseUrl}/mcp`, {
       method: "POST",
@@ -108,7 +108,7 @@ describe("Session id is not a credential", () => {
   });
 
   it("rejects GET /mcp carrying only a valid session id", async () => {
-    const sessionId = await openSession(harness.baseUrl);
+    const sessionId = await openSession({ baseUrl: harness.baseUrl });
 
     const response = await fetch(`${harness.baseUrl}/mcp`, {
       method: "GET",
@@ -119,7 +119,7 @@ describe("Session id is not a credential", () => {
   });
 
   it("rejects DELETE /mcp carrying only a valid session id", async () => {
-    const sessionId = await openSession(harness.baseUrl);
+    const sessionId = await openSession({ baseUrl: harness.baseUrl });
 
     const response = await fetch(`${harness.baseUrl}/mcp`, {
       method: "DELETE",
@@ -140,7 +140,7 @@ describe("Session id is not a credential", () => {
   });
 
   it("accepts a lowercase bearer scheme, which RFC 7235 allows", async () => {
-    const sessionId = await openSession(harness.baseUrl);
+    const sessionId = await openSession({ baseUrl: harness.baseUrl });
 
     const response = await fetch(`${harness.baseUrl}/mcp`, {
       method: "POST",
@@ -157,7 +157,7 @@ describe("Session id is not a credential", () => {
   });
 
   it("does not reveal whether another key's session exists", async () => {
-    const sessionId = await openSession(harness.baseUrl, VALID_KEY);
+    const sessionId = await openSession({ baseUrl: harness.baseUrl, apiKey: VALID_KEY });
 
     const someoneElses = await fetch(`${harness.baseUrl}/mcp`, {
       method: "DELETE",
@@ -183,7 +183,7 @@ describe("Session id is not a credential", () => {
   });
 
   it("rejects a different valid key reusing someone else's session", async () => {
-    const sessionId = await openSession(harness.baseUrl, VALID_KEY);
+    const sessionId = await openSession({ baseUrl: harness.baseUrl, apiKey: VALID_KEY });
 
     const response = await fetch(`${harness.baseUrl}/mcp`, {
       method: "POST",
@@ -201,7 +201,7 @@ describe("Session id is not a credential", () => {
   });
 
   it("still serves the session to the key that created it", async () => {
-    const sessionId = await openSession(harness.baseUrl);
+    const sessionId = await openSession({ baseUrl: harness.baseUrl });
 
     const response = await fetch(`${harness.baseUrl}/mcp`, {
       method: "POST",
@@ -239,7 +239,7 @@ describe("Revoking a key ends its sessions", () => {
     const harness = await startHarness({ port: 0, apiKeyVerifier: verifier });
 
     try {
-      const sessionId = await openSession(harness.baseUrl);
+      const sessionId = await openSession({ baseUrl: harness.baseUrl });
       const call = () =>
         fetch(`${harness.baseUrl}/mcp`, {
           method: "POST",
