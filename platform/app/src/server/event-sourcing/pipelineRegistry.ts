@@ -21,6 +21,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
+import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
@@ -193,6 +194,7 @@ import { createProjectMetadataReactor } from "./pipelines/trace-processing/react
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
+import { createTrackedEventSyncReactor } from "./pipelines/trace-processing/reactors/trackedEventSync.reactor";
 import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
 import type { ProcessStore } from "./process-manager";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
@@ -1030,6 +1032,14 @@ export class PipelineRegistry {
       reportEvaluation: evalCommands.reportEvaluation,
     });
 
+    // Live span feedback (langwatch.event) → tracked event. Routes through the
+    // same recordTrackedEventSpan path as REST POST /api/events/track so an
+    // SDK-emitted thumbs_up_down lands identically to a REST call.
+    const trackedEventSyncReactor = createTrackedEventSyncReactor({
+      recordTrackedEvent: ({ tenantId, body, eventId }) =>
+        recordTrackedEventSpan({ project: { id: tenantId }, body, eventId }),
+    });
+
     const traceUpdateBroadcastReactor = createTraceUpdateBroadcastReactor({
       broadcast: this.deps.broadcast,
       hasRedis: !!this.deps.eventSourcing.redisConnection,
@@ -1110,6 +1120,7 @@ export class PipelineRegistry {
         evaluationTriggerReactor,
         automations,
         customEvaluationSyncReactor,
+        trackedEventSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
         simulationMetricsSyncReactor,
