@@ -43,12 +43,15 @@ const declaresItsOwnLength = (headers: Headers): boolean =>
  * pass-through stream would defer it until the route handler had already begun
  * consuming, and a limit the handler can outrun is not a limit.
  */
-const readCapped = async (
-  body: ReadableStream<Uint8Array>,
-  maxSize: number,
+const readCapped = async ({
+  body,
+  maxSize,
+}: {
+  body: ReadableStream<Uint8Array>;
+  maxSize: number;
   // `Uint8Array<ArrayBuffer>` rather than a bare `Uint8Array`: the latter
   // widens to `ArrayBufferLike`, which `BodyInit` does not accept.
-): Promise<Uint8Array<ArrayBuffer>> => {
+}): Promise<Uint8Array<ArrayBuffer>> => {
   const chunks: (Uint8Array | undefined)[] = [];
   let size = 0;
   const reader = body.getReader();
@@ -99,7 +102,7 @@ export const wireBodyLimit = ({
       return next();
     }
 
-    const buffered = await readCapped(body, maxSize);
+    const buffered = await readCapped({ body, maxSize });
 
     // The rebuilt request carries a fixed body, so the chunked framing header
     // no longer describes it; undici derives Content-Length from the buffer.
