@@ -851,7 +851,7 @@ export class GatewayBudgetClickHouseRepository {
    * Pulled cost for one org/team scope, collapsed to one row per usage item.
    *
    * The shape mirrors the READ that already surfaces ingestion cost
-   * (`personalUsage.service.ts`'s principal query): filter by tenant, scope
+   * (`personalUsage.clickhouse.repository.ts`'s principal query): filter by tenant, scope
    * and scope id, never by budget. It does not mirror that query's WRITE —
    * principal rows carry real budgets and do enforce; these carry none.
    *
