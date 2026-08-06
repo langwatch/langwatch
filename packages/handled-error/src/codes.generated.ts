@@ -87,7 +87,7 @@ export const goErrorCodes = {
    *
    * @source services/aigateway/domain/errors.go
    */
-  codex_session_expired: { service: "aigateway" },
+  codex_session_expired: { service: "aigateway", httpStatus: 401 },
   /**
    * ConfigInvalid — is the herr code for configuration validation failures.
    *
