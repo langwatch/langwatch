@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
 	openai "github.com/sashabaranov/go-openai"

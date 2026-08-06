@@ -7,7 +7,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 )
 
 // SpanType categorises a span for downstream analysis and visualisation. It is

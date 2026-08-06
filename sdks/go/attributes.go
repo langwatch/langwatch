@@ -77,12 +77,14 @@ const (
 	AttributeLangWatchPromptDraft = attribute.Key("langwatch.prompt.draft")
 )
 
-// GenAI semantic-convention keys that the v1.40 semconv package does not yet
-// provide a typed constructor for, declared once here so the provider
+// GenAI attribute keys that the v1.41 semconv package does not declare — each
+// one was checked against go.opentelemetry.io/otel/semconv/v1.41.0 and has no
+// typed key or constructor there. They are declared once here so the provider
 // instrumentations and the data-capture strip-list reference the same constant
 // instead of re-typing the raw string. Keys that DO have a semconv constructor
-// (e.g. gen_ai.usage.input_tokens, gen_ai.conversation.id) are emitted via that
-// constructor directly and are not duplicated here.
+// (e.g. gen_ai.usage.input_tokens, gen_ai.conversation.id,
+// gen_ai.request.stream) are emitted via that constructor directly and are not
+// duplicated here.
 const (
 	// AttributeGenAIRequestTools carries the request's tool/function definitions
 	// as a JSON string (gen_ai.request.tools).

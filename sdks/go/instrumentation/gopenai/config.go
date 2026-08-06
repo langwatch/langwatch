@@ -62,7 +62,7 @@ func WithDataCapture(mode langwatch.DataCaptureMode) Option {
 // default it is set to "openai". Because go-openai is widely used against
 // OpenAI-compatible providers (Groq, Together, Fireworks, Ollama, …), pass the
 // matching value from the OTel GenAI semconv (e.g.
-// semconv.GenAIProviderNameGroqCloud) or a custom provider key/value.
+// semconv.GenAIProviderNameGroq) or a custom provider key/value.
 func WithGenAIProvider(provider attribute.KeyValue) Option {
 	return optionFunc(func(c *config) {
 		c.genAIProvider = provider
