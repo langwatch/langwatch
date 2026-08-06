@@ -68,6 +68,16 @@ func TestProviderErrorCode_KnownJSONDialects(t *testing.T) {
 			body: `{"errors":[{"code":"tenant_suspended","detail":"tenant"}]}`,
 			want: "tenant_suspended",
 		},
+		{
+			name: "Gemini's numeric code falls back to its status discriminant",
+			body: `{"error":{"code":429,"message":"quota exceeded","status":"RESOURCE_EXHAUSTED"}}`,
+			want: "RESOURCE_EXHAUSTED",
+		},
+		{
+			name: "a hard-limit type wins over an unrelated code, regardless of path order",
+			body: `{"error":{"type":"usage_limit_reached","code":"rate_limit_exceeded"}}`,
+			want: "usage_limit_reached",
+		},
 	}
 
 	for _, tt := range tests {
@@ -76,6 +86,17 @@ func TestProviderErrorCode_KnownJSONDialects(t *testing.T) {
 				t.Fatalf("providerErrorCode() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// @scenario "A stream error with no HTTP status still carries a reason"
+func TestDecodeProviderErrorBody_NoStatusGetsAStableReason(t *testing.T) {
+	e := decodeProviderErrorBody([]byte(`{"detail":"connection reset"}`), 0, "text/event-stream")
+	if got := handledReasonCode(t, e); got != "upstream_stream_error" {
+		t.Errorf("reason = %q, want upstream_stream_error", got)
+	}
+	if _, ok := e.Meta["http_status"]; ok {
+		t.Error("status-0 capture must not fabricate an http_status")
 	}
 }
 

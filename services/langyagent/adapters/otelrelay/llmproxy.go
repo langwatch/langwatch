@@ -339,6 +339,11 @@ var providerCodePaths = []string{
 	"error.error.code",
 	"errors.0.code",
 	"code",
+	// Google's dialect: error.code is a NUMBER (HTTP status), and the string
+	// discriminant lives under status/error.status instead ("RESOURCE_EXHAUSTED").
+	"error.status",
+	"error.error.status",
+	"status",
 	"error.type",
 	"error.error.type",
 	"errors.0.type",
@@ -404,7 +409,7 @@ func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr
 	}
 
 	code := providerErrorCode(peeked)
-	if code == "" && status > 0 {
+	if code == "" {
 		code = upstreamHTTPReasonCode(status)
 	}
 	if code != "" {
@@ -420,6 +425,24 @@ func providerErrorCode(body []byte) herr.Code {
 	if !json.Valid(body) {
 		return ""
 	}
+	// A hard-limit discriminant wins regardless of path order. providerCodePaths
+	// prefers a semantic `code` over a broad `type`, but a body carrying BOTH (a
+	// plan-limit `type` alongside an unrelated `code`) must not let the generic
+	// code bury the plan-limit signal — it is what disables the first-strike
+	// retry cut in hasHardLimitReason.
+	for _, path := range providerCodePaths {
+		value := gjson.GetBytes(body, path)
+		if value.Type != gjson.String || len(value.Str) > maxProviderCodeBytes ||
+			!providerCodePattern.MatchString(value.Str) {
+			continue
+		}
+		// herrgen:external — this is the provider's identifier, not ours, on
+		// both the lookup and the return below.
+		candidate := herr.Code(value.Str)
+		if hardLimitReasonCodes[candidate] {
+			return candidate
+		}
+	}
 	for _, path := range providerCodePaths {
 		value := gjson.GetBytes(body, path)
 		if value.Type == gjson.String && len(value.Str) <= maxProviderCodeBytes &&
@@ -431,30 +454,32 @@ func providerErrorCode(body []byte) herr.Code {
 	return ""
 }
 
+// upstreamReasonCodes name the upstream HTTP status when the provider's own
+// body carries no discriminant of its own (see providerErrorCode for that
+// case). Status 0 is never a real HTTP status; decodeProviderErrorBody passes
+// it for the SSE lane, where a terminal in-stream event has no status at all,
+// so every capture still carries exactly one reason.
+var upstreamReasonCodes = map[int]herr.Code{
+	0:                              "upstream_stream_error",
+	http.StatusBadRequest:          "upstream_bad_request",
+	http.StatusUnauthorized:        "upstream_unauthorized",
+	http.StatusForbidden:           "upstream_forbidden",
+	http.StatusNotFound:            "upstream_not_found",
+	http.StatusRequestTimeout:      "upstream_timeout",
+	http.StatusGatewayTimeout:      "upstream_timeout",
+	http.StatusConflict:            "upstream_conflict",
+	http.StatusUnprocessableEntity: "upstream_unprocessable_entity",
+	http.StatusTooManyRequests:     "upstream_rate_limited",
+}
+
 func upstreamHTTPReasonCode(status int) herr.Code {
-	switch status {
-	case http.StatusBadRequest:
-		return "upstream_bad_request"
-	case http.StatusUnauthorized:
-		return "upstream_unauthorized"
-	case http.StatusForbidden:
-		return "upstream_forbidden"
-	case http.StatusNotFound:
-		return "upstream_not_found"
-	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
-		return "upstream_timeout"
-	case http.StatusConflict:
-		return "upstream_conflict"
-	case http.StatusUnprocessableEntity:
-		return "upstream_unprocessable_entity"
-	case http.StatusTooManyRequests:
-		return "upstream_rate_limited"
-	default:
-		if status >= 500 {
-			return "upstream_unavailable"
-		}
-		return "upstream_http_error"
+	if code, ok := upstreamReasonCodes[status]; ok {
+		return code
 	}
+	if status >= 500 {
+		return "upstream_unavailable"
+	}
+	return "upstream_http_error"
 }
 
 func providerBodyKind(body []byte, contentType string) string {
