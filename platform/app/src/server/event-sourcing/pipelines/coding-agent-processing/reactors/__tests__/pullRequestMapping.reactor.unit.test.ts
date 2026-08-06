@@ -160,14 +160,61 @@ describe("pullRequestMapping reactor", () => {
       expect(options?.deduplication?.makeId).toBe(options?.makeJobId);
     });
 
-    it("lets a later session on the same branch open a fresh window", () => {
+    /**
+     * The dedup key is queue-global; the squash it protects is conditional on
+     * the existing job having a rank in the NEW payload's own group. Grouping
+     * on anything but the branch — the default is per session — puts two
+     * worktrees' folds in two groups, the rank lookup misses, and the script
+     * reads the miss as "already dispatched". Both the key and the group must
+     * name the same thing.
+     *
+     * @scenario "Concurrent sessions on one branch ask GitHub once"
+     */
+    it("groups the job on the same branch its dedup id is keyed on", () => {
+      const reactor = createPullRequestMappingReactor({
+        requestBranchMapping: vi.fn(),
+      });
+      const first = { event, foldState: foldState() };
+      const second = {
+        event: { ...event, aggregateId: "session-2" },
+        foldState: foldState(),
+      };
+
+      const groupKey = reactor.options?.groupKeyFn;
+      expect(groupKey).toBeDefined();
+      expect(groupKey?.(first)).toBe(groupKey?.(second));
+      expect(groupKey?.(first)).toBe(reactor.options?.makeJobId?.(first));
+    });
+
+    it("keeps a different branch in its own group", () => {
+      const reactor = createPullRequestMappingReactor({
+        requestBranchMapping: vi.fn(),
+      });
+
+      expect(
+        reactor.options?.groupKeyFn?.({ event, foldState: foldState() }),
+      ).not.toBe(
+        reactor.options?.groupKeyFn?.({
+          event,
+          foldState: foldState({ gitBranch: "feat/other" }),
+        }),
+      );
+    });
+
+    /**
+     * A reactor's ready score is the event's own `createdAt`, so a backlogged
+     * group stages jobs whose `createdAt + delay` deadline has already passed:
+     * they dispatch immediately and the window collapses nothing. The TTL
+     * outliving dispatch is what still holds the throttle there.
+     *
+     * @scenario "Concurrent sessions on one branch ask GitHub once"
+     */
+    it("holds the throttle past dispatch, for the window that already elapsed", () => {
       const options = createPullRequestMappingReactor({
         requestBranchMapping: vi.fn(),
       }).options;
 
-      // Mapping is level-triggered: a branch that gained a pull request after
-      // the last dispatch must still be re-asked about.
-      expect(options?.deduplication?.shouldSurviveDispatch).toBe(false);
+      expect(options?.deduplication?.shouldSurviveDispatch).toBe(true);
     });
   });
 });

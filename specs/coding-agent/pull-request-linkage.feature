@@ -45,11 +45,40 @@ Rule: Branches map to their pull requests through the organization connection
     When a pull request for that branch is opened later
     Then the periodic recheck maps it without any new session activity
 
+  # The workload the feature is for: several agent worktrees on one branch,
+  # folding within milliseconds of each other. Both the queue throttle and the
+  # durable guard have to hold across sessions, not just within one.
+  @integration @unit
+  Scenario: Concurrent sessions on one branch ask GitHub once
+    Given two sessions on the same repository and branch folding at the same time
+    When both trigger the mapping
+    Then GitHub is asked once
+    And the second trigger is collapsed rather than queued as its own job
+
   @unit
   Scenario: Rechecks stop for branches with no recent session activity
     Given a branch whose sessions all ended more than a week ago
     When the periodic recheck selects branches
     Then that branch is not rechecked
+
+  # The sweep is the one read in this feature with no organization to name, so
+  # every replica running its own timer meant the whole fleet scanning the same
+  # branches and asking GitHub about them N times.
+  @unit
+  Scenario: The recheck sweep runs once per fleet, not once per replica
+    Given several workers reach the same recheck tick
+    When the tick fires
+    Then one sweep runs and the others stand down
+
+  # Nothing removed a branch's bookkeeping or its pull requests, ever, at one
+  # row per agent branch per repository.
+  @unit
+  Scenario: Linkage rows nobody asks about stop accumulating
+    Given a branch outside the sweep's activity window
+    When the retention prune runs
+    Then its bookkeeping is removed
+    And the pull requests it was the only reason to keep are removed
+    And a reader asking again re-maps the branch from GitHub
 
   @unit
   Scenario: A repository on a non-GitHub host never triggers a GitHub call

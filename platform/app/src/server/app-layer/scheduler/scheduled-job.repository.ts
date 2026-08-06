@@ -1,22 +1,11 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
 import { Prisma, type PrismaClient } from "@prisma/client";
+import { toPgTimestampUtc } from "~/server/utils/pgTimestamp";
 import type {
   ScheduledJobRecord,
   ScheduledJobRepository,
 } from "./scheduler.types";
-
-/**
- * Render a `Date` as a naive-UTC timestamp literal (`YYYY-MM-DD HH:MM:SS.mmm`)
- * for raw-SQL comparison/assignment against the `timestamp without time zone`
- * columns. Prisma's model layer stores JS Dates in `timestamp` columns as the
- * naive UTC wall-clock; but in RAW SQL Prisma binds a JS `Date` as a
- * `timestamptz`, so `"nextRunAt" = $date` compares across the session timezone
- * (e.g. Europe/Amsterdam) and NEVER matches. Binding the naive-UTC string and
- * casting `::timestamp` makes the comparison timezone-independent.
- */
-const toPgTimestampUtc = (d: Date): string =>
-  d.toISOString().slice(0, 23).replace("T", " ");
 
 /**
  * Prisma-backed `ScheduledJob` repository (ADR-044 §4). The durable Postgres
