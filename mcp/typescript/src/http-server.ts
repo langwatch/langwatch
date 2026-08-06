@@ -290,6 +290,12 @@ export async function startHttpServer({
     res: Response,
     sessionApiKey: string
   ): Promise<boolean> {
+    const ip = clientIp(req);
+    if (authFailRateLimiter.isBlocked(ip)) {
+      res.status(429).json({ error: "Too many requests" });
+      return false;
+    }
+
     const token = readBearerToken(req);
     if (!token) {
       sendUnauthorized(
@@ -301,13 +307,13 @@ export async function startHttpServer({
 
     const apiKey = resolveApiKey(token);
     if (!apiKey || !apiKeysMatch(apiKey, sessionApiKey)) {
-      authFailRateLimiter.track(clientIp(req));
+      authFailRateLimiter.track(ip);
       sendUnauthorized(res, "Bearer token does not match session");
       return false;
     }
 
     if (!(await verifier.verify(apiKey))) {
-      authFailRateLimiter.track(clientIp(req));
+      authFailRateLimiter.track(ip);
       sendUnauthorized(res, "Invalid API key");
       return false;
     }
