@@ -671,10 +671,14 @@ describe("MetricDataPointClickHouseRepository", () => {
           (request.params.seriesIds as string[]).length,
         ).toBeLessThanOrEqual(64);
       }
-      // Split, not dropped: every series still gets asked about exactly once.
-      expect(
-        requests.flatMap((request) => request.params.seriesIds as string[]),
-      ).toHaveLength(64);
+      // Split, not dropped: every series still gets asked about exactly once,
+      // which is an identity claim rather than a count — a chunker that asked
+      // twice about one series and never about another also totals 64.
+      const asked = requests.flatMap(
+        (request) => request.params.seriesIds as string[],
+      );
+      expect(new Set(asked).size).toBe(64);
+      expect(asked).toHaveLength(64);
     });
   });
 

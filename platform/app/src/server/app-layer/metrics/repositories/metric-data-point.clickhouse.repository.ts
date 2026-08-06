@@ -359,10 +359,10 @@ function successorSeekParams({
  */
 function formatParamValue({
   value,
-  inArray = false,
+  isInArray = false,
 }: {
   value: unknown;
-  inArray?: boolean;
+  isInArray?: boolean;
 }): string {
   if (typeof value === "number") return String(value);
   if (typeof value === "string") {
@@ -372,11 +372,11 @@ function formatParamValue({
       .replace(/\t/g, "\\t")
       .replace(/\n/g, "\\n")
       .replace(/\r/g, "\\r");
-    return inArray ? `'${escaped}'` : escaped;
+    return isInArray ? `'${escaped}'` : escaped;
   }
   if (Array.isArray(value)) {
     return `[${value
-      .map((element) => formatParamValue({ value: element, inArray: true }))
+      .map((element) => formatParamValue({ value: element, isInArray: true }))
       .join(",")}]`;
   }
   throw new Error(
