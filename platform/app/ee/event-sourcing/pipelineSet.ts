@@ -1,6 +1,7 @@
 import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipelines/ingestion-pull-processing";
 import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
 import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
+import type { PulledUsageLedgerProcessDeps } from "@ee/governance/process-manager/pulledUsageLedger.process";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import {
   type PulledUsageDispatcher,
@@ -18,6 +19,11 @@ const logger = createLogger("langwatch:enterprise:event-sourcing");
 export interface EnterprisePipelineSetConfig {
   prisma: PrismaClient;
   runsWorkers: boolean;
+  /**
+   * The pulled-usage ledger writer. Absent without ClickHouse — the pipeline
+   * still records every observation, only the ledger row is skipped.
+   */
+  pulledUsageLedger?: PulledUsageLedgerProcessDeps;
 }
 
 type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
@@ -96,7 +102,7 @@ function registerIngestionPullPipeline(
  */
 function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
   const pipeline = deps.eventSourcing.register(
-    createPulledUsageProcessingPipeline(),
+    createPulledUsageProcessingPipeline({ ledger: deps.pulledUsageLedger }),
   );
   return { commands: mapCommands(pipeline.commands) };
 }
