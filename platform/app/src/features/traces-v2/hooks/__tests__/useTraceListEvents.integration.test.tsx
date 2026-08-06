@@ -81,126 +81,192 @@ beforeEach(() => {
 
 describe("useTraceListEvents", () => {
   describe("given the Events column is visible", () => {
-    /** @scenario Events are fetched for the traces currently on screen */
-    it("asks once for the page's trace ids and the list's time range", () => {
-      renderHook(() => useTraceListEvents([row("t1"), row("t2")]));
+    describe("when a page of traces is on screen", () => {
+      /** @scenario Events are shown for the traces currently on screen */
+      it("asks once for the page's trace ids and the list's time range", () => {
+        renderHook(() => useTraceListEvents({ rows: [row("t1"), row("t2")] }));
 
-      expect(lastOpts()).toEqual(expect.objectContaining({ enabled: true }));
-      expect(lastInput()).toEqual(
-        expect.objectContaining({
-          projectId: "proj-1",
-          traceIds: ["t1", "t2"],
-          timeRange: { from: 1_000, to: 2_000 },
-        }),
-      );
+        expect(lastOpts()).toEqual(expect.objectContaining({ enabled: true }));
+        expect(lastInput()).toEqual(
+          expect.objectContaining({
+            projectId: "proj-1",
+            traceIds: ["t1", "t2"],
+            timeRange: { from: 1_000, to: 2_000 },
+          }),
+        );
+      });
     });
 
-    /** @scenario The list agrees with the drawer */
-    it("merges each trace's events onto its own row", () => {
-      resolveWith({
-        t1: {
-          names: [{ name: "thumbs_up_down", count: 1, firstTimestamp: 5 }],
+    describe("when the events have arrived", () => {
+      /** @scenario The list agrees with the drawer */
+      it("merges each trace's events onto its own row", () => {
+        resolveWith({
+          t1: {
+            names: [{ name: "thumbs_up_down", count: 1, firstTimestamp: 5 }],
+            totalCount: 1,
+            distinctCount: 1,
+          },
+        });
+
+        const { result } = renderHook(() =>
+          useTraceListEvents({ rows: [row("t1"), row("t2")] }),
+        );
+
+        expect(result.current[0]?.events).toEqual({
+          groups: [{ name: "thumbs_up_down", count: 1, firstTimestamp: 5 }],
           totalCount: 1,
           distinctCount: 1,
-        },
+        });
+        // A trace the read said nothing about recorded nothing.
+        expect(result.current[1]?.events).toEqual(NO_TRACE_EVENTS);
       });
-
-      const { result } = renderHook(() =>
-        useTraceListEvents([row("t1"), row("t2")]),
-      );
-
-      expect(result.current[0]?.events).toEqual({
-        groups: [{ name: "thumbs_up_down", count: 1, firstTimestamp: 5 }],
-        totalCount: 1,
-        distinctCount: 1,
-      });
-      // A trace the read said nothing about recorded nothing.
-      expect(result.current[1]?.events).toEqual(NO_TRACE_EVENTS);
     });
 
-    /** @scenario The list still renders while events are in flight */
-    it("marks rows pending while the read is in flight, without claiming they are empty", () => {
-      harness.useQuery.mockImplementation(() => ({
-        data: undefined,
-        isLoading: true,
-      }));
+    describe("when the events have not arrived yet", () => {
+      /** @scenario The list still renders while events are in flight */
+      it("marks rows pending, without claiming they are empty", () => {
+        harness.useQuery.mockImplementation(() => ({
+          data: undefined,
+          isLoading: true,
+        }));
 
-      const { result } = renderHook(() => useTraceListEvents([row("t1")]));
+        const { result } = renderHook(() =>
+          useTraceListEvents({ rows: [row("t1")] }),
+        );
 
-      expect(result.current[0]?.eventsLoading).toBe(true);
-      expect(result.current[0]?.events).toEqual(NO_TRACE_EVENTS);
+        expect(result.current[0]?.eventsLoading).toBe(true);
+        expect(result.current[0]?.events).toEqual(NO_TRACE_EVENTS);
+      });
     });
 
-    /** @scenario A failed events read leaves the rest of the list intact */
-    it("leaves the rows intact when the read fails", () => {
-      harness.useQuery.mockImplementation(() => ({
-        data: undefined,
-        isLoading: false,
-        isError: true,
-      }));
+    describe("when the page turns and the previous page's answers are still held", () => {
+      /** @scenario Turning the page waits for that page's own events */
+      it("keeps the new rows pending rather than reading them as empty", () => {
+        // React Query hands back the old page's data with `isLoading` already
+        // false, and none of it is keyed by a trace on the new page.
+        resolveWith(
+          {
+            "old-page-trace": {
+              names: [{ name: "tool.output", count: 1, firstTimestamp: 1 }],
+              totalCount: 1,
+              distinctCount: 1,
+            },
+          },
+          { isPreviousData: true },
+        );
 
-      const rows = [row("t1"), row("t2")];
-      const { result } = renderHook(() => useTraceListEvents(rows));
+        const { result } = renderHook(() =>
+          useTraceListEvents({ rows: [row("t9")] }),
+        );
 
-      expect(result.current).toHaveLength(2);
-      expect(result.current[0]?.traceId).toBe("t1");
-      // No events to show and nothing pending, so the column falls back to
-      // its empty marker rather than the list falling over.
-      expect(result.current[0]?.events).toEqual(NO_TRACE_EVENTS);
-      expect(result.current[0]?.eventsLoading).toBeFalsy();
+        expect(result.current[0]?.eventsLoading).toBe(true);
+        expect(result.current[0]?.events).toEqual(NO_TRACE_EVENTS);
+      });
+    });
+
+    describe("when the events could not be loaded", () => {
+      /** @scenario A failed events read says so rather than reading as empty */
+      it("marks the rows unavailable and leaves the rest of them intact", () => {
+        harness.useQuery.mockImplementation(() => ({
+          data: undefined,
+          isLoading: false,
+          isError: true,
+        }));
+
+        const rows = [row("t1"), row("t2")];
+        const { result } = renderHook(() => useTraceListEvents({ rows }));
+
+        expect(result.current).toHaveLength(2);
+        expect(result.current[0]?.traceId).toBe("t1");
+        expect(result.current[0]?.eventsUnavailable).toBe(true);
+        expect(result.current[0]?.eventsLoading).toBeFalsy();
+      });
     });
   });
 
   describe("given nothing on screen reads a row's events", () => {
-    /** @scenario Hiding the Events column stops the fetch */
-    it("makes no request", () => {
-      harness.view = { columnOrder: ["time", "trace"], grouping: "flat" };
+    describe("when a page of traces is on screen", () => {
+      /** @scenario Hiding the Events column costs nothing */
+      it("makes no request", () => {
+        harness.view = { columnOrder: ["time", "trace"], grouping: "flat" };
 
-      renderHook(() => useTraceListEvents([row("t1")]));
+        renderHook(() => useTraceListEvents({ rows: [row("t1")] }));
 
-      expect(lastOpts()).toEqual(expect.objectContaining({ enabled: false }));
-    });
-
-    /** @scenario An empty page of trace ids skips the query entirely */
-    it("makes no request for an empty page even with the column visible", () => {
-      renderHook(() => useTraceListEvents([]));
-
-      expect(lastOpts()).toEqual(expect.objectContaining({ enabled: false }));
+        expect(lastOpts()).toEqual(expect.objectContaining({ enabled: false }));
+      });
     });
   });
 
-  describe("when the user enables the Events column", () => {
-    /** @scenario Enabling the Events column triggers the fetch */
-    it("starts asking for the traces already on screen", () => {
-      harness.view = { columnOrder: ["time", "trace"], grouping: "flat" };
-      const rows = [row("t1")];
-      const { rerender } = renderHook(() => useTraceListEvents(rows));
-      expect(lastOpts()).toEqual(expect.objectContaining({ enabled: false }));
+  describe("given the page has no traces on it", () => {
+    describe("when the Events column is visible", () => {
+      /** @scenario A page with no traces on it shows no events */
+      it("makes no request", () => {
+        renderHook(() => useTraceListEvents({ rows: [] }));
 
-      harness.view = {
-        columnOrder: ["time", "trace", "events"],
-        grouping: "flat",
-      };
-      rerender();
+        expect(lastOpts()).toEqual(expect.objectContaining({ enabled: false }));
+      });
+    });
+  });
 
-      expect(lastOpts()).toEqual(expect.objectContaining({ enabled: true }));
-      expect(lastInput()).toEqual(
-        expect.objectContaining({ traceIds: ["t1"] }),
-      );
+  describe("given the rows are onboarding sample traces", () => {
+    describe("when the Events column is visible", () => {
+      /** @scenario Onboarding sample traces keep the events they ship with */
+      it("looks nothing up and leaves the fixtures' own events alone", () => {
+        const sample = row("sample-1");
+        sample.events = {
+          groups: [{ name: "thumbs_up_down", count: 1, firstTimestamp: 1 }],
+          totalCount: 1,
+          distinctCount: 1,
+        };
+
+        const { result } = renderHook(() =>
+          useTraceListEvents({ rows: [sample], isSamplePreview: true }),
+        );
+
+        expect(lastOpts()).toEqual(expect.objectContaining({ enabled: false }));
+        expect(result.current[0]?.events.groups).toEqual([
+          { name: "thumbs_up_down", count: 1, firstTimestamp: 1 },
+        ]);
+      });
+    });
+  });
+
+  describe("given the Events column was hidden", () => {
+    describe("when the user enables it", () => {
+      /** @scenario Enabling the Events column fills it in place */
+      it("starts asking for the traces already on screen", () => {
+        harness.view = { columnOrder: ["time", "trace"], grouping: "flat" };
+        const rows = [row("t1")];
+        const { rerender } = renderHook(() => useTraceListEvents({ rows }));
+        expect(lastOpts()).toEqual(expect.objectContaining({ enabled: false }));
+
+        harness.view = {
+          columnOrder: ["time", "trace", "events"],
+          grouping: "flat",
+        };
+        rerender();
+
+        expect(lastOpts()).toEqual(expect.objectContaining({ enabled: true }));
+        expect(lastInput()).toEqual(
+          expect.objectContaining({ traceIds: ["t1"] }),
+        );
+      });
     });
   });
 
   describe("given the Conversations lens is active without the Events column", () => {
-    /** @scenario A group's event count sums its traces' events */
-    it("still asks, because the group rows total their turns' events", () => {
-      harness.view = {
-        columnOrder: ["conversation", "turns"],
-        grouping: "by-conversation",
-      };
+    describe("when a page of traces is on screen", () => {
+      /** @scenario A group's event count sums its traces' events */
+      it("still asks, because the group rows total their turns' events", () => {
+        harness.view = {
+          columnOrder: ["conversation", "turns"],
+          grouping: "by-conversation",
+        };
 
-      renderHook(() => useTraceListEvents([row("t1")]));
+        renderHook(() => useTraceListEvents({ rows: [row("t1")] }));
 
-      expect(lastOpts()).toEqual(expect.objectContaining({ enabled: true }));
+        expect(lastOpts()).toEqual(expect.objectContaining({ enabled: true }));
+      });
     });
   });
 });

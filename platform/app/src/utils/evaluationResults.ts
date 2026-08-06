@@ -396,48 +396,63 @@ export function formatEvalScoreText(
  */
 export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
   const status = normalizeEvalStatus(input);
-  const color = EVALUATION_STATUS_COLORS[status];
-  const statusLabel = getStatusLabel(status);
-  const displayName =
-    input.name || input.evaluatorName || input.evaluatorId || "Unknown";
   const noVerdict = status === "skipped" || status === "error";
-  // A categorising evaluator's verdict IS its label. Show that, and nothing
-  // where the score and the pass/fail would go: both are stand-ins invented
-  // for fields it never filled, and printing them claims a run that scored
-  // zero and passed.
-  //
-  // A caller that knows its `scoreType` is believed over `score`, because its
-  // `score` may be one of those stand-ins. A caller that doesn't know is read
-  // off the raw fields, where an absent score and an absent verdict beside a
-  // label say the same thing.
-  const isCategorical =
-    input.scoreType === "categorical" ||
-    (input.scoreType == null && typeof input.score !== "number");
-  const categoryLabel =
-    !noVerdict && isCategorical && input.label && input.passed == null
-      ? input.label
-      : null;
+  const categoryLabel = resolveCategoryLabel({ input, noVerdict });
   const scoreText =
     categoryLabel == null && typeof input.score === "number"
       ? formatEvalScoreText(input.score)
       : null;
 
-  // Surface a colored Pass/Fail label only when the evaluator produced a
-  // pure boolean verdict (no numeric score to show in its place).
-  let passLabel: EvalChipDisplay["passLabel"] = null;
-  if (scoreText == null && categoryLabel == null && !noVerdict) {
-    if (status === "passed") passLabel = { text: "Pass", color: "green.fg" };
-    else if (status === "failed") passLabel = { text: "Fail", color: "red.fg" };
-  }
-
   return {
     status,
-    color,
-    statusLabel,
+    color: EVALUATION_STATUS_COLORS[status],
+    statusLabel: getStatusLabel(status),
     categoryLabel,
-    displayName,
+    displayName:
+      input.name || input.evaluatorName || input.evaluatorId || "Unknown",
     scoreText,
     noVerdict,
-    passLabel,
+    passLabel:
+      scoreText == null && categoryLabel == null && !noVerdict
+        ? resolvePassLabel(status)
+        : null,
   };
+}
+
+/**
+ * A categorising evaluator's verdict IS its label. Return it so callers can
+ * show it where the score and the pass/fail would go: both are stand-ins
+ * invented for fields it never filled, and printing them claims a run that
+ * scored zero and passed.
+ *
+ * A caller that knows its `scoreType` is believed over `score`, because its
+ * `score` may be one of those stand-ins. A caller that doesn't know is read
+ * off the raw fields: a label with neither a score nor a verdict beside it
+ * came from an evaluator that only categorised. A boolean score is a verdict,
+ * so it never reads as a category no matter what it is labelled.
+ */
+function resolveCategoryLabel({
+  input,
+  noVerdict,
+}: {
+  input: EvalChipInput;
+  noVerdict: boolean;
+}): string | null {
+  if (noVerdict || !input.label || input.passed != null) return null;
+  const isCategorical =
+    input.scoreType === "categorical" ||
+    (input.scoreType == null && input.score == null);
+  return isCategorical ? input.label : null;
+}
+
+/**
+ * The colored Pass/Fail label, for evaluators that produced a pure boolean
+ * verdict with no numeric score to show in its place.
+ */
+function resolvePassLabel(
+  status: ParsedEvaluationResult["status"],
+): EvalChipDisplay["passLabel"] {
+  if (status === "passed") return { text: "Pass", color: "green.fg" };
+  if (status === "failed") return { text: "Fail", color: "red.fg" };
+  return null;
 }

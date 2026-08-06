@@ -376,6 +376,79 @@ function dedupInTupleForTraceIds(extraInnerWhere: string): string {
 }
 
 /**
+ * One row per (trace, event name) for a page of traces, ordered so the first
+ * name a trace recorded comes first.
+ *
+ * Three stages, innermost out: elect each span's latest version and keep only
+ * the ones carrying events, expand those spans' `Events.*` arrays, then
+ * collapse to one row per (trace, event name).
+ *
+ * The window aggregates run over the whole per-trace partition and
+ * `LIMIT ... BY` trims afterwards, so a trimmed trace still reports the totals
+ * of everything it recorded, not of what survived the trim.
+ */
+function traceEventRollupQuery(): string {
+  const partitionAnd =
+    "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+    "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})";
+
+  return `
+    SELECT
+      traceId,
+      name,
+      nameCount,
+      firstTimestamp,
+      sum(nameCount) OVER (PARTITION BY traceId) AS totalCount,
+      count() OVER (PARTITION BY traceId) AS distinctCount
+    FROM (
+      SELECT
+        TraceId AS traceId,
+        event_name AS name,
+        count() AS nameCount,
+        toUnixTimestamp64Milli(min(event_timestamp)) AS firstTimestamp
+      FROM (
+        SELECT
+          TraceId,
+          "Events.Timestamp" AS Events_Timestamp,
+          "Events.Name" AS Events_Name
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId IN {traceIds:Array(String)}
+          AND notEmpty("Events.Name")
+          ${partitionAnd}
+          AND ${dedupInTupleForTraceIds(partitionAnd)}
+      )
+      ARRAY JOIN
+        Events_Timestamp AS event_timestamp,
+        Events_Name AS event_name
+      GROUP BY traceId, name
+    )
+    ORDER BY traceId ASC, firstTimestamp ASC, name ASC
+    LIMIT {maxNames:UInt32} BY traceId
+  `;
+}
+
+/** Gather {@link traceEventRollupQuery}'s flat rows into one rollup per trace. */
+function toTraceEventRollups(
+  rows: TraceEventRollupRow[],
+): Record<string, TraceEventRollup> {
+  const rollups: Record<string, TraceEventRollup> = {};
+  for (const row of rows) {
+    const rollup = (rollups[row.traceId] ??= {
+      names: [],
+      totalCount: asNumber(row.totalCount),
+      distinctCount: asNumber(row.distinctCount),
+    });
+    rollup.names.push({
+      name: row.name,
+      count: asNumber(row.nameCount),
+      firstTimestamp: asNumber(row.firstTimestamp),
+    });
+  }
+  return rollups;
+}
+
+/**
  * Per-bucket key matchers for the LangWatch signals projection. Each entry
  * compiles to one ClickHouse boolean expression over `mapKeys(SpanAttributes)`.
  * Order must match `LANGWATCH_SIGNAL_BUCKETS` in span-storage.repository.ts —
@@ -1574,55 +1647,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       // The page's traces all occurred inside the list's range, and a span
       // starts no earlier than its trace does, so padding both ends by the
       // standard partition window covers every span of every trace on the
-      // page without widening to a full-history scan.
+      // page without widening to a full-history scan. It is the same window
+      // the per-trace detail read uses, which is what keeps the list and the
+      // drawer agreeing on what a trace recorded.
       const fromMs = timeRange.from - DEFAULT_PARTITION_WINDOW_MS;
       const toMs = timeRange.to + DEFAULT_PARTITION_WINDOW_MS;
-      const partitionAnd =
-        "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-        "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})";
-
-      // Three stages, innermost out: elect each span's latest version and keep
-      // only the ones carrying events, expand those spans' `Events.*` arrays,
-      // then collapse to one row per (trace, event name).
-      //
-      // The window aggregates run over the whole per-trace partition and
-      // `LIMIT ... BY` trims afterwards, so a trimmed trace still reports the
-      // totals of everything it recorded, not of what survived the trim.
       const result = await client.query({
-        query: `
-          SELECT
-            traceId,
-            name,
-            nameCount,
-            firstTimestamp,
-            sum(nameCount) OVER (PARTITION BY traceId) AS totalCount,
-            count() OVER (PARTITION BY traceId) AS distinctCount
-          FROM (
-            SELECT
-              TraceId AS traceId,
-              event_name AS name,
-              count() AS nameCount,
-              toUnixTimestamp64Milli(min(event_timestamp)) AS firstTimestamp
-            FROM (
-              SELECT
-                TraceId,
-                "Events.Timestamp" AS Events_Timestamp,
-                "Events.Name" AS Events_Name
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId IN {traceIds:Array(String)}
-                AND notEmpty("Events.Name")
-                ${partitionAnd}
-                AND ${dedupInTupleForTraceIds(partitionAnd)}
-            )
-            ARRAY JOIN
-              Events_Timestamp AS event_timestamp,
-              Events_Name AS event_name
-            GROUP BY traceId, name
-          )
-          ORDER BY traceId ASC, firstTimestamp ASC, name ASC
-          LIMIT {maxNames:UInt32} BY traceId
-        `,
+        query: traceEventRollupQuery(),
         query_params: {
           tenantId,
           traceIds,
@@ -1633,21 +1664,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         format: "JSONEachRow",
       });
 
-      const rows = (await result.json()) as TraceEventRollupRow[];
-      const rollups: Record<string, TraceEventRollup> = {};
-      for (const row of rows) {
-        const rollup = (rollups[row.traceId] ??= {
-          names: [],
-          totalCount: asNumber(row.totalCount),
-          distinctCount: asNumber(row.distinctCount),
-        });
-        rollup.names.push({
-          name: row.name,
-          count: asNumber(row.nameCount),
-          firstTimestamp: asNumber(row.firstTimestamp),
-        });
-      }
-      return rollups;
+      return toTraceEventRollups(
+        (await result.json()) as TraceEventRollupRow[],
+      );
     } catch (error) {
       logger.error(
         {

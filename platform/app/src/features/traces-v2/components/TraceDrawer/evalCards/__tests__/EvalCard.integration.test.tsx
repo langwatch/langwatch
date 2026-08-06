@@ -129,7 +129,7 @@ describe("EvalCard evaluator inputs", () => {
   });
 });
 
-describe("EvalCard header", () => {
+describe("given a categorising evaluator that returned only a category", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getEvaluationInputsUseQueryMock.mockReturnValue({
@@ -138,19 +138,18 @@ describe("EvalCard header", () => {
     });
   });
 
-  describe("given a categorising evaluator that returned only a category", () => {
-    // How `langevals/llm_category` arrives: a label, and stand-ins where the
-    // score and verdict would be.
-    const categoryEval: EvalEntry = {
-      name: "Max conversation outcome",
-      score: 0,
-      scoreType: "categorical",
-      status: "pass",
-      label: "resolved",
-      evaluatorType: "langevals/llm_category",
-      evaluationId: "eval-cat",
-    };
+  // How a categorising evaluator arrives: a label, and stand-ins where the
+  // score and verdict would be.
+  const categoryEval: EvalEntry = {
+    name: "Max conversation outcome",
+    score: 0,
+    scoreType: "categorical",
+    status: "pass",
+    label: "resolved",
+    evaluationId: "eval-cat",
+  };
 
+  describe("when the card renders", () => {
     /** @scenario A category verdict leads the card header */
     it("leads with the category", () => {
       renderCard(categoryEval);
@@ -170,7 +169,17 @@ describe("EvalCard header", () => {
     });
 
     /** @scenario A category verdict leads the card header */
-    it("does not repeat the category under Show details", () => {
+    it("still leads with a category that reads like the stand-in score", () => {
+      // "0" is a real category here; matching the placeholder score it
+      // displaced must not cost the card its only verdict.
+      renderCard({ ...categoryEval, label: "0" });
+      expect(screen.getByText("0")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the card's details are expanded", () => {
+    /** @scenario A category verdict leads the card header */
+    it("does not repeat the category", () => {
       renderCard(categoryEval);
       // Inputs are still lazily loadable, so the toggle may exist; what must
       // not exist is a second copy of the category.
@@ -180,28 +189,47 @@ describe("EvalCard header", () => {
       expect(screen.getAllByText("resolved")).toHaveLength(1);
     });
   });
+});
 
-  describe("given an evaluator that returned a label alongside a real verdict", () => {
-    const labelledEval: EvalEntry = {
-      name: "Toxicity",
-      score: 0.9,
-      scoreType: "numeric",
-      status: "pass",
-      label: "safe",
-      passed: true,
-      evaluationId: "eval-labelled",
-    };
+describe("given an evaluator that returned a label alongside a real verdict", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getEvaluationInputsUseQueryMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    });
+  });
 
+  describe("when the card renders", () => {
     /** @scenario A label alongside a real verdict rides next to the badge */
     it("keeps the badge and the score, and adds the label beside them", () => {
-      renderCard(labelledEval);
+      renderCard({
+        name: "Toxicity",
+        score: 0.9,
+        scoreType: "numeric",
+        status: "pass",
+        label: "safe",
+        passed: true,
+        evaluationId: "eval-labelled",
+      });
+
       expect(screen.getByText("PASS")).toBeInTheDocument();
       expect(screen.getByText("safe")).toBeInTheDocument();
       expect(screen.getByText("0.90")).toBeInTheDocument();
     });
   });
+});
 
-  describe("given an evaluator that returned no label", () => {
+describe("given an evaluator that returned no label", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getEvaluationInputsUseQueryMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    });
+  });
+
+  describe("when the card renders", () => {
     /** @scenario An evaluator with no label is unchanged */
     it("shows the badge, the name and the score, and no category chip", () => {
       renderCard({

@@ -153,4 +153,10 @@ export interface TraceListItem {
    * claim the trace recorded nothing.
    */
   eventsLoading?: boolean;
+  /**
+   * True when the page's events read failed. The column says so instead of
+   * showing its empty marker, which would report a trace that has events as
+   * having none.
+   */
+  eventsUnavailable?: boolean;
 }

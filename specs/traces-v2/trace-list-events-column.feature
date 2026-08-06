@@ -63,78 +63,92 @@ Rule: The Events column shows the trace's own events
     Given a trace whose drawer Events section lists 1 event
     Then that trace's row in the list shows 1 event
 
-Rule: Events are read on demand, per visible page
-  The events read is a second query, not part of the list read: the list is
-  the query that gates first paint, and events live in a different table.
+Rule: The column fills itself in without holding up the list
+  Events live apart from everything else on a row, so they arrive after it.
+  Until they do, and if they never do, the column says which of those two it
+  is rather than answering for the trace.
 
   Background:
     Given the user is authenticated with "traces:view" permission
 
   @integration
-  Scenario: Events are fetched for the traces currently on screen
+  Scenario: Events are shown for the traces currently on screen
     Given the Events column is visible
     When a page of traces loads
-    Then events are requested once for that page's trace ids
+    Then each row on that page shows the events of its own trace
 
   @integration
-  Scenario: Hiding the Events column stops the fetch
+  Scenario: Hiding the Events column costs nothing
     Given no visible column or grouping needs events
     When a page of traces loads
-    Then no events request is made
+    Then the list does not go looking for events
 
   @integration
-  Scenario: Enabling the Events column triggers the fetch
+  Scenario: Enabling the Events column fills it in place
     Given the Events column was hidden
     When the user enables the Events column
-    Then events are requested for the traces already on screen
-    And the trace list itself is not refetched
+    Then the traces already on screen gain their events
+    And the rest of the list is not reloaded
 
   @integration
   Scenario: The list still renders while events are in flight
-    Given the events request has not resolved
+    Given the events have not arrived yet
     Then every other column renders its value
     And the Events column shows a pending placeholder rather than the empty marker
     # Showing the empty marker early would read as "this trace has no events".
 
   @integration
-  Scenario: A failed events read leaves the rest of the list intact
-    Given the events request fails
-    Then the trace rows still render
-    And the Events column shows the empty marker
-    And no error toast interrupts the user
-    # The column is supplementary; losing it must not take the list down.
+  Scenario: Turning the page waits for that page's own events
+    Given the user moves to the next page
+    Then the Events column shows a pending placeholder until the new page's events arrive
+    # The previous page's answers say nothing about these traces.
 
-Rule: Events reads are tenant-scoped and bounded
-  The read goes to `stored_spans`, which is ordered by
-  (TenantId, TraceId, SpanId) and partitioned by week.
+  @integration
+  Scenario: A failed events read says so rather than reading as empty
+    Given the events could not be loaded
+    Then the trace rows still render
+    And the Events column reads as unavailable, not as empty
+    And no error toast interrupts the user
+    # The column is supplementary; losing it must not take the list down, and
+    # an empty marker would report a trace that has events as having none.
+
+  @integration
+  Scenario: Onboarding sample traces keep the events they ship with
+    Given the user is seeing the onboarding sample traces
+    Then their events are shown as the samples describe them
+    And no events are looked up for them
+
+Rule: A row never has to render an unbounded number of events
+  A single agent turn can record hundreds of events. The column stays
+  readable, and one trace's history cannot swell the list's response.
 
   Background:
     Given a project with traces that carry span events
 
   @integration
   Scenario: Only the caller's project is read
-    When events are read for a page of trace ids
-    Then the query filters on the caller's TenantId first
-    And trace ids belonging to another project return nothing
-
-  @integration
-  Scenario: The read is pruned to the page's time range
-    When events are read for a page of trace ids
-    Then the query is bounded by the list's time range
-    And partitions outside that range are not scanned
+    When the list shows events for a page of traces
+    Then traces belonging to another project contribute nothing
 
   @integration
   Scenario: A trace with a very large number of events stays bounded
     Given a trace recorded events under more distinct names than a row can show
-    When events are read for it
-    Then the response carries at most the badge cap plus the remainder count
-    And the row never receives one entry per event
+    When the list shows events for it
+    Then the row receives at most the badge cap plus a count of the rest
+    And it never receives one entry per event
 
   @integration
-  Scenario: An empty page of trace ids skips the query entirely
+  Scenario: The search is confined to the period on screen
+    Given the list is showing a period the trace's events fall outside of
+    When the list shows events for it
+    Then those events are not counted on the row
+    # The drawer reads the same window around a trace, so the two never
+    # disagree about what it recorded.
+
+  @integration
+  Scenario: A page with no traces on it shows no events
     Given the visible page has no traces
-    When the events read runs
-    Then no ClickHouse query is issued
+    Then no events are looked up
 
 Rule: Conversation groups count the events of their turns
   The Conversations lens summarises each group, including how many events

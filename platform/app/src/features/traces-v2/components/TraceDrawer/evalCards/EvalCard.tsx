@@ -81,8 +81,10 @@ export function EvalCard({
   // The labeled categorical/boolean verdict is sometimes more informative
   // than the numeric score (e.g. score=1 with label="safe"), so the header
   // carries it alongside the badge. Only a category-only run needs no detail
-  // row for it — there the label IS the header.
-  const hasLabel = !!eval_.label && eval_.label !== String(eval_.score);
+  // row for it — there the label IS the header, which is also why it shows
+  // even when it reads the same as the placeholder score it stands in for.
+  const hasLabel =
+    !!eval_.label && (categoryOnly || eval_.label !== String(eval_.score));
   const showLabelDetailRow = hasLabel && !categoryOnly;
 
   const meta: string[] = [];

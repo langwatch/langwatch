@@ -81,8 +81,7 @@ Rule: Eval card layout
     When the user clicks "Show details"
     Then a details panel reveals the available rows (Label, Error, IDs, Stacktrace, Inputs)
 
-  # A categorising evaluator (langevals/llm_category and anything else that
-  # answers with a category) returns a label and neither a score nor a
+  # A categorising evaluator returns a label and neither a score nor a
   # pass/fail. Reading that as a passing run scoring zero is a fabrication
   # twice over, and it buries the one thing the evaluator actually said.
   @integration

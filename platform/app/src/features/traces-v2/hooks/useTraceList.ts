@@ -26,7 +26,10 @@ export interface TraceListResult {
  */
 export function useTraceList(): TraceListResult {
   const query = useTraceListQuery();
-  const data = useTraceListEvents(query.data);
+  const data = useTraceListEvents({
+    rows: query.data,
+    isSamplePreview: query.isSamplePreview,
+  });
   const newIds = useNewlyArrivedTraceIds(query.data);
   useViewSwitchingDim({
     isFetching: query.isFetching,

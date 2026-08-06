@@ -56,21 +56,26 @@ describe("mapTraceListPayload", () => {
     });
   });
 
-  describe("when items already carry spanCount", () => {
-    it("preserves the supplied value", () => {
-      const rows = mapTraceListPayload({
-        items: [{ traceId: "t1", spanCount: 7 }],
+  describe("given items that already carry spanCount", () => {
+    describe("when mapping the payload", () => {
+      it("preserves the supplied value", () => {
+        const rows = mapTraceListPayload({
+          items: [{ traceId: "t1", spanCount: 7 }],
+        });
+        expect(rows[0]?.spanCount).toBe(7);
       });
-      expect(rows[0]?.spanCount).toBe(7);
     });
   });
 
-  describe("when the list payload carries no events", () => {
-    it("leaves rows eventless for the separate events read to fill in", () => {
-      // Events are not on the trace summary — `useTraceListEvents` merges them
-      // in from `tracesV2.listEvents`, so the list payload never carries any.
-      const rows = mapTraceListPayload({ items: [{ traceId: "t1" }] });
-      expect(rows[0]?.events).toEqual(NO_TRACE_EVENTS);
+  describe("given a list payload that carries no events", () => {
+    describe("when mapping the payload", () => {
+      it("leaves rows eventless for the separate events read to fill in", () => {
+        // Events are not on the trace summary — `useTraceListEvents` merges
+        // them in from `tracesV2.listEvents`, so the list payload never
+        // carries any.
+        const rows = mapTraceListPayload({ items: [{ traceId: "t1" }] });
+        expect(rows[0]?.events).toEqual(NO_TRACE_EVENTS);
+      });
     });
   });
 });

@@ -16,6 +16,7 @@ import { UserAvatar } from "~/components/UserAvatar";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { EvalChipDisplay } from "~/utils/evaluationResults";
 import { getEvalChipDisplay } from "~/utils/evaluationResults";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
 import type { RichEval } from "../../hooks/useTraceEvaluations";
@@ -446,6 +447,41 @@ function buildLastUsedPromptChipDef({
   };
 }
 
+/**
+ * The chip's trailing verdict: a tinted badge for skipped/error, the category
+ * for a categorising evaluator, the numeral for a scoring one, colored
+ * Pass/Fail for a judging one. Mirrors the trace-table EvalChip.
+ */
+function EvalChipVerdict({ display }: { display: EvalChipDisplay }) {
+  if (display.status === "skipped")
+    return <NoVerdictMicroBadge icon={LuCircleSlash} label="SKIPPED" />;
+  if (display.status === "error")
+    return <NoVerdictMicroBadge icon={LuCircleAlert} label="ERROR" />;
+  if (display.categoryLabel)
+    return (
+      <Text textStyle="2xs" fontWeight="semibold" color="blue.fg" truncate>
+        {display.categoryLabel}
+      </Text>
+    );
+  if (display.scoreText)
+    return (
+      <Text textStyle="2xs" fontWeight="semibold" color="fg.muted">
+        {display.scoreText}
+      </Text>
+    );
+  if (display.passLabel)
+    return (
+      <Text
+        textStyle="2xs"
+        fontWeight="semibold"
+        color={display.passLabel.color}
+      >
+        {display.passLabel.text}
+      </Text>
+    );
+  return null;
+}
+
 function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
   // Single source of truth for color / status label / score formatting.
   // The trace-list `EvalChip`, the v3 EvaluatorChip, and this header
@@ -471,30 +507,7 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
       <Text textStyle="xs" color="fg" fontWeight="medium" truncate>
         {display.displayName}
       </Text>
-      {/* Trailing verdict — for skipped/error this is a tinted badge;
-          for boolean Pass/Fail it's colored text; for numeric it's
-          a muted-foreground numeral. Mirrors the trace-table EvalChip. */}
-      {display.status === "skipped" ? (
-        <NoVerdictMicroBadge icon={LuCircleSlash} label="SKIPPED" />
-      ) : display.status === "error" ? (
-        <NoVerdictMicroBadge icon={LuCircleAlert} label="ERROR" />
-      ) : display.categoryLabel ? (
-        <Text textStyle="2xs" fontWeight="semibold" color="blue.fg" truncate>
-          {display.categoryLabel}
-        </Text>
-      ) : display.scoreText ? (
-        <Text textStyle="2xs" fontWeight="semibold" color="fg.muted">
-          {display.scoreText}
-        </Text>
-      ) : display.passLabel ? (
-        <Text
-          textStyle="2xs"
-          fontWeight="semibold"
-          color={display.passLabel.color}
-        >
-          {display.passLabel.text}
-        </Text>
-      ) : null}
+      <EvalChipVerdict display={display} />
     </HStack>
   );
   return {

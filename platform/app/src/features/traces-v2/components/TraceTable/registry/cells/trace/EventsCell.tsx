@@ -12,7 +12,13 @@ type Density = "compact" | "comfortable";
  */
 const VISIBLE_BADGES = 3;
 
-function renderEvents(row: TraceListItem, density: Density) {
+function renderEvents({
+  row,
+  density,
+}: {
+  row: TraceListItem;
+  density: Density;
+}) {
   const textStyle = density === "compact" ? "xs" : "sm";
   const { groups, distinctCount } = row.events;
 
@@ -22,6 +28,19 @@ function renderEvents(row: TraceListItem, density: Density) {
     // make, so hold the space instead.
     if (row.eventsLoading) {
       return <Skeleton height="16px" width="60px" borderRadius="md" />;
+    }
+    // Same reasoning once the read has failed: the trace may well have events
+    // and we simply cannot say. The rest of the row is unaffected.
+    if (row.eventsUnavailable) {
+      return (
+        <Text
+          textStyle={textStyle}
+          color="fg.subtle"
+          title="Events could not be loaded"
+        >
+          Unavailable
+        </Text>
+      );
     }
     return (
       <Text textStyle={textStyle} color="fg.subtle">
@@ -45,7 +64,10 @@ function renderEvents(row: TraceListItem, density: Density) {
           fontWeight="medium"
           color="fg.muted"
           flexShrink={0}
-          title={remainderTitle(groups.slice(VISIBLE_BADGES), hiddenCount)}
+          title={remainderTitle({
+            remaining: groups.slice(VISIBLE_BADGES),
+            hiddenCount,
+          })}
         >
           +{hiddenCount}
         </Text>
@@ -59,10 +81,13 @@ function renderEvents(row: TraceListItem, density: Density) {
  * server-side, so past that trim the chip can only report how many more there
  * were rather than pretend to name them.
  */
-function remainderTitle(
-  remaining: { name: string }[],
-  hiddenCount: number,
-): string {
+function remainderTitle({
+  remaining,
+  hiddenCount,
+}: {
+  remaining: { name: string }[];
+  hiddenCount: number;
+}): string {
   const named = remaining.map((event) => event.name);
   const unnamed = hiddenCount - named.length;
   if (unnamed > 0) named.push(`and ${unnamed.toLocaleString()} more`);
@@ -72,6 +97,6 @@ function remainderTitle(
 export const EventsCell = {
   id: "events",
   label: "Events",
-  render: ({ row }) => renderEvents(row, "compact"),
-  renderComfortable: ({ row }) => renderEvents(row, "comfortable"),
+  render: ({ row }) => renderEvents({ row, density: "compact" }),
+  renderComfortable: ({ row }) => renderEvents({ row, density: "comfortable" }),
 } as const satisfies CellDef<TraceListItem>;

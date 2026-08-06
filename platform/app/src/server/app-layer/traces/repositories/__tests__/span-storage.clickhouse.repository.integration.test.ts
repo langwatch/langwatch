@@ -322,12 +322,17 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       to: rollupBase.getTime() + 60_000,
     };
 
-    function rollupRow(
-      traceId: string,
-      spanId: string,
-      events: { ts: Date; name: string }[],
-      overrides: Record<string, unknown> = {},
-    ) {
+    function rollupRow({
+      traceId,
+      spanId,
+      events,
+      overrides = {},
+    }: {
+      traceId: string;
+      spanId: string;
+      events: { ts: Date; name: string }[];
+      overrides?: Record<string, unknown>;
+    }) {
       return makeEventRow(
         spanId,
         events.map((e) => ({ ts: e.ts, name: e.name, attrs: {} })),
@@ -338,46 +343,61 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
     beforeAll(async () => {
       await insertRows([
         // One tracked-event trace, the shape a thumbs-up lands as.
-        rollupRow(feedbackTraceId, "fb-span", [
-          { ts: at(10), name: "thumbs_up_down" },
-        ]),
+        rollupRow({
+          traceId: feedbackTraceId,
+          spanId: "fb-span",
+          events: [{ ts: at(10), name: "thumbs_up_down" }],
+        }),
         // An agent turn: the same two names over and over, across spans.
-        rollupRow(chattyTraceId, "chatty-span-1", [
-          { ts: at(30), name: "gen_ai.request.attempt" },
-          { ts: at(40), name: "tool.output" },
-          { ts: at(50), name: "gen_ai.request.attempt" },
-        ]),
-        rollupRow(chattyTraceId, "chatty-span-2", [
-          { ts: at(60), name: "tool.output" },
-          { ts: at(70), name: "exception" },
-        ]),
+        rollupRow({
+          traceId: chattyTraceId,
+          spanId: "chatty-span-1",
+          events: [
+            { ts: at(30), name: "gen_ai.request.attempt" },
+            { ts: at(40), name: "tool.output" },
+            { ts: at(50), name: "gen_ai.request.attempt" },
+          ],
+        }),
+        rollupRow({
+          traceId: chattyTraceId,
+          spanId: "chatty-span-2",
+          events: [
+            { ts: at(60), name: "tool.output" },
+            { ts: at(70), name: "exception" },
+          ],
+        }),
         // Stale version of chatty-span-2 — its events must not be counted.
-        rollupRow(
-          chattyTraceId,
-          "chatty-span-2",
-          [{ ts: at(-500), name: "stale.rollup" }],
-          {
+        rollupRow({
+          traceId: chattyTraceId,
+          spanId: "chatty-span-2",
+          events: [{ ts: at(-500), name: "stale.rollup" }],
+          overrides: {
             StartTime: new Date(base - 90_000),
             EndTime: new Date(base - 90_000 + 50),
             UpdatedAt: new Date(base - 90_000),
             CreatedAt: new Date(base - 90_000),
           },
-        ),
+        }),
         // A trace whose spans carry no events at all.
-        rollupRow(quietTraceId, "quiet-span", []),
+        rollupRow({ traceId: quietTraceId, spanId: "quiet-span", events: [] }),
         // More distinct names than one row can show.
-        rollupRow(
-          noisyTraceId,
-          "noisy-span",
-          Array.from({ length: MAX_EVENT_NAMES_PER_TRACE + 5 }, (_, i) => ({
-            ts: at(100 + i),
-            name: `event.kind.${String(i).padStart(2, "0")}`,
-          })),
-        ),
+        rollupRow({
+          traceId: noisyTraceId,
+          spanId: "noisy-span",
+          events: Array.from(
+            { length: MAX_EVENT_NAMES_PER_TRACE + 5 },
+            (_, i) => ({
+              ts: at(100 + i),
+              name: `event.kind.${String(i).padStart(2, "0")}`,
+            }),
+          ),
+        }),
         // Same trace id shape, different tenant.
-        rollupRow(otherTenantTraceId, "other-span", [
-          { ts: at(10), name: "thumbs_up_down" },
-        ]),
+        rollupRow({
+          traceId: otherTenantTraceId,
+          spanId: "other-span",
+          events: [{ ts: at(10), name: "thumbs_up_down" }],
+        }),
       ]);
       await insertRows([
         makeEventRow(
@@ -446,7 +466,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       });
     });
 
-    /** @scenario Events are fetched for the traces currently on screen */
+    /** @scenario Events are shown for the traces currently on screen */
     it("answers a whole page in one call, keyed by trace id", async () => {
       const rollups = await repo.getTraceEventRollupsByTraceIds({
         tenantId: rollupTenantId,
@@ -499,7 +519,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       ).not.toContain("leaked");
     });
 
-    /** @scenario The read is pruned to the page's time range */
+    /** @scenario The search is confined to the period on screen */
     it("returns nothing when the page's time range excludes the spans", async () => {
       const longAgo = rollupBase.getTime() - 400 * 24 * 60 * 60 * 1000;
       const rollups = await repo.getTraceEventRollupsByTraceIds({
@@ -511,7 +531,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       expect(rollups).toEqual({});
     });
 
-    /** @scenario An empty page of trace ids skips the query entirely */
+    /** @scenario A page with no traces on it shows no events */
     it("issues no query for an empty page", async () => {
       const failingRepo = new SpanStorageClickHouseRepository(async () => {
         throw new Error("resolveClient must not be called");

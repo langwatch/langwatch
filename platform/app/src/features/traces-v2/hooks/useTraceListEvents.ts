@@ -15,10 +15,19 @@ import { NO_TRACE_EVENTS } from "../types/trace";
  * That read is its own query: the list is what gates first paint, and a page
  * whose columns and grouping never mention events pays nothing.
  *
- * A failed read leaves rows with no events rather than taking the list down —
- * the column is supplementary to every other thing on the row.
+ * A failed read leaves the rest of the list standing rather than taking it
+ * down: the column is supplementary to every other thing on the row. It says
+ * so rather than falling back to the empty marker, which would report a trace
+ * with events as having none.
  */
-export function useTraceListEvents(rows: TraceListItem[]): TraceListItem[] {
+export function useTraceListEvents({
+  rows,
+  isSamplePreview = false,
+}: {
+  rows: TraceListItem[];
+  /** Fixture rows carry their own events and have no ids to read back. */
+  isSamplePreview?: boolean;
+}): TraceListItem[] {
   const { project } = useOrganizationTeamProject();
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
   const needsEvents = useViewStore(rowsNeedEvents);
@@ -38,7 +47,8 @@ export function useTraceListEvents(rows: TraceListItem[]): TraceListItem[] {
     [traceIdsKey],
   );
 
-  const enabled = !!project?.id && needsEvents && traceIds.length > 0;
+  const enabled =
+    !!project?.id && !isSamplePreview && needsEvents && traceIds.length > 0;
   const query = api.tracesV2.listEvents.useQuery(
     {
       projectId: project?.id ?? "",
@@ -55,10 +65,15 @@ export function useTraceListEvents(rows: TraceListItem[]): TraceListItem[] {
   );
 
   const rollups = query.data;
-  const isLoading = enabled && query.isLoading;
+  // `keepPreviousData` hands back the previous page's rollups with `isLoading`
+  // already false, so a row on the new page would find no entry of its own and
+  // read as eventless. It is still waiting, and says so until its own answer
+  // arrives.
+  const isLoading = enabled && (query.isLoading || query.isPreviousData);
+  const isUnavailable = enabled && query.isError;
 
   return useMemo(() => {
-    if (!rollups && !isLoading) return rows;
+    if (!rollups && !isLoading && !isUnavailable) return rows;
     return rows.map((row) => {
       const rollup = rollups?.[row.traceId];
       return {
@@ -71,9 +86,10 @@ export function useTraceListEvents(rows: TraceListItem[]): TraceListItem[] {
             }
           : NO_TRACE_EVENTS,
         eventsLoading: isLoading,
+        eventsUnavailable: isUnavailable,
       };
     });
-  }, [rows, rollups, isLoading]);
+  }, [rows, rollups, isLoading, isUnavailable]);
 }
 
 /**
