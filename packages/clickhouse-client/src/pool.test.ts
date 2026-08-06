@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_CLIENTS_PER_PROCESS,
   DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
   deriveFleetPoolCeiling,
   FALLBACK_POOL_SIZE,
@@ -63,7 +64,7 @@ describe("deriveFleetPoolCeiling", () => {
             replicas: 10,
             serverMaxConcurrentQueries: 1000,
           }),
-        ).toBe(35);
+        ).toBe(70);
       });
 
       it("gives a process holding one client twice the pool", () => {
@@ -77,6 +78,7 @@ describe("deriveFleetPoolCeiling", () => {
         });
 
         expect(one).toBe(21);
+        expect(two).toBe(10);
         expect(one!).toBeGreaterThan(two!);
       });
 
@@ -135,9 +137,9 @@ describe("resolvePoolSize", () => {
         const decision = resolvePoolSize({ replicas: 10 });
 
         expect(decision).toMatchObject({
-          size: 10,
+          size: 21,
           source: "derived",
-          derivedCeiling: 10,
+          derivedCeiling: 21,
           exceedsBudget: false,
         });
       });
@@ -147,11 +149,11 @@ describe("resolvePoolSize", () => {
   describe("given a fleet so large the budget cannot afford one connection", () => {
     describe("when the size is resolved", () => {
       it("still reports the budget as exceeded", () => {
-        // 151 replicas x 2 clients x the floored minimum of 1 is 302
+        // 301 replicas x 1 client x the floored minimum of 1 is 301
         // connections against the default 300-query ceiling - the floor that
         // keeps the *ceiling* at a usable 1 must not also hide that the real
         // budget is already gone.
-        const decision = resolvePoolSize({ replicas: 151 });
+        const decision = resolvePoolSize({ replicas: 301 });
 
         expect(decision.size).toBe(1);
         expect(decision.exceedsBudget).toBe(true);
@@ -172,7 +174,7 @@ describe("resolvePoolSize", () => {
         const decision = resolvePoolSize({ override: 40, replicas: 10 });
 
         expect(decision.exceedsBudget).toBe(true);
-        expect(decision.derivedCeiling).toBe(10);
+        expect(decision.derivedCeiling).toBe(21);
       });
 
       it("raises no conflict when it fits the budget", () => {
@@ -184,7 +186,7 @@ describe("resolvePoolSize", () => {
       it("still reports the ceiling when nothing conflicts", () => {
         expect(
           resolvePoolSize({ override: 8, replicas: 10 }).derivedCeiling,
-        ).toBe(10);
+        ).toBe(21);
       });
     });
 
@@ -205,7 +207,7 @@ describe("resolvePoolSize", () => {
       it("falls through to the derived size when it is unusable", () => {
         const decision = resolvePoolSize({ override: 0, replicas: 10 });
 
-        expect(decision.size).toBe(10);
+        expect(decision.size).toBe(21);
         expect(decision.source).toBe("derived");
         expect(decision.rejectedOverride).toBe(0);
       });
@@ -269,9 +271,9 @@ describe("poolSizingFromEnv", () => {
           poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "10" }),
         );
 
-        expect(decision.size * 10 * 2).toBeLessThanOrEqual(
-          DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
-        );
+        expect(
+          decision.size * 10 * DEFAULT_CLIENTS_PER_PROCESS,
+        ).toBeLessThanOrEqual(DEFAULT_SERVER_MAX_CONCURRENT_QUERIES);
       });
     });
   });
