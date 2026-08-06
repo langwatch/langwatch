@@ -82,6 +82,37 @@ func ClassifyPressure(m MemStat) Pressure {
 	}
 }
 
+// heavyRunBudget is what one heavy run is assumed to want. Sized from the
+// measured 573 MB per vitest fork times a default width, rounded to something
+// a reader can hold in their head.
+const heavyRunBudget = uint64(3) << 30
+
+// HeavySlots is how many heavy runs may be in flight across the whole machine.
+//
+// Sized from what is actually FREE rather than from total RAM. The difference
+// is not academic: on a laptop with a container VM holding 8 GiB, total memory
+// overstates what this process can have by nearly half, and a limit computed
+// from it over-admits by exactly the amount some other tenant is holding.
+// Compressor occupancy is subtracted for the same reason — it is memory the
+// machine has already had to work to reclaim.
+//
+// Capped by cores as well, because these runs saturate CPU as readily as RAM,
+// and never below one, or nothing would ever run.
+func HeavySlots(m MemStat, numCPU int) int {
+	usable := m.TotalBytes
+	if m.CompressedBytes < usable {
+		usable -= m.CompressedBytes
+	}
+	slots := 1
+	if usable >= heavyRunBudget {
+		slots = int(usable / heavyRunBudget)
+	}
+	if numCPU > 0 {
+		slots = min(slots, max(numCPU/4, 1))
+	}
+	return max(slots, 1)
+}
+
 // CallerKind is who asked for a heavy run. It decides the wait ceiling, because
 // it decides the prompt-cache floor.
 //

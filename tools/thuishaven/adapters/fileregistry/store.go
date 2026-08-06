@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
@@ -303,6 +304,108 @@ func (s *Store) Daemon() (app.DaemonInfo, bool) {
 }
 
 func (s *Store) ClearDaemon() { _ = os.Remove(s.daemonPath()) }
+
+func (s *Store) heavyRunsDir() string  { return filepath.Join(s.home, "heavy-runs") }
+func (s *Store) durationsPath() string { return filepath.Join(s.home, "run-durations.json") }
+
+// HeavyRuns counts the heavy runs live on this machine, across every worktree
+// and terminal.
+//
+// Occupancy is derived from whether each recorded pid is still alive rather
+// than from a counter anyone has to decrement, so a killed run frees its place
+// with no bookkeeping — the same property the shared check queue relies on. A
+// dead entry is swept as it is found.
+func (s *Store) HeavyRuns() int {
+	entries, err := os.ReadDir(s.heavyRunsDir())
+	if err != nil {
+		return 0
+	}
+	live := 0
+	for _, e := range entries {
+		pid, err := strconv.Atoi(strings.TrimSuffix(e.Name(), ".json"))
+		if err != nil {
+			continue
+		}
+		if processAlive(pid) {
+			live++
+			continue
+		}
+		_ = os.Remove(filepath.Join(s.heavyRunsDir(), e.Name()))
+	}
+	return live
+}
+
+// ClaimHeavyRun records this process as holding a heavy slot.
+func (s *Store) ClaimHeavyRun(pid int, command string) (func(), error) {
+	if err := os.MkdirAll(s.heavyRunsDir(), 0o755); err != nil {
+		return func() {}, err
+	}
+	path := filepath.Join(s.heavyRunsDir(), strconv.Itoa(pid)+".json")
+	b, err := json.Marshal(map[string]any{"pid": pid, "command": command, "at": time.Now()})
+	if err != nil {
+		return func() {}, err
+	}
+	if err := writeFileAtomic(path, b, 0o644); err != nil {
+		return func() {}, err
+	}
+	return func() { _ = os.Remove(path) }, nil
+}
+
+// processAlive reports whether a pid is a live process. Signal 0 tests for
+// existence without delivering anything; EPERM means it exists but belongs to
+// someone else, which still counts as occupied.
+func processAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	p, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	return p.Signal(syscall.Signal(0)) == nil
+}
+
+// ObservedDuration is how long this kind of command has taken before, or zero
+// when it has never been timed. Zero is load-bearing: callers treat an
+// unobserved command as long, so it queues rather than being narrowed on a
+// guess.
+func (s *Store) ObservedDuration(key string) time.Duration {
+	if key == "" {
+		return 0
+	}
+	return s.readDurations()[key]
+}
+
+// ObserveDuration folds a completed run into the running estimate.
+//
+// An exponential moving average rather than a stored history: one file, no
+// growth, and a machine that gets slower (or a suite that gets bigger) is
+// tracked within a few runs instead of being anchored to whatever the first
+// one happened to cost.
+func (s *Store) ObserveDuration(key string, took time.Duration) {
+	if key == "" || took <= 0 {
+		return
+	}
+	all := s.readDurations()
+	if prev, ok := all[key]; ok {
+		took = (prev*3 + took) / 4
+	}
+	all[key] = took
+	if b, err := json.Marshal(all); err == nil {
+		_ = os.MkdirAll(s.home, 0o755)
+		_ = writeFileAtomic(s.durationsPath(), b, 0o644)
+	}
+}
+
+func (s *Store) readDurations() map[string]time.Duration {
+	out := map[string]time.Duration{}
+	b, err := os.ReadFile(s.durationsPath())
+	if err != nil {
+		return out
+	}
+	_ = json.Unmarshal(b, &out)
+	return out
+}
 
 func (s *Store) pressurePath() string { return filepath.Join(s.home, "pressure.json") }
 

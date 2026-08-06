@@ -383,6 +383,24 @@ var table = []commandSpec{
 		run: runClean,
 	},
 	{
+		name:    "run",
+		summary: "run a command under a machine-wide heavy slot, so parallel test runs can't take the machine",
+		args:    "--sh <command>",
+		flags: []flagSpec{
+			{long: "--sh", takesValue: true, value: "<command>", summary: "the command line to run, as one argument — quoted so operators stay inside the slot"},
+			{long: "--class", takesValue: true, value: "heavy", summary: "which slot pool to take (only \"heavy\" today)"},
+			// NOT --agent: that already means plain, token-free output everywhere
+			// else in this CLI, and ADR-064 rule 2 is one meaning per flag.
+			{long: "--agent-id", takesValue: true, value: "<id>", summary: "the sub-agent this run belongs to — picks the shorter wait ceiling its prompt cache needs"},
+		},
+		run: runHeavy,
+	},
+	{
+		name:    "gate",
+		summary: "answer a Claude Code PreToolUse hook on stdin (admission + cost safety)",
+		run:     runGate,
+	},
+	{
 		name:    "typecheck",
 		summary: "pnpm typecheck under a machine-wide RAM slot (args forwarded)",
 		args:    "[args…]",

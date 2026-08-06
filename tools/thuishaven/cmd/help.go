@@ -76,9 +76,13 @@ ENVIRONMENT
                                  runaway tsgo shouldn't sit on a slot forever.
     CHECK_SLOTS=N                The sibling knob outside haven: caps concurrent
                                  "pnpm typecheck" and "pnpm lint" runs machine
-                                 wide (0 disables). "haven typecheck" sets it to
-                                 0 for the run it spawns, holding its own slot
-                                 instead.
+                                 wide (0 disables). "haven typecheck" and
+                                 "haven run" set it to 0 for the run they spawn,
+                                 holding their own slot instead, so a run is
+                                 never counted twice and cannot queue behind
+                                 itself.
+    HAVEN_SLOT_HELD=1            Set by "haven run" inside the command it spawns:
+                                 this run is already admitted, do not admit again.
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
     HAVEN_DB_TTL=336h            Background-prune databases whose worktree has not

@@ -76,6 +76,22 @@ type Store interface {
 	// and nothing else, so slot counting never depends on the daemon running.
 	WritePressure(domain.PressureRecord) error
 	ReadPressure() (domain.PressureRecord, bool)
+	// HeavyRuns counts the heavy runs live on this machine right now, across
+	// every worktree and terminal. Occupancy is derived from whether each
+	// recorded pid is still alive, so a killed run frees its place with no
+	// bookkeeping — the same property #6598's queue relies on.
+	HeavyRuns() int
+	// ClaimHeavyRun records this process as holding a heavy slot and returns the
+	// release. The claim is what makes a rewrapped run visible to every other
+	// caller on the machine.
+	ClaimHeavyRun(pid int, command string) (release func(), err error)
+	// ObservedDuration is how long this command has taken before, or zero when
+	// it has never been timed. Zero is load-bearing: an unobserved command is
+	// treated as long, so it queues rather than being narrowed on a guess.
+	ObservedDuration(command string) time.Duration
+	// ObserveDuration records how long a run actually took, so the next one can
+	// be decided on evidence rather than a default.
+	ObserveDuration(command string, took time.Duration)
 }
 
 // Supervisor runs child processes: one-shot prepare/seed steps and the

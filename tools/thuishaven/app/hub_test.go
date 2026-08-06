@@ -25,6 +25,8 @@ type fakeStore struct {
 
 	pressure        domain.PressureRecord
 	pressureWritten bool
+	heavyRuns       int
+	observed        time.Duration
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -89,6 +91,13 @@ func (f *fakeStore) WritePressure(rec domain.PressureRecord) error {
 func (f *fakeStore) ReadPressure() (domain.PressureRecord, bool) {
 	return f.pressure, f.pressureWritten
 }
+func (f *fakeStore) HeavyRuns() int { return f.heavyRuns }
+func (f *fakeStore) ClaimHeavyRun(int, string) (func(), error) {
+	f.heavyRuns++
+	return func() { f.heavyRuns-- }, nil
+}
+func (f *fakeStore) ObservedDuration(string) time.Duration        { return f.observed }
+func (f *fakeStore) ObserveDuration(_ string, took time.Duration) { f.observed = took }
 
 type fakeSystem struct {
 	alive           map[int]bool
