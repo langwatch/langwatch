@@ -102,11 +102,15 @@ export type CredentialClass =
  * for every route but one kind: a handler-managed route can opt out of its
  * app's family, and that is the only thing this has to read from the policy.
  *
- * Throws on the one pair that has no answer: a handler on a service app that
- * says it accepts an API key. A service app resolves neither a project nor an
- * organization, so there is no key family to name and any guess would be
- * published to integrators as fact. No route is written that way today, and
- * this is what keeps it that way.
+ * The pair worth spelling out is a handler on a **service** app that says it
+ * accepts an API key, which is what the receiver surface is: the collector,
+ * the three OTLP signals, annotations, legacy traces and evaluations all sit
+ * on a service app and resolve `X-Auth-Token` themselves. There are only two
+ * key families, and the organization one exists only where an organization is
+ * resolved, so a handler resolving a key on an app that resolves neither is
+ * resolving a project key. Falling through to the service app's own answer,
+ * `internal`, would say those routes take a shared secret, which is exactly
+ * backwards for the most widely integrated endpoints we have.
  */
 export function credentialClassFor({
   scope,
@@ -120,16 +124,8 @@ export function credentialClassFor({
   if (policy.kind === "handlerManaged") {
     if (policy.credential === "internal") return "internal";
     if (policy.credential === "session") return "session";
-    // apiKey / both: the handler accepts a key, so the app's own family is
-    // the answer, and the two scopes that have no family are refused below.
-    if (scope === "service" || scope === "session") {
-      throw new Error(
-        `handlerManagedAuth({ credential: "${policy.credential}" }) on a ${scope} app has no API-key family: ` +
-          "a service or session app resolves neither a project nor an organization, so nothing decides which " +
-          "key reaches the route. Mount it on a project or organization app, or declare the credential the " +
-          "handler really takes.",
-      );
-    }
+    // apiKey / both, on an app whose scope names no key family of its own.
+    if (scope === "service" || scope === "session") return "project_api_key";
   }
   switch (scope) {
     case "project":

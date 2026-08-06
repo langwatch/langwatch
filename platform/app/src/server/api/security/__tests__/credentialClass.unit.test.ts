@@ -146,6 +146,15 @@ describe("credentialClassFor", () => {
       { scope: "organization", credential: "internal", expected: "internal" },
       { scope: "service", credential: "session", expected: "session" },
       { scope: "service", credential: "internal", expected: "internal" },
+      // The receiver surface: the collector, the three OTLP signals,
+      // annotations and the legacy trace and evaluation routes all sit on a
+      // service app and resolve X-Auth-Token in the handler. Falling through
+      // to the service app's own answer would call our most widely integrated
+      // endpoints shared-secret routes.
+      { scope: "service", credential: "apiKey", expected: "project_api_key" },
+      { scope: "service", credential: "both", expected: "project_api_key" },
+      { scope: "session", credential: "apiKey", expected: "project_api_key" },
+      { scope: "session", credential: "both", expected: "project_api_key" },
     ] as const)("a $scope app taking $credential publishes $expected", ({
       scope,
       credential,
@@ -154,18 +163,6 @@ describe("credentialClassFor", () => {
       expect(
         credentialClassFor({ scope, policy: handlerManaged(credential) }),
       ).toBe(expected);
-    });
-
-    it.each([
-      "apiKey",
-      "both",
-    ] as const)("refuses a service app whose handler takes %s, which names no key family", (credential) => {
-      expect(() =>
-        credentialClassFor({
-          scope: "service",
-          policy: handlerManaged(credential),
-        }),
-      ).toThrow(/no API-key family/);
     });
   });
 });
