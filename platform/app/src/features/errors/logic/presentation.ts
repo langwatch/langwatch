@@ -583,6 +583,38 @@ const presentations = {
       return `${workspace}, so its access isn't managed from here. Their organization role already decides what they can do in it. To work together, use a shared team.`;
     },
   },
+  team_last_admin_required: {
+    // Names the team, because this is raised while editing one member who may
+    // be an admin of several, and it offers the one step that clears it. The
+    // reader holds the permission to promote somebody, so telling them to
+    // contact support or an admin would be sending them to themselves.
+    title: "That team would be left without an admin",
+    describe: (error) => {
+      const teamName = str(error, "teamName", "");
+      const team = teamName ? `"${teamName}"` : "This team";
+      return `${team} has no other admin, and a team needs at least one. Give somebody else the Admin role there first, then make this change.`;
+    },
+  },
+  cannot_remove_self_as_last_admin: {
+    // The same wall from the inside. Nobody else can promote a replacement for
+    // them, so the remedy is theirs to do in this order and the copy says so.
+    title: "You are the only admin of that team",
+    describe: (error) => {
+      const teamName = str(error, "teamName", "");
+      const team = teamName ? `"${teamName}"` : "that team";
+      return `You cannot give up the Admin role in ${team} while you are the only one holding it. Make somebody else an admin there first.`;
+    },
+  },
+  lite_member_viewer_only: {
+    // Not a field to correct: the seat sets the ceiling, so the two ways out
+    // are the two named here.
+    title: "A Lite Member can only view a team",
+    describe: (error) => {
+      const teamName = str(error, "teamName", "");
+      const team = teamName ? ` in "${teamName}"` : "";
+      return `A Lite Member seat allows the Viewer role only${team}. Leave the team role as Viewer, or move them to a full member seat to give them more.`;
+    },
+  },
   already_organization_member: {
     // An invite form takes several addresses at once, so the address has to be
     // in the sentence — "one of these is already a member" is not an answer.

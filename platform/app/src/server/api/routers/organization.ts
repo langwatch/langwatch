@@ -1573,20 +1573,25 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      await getApp().organizations.updateMemberRole({
-        organizationId: input.organizationId,
-        userId: input.userId,
-        role: input.role,
-        teamRoleUpdates: input.teamRoleUpdates,
-        currentMemberships: currentMemberships.map((m) => ({
-          teamId: m.teamId,
-          role: m.role,
-        })),
-        organizationTeamIds,
-        currentUserId: ctx.session.user.id,
-      });
+      const { teamsLeftWithoutAdmin } =
+        await getApp().organizations.updateMemberRole({
+          organizationId: input.organizationId,
+          userId: input.userId,
+          role: input.role,
+          teamRoleUpdates: input.teamRoleUpdates,
+          currentMemberships: currentMemberships.map((m) => ({
+            teamId: m.teamId,
+            role: m.role,
+          })),
+          organizationTeamIds,
+          currentUserId: ctx.session.user.id,
+        });
 
-      return { success: true };
+      // Reported rather than refused: correcting a seat down to Viewer can take
+      // away a shared team's only team-scoped admin, which is allowed because
+      // organization admins administer every shared team anyway. Naming the
+      // teams is what keeps the decision from being a silent one.
+      return { success: true, teamsLeftWithoutAdmin };
     }),
 
   getAuditLogs: protectedProcedure

@@ -265,7 +265,7 @@ describe("organization member role plan limit enforcement", () => {
             organizationId,
             role: OrganizationUserRole.EXTERNAL,
           }),
-        ).resolves.toEqual({ success: true });
+        ).resolves.toMatchObject({ success: true });
 
         const updated = await prisma.organizationUser.findUnique({
           where: {
@@ -352,7 +352,7 @@ describe("organization member role plan limit enforcement", () => {
             userId: targetUserId,
             role: TeamUserRole.VIEWER,
           }),
-        ).resolves.toEqual({ success: true });
+        ).resolves.toMatchObject({ success: true });
 
         // Read the BINDING, not the `TeamUser` row. `updateTeamMemberRole`
         // replaces the TEAM-scoped RoleBinding and leaves the legacy row

@@ -67,6 +67,88 @@ export class PersonalWorkspaceNotManagedHereError extends HandledError {
   }
 }
 
+/**
+ * A change would leave a team with nobody who can administer it from the team
+ * itself.
+ *
+ * Handled, and it names the team: these refusals are raised while editing one
+ * member who may belong to several teams, and "this team" sends the reader
+ * looking for which one. The remedy is theirs and it is one step, promote
+ * another admin there, so the copy can say it.
+ *
+ * Raised for a team-local decision only. An organization-level seat change is
+ * allowed to leave a shared team without a team-scoped admin, because an
+ * ORGANIZATION-scoped ADMIN binding administers every shared team and the state
+ * this guard exists to prevent is not the state that produces. See
+ * `specs/members/member-role-team-restrictions.feature`.
+ */
+export class TeamLastAdminRequiredError extends HandledError {
+  declare readonly code: "team_last_admin_required";
+
+  constructor(teamName?: string | null) {
+    super(
+      "team_last_admin_required",
+      "A team needs at least one admin, and this change would leave it with none.",
+      {
+        meta: teamName ? { teamName } : {},
+        httpStatus: 409,
+        fault: "customer",
+      },
+    );
+    this.name = "TeamLastAdminRequiredError";
+  }
+}
+
+/**
+ * The caller is the team's only admin and is trying to demote or remove
+ * themselves.
+ *
+ * Its own code because the remedy is not the same one
+ * {@link TeamLastAdminRequiredError} offers: nobody else can promote a
+ * replacement on their behalf, so the copy has to tell them to do it first
+ * rather than suggest asking an admin.
+ */
+export class CannotRemoveSelfAsLastAdminError extends HandledError {
+  declare readonly code: "cannot_remove_self_as_last_admin";
+
+  constructor(teamName?: string | null) {
+    super(
+      "cannot_remove_self_as_last_admin",
+      "You are the only admin of this team, so you cannot give up the role yet.",
+      {
+        meta: teamName ? { teamName } : {},
+        httpStatus: 409,
+        fault: "customer",
+      },
+    );
+    this.name = "CannotRemoveSelfAsLastAdminError";
+  }
+}
+
+/**
+ * A team role other than Viewer was asked for somebody on a Lite Member seat.
+ *
+ * The seat decides the ceiling, so this is not a field the caller can fix by
+ * picking a different team role: they either leave it at Viewer or move the
+ * member to a full seat.
+ */
+export class LiteMemberViewerOnlyError extends HandledError {
+  declare readonly code: "lite_member_viewer_only";
+
+  constructor(teamName?: string | null) {
+    super(
+      "lite_member_viewer_only",
+      "A Lite Member seat allows the Viewer team role only.",
+      {
+        meta: teamName ? { teamName } : {},
+        httpStatus: 409,
+        fault: "customer",
+      },
+    );
+    this.name = "LiteMemberViewerOnlyError";
+  }
+}
+
 export class TeamRestService {
   constructor(readonly repo: TeamRepository) {}
 
