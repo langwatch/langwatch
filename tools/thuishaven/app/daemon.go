@@ -157,10 +157,107 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				o.store.RemoveStack(s.Slug)
 				o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
 			}
+			o.governPressure()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 		}
 	}
+}
+
+// vitestWorkerMarker is what an orphaned test worker's command line contains.
+// Narrow on purpose: the sweep below reclaims a process only when it matches
+// this AND is owned by PID 1, which together mean an interrupted run left it
+// behind and nobody is coming back for it.
+const vitestWorkerMarker = "vitest/dist/workers"
+
+// governPressure is the daemon's whole response to a loaded machine (ADR-087).
+//
+// It samples, publishes, and then slows things down — it never kills. macOS can
+// bound a process's memory (`taskpolicy -m` sets a jetsam limit at spawn), but
+// jetsam kills what breaches it, which turns a slow machine into lost work.
+// Demotion is reversible and costs nothing but time.
+func (o *Orchestrator) governPressure() {
+	level := domain.ClassifyPressure(o.sys.MemStat())
+
+	// Publish first, so readers see the current level even if the demotion below
+	// does nothing. A failure to publish is not worth a tick: readers treat a
+	// missing record as green, which disables narrowing and refusal and leaves
+	// slot counting exactly as it was.
+	if err := o.store.WritePressure(domain.PressureRecord{
+		Version:   domain.PressureRecordVersion,
+		Level:     level.String(),
+		WrittenAt: o.sys.Now(),
+	}); err != nil {
+		o.log.Warn("could not publish memory pressure", zap.Error(err))
+	}
+
+	o.sweepOrphanedWorkers()
+
+	stacks := o.store.Stacks()
+	if len(stacks) == 0 {
+		return
+	}
+	// Stacks() is ordered most-recently-updated first, so the head is the
+	// worktree being worked in. Demoting that one would slow down exactly the
+	// thing the developer is watching.
+	focused := stacks[0].Slug
+
+	if level == domain.Green {
+		for _, s := range stacks {
+			if o.sys.ProcessAlive(s.LauncherPID) {
+				o.sys.RestoreGroup(s.LauncherPID)
+			}
+		}
+		return
+	}
+
+	for _, s := range stacks {
+		if s.Slug == focused || !o.sys.ProcessAlive(s.LauncherPID) {
+			continue
+		}
+		o.sys.DemoteGroup(s.LauncherPID)
+	}
+
+	if level == domain.Red {
+		if slug, rss := o.fattestStack(); slug != "" {
+			// Named, not stopped. The daemon did not start this work and has no
+			// standing to end it; the operator decides.
+			o.log.Warn("memory pressure critical",
+				zap.String("largest_stack", slug),
+				zap.String("rss", domain.HumanBytes(int64(rss))),
+				zap.String("hint", "haven down "+slug))
+		}
+	}
+}
+
+// sweepOrphanedWorkers reclaims test workers an interrupted run left parented to
+// PID 1. haven already does this for dev-runtime processes at every `up`
+// (procsupervisor.reapOrphans); this is the same rule on the tick, widened to
+// the workers CLAUDE.md currently asks people to pkill by hand.
+func (o *Orchestrator) sweepOrphanedWorkers() {
+	orphans := o.sys.OrphanedWorkers(vitestWorkerMarker)
+	for _, pid := range orphans {
+		o.sys.KillGroup(pid)
+	}
+	if len(orphans) > 0 {
+		o.log.Info("reclaimed orphaned test workers", zap.Int("count", len(orphans)))
+	}
+}
+
+// fattestStack names the live stack with the largest process-group footprint.
+// Approximate by construction — GroupRSS double-counts shared pages — which is
+// fine for "which one should I look at first" and is why it is never a control
+// input.
+func (o *Orchestrator) fattestStack() (slug string, rss uint64) {
+	for _, s := range o.store.Stacks() {
+		if !o.sys.ProcessAlive(s.LauncherPID) {
+			continue
+		}
+		if got := o.sys.GroupRSS(s.LauncherPID); got > rss {
+			slug, rss = s.Slug, got
+		}
+	}
+	return slug, rss
 }
 
 // pruneIdleDatabases drops per-slug ClickHouse + Postgres databases whose

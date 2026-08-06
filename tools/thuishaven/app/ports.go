@@ -69,6 +69,13 @@ type Store interface {
 	ClaimDaemon(DaemonInfo) (bool, error)
 	Daemon() (DaemonInfo, bool)
 	ClearDaemon()
+	// WritePressure publishes the daemon's current reading of the machine, and
+	// ReadPressure is how every other process on the box consults it. Absent,
+	// unparseable, stale or written by an unknown version all read as "no
+	// record", which callers treat as green — it disables narrowing and refusal
+	// and nothing else, so slot counting never depends on the daemon running.
+	WritePressure(domain.PressureRecord) error
+	ReadPressure() (domain.PressureRecord, bool)
 }
 
 // Supervisor runs child processes: one-shot prepare/seed steps and the
@@ -127,6 +134,19 @@ type System interface {
 	// GroupRSS is the resident set of a process group (keyed by any member pid),
 	// in bytes — a stack's real memory footprint (0 if undetectable).
 	GroupRSS(pid int) uint64
+	// MemStat samples the machine's memory-pressure signals: compressor
+	// occupancy and swap, which unlike summed RSS do not double-count shared
+	// pages. An unreadable signal stays zero and classifies green (ADR-087).
+	MemStat() domain.MemStat
+	// DemoteGroup moves a process group into the throttled background band, and
+	// RestoreGroup moves it back. The group, not the launcher: the policy is
+	// inherited only by processes forked after it is set, so a tree that is
+	// already running has to be walked.
+	DemoteGroup(pid int)
+	RestoreGroup(pid int)
+	// OrphanedWorkers lists processes matching marker whose parent is PID 1 —
+	// test workers an interrupted run left behind, owned by nobody.
+	OrphanedWorkers(marker string) []int
 }
 
 // ClickHouse manages one shared, memory-capped Altinity ClickHouse container (on

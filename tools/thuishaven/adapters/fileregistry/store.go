@@ -303,3 +303,37 @@ func (s *Store) Daemon() (app.DaemonInfo, bool) {
 }
 
 func (s *Store) ClearDaemon() { _ = os.Remove(s.daemonPath()) }
+
+func (s *Store) pressurePath() string { return filepath.Join(s.home, "pressure.json") }
+
+// WritePressure publishes the daemon's current reading of the machine.
+//
+// Written atomically because every other process on the box reads it while the
+// daemon is rewriting it, and a half-written record must never be observed —
+// though a reader that did see one treats it as absent, so the worst case is a
+// tick of green rather than a crash.
+func (s *Store) WritePressure(rec domain.PressureRecord) error {
+	b, err := json.Marshal(rec)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(s.home, 0o755); err != nil {
+		return err
+	}
+	return writeFileAtomic(s.pressurePath(), b, 0o644)
+}
+
+// ReadPressure returns the published record, or ok=false when there is nothing
+// trustworthy to read. Callers pass the result to domain.ReadPressure, which
+// resolves absent, stale and unknown-version alike to green.
+func (s *Store) ReadPressure() (domain.PressureRecord, bool) {
+	var rec domain.PressureRecord
+	b, err := os.ReadFile(s.pressurePath())
+	if err != nil {
+		return rec, false
+	}
+	if json.Unmarshal(b, &rec) != nil {
+		return rec, false
+	}
+	return rec, true
+}
