@@ -32,7 +32,37 @@ const paginationSchema = z.object({
 });
 
 /**
+ * What the REST boundary sends when a route throws a `HandledError`.
+ *
+ * `handledErrorResponseBody` builds `{ error: code, message }` and then spreads
+ * the error's `meta` at the TOP level, plus `tips` / `docsUrl` / `fault` /
+ * `reasons` when present — so this is deliberately open: `meta`'s keys differ
+ * per code and arrive as siblings of `error`, not nested under it.
+ *
+ * `error` carries the stable code, not prose. Branch on it; write the words a
+ * customer reads from your own registry keyed on that code (ADR-045).
+ */
+export const handledErrorEnvelopeSchema = z
+  .object({
+    error: z.string().describe("Stable failure code; branch on this"),
+    message: z.string().optional(),
+    fault: z
+      .string()
+      .optional()
+      .describe(
+        "Who the failure is attributable to: customer, platform, provider",
+      ),
+    tips: z.array(z.string()).optional(),
+    docsUrl: z.string().optional(),
+  })
+  .passthrough();
+
+/**
  * A failure we could name, serialised for a client to branch on (ADR-045).
+ *
+ * This is the NESTED form, carried as a `domainError` field on a run or a row —
+ * distinct from {@link handledErrorEnvelopeSchema}, which is the flat body the
+ * boundary returns when the request itself fails.
  *
  * `code` is the stable discriminant and the only field to key logic off.
  * Nothing here is sensitive — that is what makes an error handled — but the

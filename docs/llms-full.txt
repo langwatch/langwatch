@@ -60201,7 +60201,7 @@ openapi: "POST /api/experiment/init"
 
 ---
 
-# FILE: ./api-reference/experiments/list-experiments.mdx
+# FILE: ./api-reference/experiments/list-experiments-for-the-project.mdx
 
 ---
 title: "List experiments for the project"

@@ -32,24 +32,24 @@ Feature: Every public REST route reaches the OpenAPI document
   Scenario: A public route missing from the document fails the check
     Given a handler registered under a public prefix
     And no operation for it in the generated document
-    When the completeness check runs
+    When the route-coverage check runs
     Then it reports the route under the route-coverage rule
     And the check exits non-zero
 
   Scenario: An internal route is excluded by a written reason
     Given a handler registered under a public prefix
     And an exclusion entry naming that operation and why it stays unpublished
-    When the completeness check runs
+    When the route-coverage check runs
     Then the route is not reported
 
   Scenario: An exclusion that no longer suppresses anything fails the check
     Given an exclusion entry for an operation that no longer exists
-    When the completeness check runs
+    When the route-coverage check runs
     Then it reports the entry as stale
     And the check exits non-zero
 
   Scenario: A route annotated but whose app is unwired is still caught
     Given a handler carrying describeRoute metadata
     And its Hono app is not imported by the spec generator
-    When the completeness check runs
+    When the route-coverage check runs
     Then the route is reported as missing from the document

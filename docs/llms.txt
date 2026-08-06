@@ -721,12 +721,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Experiments
 
 - [Overview](https://langwatch.ai/docs/api-reference/experiments/overview.md): Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly.
-- [List experiments for the project](https://langwatch.ai/docs/api-reference/experiments/list-experiments.md)
-- [List runs of an experiment](https://langwatch.ai/docs/api-reference/experiments/list-runs-of-an-experiment.md)
 - [Create an experiment](https://langwatch.ai/docs/api-reference/experiments/create-an-experiment.md)
+- [List experiments for the project](https://langwatch.ai/docs/api-reference/experiments/list-experiments-for-the-project.md)
+- [Run an experiment](https://langwatch.ai/docs/api-reference/experiments/run-an-experiment.md)
+- [List runs of an experiment](https://langwatch.ai/docs/api-reference/experiments/list-runs-of-an-experiment.md)
 - [Poll a run](https://langwatch.ai/docs/api-reference/experiments/poll-a-run.md)
 - [Read run results](https://langwatch.ai/docs/api-reference/experiments/read-run-results.md)
-- [Run an experiment](https://langwatch.ai/docs/api-reference/experiments/run-an-experiment.md)
 
 ## Monitors
 

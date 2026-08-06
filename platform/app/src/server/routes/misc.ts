@@ -487,7 +487,10 @@ secured.access(experimentsManageAuth).post(
               },
             },
             required: ["experiment_type"],
-            oneOf: [
+            // `anyOf`, not `oneOf`: the handler's refine only asks that at
+            // least one identifier is present, and sending both is accepted.
+            // `oneOf` would document exactly-one and reject a valid body.
+            anyOf: [
               { required: ["experiment_slug"] },
               { required: ["experiment_id"] },
             ],

@@ -26,6 +26,16 @@ interface EndpointGroup {
   dirName: string;
   pathPrefixes: string[];
   overviewDescription: string;
+  /**
+   * `METHOD /path` keys, in the order a reader should meet them.
+   *
+   * The default sort is CRUD-shaped — list, create, get, update, delete — which
+   * is right for a resource but wrong for a family that is a sequence of steps.
+   * A group whose overview describes a lifecycle sets this so the sidebar and
+   * the prose agree; anything the list omits falls in behind, still sorted the
+   * default way.
+   */
+  endpointOrder?: string[];
 }
 
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
@@ -113,6 +123,16 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/experiments", "/api/experiment"],
     overviewDescription:
       "Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly.",
+    // The order the overview describes, so a reader going down the sidebar
+    // meets the calls in the order they would make them.
+    endpointOrder: [
+      "POST /api/experiment/init",
+      "GET /api/experiments",
+      "POST /api/experiments/{slug}/run",
+      "GET /api/experiments/runs",
+      "GET /api/experiments/runs/{runId}",
+      "GET /api/experiments/runs/{runId}/results",
+    ],
   },
   {
     name: "Monitors",
@@ -492,7 +512,18 @@ function main() {
 
     if (endpoints.length === 0) continue;
 
+    // A declared order wins; everything it does not name keeps the CRUD sort
+    // and follows behind, so adding a route never silently reshuffles the rest.
+    const declaredOrder = group.endpointOrder ?? [];
+    const declaredIndex = (method: string, apiPath: string): number => {
+      const at = declaredOrder.indexOf(`${method.toUpperCase()} ${apiPath}`);
+      return at === -1 ? Number.MAX_SAFE_INTEGER : at;
+    };
+
     endpoints.sort((a, b) => {
+      const aDeclared = declaredIndex(a.method, a.path);
+      const bDeclared = declaredIndex(b.method, b.path);
+      if (aDeclared !== bDeclared) return aDeclared - bDeclared;
       const aScore = sortScore(a.method, a.path);
       const bScore = sortScore(b.method, b.path);
       if (aScore !== bScore) return aScore - bScore;

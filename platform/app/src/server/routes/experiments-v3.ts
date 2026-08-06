@@ -61,6 +61,7 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/featureAdoption";
 import {
+  handledErrorEnvelopeSchema,
   listRunsResponseSchema,
   runResultsResponseSchema,
   runStatusResponseSchema,
@@ -70,17 +71,21 @@ import {
 const logger = createLogger("langwatch:experiments-v3");
 
 /**
- * The errors these four routes answer with, in the flat `{ error }` shape they
- * actually send. `baseResponses` describes the canonical families; this surface
- * predates it and its handlers return `{ error }` directly, so documenting the
- * canonical envelope here would describe a body no caller receives.
+ * The errors these four routes answer with.
+ *
+ * Both come out flat, but by different routes. A 404 is a thrown
+ * `HandledError` (`ExperimentNotFoundError`, `RunNotFoundError`) that the
+ * boundary serialises, so it carries the code in `error` plus the error's
+ * `meta` spread alongside it. A 401 is hand-rolled in the handler, which
+ * forwards the handled denial payload when there is one and falls back to a
+ * bare `{ error }` when there is not — the same open shape covers both.
  */
 const experimentErrorResponses = {
   401: {
-    description: "Missing or invalid API key",
+    description: "Missing or invalid API key, or the key lacks the permission",
     content: {
       "application/json": {
-        schema: resolver(z.object({ error: z.string() })),
+        schema: resolver(handledErrorEnvelopeSchema),
       },
     },
   },
@@ -88,7 +93,7 @@ const experimentErrorResponses = {
     description: "No such experiment or run in this project",
     content: {
       "application/json": {
-        schema: resolver(z.object({ error: z.string() })),
+        schema: resolver(handledErrorEnvelopeSchema),
       },
     },
   },
@@ -432,6 +437,20 @@ secured.access(apiKeyAuthRun).post(
     tags: ["Experiments"],
     responses: {
       ...experimentErrorResponses,
+      400: {
+        description:
+          "The body was not valid JSON, failed input validation, or the experiment has no dataset configured",
+        content: {
+          // These three refusals are hand-rolled in the handler and carry a
+          // sentence in `error` rather than a stable code, so this documents
+          // the shape as sent. Converting them to HandledError is the right
+          // end state, but it turns `error` into a code slug and would break
+          // any CI script matching the current text — worth its own change.
+          "application/json": {
+            schema: resolver(z.object({ error: z.string() })),
+          },
+        },
+      },
       200: {
         description: "Run started",
         content: {

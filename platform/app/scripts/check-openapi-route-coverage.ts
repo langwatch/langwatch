@@ -363,11 +363,6 @@ export const UNPUBLISHED: Exclusion[] = [
     category: "gap",
     why: "documented at /api/annotations/trace/{id} while the handler names the segment :trace; the endpoint is published, the placeholder names disagree",
   },
-  {
-    match: "POST /api/admin/{resource}",
-    category: "internal",
-    why: "catch-all back-office mutation, same staff-only surface as the rest of /api/admin",
-  },
 ];
 
 interface OpenApiDocument {
@@ -484,45 +479,56 @@ export function auditCoverage({
   };
 }
 
+/** Why each route reached the report, and which publishing step it skipped. */
+function formatUnexplained(routes: RegisteredRoute[]): string[] {
+  if (routes.length === 0) return [];
+
+  const lines = [
+    `${routes.length} registered route${routes.length === 1 ? " is" : "s are"} missing from the OpenAPI document with no reason on record:`,
+    "",
+  ];
+
+  for (const route of routes) {
+    lines.push(`  ${route.key}`);
+    lines.push(
+      `    ${route.file}${route.described ? " (has describeRoute, so its app is probably not imported by generateOpenAPISpec)" : " (no describeRoute, so the generator skips it)"}`,
+    );
+  }
+
+  lines.push(
+    "",
+    "Publish it: add describeRoute({...}) to the handler, import its app in",
+    "src/tasks/generateOpenAPISpec.ts, add its prefix to APP_DERIVED_PREFIXES,",
+    "then run `pnpm run task generateOpenAPISpec`.",
+    "",
+    "Or record why it stays unpublished, in UNPUBLISHED in this file.",
+  );
+
+  return lines;
+}
+
+/** Entries that excused nothing, with the reason they are no longer earning. */
+function formatStale(exclusions: Exclusion[]): string[] {
+  if (exclusions.length === 0) return [];
+
+  const lines = [
+    `${exclusions.length} UNPUBLISHED entr${exclusions.length === 1 ? "y excuses" : "ies excuse"} nothing and must be deleted:`,
+    "",
+  ];
+
+  for (const exclusion of exclusions) {
+    lines.push(`  ${exclusion.match} [${exclusion.category}]`);
+    lines.push(`    was excused because: ${exclusion.why}`);
+  }
+
+  return lines;
+}
+
 function formatReport(result: CoverageResult): string {
-  const lines: string[] = [];
-
-  if (result.unexplained.length > 0) {
-    const count = result.unexplained.length;
-    lines.push(
-      `${count} registered route${count === 1 ? "" : "s"} ${count === 1 ? "is" : "are"} missing from the OpenAPI document with no reason on record:`,
-      "",
-    );
-    for (const route of result.unexplained) {
-      lines.push(`  ${route.key}`);
-      lines.push(
-        `    ${route.file}${route.described ? " (has describeRoute, so its app is probably not imported by generateOpenAPISpec)" : " (no describeRoute, so the generator skips it)"}`,
-      );
-    }
-    lines.push(
-      "",
-      "Publish it: add describeRoute({...}) to the handler, import its app in",
-      "src/tasks/generateOpenAPISpec.ts, add its prefix to APP_DERIVED_PREFIXES,",
-      "then run `pnpm run task generateOpenAPISpec`.",
-      "",
-      "Or record why it stays unpublished, in UNPUBLISHED in this file.",
-    );
-  }
-
-  if (result.stale.length > 0) {
-    if (lines.length > 0) lines.push("");
-    const count = result.stale.length;
-    lines.push(
-      `${count} UNPUBLISHED entr${count === 1 ? "y excuses" : "ies excuse"} nothing and must be deleted:`,
-      "",
-    );
-    for (const exclusion of result.stale) {
-      lines.push(`  ${exclusion.match} [${exclusion.category}]`);
-      lines.push(`    was excused because: ${exclusion.why}`);
-    }
-  }
-
-  return lines.join("\n");
+  return [formatUnexplained(result.unexplained), formatStale(result.stale)]
+    .filter((section) => section.length > 0)
+    .map((section) => section.join("\n"))
+    .join("\n\n");
 }
 
 function main(): void {

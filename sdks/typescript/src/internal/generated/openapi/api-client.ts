@@ -1366,7 +1366,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List experiments for the project. Includes a runs count and last-run timestamp per experiment. */
+        /**
+         * List experiments for the project
+         * @description List experiments for the project. Includes a runs count and last-run timestamp per experiment.
+         */
         get: operations["getApiExperiments"];
         put?: never;
         post?: never;
@@ -5883,7 +5886,12 @@ export interface operations {
     };
     getApiExperiments: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 1-based page number */
+                page?: number;
+                /** @description Experiments per page, capped at 200 */
+                pageSize?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5997,14 +6005,33 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
-            /** @description Missing or invalid API key */
-            401: {
+            /** @description The body was not valid JSON, failed input validation, or the experiment has no dataset configured */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
                         error: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key, or the key lacks the permission */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -6015,7 +6042,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Stable failure code; branch on this */
                         error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -6102,14 +6137,22 @@ export interface operations {
                     };
                 };
             };
-            /** @description Missing or invalid API key */
+            /** @description Missing or invalid API key, or the key lacks the permission */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        /** @description Stable failure code; branch on this */
                         error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -6120,7 +6163,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Stable failure code; branch on this */
                         error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -6218,14 +6269,22 @@ export interface operations {
                     };
                 };
             };
-            /** @description Missing or invalid API key */
+            /** @description Missing or invalid API key, or the key lacks the permission */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        /** @description Stable failure code; branch on this */
                         error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -6236,7 +6295,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Stable failure code; branch on this */
                         error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -6343,14 +6410,22 @@ export interface operations {
                     };
                 };
             };
-            /** @description Missing or invalid API key */
+            /** @description Missing or invalid API key, or the key lacks the permission */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        /** @description Stable failure code; branch on this */
                         error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -6361,7 +6436,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Stable failure code; branch on this */
                         error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -6390,7 +6473,7 @@ export interface operations {
                     experiment_name?: string;
                     /** @description Optimization Studio workflow this experiment belongs to */
                     workflowId?: string;
-                } & (unknown | unknown);
+                } | unknown | unknown;
             };
         };
         responses: {

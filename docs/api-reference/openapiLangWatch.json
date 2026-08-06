@@ -7520,7 +7520,30 @@
           }
         },
         "operationId": "getApiExperiments",
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "1-based page number"
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 200
+            },
+            "description": "Experiments per page, capped at 200"
+          }
+        ],
+        "summary": "List experiments for the project",
         "description": "List experiments for the project. Includes a runs count and last-run timestamp per experiment."
       }
     },
@@ -7566,8 +7589,8 @@
               }
             }
           },
-          "401": {
-            "description": "Missing or invalid API key",
+          "400": {
+            "description": "The body was not valid JSON, failed input validation, or the experiment has no dataset configured",
             "content": {
               "application/json": {
                 "schema": {
@@ -7584,6 +7607,42 @@
               }
             }
           },
+          "401": {
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "404": {
             "description": "No such experiment or run in this project",
             "content": {
@@ -7592,12 +7651,30 @@
                   "type": "object",
                   "properties": {
                     "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
                       "type": "string"
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "additionalProperties": true
                 }
               }
             }
@@ -7847,19 +7924,37 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
+            "description": "Missing or invalid API key, or the key lacks the permission",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
                       "type": "string"
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "additionalProperties": true
                 }
               }
             }
@@ -7872,12 +7967,30 @@
                   "type": "object",
                   "properties": {
                     "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
                       "type": "string"
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "additionalProperties": true
                 }
               }
             }
@@ -8161,19 +8274,37 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
+            "description": "Missing or invalid API key, or the key lacks the permission",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
                       "type": "string"
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "additionalProperties": true
                 }
               }
             }
@@ -8186,12 +8317,30 @@
                   "type": "object",
                   "properties": {
                     "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
                       "type": "string"
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "additionalProperties": true
                 }
               }
             }
@@ -8550,19 +8699,37 @@
             }
           },
           "401": {
-            "description": "Missing or invalid API key",
+            "description": "Missing or invalid API key, or the key lacks the permission",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
                       "type": "string"
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "additionalProperties": true
                 }
               }
             }
@@ -8575,12 +8742,30 @@
                   "type": "object",
                   "properties": {
                     "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
                       "type": "string"
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "additionalProperties": true
                 }
               }
             }
@@ -8754,7 +8939,7 @@
                 "required": [
                   "experiment_type"
                 ],
-                "oneOf": [
+                "anyOf": [
                   {
                     "required": [
                       "experiment_slug"

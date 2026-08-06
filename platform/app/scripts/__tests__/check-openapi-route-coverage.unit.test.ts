@@ -228,18 +228,42 @@ describe("the UNPUBLISHED list", () => {
     expect(new Set(matches).size).toBe(matches.length);
   });
 
-  it("never lets one entry sit inside another's prefix", () => {
-    const shadowed = UNPUBLISHED.filter((entry) =>
-      UNPUBLISHED.some(
-        (other) =>
-          other !== entry &&
-          other.match.startsWith("/") &&
-          entry.match !== other.match &&
-          excludes(other, `GET ${entry.match}`),
-      ),
-    );
+  describe("when one entry sits inside another's prefix", () => {
+    // The probe has to be a real operation key. An entry written in the
+    // operation form already is one; a prefix entry needs a method bolted on.
+    // Building `GET ${match}` unconditionally was the bug that let
+    // `POST /api/admin/{resource}` hide under the `/api/admin` prefix: the
+    // probe became `GET POST /api/admin/{resource}`, whose path reads as
+    // `POST /api/admin/{resource}` and matches no prefix at all.
+    const probe = (match: string) =>
+      match.startsWith("/") ? `GET ${match}` : match;
 
-    expect(shadowed.map((entry) => entry.match)).toEqual([]);
+    it("builds a probe key that a prefix entry can actually match", () => {
+      expect(probe("/api/admin")).toBe("GET /api/admin");
+      expect(probe("POST /api/admin/{resource}")).toBe(
+        "POST /api/admin/{resource}",
+      );
+      expect(
+        excludes(
+          { match: "/api/admin", category: "internal", why: "staff only" },
+          probe("POST /api/admin/{resource}"),
+        ),
+      ).toBe(true);
+    });
+
+    it("reports it, so the redundant entry can be deleted", () => {
+      const shadowed = UNPUBLISHED.filter((entry) =>
+        UNPUBLISHED.some(
+          (other) =>
+            other !== entry &&
+            other.match.startsWith("/") &&
+            entry.match !== other.match &&
+            excludes(other, probe(entry.match)),
+        ),
+      );
+
+      expect(shadowed.map((entry) => entry.match)).toEqual([]);
+    });
   });
 });
 

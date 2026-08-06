@@ -1004,12 +1004,12 @@
             "group": "Experiments",
             "pages": [
               "api-reference/experiments/overview",
-              "api-reference/experiments/list-experiments",
-              "api-reference/experiments/list-runs-of-an-experiment",
               "api-reference/experiments/create-an-experiment",
+              "api-reference/experiments/list-experiments-for-the-project",
+              "api-reference/experiments/run-an-experiment",
+              "api-reference/experiments/list-runs-of-an-experiment",
               "api-reference/experiments/poll-a-run",
-              "api-reference/experiments/read-run-results",
-              "api-reference/experiments/run-an-experiment"
+              "api-reference/experiments/read-run-results"
             ]
           },
           {
