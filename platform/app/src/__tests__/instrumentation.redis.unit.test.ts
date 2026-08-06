@@ -85,34 +85,47 @@ describe("redisStatementSerializer", () => {
   // Dropping the values is not enough on its own: the key is caller-controlled,
   // so an unbounded one would reintroduce the large attribute this exists to
   // prevent.
-  describe("when the key would exceed the cap", () => {
+  describe("given a key longer than the cap", () => {
     const hugeKey = "k".repeat(MAX_DB_STATEMENT_CHARS * 2);
 
-    it("caps the statement at the maximum, marker included", () => {
-      const statement = redisStatementSerializer("get", [hugeKey]);
+    describe("when serializing", () => {
+      it("caps the statement at the maximum, marker included", () => {
+        const statement = redisStatementSerializer("get", [hugeKey]);
 
-      expect(statement).toHaveLength(MAX_DB_STATEMENT_CHARS);
+        expect(statement).toHaveLength(MAX_DB_STATEMENT_CHARS);
+      });
+
+      it("marks the truncation, so a shortened key cannot pass for a real one", () => {
+        expect(redisStatementSerializer("get", [hugeKey])).toMatch(/\.\.\.$/);
+        expect(redisStatementSerializer("get", [hugeKey])).toMatch(
+          /^get k+\.\.\.$/,
+        );
+      });
     });
+  });
 
-    it("marks the truncation, so a shortened key cannot pass for a real one", () => {
-      expect(redisStatementSerializer("get", [hugeKey])).toMatch(/\.\.\.$/);
-      expect(redisStatementSerializer("get", [hugeKey])).toMatch(
-        /^get k+\.\.\.$/,
-      );
+  describe("given a key exactly at the cap", () => {
+    const exactKey = "k".repeat(MAX_DB_STATEMENT_CHARS - "get ".length);
+
+    describe("when serializing", () => {
+      it("leaves the statement untouched", () => {
+        const statement = redisStatementSerializer("get", [exactKey]);
+
+        expect(statement).toHaveLength(MAX_DB_STATEMENT_CHARS);
+        expect(statement).not.toMatch(/\.\.\.$/);
+      });
     });
+  });
 
-    it("leaves a statement exactly at the cap untouched", () => {
-      const exactKey = "k".repeat(MAX_DB_STATEMENT_CHARS - "get ".length);
-      const statement = redisStatementSerializer("get", [exactKey]);
+  describe("given a key one character under the cap", () => {
+    const nearKey = "k".repeat(MAX_DB_STATEMENT_CHARS - "get ".length - 1);
 
-      expect(statement).toHaveLength(MAX_DB_STATEMENT_CHARS);
-      expect(statement).not.toMatch(/\.\.\.$/);
-    });
-
-    it("leaves a statement one under the cap untouched", () => {
-      const nearKey = "k".repeat(MAX_DB_STATEMENT_CHARS - "get ".length - 1);
-
-      expect(redisStatementSerializer("get", [nearKey])).toBe(`get ${nearKey}`);
+    describe("when serializing", () => {
+      it("leaves the statement untouched", () => {
+        expect(redisStatementSerializer("get", [nearKey])).toBe(
+          `get ${nearKey}`,
+        );
+      });
     });
   });
 
