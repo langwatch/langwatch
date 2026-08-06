@@ -61,16 +61,16 @@ import {
 import {
   TRACE_PROCESSING_COMMAND_TYPES,
   TRACE_PROCESSING_EVENT_TYPES,
-  TRACE_PROCESSING_STAGING_EVENT_TYPES,
 } from "../pipelines/trace-processing/schemas/constants";
 
 /**
  * Test-only event type identifiers. Minimal brands without full schemas, used
  * only to validate the pipeline in tests: `test.integration.event` for
- * integration coverage, and `test.referenced` for the enqueue-staging seam's
- * claim-check unit (a synthetic reference a `stage` hook returns).
+ * integration coverage. Staged queue payloads (what a `stage` hook returns)
+ * are plain job DTOs, not events, so they need no brand here — see
+ * `StagedJobPayload`.
  */
-const TEST_EVENT_TYPES = ["test.integration.event", "test.referenced"] as const;
+const TEST_EVENT_TYPES = ["test.integration.event"] as const;
 
 /**
  * All event type identifiers defined in schemas.
@@ -78,9 +78,6 @@ const TEST_EVENT_TYPES = ["test.integration.event", "test.referenced"] as const;
 export const EVENT_TYPE_IDENTIFIERS = [
   ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
-  // Staging-only brands (ADR-069): valid Event types that a `stage` hook may
-  // return but that are never appended to the event log.
-  ...TRACE_PROCESSING_STAGING_EVENT_TYPES,
   ...METRIC_PROCESSING_EVENT_TYPES,
   ...LOG_PROCESSING_EVENT_TYPES,
   ...CODING_AGENT_PROCESSING_EVENT_TYPES,

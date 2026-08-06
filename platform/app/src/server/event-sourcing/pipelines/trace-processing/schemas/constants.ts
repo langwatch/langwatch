@@ -9,9 +9,13 @@ export const SPAN_RECEIVED_EVENT_VERSIONS = [
  * The claim-check twin of `span_received` (ADR-069): staged onto a
  * subscriber's queue in place of the full event, carrying only the span's
  * identity — the payload stays in its canonical store and the handler reads
- * it back from there. It is never appended to the event log, which is why it
- * is deliberately absent from TRACE_PROCESSING_EVENT_TYPES: it exists only
- * between the routing seam and the subscriber that opted into it.
+ * it back from there.
+ *
+ * This is a plain versioned JOB PAYLOAD, not an event: it exists only between
+ * the routing seam and the subscriber that opted into it and is NEVER
+ * appended to the event log — which is why it appears in no event-type
+ * registry (TRACE_PROCESSING_EVENT_TYPES or otherwise). The durable event
+ * stays `span_received`.
  *
  * The versions array is load-bearing: a consumer parses a reference by
  * version, and a version it does not know fails loudly into the queue's
@@ -19,12 +23,12 @@ export const SPAN_RECEIVED_EVENT_VERSIONS = [
  * reference's shape — or the contract of the store it resolves through —
  * changes incompatibly.
  */
-export const SPAN_REFERENCED_EVENT_TYPE =
+export const SPAN_REFERENCED_PAYLOAD_TYPE =
   "lw.obs.trace.span_referenced" as const;
-export const SPAN_REFERENCED_EVENT_VERSION_LATEST = "2026-07-24" as const;
+export const SPAN_REFERENCED_PAYLOAD_VERSION_LATEST = "2026-07-24" as const;
 
-export const SPAN_REFERENCED_EVENT_VERSIONS = [
-  SPAN_REFERENCED_EVENT_VERSION_LATEST,
+export const SPAN_REFERENCED_PAYLOAD_VERSIONS = [
+  SPAN_REFERENCED_PAYLOAD_VERSION_LATEST,
 ] as const;
 
 export const TOPIC_ASSIGNED_EVENT_TYPE = "lw.obs.trace.topic_assigned" as const;
@@ -123,20 +127,6 @@ export const TRACE_PROCESSING_EVENT_TYPES = [
 
 export type TraceProcessingEventType =
   (typeof TRACE_PROCESSING_EVENT_TYPES)[number];
-
-/**
- * Staging-only event types (ADR-069): valid Event brands that travel between
- * the routing seam and a subscriber's queue but are NEVER appended to the
- * event log — which is why they stay out of TRACE_PROCESSING_EVENT_TYPES. They
- * are registered as type identifiers (see typeIdentifiers.ts) solely so a
- * `stage` hook can return them as well-typed Events.
- */
-export const TRACE_PROCESSING_STAGING_EVENT_TYPES = [
-  SPAN_REFERENCED_EVENT_TYPE,
-] as const;
-
-export type TraceProcessingStagingEventType =
-  (typeof TRACE_PROCESSING_STAGING_EVENT_TYPES)[number];
 
 export const RECORD_SPAN_COMMAND_TYPE = "lw.obs.trace.record_span" as const;
 export const ASSIGN_TOPIC_COMMAND_TYPE = "lw.obs.trace.assign_topic" as const;

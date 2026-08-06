@@ -57,6 +57,15 @@ export const incrementClickHouseQueryCount = (
 // chosen for the expensive ones.
 export type WindowedReadOutcome =
   | "hit"
+  /**
+   * The hinted window came back empty and the caller forbade widening
+   * (`fallback: "none"`), so there is no widen outcome to record instead. Split
+   * out of `hit` because a read that resolves queued work retries on empty:
+   * counting it as a hit made a permanently-failing lookup read as a healthy
+   * one, which is how 22 blocked claim-check groups stayed invisible on this
+   * metric through 2026-08-05.
+   */
+  | "windowed_empty"
   | "widened_hit"
   | "widened_empty"
   | "unbounded_hit"
