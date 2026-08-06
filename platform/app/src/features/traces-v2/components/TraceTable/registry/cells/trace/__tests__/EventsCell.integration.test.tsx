@@ -17,6 +17,7 @@ import { EventsCell } from "../EventsCell";
 
 afterEach(cleanup);
 
+/** One event name and how often the trace recorded it, as the read returns it. */
 function group({
   name,
   count = 1,
@@ -29,6 +30,7 @@ function group({
   return { name, count, firstTimestamp };
 }
 
+/** A row carrying nothing the cell reads, so each case sets only its own state. */
 function row(over: Partial<TraceListItem>): TraceListItem {
   return {
     traceId: "t1",
@@ -48,6 +50,10 @@ function row(over: Partial<TraceListItem>): TraceListItem {
   } as unknown as TraceListItem;
 }
 
+/**
+ * Renders the cell the way the table does, through the registry entry rather
+ * than the component, so a change to what the column registers is caught here.
+ */
 function renderCell(item: TraceListItem) {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -56,6 +62,7 @@ function renderCell(item: TraceListItem) {
   );
 }
 
+/** Five names in first-occurrence order, two past what the cell shows. */
 const NAMES = ["a.one", "b.two", "c.three", "d.four", "e.five"];
 
 describe("EventsCell", () => {

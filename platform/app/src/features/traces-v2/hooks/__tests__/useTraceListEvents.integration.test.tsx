@@ -43,6 +43,7 @@ import type { TraceListItem } from "../../types/trace";
 import { NO_TRACE_EVENTS } from "../../types/trace";
 import { useTraceListEvents } from "../useTraceListEvents";
 
+/** A row with no events of its own, so only what the hook merges in shows up. */
 function row(traceId: string): TraceListItem {
   return {
     traceId,
@@ -61,9 +62,15 @@ function row(traceId: string): TraceListItem {
   } as unknown as TraceListItem;
 }
 
+/** What the hook asked for on its most recent render. */
 const lastInput = () => harness.useQuery.mock.calls.at(-1)?.[0];
+/** Whether that render asked at all, and under what caching. */
 const lastOpts = () => harness.useQuery.mock.calls.at(-1)?.[1];
 
+/**
+ * Answers the query with `data`, plus whichever React Query flags the case is
+ * about (`isPreviousData` for a page turn, `isError` for a failed read).
+ */
 function resolveWith({
   data,
   extra = {},

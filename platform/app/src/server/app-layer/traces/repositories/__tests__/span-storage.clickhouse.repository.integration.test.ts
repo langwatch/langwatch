@@ -322,6 +322,11 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       to: rollupBase.getTime() + 60_000,
     };
 
+    /**
+     * A span of this suite's own tenant. Every row goes to `rollupTenantId`
+     * unless `overrides` says otherwise, so a fixture meant to belong to a
+     * neighbouring tenant has to say so explicitly.
+     */
     function rollupRow({
       traceId,
       spanId,
