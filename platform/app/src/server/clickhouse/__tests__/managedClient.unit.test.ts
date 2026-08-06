@@ -87,6 +87,12 @@ describe("createManagedClickHouseClient", () => {
           "keep_alive",
           "max_open_connections",
         ]) {
+          // Presence first: comparing the two alone also passes when the
+          // setting is absent from both, which is the regression worth having.
+          expect(
+            first?.[key],
+            `every managed client sets ${key}`,
+          ).toBeDefined();
           expect(second?.[key]).toEqual(first?.[key]);
         }
       });
