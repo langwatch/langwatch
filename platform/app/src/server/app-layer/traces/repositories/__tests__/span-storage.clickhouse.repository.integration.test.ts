@@ -521,7 +521,11 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       // would pass a "does not contain" check without proving anything.
       expect(rollups[otherTenantTraceId]).toEqual({
         names: [
-          { name: "thumbs_up_down", count: 1, firstTimestamp: at(10).getTime() },
+          {
+            name: "thumbs_up_down",
+            count: 1,
+            firstTimestamp: at(10).getTime(),
+          },
         ],
         totalCount: 1,
         distinctCount: 1,
