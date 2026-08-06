@@ -16,7 +16,7 @@
  * catch it coming back. These assertions are deliberately about the real files.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -101,13 +101,26 @@ describe("the experiments REST API", () => {
 
   describe("given the API reference page generator", () => {
     /** @scenario "Experiments have a reference section a reader can navigate to" */
-    it("owns every experiment path under an Experiments group", () => {
-      expect(pageGeneratorSource).toContain('name: "Experiments"');
-      // Singular and plural both, or one of the two families goes unowned and
-      // the generator fails the path with no group and no skip reason.
-      expect(pageGeneratorSource).toContain(
-        'pathPrefixes: ["/api/experiments", "/api/experiment"]',
+    it("gives every experiment operation a page in the reference", () => {
+      // Assert on the pages themselves rather than on the generator's prefix
+      // list: the defect was a reader finding nothing to click, and a page is
+      // what that reader finds. A source-substring check would also have gone
+      // red the moment the group legitimately took on another prefix.
+      const referenced = new Set(
+        readdirSync(join(REPO_ROOT, "docs/api-reference/experiments"))
+          .filter((file) => file.endsWith(".mdx"))
+          .flatMap((file) => {
+            const page = readFileSync(
+              join(REPO_ROOT, "docs/api-reference/experiments", file),
+              "utf8",
+            );
+            return /^openapi:\s*"([^"]+)"/m.exec(page)?.[1] ?? [];
+          }),
       );
+
+      for (const [method, path] of OPERATIONS) {
+        expect(referenced).toContain(`${method.toUpperCase()} ${path}`);
+      }
     });
 
     it("no longer lists any experiment path as undocumented", () => {

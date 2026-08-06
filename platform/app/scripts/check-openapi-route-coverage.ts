@@ -299,41 +299,6 @@ export const UNPUBLISHED = [
     why: "runs an evaluator across a dataset; shares the evaluator body shape above",
   },
   {
-    match: "POST /api/dspy/log_steps",
-    category: "gap",
-    why: "reports DSPy optimizer steps against an experiment; the payload is the DSPy step schema",
-  },
-  {
-    match: "POST /api/track_event",
-    category: "gap",
-    why: "customer event tracking. /api/events/track is the documented successor and this is its predecessor, still called by older SDKs",
-  },
-  {
-    match: "POST /api/analytics",
-    category: "gap",
-    why: "predecessor of the documented POST /api/analytics/timeseries, still accepted for older callers",
-  },
-  {
-    match: "POST /api/trigger/slack",
-    category: "gap",
-    why: "creates a Slack alert trigger with a project key. The documented /api/triggers family supersedes it, and this narrower form is still accepted",
-  },
-  {
-    match: "POST /api/workflows/{workflowId}/run",
-    category: "gap",
-    why: "runs an Optimization Studio workflow. The response is the workflow's own output shape, which varies per workflow and needs a documented envelope first",
-  },
-  {
-    match: "POST /api/workflows/{workflowId}/{versionId}/run",
-    category: "gap",
-    why: "the pinned-version form of the workflow run, same reasoning",
-  },
-  {
-    match: "POST /api/optimization/{workflowId}/{versionId}",
-    category: "gap",
-    why: "starts an optimization run over a workflow version, same envelope question as the workflow run",
-  },
-  {
     match: "POST /api/export/traces/download",
     category: "gap",
     why: "returns a file stream rather than JSON, so it needs a documented binary response",

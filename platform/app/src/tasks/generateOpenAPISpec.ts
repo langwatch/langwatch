@@ -44,6 +44,10 @@ const APP_DERIVED_PREFIXES = [
   // hand-written copies are pruned here.
   "/api/experiment",
   "/api/experiments",
+  "/api/dspy",
+  "/api/optimization",
+  "/api/track_event",
+  "/api/trigger",
   "/api/webhooks",
   "/api/gateway/v1",
   "/api/governance",

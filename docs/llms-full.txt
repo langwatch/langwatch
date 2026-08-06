@@ -59207,6 +59207,15 @@ Query analytics timeseries data with metrics, aggregations, and filters.
 
 ---
 
+# FILE: ./api-reference/analytics/query-analytics-timeseries-legacy-path.mdx
+
+---
+title: "Query analytics timeseries (legacy path)"
+openapi: "POST /api/analytics"
+---
+
+---
+
 # FILE: ./api-reference/annotations/create-annotation-trace.mdx
 
 ---
@@ -60192,6 +60201,37 @@ openapi: post /langevals/valid_format/evaluate
 ---
 ---
 
+# FILE: ./api-reference/events/create-track.mdx
+
+---
+title: "Record a user event"
+openapi: "POST /api/events/track"
+---
+
+---
+
+# FILE: ./api-reference/events/overview.mdx
+
+---
+title: "Overview"
+description: "Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it."
+---
+
+## Intro
+
+Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it.
+
+---
+
+# FILE: ./api-reference/events/track-an-event-legacy-path.mdx
+
+---
+title: "Track an event (legacy path)"
+openapi: "POST /api/track_event"
+---
+
+---
+
 # FILE: ./api-reference/experiments/create-an-experiment.mdx
 
 ---
@@ -60246,6 +60286,15 @@ openapi: "GET /api/experiments/runs/{runId}"
 ---
 title: "Read run results"
 openapi: "GET /api/experiments/runs/{runId}/results"
+---
+
+---
+
+# FILE: ./api-reference/experiments/report-dspy-optimizer-steps.mdx
+
+---
+title: "Report DSPy optimizer steps"
+openapi: "POST /api/dspy/log_steps"
 ---
 
 ---
@@ -62177,6 +62226,15 @@ openapi: "PATCH /api/traces/{traceId}/metadata"
 
 ---
 
+# FILE: ./api-reference/triggers/create-a-slack-alert-trigger.mdx
+
+---
+title: "Create a Slack alert trigger"
+openapi: "POST /api/trigger/slack"
+---
+
+---
+
 # FILE: ./api-reference/triggers/create-triggers.mdx
 
 ---
@@ -62402,6 +62460,33 @@ description: "Manage Optimization Studio workflows. List, update, and archive wo
 ## Intro
 
 Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.
+
+---
+
+# FILE: ./api-reference/workflows/run-a-specific-workflow-version.mdx
+
+---
+title: "Run a specific workflow version"
+openapi: "POST /api/workflows/{workflowId}/{versionId}/run"
+---
+
+---
+
+# FILE: ./api-reference/workflows/run-a-workflow-version-legacy-path.mdx
+
+---
+title: "Run a workflow version (legacy path)"
+openapi: "POST /api/optimization/{workflowId}/{versionId}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/run-a-workflow.mdx
+
+---
+title: "Run a workflow"
+openapi: "POST /api/workflows/{workflowId}/run"
+---
 
 ---
 

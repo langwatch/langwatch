@@ -1009,7 +1009,8 @@
               "api-reference/experiments/run-an-experiment",
               "api-reference/experiments/list-runs-of-an-experiment",
               "api-reference/experiments/poll-a-run",
-              "api-reference/experiments/read-run-results"
+              "api-reference/experiments/read-run-results",
+              "api-reference/experiments/report-dspy-optimizer-steps"
             ]
           },
           {
@@ -1113,10 +1114,19 @@
             "pages": [
               "api-reference/triggers/overview",
               "api-reference/triggers/list-triggers",
+              "api-reference/triggers/create-a-slack-alert-trigger",
               "api-reference/triggers/create-triggers",
               "api-reference/triggers/get-triggers",
               "api-reference/triggers/update-triggers",
               "api-reference/triggers/delete-triggers"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api-reference/events/overview",
+              "api-reference/events/create-track",
+              "api-reference/events/track-an-event-legacy-path"
             ]
           },
           {
@@ -1126,7 +1136,10 @@
               "api-reference/workflows/list-workflows",
               "api-reference/workflows/get-workflows",
               "api-reference/workflows/update-workflows",
+              "api-reference/workflows/run-a-workflow-version-legacy-path",
               "api-reference/workflows/action-evaluate",
+              "api-reference/workflows/run-a-specific-workflow-version",
+              "api-reference/workflows/run-a-workflow",
               "api-reference/workflows/delete-workflows"
             ]
           },
@@ -1157,6 +1170,7 @@
             "group": "Analytics",
             "pages": [
               "api-reference/analytics/overview",
+              "api-reference/analytics/query-analytics-timeseries-legacy-path",
               "api-reference/analytics/create-timeseries"
             ]
           },

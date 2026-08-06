@@ -94,7 +94,23 @@ import {
   experimentInitBadRequestSchema,
   experimentInitForbiddenSchema,
   experimentInitResponseSchema,
+  handledErrorEnvelopeSchema,
 } from "./experiments-v3.schemas";
+import {
+  acknowledgementSchema,
+  analyticsTimeseriesResponseSchema,
+  legacySentenceErrorSchema,
+  requestBodySchema,
+  workflowRunResponseSchema,
+} from "./misc.schemas";
+
+/**
+ * The body the analytics handler parses, minus `projectId`, which it takes
+ * from the authenticated key rather than the request.
+ */
+const analyticsRequestSchema = sharedFiltersInputSchema
+  .omit({ projectId: true })
+  .extend(timeseriesSeriesInput.shape);
 
 const logger = createLogger("langwatch:misc");
 // Shared auth middlewares for every API-key-aware handler in this file.
@@ -163,9 +179,60 @@ const triggersManageAuth = handlerManagedAuth({
   credential: "apiKey",
 });
 
-secured
-  .access(analyticsViewAuth)
-  .post("/analytics", authMiddleware, requireAnalyticsView, async (c) => {
+secured.access(analyticsViewAuth).post(
+  "/analytics",
+  describeRoute({
+    summary: "Query analytics timeseries (legacy path)",
+    description:
+      "Query analytics timeseries with metrics, aggregations and filters. Identical to `POST /api/analytics/timeseries`, which is the path to use in new integrations; this one stays for callers written against it.",
+    tags: ["Analytics"],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: requestBodySchema(analyticsRequestSchema),
+        },
+      },
+    },
+    responses: {
+      200: {
+        description:
+          "Timeseries data for the requested range and the one before it",
+        content: {
+          "application/json": {
+            schema: resolver(analyticsTimeseriesResponseSchema),
+          },
+        },
+      },
+      400: {
+        description: "The body was not valid JSON, or failed validation",
+        content: {
+          "application/json": {
+            schema: resolver(legacySentenceErrorSchema),
+          },
+        },
+      },
+      401: {
+        description: "Missing or invalid API key",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ message: z.string() })),
+          },
+        },
+      },
+      403: {
+        description: "The API key lacks analytics:view",
+        content: {
+          "application/json": {
+            schema: resolver(handledErrorEnvelopeSchema),
+          },
+        },
+      },
+    },
+  }),
+  authMiddleware,
+  requireAnalyticsView,
+  async (c) => {
     const project = c.get("project");
 
     let body: Record<string, any>;
@@ -199,7 +266,8 @@ secured
         throw e;
       }
     }
-  });
+  },
+);
 
 // =============================================
 // POST /api/demo/hotel_bot
@@ -297,132 +365,177 @@ secured
 // =============================================
 // POST /api/dspy/log_steps
 // =============================================
-secured
-  .access(experimentsManageAuth)
-  .post(
-    "/dspy/log_steps",
-    bodyLimit({ maxSize: 20 * 1024 * 1024 }),
-    authMiddleware,
-    requireExperimentsManage,
-    async (c) => {
-      const project = c.get("project");
+secured.access(experimentsManageAuth).post(
+  "/dspy/log_steps",
+  describeRoute({
+    summary: "Report DSPy optimizer steps",
+    description:
+      "Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.",
+    tags: ["Experiments"],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: requestBodySchema(z.array(dSPyStepRESTParamsSchema)),
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "Every step in the batch was recorded",
+        content: {
+          "application/json": { schema: resolver(acknowledgementSchema) },
+        },
+      },
+      400: {
+        description:
+          "The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds",
+        content: {
+          "application/json": {
+            schema: resolver(legacySentenceErrorSchema),
+          },
+        },
+      },
+      401: {
+        description: "Missing or invalid API key",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ message: z.string() })),
+          },
+        },
+      },
+      403: {
+        description: "The API key lacks experiments:manage",
+        content: {
+          "application/json": {
+            schema: resolver(handledErrorEnvelopeSchema),
+          },
+        },
+      },
+    },
+  }),
+  bodyLimit({ maxSize: 20 * 1024 * 1024 }),
+  authMiddleware,
+  requireExperimentsManage,
+  async (c) => {
+    const project = c.get("project");
 
-      let body: unknown;
-      let payloadSize: number;
-      try {
-        // Take the size from the wire bytes rather than re-serialising the
-        // parsed body: bodies here run to 20MB, and the old
-        // `JSON.stringify(body).length` both cost a full second pass and
-        // reported UTF-16 code units instead of transferred bytes.
-        const raw = await c.req.text();
-        payloadSize = Buffer.byteLength(raw, "utf8");
-        body = JSON.parse(raw);
-      } catch {
-        return c.json({ message: "Bad request" }, 400);
-      }
+    let body: unknown;
+    let payloadSize: number;
+    try {
+      // Take the size from the wire bytes rather than re-serialising the
+      // parsed body: bodies here run to 20MB, and the old
+      // `JSON.stringify(body).length` both cost a full second pass and
+      // reported UTF-16 code units instead of transferred bytes.
+      const raw = await c.req.text();
+      payloadSize = Buffer.byteLength(raw, "utf8");
+      body = JSON.parse(raw);
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
+    }
 
-      const payloadSizeMB = payloadSize / (1024 * 1024);
-      getPayloadSizeHistogram("log_steps").observe(payloadSize);
+    const payloadSizeMB = payloadSize / (1024 * 1024);
+    getPayloadSizeHistogram("log_steps").observe(payloadSize);
 
-      logger.info(
+    logger.info(
+      {
+        payloadSize,
+        payloadSizeMB: payloadSizeMB.toFixed(2),
+        projectId: project.id,
+      },
+      "DSPy log_steps request received",
+    );
+
+    let params: DSPyStepRESTParams[];
+    try {
+      params = z.array(dSPyStepRESTParamsSchema).parse(body);
+    } catch (error) {
+      logger.error(
         {
+          error,
           payloadSize,
           payloadSizeMB: payloadSizeMB.toFixed(2),
           projectId: project.id,
         },
-        "DSPy log_steps request received",
+        "invalid log_steps data received",
       );
+      captureException(toError(error), { extra: { projectId: project.id } });
+      const validationError = fromZodError(error as ZodError);
+      return c.json({ error: validationError.message }, 400);
+    }
 
-      let params: DSPyStepRESTParams[];
-      try {
-        params = z.array(dSPyStepRESTParamsSchema).parse(body);
-      } catch (error) {
+    for (const param of params) {
+      if (
+        param.timestamps.created_at &&
+        param.timestamps.created_at.toString().length === 10
+      ) {
         logger.error(
-          {
-            error,
-            payloadSize,
-            payloadSizeMB: payloadSizeMB.toFixed(2),
-            projectId: project.id,
-          },
-          "invalid log_steps data received",
+          { param, projectId: project.id },
+          "timestamps not in milliseconds for step",
         );
-        captureException(toError(error), { extra: { projectId: project.id } });
-        const validationError = fromZodError(error as ZodError);
-        return c.json({ error: validationError.message }, 400);
+        return c.json(
+          {
+            error:
+              "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+          },
+          400,
+        );
       }
+    }
 
-      for (const param of params) {
-        if (
-          param.timestamps.created_at &&
-          param.timestamps.created_at.toString().length === 10
-        ) {
+    logger.info(
+      { stepCount: params.length, projectId: project.id },
+      "Processing DSPy steps",
+    );
+
+    for (const param of params) {
+      try {
+        await processDSPyStep(project, param);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
           logger.error(
-            { param, projectId: project.id },
-            "timestamps not in milliseconds for step",
+            {
+              error,
+              stepId: param.index,
+              runId: param.run_id,
+              projectId: project.id,
+            },
+            "failed to validate data for DSPy step",
           );
+          captureException(toError(error), {
+            extra: { projectId: project.id, param },
+          });
+          const validationError = fromZodError(error);
+          return c.json({ error: validationError.message }, 400);
+        } else {
+          logger.error(
+            {
+              error,
+              stepId: param.index,
+              runId: param.run_id,
+              projectId: project.id,
+            },
+            "internal server error processing DSPy step",
+          );
+          captureException(toError(error), {
+            extra: { projectId: project.id, param },
+          });
           return c.json(
             {
               error:
-                "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+                error instanceof Error
+                  ? error.message
+                  : "Internal server error",
             },
-            400,
+            500,
           );
         }
       }
+    }
 
-      logger.info(
-        { stepCount: params.length, projectId: project.id },
-        "Processing DSPy steps",
-      );
-
-      for (const param of params) {
-        try {
-          await processDSPyStep(project, param);
-        } catch (error) {
-          if (error instanceof z.ZodError) {
-            logger.error(
-              {
-                error,
-                stepId: param.index,
-                runId: param.run_id,
-                projectId: project.id,
-              },
-              "failed to validate data for DSPy step",
-            );
-            captureException(toError(error), {
-              extra: { projectId: project.id, param },
-            });
-            const validationError = fromZodError(error);
-            return c.json({ error: validationError.message }, 400);
-          } else {
-            logger.error(
-              {
-                error,
-                stepId: param.index,
-                runId: param.run_id,
-                projectId: project.id,
-              },
-              "internal server error processing DSPy step",
-            );
-            captureException(toError(error), {
-              extra: { projectId: project.id, param },
-            });
-            return c.json(
-              {
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : "Internal server error",
-              },
-              500,
-            );
-          }
-        }
-      }
-
-      return c.json({ message: "ok" });
-    },
-  );
+    return c.json({ message: "ok" });
+  },
+);
 
 // =============================================
 // POST /api/experiment/init
@@ -781,36 +894,152 @@ secured
     return c.json({ redirect: redirectUrl.toString() });
   });
 
+/**
+ * What every synchronous workflow-run route documents.
+ *
+ * The three of them delegate to one handler, so they answer the same shapes;
+ * only the path parameters and the wording differ, and those are spread in at
+ * each registration.
+ */
+const workflowRunResponses = {
+  200: {
+    description: "The workflow finished; `result` holds its output fields",
+    content: {
+      "application/json": { schema: resolver(workflowRunResponseSchema) },
+    },
+  },
+  400: {
+    description:
+      "The request was not sent as application/json, or the body was not valid JSON",
+    content: {
+      "application/json": {
+        schema: resolver(z.object({ message: z.string() })),
+      },
+    },
+  },
+  401: {
+    description: "Missing or invalid API key",
+    content: {
+      "application/json": {
+        schema: resolver(z.object({ message: z.string() })),
+      },
+    },
+  },
+  403: {
+    description: "The API key lacks workflows:manage",
+    content: {
+      "application/json": { schema: resolver(handledErrorEnvelopeSchema) },
+    },
+  },
+  404: {
+    description: "No such workflow, or it has never been published",
+    content: {
+      "application/json": { schema: resolver(handledErrorEnvelopeSchema) },
+    },
+  },
+} as const;
+
+/**
+ * A workflow run takes the workflow's own entry fields as its body, so there is
+ * no fixed set of properties to name: open the object and say where the names
+ * come from.
+ */
+const workflowRunRequestBody = {
+  required: true,
+  content: {
+    "application/json": {
+      schema: {
+        type: "object" as const,
+        additionalProperties: true,
+        description:
+          "The workflow's input fields, named as the workflow's entry node names them",
+      },
+    },
+  },
+};
+
 // =============================================
 // POST /api/optimization/:workflowId/:versionId  (deprecated)
 // =============================================
-secured
-  .access(workflowsManageAuth)
-  .post(
-    "/optimization/:workflowId/:versionId",
-    authMiddleware,
-    requireWorkflowsManage,
-    async (c) => {
-      // Delegates to the same handler as POST /workflows/:workflowId/:versionId/run
-      // (below) — this route used to duplicate that logic with its own
-      // catch-and-flatten-to-500, which had drifted to disagree with the
-      // canonical route on the status code for identical failures.
-      return handleWorkflowRun(
-        c,
-        c.req.param("workflowId"),
-        c.req.param("versionId"),
-      );
-    },
-  );
+secured.access(workflowsManageAuth).post(
+  "/optimization/:workflowId/:versionId",
+  describeRoute({
+    summary: "Run a workflow version (legacy path)",
+    description:
+      "Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one stays for callers written against it.",
+    tags: ["Workflows"],
+    requestBody: workflowRunRequestBody,
+    responses: workflowRunResponses,
+  }),
+  authMiddleware,
+  requireWorkflowsManage,
+  async (c) => {
+    // Delegates to the same handler as POST /workflows/:workflowId/:versionId/run
+    // (below) — this route used to duplicate that logic with its own
+    // catch-and-flatten-to-500, which had drifted to disagree with the
+    // canonical route on the status code for identical failures.
+    return handleWorkflowRun(
+      c,
+      c.req.param("workflowId"),
+      c.req.param("versionId"),
+    );
+  },
+);
 
 // =============================================
 // POST /api/track_event
 // =============================================
 // Both this legacy URL and the canonical POST /api/events/track route
 // through track-event.service so behaviour stays identical between them.
-secured
-  .access(tracesCreateAuth)
-  .post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
+secured.access(tracesCreateAuth).post(
+  "/track_event",
+  describeRoute({
+    summary: "Track an event (legacy path)",
+    description:
+      "Record a customer event against a trace or thread. Identical to `POST /api/events/track`, which is the path to use in new integrations; this one stays for callers written against it. Supply `event_id` yourself to make the call idempotent.",
+    tags: ["Events"],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: requestBodySchema(trackEventRESTParamsValidatorSchema),
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "The event was accepted",
+        content: {
+          "application/json": { schema: resolver(acknowledgementSchema) },
+        },
+      },
+      400: {
+        description: "The body was not valid JSON, or failed validation",
+        content: {
+          "application/json": { schema: resolver(legacySentenceErrorSchema) },
+        },
+      },
+      401: {
+        description: "Missing or invalid API key",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ message: z.string() })),
+          },
+        },
+      },
+      403: {
+        description: "The API key lacks traces:create",
+        content: {
+          "application/json": {
+            schema: resolver(handledErrorEnvelopeSchema),
+          },
+        },
+      },
+    },
+  }),
+  authMiddleware,
+  requireTracesCreate,
+  async (c) => {
     const project = c.get("project");
 
     let rawBody: Record<string, any>;
@@ -856,7 +1085,8 @@ secured
     }
 
     return c.json({ message: "Event tracked" });
-  });
+  },
+);
 
 // =============================================
 // POST /api/track_usage
@@ -1029,9 +1259,81 @@ const filterSchema = z
   )
   .default({});
 
-secured
-  .access(triggersManageAuth)
-  .post("/trigger/slack", authMiddleware, requireTriggersManage, async (c) => {
+const slackTriggerBodySchema = z.object({
+  slack_webhook: z
+    .string()
+    .url()
+    .describe("Incoming webhook URL the alert is posted to"),
+  name: z.string().describe("How the trigger is listed in the app"),
+  message: z
+    .string()
+    .optional()
+    .describe("Extra line included with each alert"),
+  filters: filterSchema.describe(
+    "Which traces the trigger fires on. An empty object fires on all of them.",
+  ),
+  alert_type: z.nativeEnum(AlertType),
+});
+
+secured.access(triggersManageAuth).post(
+  "/trigger/slack",
+  describeRoute({
+    summary: "Create a Slack alert trigger",
+    description:
+      "Create a trigger that posts to a Slack incoming webhook when traces match its filters. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.",
+    tags: ["Triggers"],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: requestBodySchema(slackTriggerBodySchema),
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "The trigger was created",
+        content: {
+          "application/json": { schema: resolver(acknowledgementSchema) },
+        },
+      },
+      400: {
+        description: "The body was not valid JSON, or failed validation",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                message: z.string(),
+                errors: z
+                  .array(z.record(z.string(), z.unknown()))
+                  .optional()
+                  .describe("The individual validation failures, when present"),
+              }),
+            ),
+          },
+        },
+      },
+      401: {
+        description: "Missing or invalid API key",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ message: z.string() })),
+          },
+        },
+      },
+      403: {
+        description: "The API key lacks triggers:manage",
+        content: {
+          "application/json": {
+            schema: resolver(handledErrorEnvelopeSchema),
+          },
+        },
+      },
+    },
+  }),
+  authMiddleware,
+  requireTriggersManage,
+  async (c) => {
     const project = c.get("project");
 
     let body: Record<string, any>;
@@ -1041,16 +1343,8 @@ secured
       return c.json({ message: "Bad request" }, 400);
     }
 
-    const schema = z.object({
-      slack_webhook: z.string().url("The Slack webhook must be a valid URL"),
-      name: z.string(),
-      message: z.string().optional(),
-      filters: filterSchema,
-      alert_type: z.nativeEnum(AlertType),
-    });
-
     try {
-      const validatedData = schema.parse(body);
+      const validatedData = slackTriggerBodySchema.parse(body);
 
       await prisma.trigger.create({
         data: {
@@ -1076,37 +1370,50 @@ secured
       logger.error({ error }, "Error creating trigger");
       return c.json({ message: "Error creating trigger" }, 500);
     }
-  });
+  },
+);
 
 // =============================================
 // POST /api/workflows/:workflowId/run
 // POST /api/workflows/:workflowId/:versionId/run
 // =============================================
-secured
-  .access(workflowsManageAuth)
-  .post(
-    "/workflows/:workflowId/run",
-    authMiddleware,
-    requireWorkflowsManage,
-    async (c) => {
-      return handleWorkflowRun(c, c.req.param("workflowId"), undefined);
-    },
-  );
+secured.access(workflowsManageAuth).post(
+  "/workflows/:workflowId/run",
+  describeRoute({
+    summary: "Run a workflow",
+    description:
+      "Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's published version; address a specific version with the `{versionId}` form of this path.",
+    tags: ["Workflows"],
+    requestBody: workflowRunRequestBody,
+    responses: workflowRunResponses,
+  }),
+  authMiddleware,
+  requireWorkflowsManage,
+  async (c) => {
+    return handleWorkflowRun(c, c.req.param("workflowId"), undefined);
+  },
+);
 
-secured
-  .access(workflowsManageAuth)
-  .post(
-    "/workflows/:workflowId/:versionId/run",
-    authMiddleware,
-    requireWorkflowsManage,
-    async (c) => {
-      return handleWorkflowRun(
-        c,
-        c.req.param("workflowId"),
-        c.req.param("versionId"),
-      );
-    },
-  );
+secured.access(workflowsManageAuth).post(
+  "/workflows/:workflowId/:versionId/run",
+  describeRoute({
+    summary: "Run a specific workflow version",
+    description:
+      "Run one pinned version of an Optimization Studio workflow synchronously and return its output. Use this when a caller must keep hitting the same version as the workflow is edited.",
+    tags: ["Workflows"],
+    requestBody: workflowRunRequestBody,
+    responses: workflowRunResponses,
+  }),
+  authMiddleware,
+  requireWorkflowsManage,
+  async (c) => {
+    return handleWorkflowRun(
+      c,
+      c.req.param("workflowId"),
+      c.req.param("versionId"),
+    );
+  },
+);
 
 async function handleWorkflowRun(
   c: any,

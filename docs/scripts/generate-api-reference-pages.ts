@@ -71,8 +71,6 @@ const SKIP_PATHS: Record<string, string> = {
     "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
-  "/api/events/track":
-    "Not yet documented in the API reference: the trace event tracking route has no reference page yet.",
   "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
@@ -120,7 +118,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     // Two prefixes, because the create endpoint is singular: `/api/experiments`
     // does not start with `/api/experiment/`, so one prefix would leave either
     // the create call or the rest of the family unowned.
-    pathPrefixes: ["/api/experiments", "/api/experiment"],
+    pathPrefixes: ["/api/experiments", "/api/experiment", "/api/dspy"],
     overviewDescription:
       "Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly.",
     // The order the overview describes, so a reader going down the sidebar
@@ -132,6 +130,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "GET /api/experiments/runs",
       "GET /api/experiments/runs/{runId}",
       "GET /api/experiments/runs/{runId}/results",
+      "POST /api/dspy/log_steps",
     ],
   },
   {
@@ -192,14 +191,26 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
     name: "Triggers",
     dirName: "triggers",
-    pathPrefixes: ["/api/triggers"],
+    pathPrefixes: ["/api/triggers", "/api/trigger"],
     overviewDescription:
       "Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.",
   },
   {
+    name: "Events",
+    dirName: "events",
+    // `/api/track_event` is the older spelling of the same call, still the one
+    // most SDK versions in the wild send.
+    pathPrefixes: ["/api/events", "/api/track_event"],
+    overviewDescription:
+      "Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it.",
+    endpointOrder: ["POST /api/events/track", "POST /api/track_event"],
+  },
+  {
     name: "Workflows",
     dirName: "workflows",
-    pathPrefixes: ["/api/workflows"],
+    // `/api/optimization/...` is the older spelling of the version-pinned
+    // workflow run, and reads as part of the same family.
+    pathPrefixes: ["/api/workflows", "/api/optimization"],
     overviewDescription:
       "Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.",
   },
