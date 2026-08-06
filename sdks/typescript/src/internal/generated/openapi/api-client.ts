@@ -1379,6 +1379,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evaluations/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the built-in evaluators
+         * @description List every evaluator this server ships with, along with the `data` fields each one needs and the settings it accepts. The keys of `evaluators` are the ids you put in the evaluate path. The list is the same for every caller and needs no credential.
+         */
+        get: operations["getApiEvaluationsList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evaluations/{evaluator}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run an evaluator
+         * @description Run one evaluator over a single input and get its score back. Built-in evaluators whose id has two segments, such as `ragas/faithfulness`, are addressed with the two-segment form of this path. Bodies up to 30MB are accepted.
+         */
+        post: operations["postApiEvaluationsByEvaluatorEvaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evaluations/{evaluator}/{subpath}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a namespaced evaluator
+         * @description Run one evaluator whose id has two segments, such as `ragas/faithfulness` or `langevals/valid_format`. Identical to the single-segment form in every other respect; the id is simply split across two path segments.
+         */
+        post: operations["postApiEvaluationsByEvaluatorBySubpathEvaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guardrails/{evaluator}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run an evaluator as a guardrail
+         * @description Run an evaluator inline and gate on one boolean. Same call as the evaluate path with `as_guardrail` set: every outcome carries `passed`, so an evaluator that skips or fails does not block the request it was guarding. Check `passed` and let the request through when it is true.
+         */
+        post: operations["postApiGuardrailsByEvaluatorEvaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/experiments/{slug}/run": {
         parameters: {
             query?: never;
@@ -6110,6 +6190,505 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiEvaluationsList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The evaluator catalogue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Keyed by evaluator id, the value you put in the evaluate path */
+                        evaluators: {
+                            [key: string]: {
+                                /** @description Display name of the evaluator */
+                                name: string;
+                                description: string;
+                                category: string;
+                                docsUrl?: string;
+                                /** @description Whether this evaluator can gate a request as a guardrail */
+                                isGuardrail: boolean;
+                                /** @description `data` keys the evaluate call must supply */
+                                requiredFields: string[];
+                                optionalFields: string[];
+                                /** @description Each setting's default and description */
+                                settings: {
+                                    [key: string]: unknown;
+                                };
+                                /** @description JSON Schema for this evaluator's settings object */
+                                settings_json_schema: {
+                                    [key: string]: unknown;
+                                };
+                                /** @description Server-side variables the evaluator needs configured */
+                                envVars: string[];
+                                /** @description What its score, passed and label mean */
+                                result: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiEvaluationsByEvaluatorEvaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Which evaluator to run. Either a built-in id (`ragas/faithfulness`), the slug of a monitor configured in this project, or `evaluators/{slug|id}` for a saved evaluator. `GET /api/evaluations/list` returns the built-in ids. */
+                evaluator: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them. */
+                    data: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Per-call overrides of the evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults. */
+                    settings?: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Attaches the result to a trace you already sent */
+                    trace_id?: string | null;
+                    /** @description Supply your own id to make the call idempotent */
+                    evaluation_id?: string | null;
+                    evaluator_id?: string | null;
+                    /** @description Overrides the name the result is recorded under */
+                    name?: string | null;
+                    /** @description Evaluate as a guardrail: a skipped or failed evaluation answers `passed` rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you. */
+                    as_guardrail?: boolean | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "processed";
+                        score?: number;
+                        passed?: boolean;
+                        label?: string;
+                        details?: string;
+                        /** @description What running the evaluator cost */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
+                        /** @description The evaluator's own output, unprocessed */
+                        raw_response?: unknown;
+                    } | {
+                        /** @constant */
+                        status: "skipped";
+                        /** @description Why the evaluator declined to score this input */
+                        details?: string;
+                        /** @description Always true in guardrail mode, so a skip does not block */
+                        passed?: boolean;
+                    } | {
+                        /** @constant */
+                        status: "error";
+                        /**
+                         * @description Constant: the evaluator's own type is not exposed
+                         * @constant
+                         */
+                        error_type: "EVALUATOR_ERROR";
+                        details: string;
+                        /** @description Always true in guardrail mode, so a failure does not block */
+                        passed?: boolean;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, failed validation, or omitted a field this evaluator requires */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description The API key lacks evaluations:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description No evaluator answers to that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiEvaluationsByEvaluatorBySubpathEvaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description First segment of the evaluator id, such as `ragas` */
+                evaluator: string;
+                /** @description Second segment of the evaluator id, such as `faithfulness` */
+                subpath: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them. */
+                    data: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Per-call overrides of the evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults. */
+                    settings?: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Attaches the result to a trace you already sent */
+                    trace_id?: string | null;
+                    /** @description Supply your own id to make the call idempotent */
+                    evaluation_id?: string | null;
+                    evaluator_id?: string | null;
+                    /** @description Overrides the name the result is recorded under */
+                    name?: string | null;
+                    /** @description Evaluate as a guardrail: a skipped or failed evaluation answers `passed` rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you. */
+                    as_guardrail?: boolean | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "processed";
+                        score?: number;
+                        passed?: boolean;
+                        label?: string;
+                        details?: string;
+                        /** @description What running the evaluator cost */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
+                        /** @description The evaluator's own output, unprocessed */
+                        raw_response?: unknown;
+                    } | {
+                        /** @constant */
+                        status: "skipped";
+                        /** @description Why the evaluator declined to score this input */
+                        details?: string;
+                        /** @description Always true in guardrail mode, so a skip does not block */
+                        passed?: boolean;
+                    } | {
+                        /** @constant */
+                        status: "error";
+                        /**
+                         * @description Constant: the evaluator's own type is not exposed
+                         * @constant
+                         */
+                        error_type: "EVALUATOR_ERROR";
+                        details: string;
+                        /** @description Always true in guardrail mode, so a failure does not block */
+                        passed?: boolean;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, failed validation, or omitted a field this evaluator requires */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description The API key lacks evaluations:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description No evaluator answers to that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiGuardrailsByEvaluatorEvaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Which evaluator to run. Either a built-in id (`ragas/faithfulness`), the slug of a monitor configured in this project, or `evaluators/{slug|id}` for a saved evaluator. `GET /api/evaluations/list` returns the built-in ids. */
+                evaluator: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them. */
+                    data: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Per-call overrides of the evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults. */
+                    settings?: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Attaches the result to a trace you already sent */
+                    trace_id?: string | null;
+                    /** @description Supply your own id to make the call idempotent */
+                    evaluation_id?: string | null;
+                    evaluator_id?: string | null;
+                    /** @description Overrides the name the result is recorded under */
+                    name?: string | null;
+                    /** @description Evaluate as a guardrail: a skipped or failed evaluation answers `passed` rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you. */
+                    as_guardrail?: boolean | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "processed";
+                        score?: number;
+                        passed?: boolean;
+                        label?: string;
+                        details?: string;
+                        /** @description What running the evaluator cost */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
+                        /** @description The evaluator's own output, unprocessed */
+                        raw_response?: unknown;
+                    } | {
+                        /** @constant */
+                        status: "skipped";
+                        /** @description Why the evaluator declined to score this input */
+                        details?: string;
+                        /** @description Always true in guardrail mode, so a skip does not block */
+                        passed?: boolean;
+                    } | {
+                        /** @constant */
+                        status: "error";
+                        /**
+                         * @description Constant: the evaluator's own type is not exposed
+                         * @constant
+                         */
+                        error_type: "EVALUATOR_ERROR";
+                        details: string;
+                        /** @description Always true in guardrail mode, so a failure does not block */
+                        passed?: boolean;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, failed validation, or omitted a field this evaluator requires */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description The API key lacks evaluations:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description No evaluator answers to that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
                     };
                 };
             };

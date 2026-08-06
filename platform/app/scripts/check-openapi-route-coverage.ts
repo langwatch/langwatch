@@ -269,26 +269,6 @@ export const UNPUBLISHED = [
     why: "AI Governance source receivers, addressed with a per-source ingestion key. Documented today in the governance sources guide rather than the API reference",
   },
   {
-    match: "POST /api/evaluations/{evaluator}/evaluate",
-    category: "gap",
-    why: "per-evaluator invocation. Every evaluator's own body and result are already generated into openapi-evals.json, so this needs those two documents joined rather than a new annotation",
-  },
-  {
-    match: "POST /api/evaluations/{evaluator}/{subpath}/evaluate",
-    category: "gap",
-    why: "the two-segment evaluator ids (ragas/faithfulness), same reasoning as the single-segment form",
-  },
-  {
-    match: "POST /api/guardrails/{evaluator}/evaluate",
-    category: "gap",
-    why: "the guardrail form of the evaluate call, same reasoning",
-  },
-  {
-    match: "GET /api/evaluations/list",
-    category: "gap",
-    why: "lists the evaluators available to a project; belongs with the evaluator documents above",
-  },
-  {
     match: "POST /api/evaluations/batch/log_results",
     category: "gap",
     why: "how an SDK batch evaluation reports its rows back after POST /api/experiment/init; the payload is the batch result schema",

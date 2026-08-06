@@ -1001,6 +1001,16 @@
             ]
           },
           {
+            "group": "Evaluations",
+            "pages": [
+              "api-reference/evaluations/overview",
+              "api-reference/evaluations/list-the-built-in-evaluators",
+              "api-reference/evaluations/run-an-evaluator",
+              "api-reference/evaluations/run-a-namespaced-evaluator",
+              "api-reference/evaluations/run-an-evaluator-as-a-guardrail"
+            ]
+          },
+          {
             "group": "Experiments",
             "pages": [
               "api-reference/experiments/overview",

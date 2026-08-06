@@ -20,6 +20,8 @@ import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { describeRoute } from "hono-openapi";
+import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -32,7 +34,11 @@ import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFie
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import type { Permission } from "~/server/api/rbac";
 import { getCustomEvaluators } from "~/server/api/routers/evaluations";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import {
+  createServiceApp,
+  handlerManagedAuth,
+  publicEndpoint,
+} from "~/server/api/security";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -86,20 +92,34 @@ import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
+import {
+  evaluateErrorSchema,
+  evaluateRequestSchema,
+  evaluateResponseSchema,
+  evaluatorCatalogueResponseSchema,
+} from "./evaluations-legacy.schemas";
+import { requestBodySchema } from "./misc.schemas";
+
+patchZodOpenapi();
 
 const logger = createLogger("langwatch:evaluations-legacy");
 const tokenResolver = TokenResolver.create(prisma);
 
 const AUTH_REASON = "project API key resolved in-handler";
 
-// The static evaluator catalogue: no project data, so no permission.
-const catalogueAuth = handlerManagedAuth({
-  reason: "public evaluator catalogue; no project data returned",
-  permissions: [],
-  credential: "apiKey",
-});
+// The static evaluator catalogue: the same list for every caller, with no
+// project data in it. The declared policy says `public` rather than `apiKey`
+// because that is what the handler enforces — it never resolves a token — and
+// a declaration nobody checks is worse than none: it reads as a credential
+// requirement to anyone auditing the registry while letting an unauthenticated
+// request straight through. Tightening it would break the SDKs that read the
+// catalogue before they have a key, which is the call this endpoint exists for.
+const catalogueAuth = publicEndpoint(
+  "static evaluator catalogue; the same list for every caller, no project data",
+);
 // Every other legacy route runs or records an evaluation.
 //
 // NOTE: these ask for `evaluations:manage` on what are append/create actions —
@@ -169,8 +189,19 @@ async function authenticateRequest(
 const secured = createServiceApp({ basePath: "/api" });
 
 // ---------- GET /api/evaluations/list ----------
-secured.access(catalogueAuth).get("/evaluations/list", async (c) => {
-  const evaluators = Object.fromEntries(
+/**
+ * The catalogue, built once.
+ *
+ * `zodToJsonSchema` over ~40 settings schemas is not free, and the answer is
+ * the same for every caller on every request: the evaluator list is compiled
+ * in. Building it per request turned an unauthenticated endpoint into a CPU
+ * amplifier; building it once at first use costs one pass for the life of the
+ * process.
+ */
+let evaluatorCatalogue: Record<string, unknown> | undefined;
+
+const buildEvaluatorCatalogue = (): Record<string, unknown> =>
+  Object.fromEntries(
     Object.entries(AVAILABLE_EVALUATORS)
       .filter(
         ([key]) =>
@@ -193,8 +224,32 @@ secured.access(catalogueAuth).get("/evaluations/list", async (c) => {
       ]),
   );
 
-  return c.json({ evaluators });
-});
+secured.access(catalogueAuth).get(
+  "/evaluations/list",
+  describeRoute({
+    summary: "List the built-in evaluators",
+    description:
+      "List every evaluator this server ships with, along with the `data` fields each one needs and the settings it accepts. The keys of `evaluators` are the ids you put in the evaluate path. The list is the same for every caller and needs no credential.",
+    tags: ["Evaluations"],
+    // Overrides the document's root requirement: this endpoint takes no
+    // credential, and declaring one it does not check would be a fiction.
+    security: [],
+    responses: {
+      200: {
+        description: "The evaluator catalogue",
+        content: {
+          "application/json": {
+            schema: resolver(evaluatorCatalogueResponseSchema),
+          },
+        },
+      },
+    },
+  }),
+  (c) => {
+    evaluatorCatalogue ??= buildEvaluatorCatalogue();
+    return c.json({ evaluators: evaluatorCatalogue });
+  },
+);
 
 // ---------- POST /api/evaluations/batch/log_results ----------
 secured
@@ -318,41 +373,149 @@ secured
     },
   );
 
-// ---------- POST /api/evaluations/:evaluator/evaluate ----------
-secured
-  .access(legacyEvaluationAuth)
-  .post(
-    "/evaluations/:evaluator/evaluate",
-    bodyLimit({ maxSize: 30 * 1024 * 1024 }),
-    async (c) => {
-      const evaluatorSlug = c.req.param("evaluator");
-      return handleEvaluatorCall(c, evaluatorSlug, false);
+/**
+ * What every evaluate route documents.
+ *
+ * The three of them run one handler over one envelope, so they answer the same
+ * shapes; only the path parameters and the wording differ.
+ */
+const evaluateResponses = {
+  200: {
+    description:
+      "The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three.",
+    content: {
+      "application/json": { schema: resolver(evaluateResponseSchema) },
     },
-  );
+  },
+  400: {
+    description:
+      "The body was not valid JSON, failed validation, or omitted a field this evaluator requires",
+    content: {
+      "application/json": { schema: resolver(evaluateErrorSchema) },
+    },
+  },
+  401: {
+    description: "Missing or invalid API key",
+    content: {
+      "application/json": { schema: resolver(evaluateErrorSchema) },
+    },
+  },
+  403: {
+    description: "The API key lacks evaluations:manage",
+    content: {
+      "application/json": { schema: resolver(evaluateErrorSchema) },
+    },
+  },
+  404: {
+    description: "No evaluator answers to that id",
+    content: {
+      "application/json": { schema: resolver(evaluateErrorSchema) },
+    },
+  },
+} as const;
+
+const evaluateRequestBody = {
+  required: true,
+  content: {
+    "application/json": { schema: requestBodySchema(evaluateRequestSchema) },
+  },
+};
+
+/**
+ * What goes in the `{evaluator}` slot. Not a closed set, and not enumerable
+ * here: two of the three forms name rows in the caller's own project.
+ */
+const EVALUATOR_PARAM_DESCRIPTION =
+  "Which evaluator to run. Either a built-in id (`ragas/faithfulness`), the slug of a monitor configured in this project, or `evaluators/{slug|id}` for a saved evaluator. `GET /api/evaluations/list` returns the built-in ids.";
+
+// ---------- POST /api/evaluations/:evaluator/evaluate ----------
+secured.access(legacyEvaluationAuth).post(
+  "/evaluations/:evaluator/evaluate",
+  describeRoute({
+    summary: "Run an evaluator",
+    description:
+      "Run one evaluator over a single input and get its score back. Built-in evaluators whose id has two segments, such as `ragas/faithfulness`, are addressed with the two-segment form of this path. Bodies up to 30MB are accepted.",
+    tags: ["Evaluations"],
+    parameters: [
+      {
+        in: "path",
+        name: "evaluator",
+        required: true,
+        schema: { type: "string" },
+        description: EVALUATOR_PARAM_DESCRIPTION,
+      },
+    ],
+    requestBody: evaluateRequestBody,
+    responses: evaluateResponses,
+  }),
+  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
+  async (c) => {
+    const evaluatorSlug = c.req.param("evaluator");
+    return handleEvaluatorCall(c, evaluatorSlug, false);
+  },
+);
 
 // ---------- POST /api/evaluations/:evaluator/:subpath/evaluate ----------
-secured
-  .access(legacyEvaluationAuth)
-  .post(
-    "/evaluations/:evaluator/:subpath/evaluate",
-    bodyLimit({ maxSize: 30 * 1024 * 1024 }),
-    async (c) => {
-      const evaluatorSlug = `${c.req.param("evaluator")}/${c.req.param("subpath")}`;
-      return handleEvaluatorCall(c, evaluatorSlug, false);
-    },
-  );
+secured.access(legacyEvaluationAuth).post(
+  "/evaluations/:evaluator/:subpath/evaluate",
+  describeRoute({
+    summary: "Run a namespaced evaluator",
+    description:
+      "Run one evaluator whose id has two segments, such as `ragas/faithfulness` or `langevals/valid_format`. Identical to the single-segment form in every other respect; the id is simply split across two path segments.",
+    tags: ["Evaluations"],
+    parameters: [
+      {
+        in: "path",
+        name: "evaluator",
+        required: true,
+        schema: { type: "string" },
+        description: "First segment of the evaluator id, such as `ragas`",
+      },
+      {
+        in: "path",
+        name: "subpath",
+        required: true,
+        schema: { type: "string" },
+        description:
+          "Second segment of the evaluator id, such as `faithfulness`",
+      },
+    ],
+    requestBody: evaluateRequestBody,
+    responses: evaluateResponses,
+  }),
+  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
+  async (c) => {
+    const evaluatorSlug = `${c.req.param("evaluator")}/${c.req.param("subpath")}`;
+    return handleEvaluatorCall(c, evaluatorSlug, false);
+  },
+);
 
 // ---------- POST /api/guardrails/:evaluator/evaluate ----------
-secured
-  .access(legacyEvaluationAuth)
-  .post(
-    "/guardrails/:evaluator/evaluate",
-    bodyLimit({ maxSize: 30 * 1024 * 1024 }),
-    async (c) => {
-      const evaluatorSlug = c.req.param("evaluator");
-      return handleEvaluatorCall(c, evaluatorSlug, true);
-    },
-  );
+secured.access(legacyEvaluationAuth).post(
+  "/guardrails/:evaluator/evaluate",
+  describeRoute({
+    summary: "Run an evaluator as a guardrail",
+    description:
+      "Run an evaluator inline and gate on one boolean. Same call as the evaluate path with `as_guardrail` set: every outcome carries `passed`, so an evaluator that skips or fails does not block the request it was guarding. Check `passed` and let the request through when it is true.",
+    tags: ["Evaluations"],
+    parameters: [
+      {
+        in: "path",
+        name: "evaluator",
+        required: true,
+        schema: { type: "string" },
+        description: EVALUATOR_PARAM_DESCRIPTION,
+      },
+    ],
+    requestBody: evaluateRequestBody,
+    responses: evaluateResponses,
+  }),
+  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
+  async (c) => {
+    const evaluatorSlug = c.req.param("evaluator");
+    return handleEvaluatorCall(c, evaluatorSlug, true);
+  },
+);
 
 // ---------- POST /api/dataset/evaluate ----------
 secured.access(legacyEvaluationAuth).post("/dataset/evaluate", async (c) => {

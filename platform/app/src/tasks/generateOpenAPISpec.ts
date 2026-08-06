@@ -25,6 +25,7 @@ import rawCurrentSpec from "../app/api/openapiLangWatch.json";
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
 // bot, the MCP authorize step) cannot reach a public document merely by living
 // next to something that is published.
+import { app as evaluationsLegacyApp } from "../server/routes/evaluations-legacy";
 import { app as experimentsV3App } from "../server/routes/experiments-v3";
 import { app as miscApp } from "../server/routes/misc";
 
@@ -44,6 +45,8 @@ const APP_DERIVED_PREFIXES = [
   // hand-written copies are pruned here.
   "/api/experiment",
   "/api/experiments",
+  "/api/guardrails",
+  "/api/evaluations",
   "/api/dspy",
   "/api/optimization",
   "/api/track_event",
@@ -139,6 +142,8 @@ export default async function execute() {
   const eventsSpec = await generateSpecs(eventsApp);
   console.log("Building experiments spec...");
   const experimentsSpec = await generateSpecs(experimentsApp);
+  console.log("Building legacy evaluations spec...");
+  const evaluationsLegacySpec = await generateSpecs(evaluationsLegacyApp);
   console.log("Building experiment runs spec...");
   const experimentsV3Spec = await generateSpecs(experimentsV3App);
   console.log("Building experiment init spec...");
@@ -193,6 +198,7 @@ export default async function execute() {
       evaluatorsSpec,
       eventsSpec,
       experimentsSpec,
+      evaluationsLegacySpec,
       experimentsV3Spec,
       miscSpec,
       gatewayPlatformSpec,

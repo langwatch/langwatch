@@ -7547,6 +7547,972 @@
         "description": "List experiments for the project. Includes a runs count and last-run timestamp per experiment."
       }
     },
+    "/api/evaluations/list": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The evaluator catalogue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "evaluators": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Display name of the evaluator"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "docsUrl": {
+                            "type": "string"
+                          },
+                          "isGuardrail": {
+                            "type": "boolean",
+                            "description": "Whether this evaluator can gate a request as a guardrail"
+                          },
+                          "requiredFields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "`data` keys the evaluate call must supply"
+                          },
+                          "optionalFields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "settings": {
+                            "type": "object",
+                            "additionalProperties": {},
+                            "description": "Each setting's default and description"
+                          },
+                          "settings_json_schema": {
+                            "type": "object",
+                            "additionalProperties": {},
+                            "description": "JSON Schema for this evaluator's settings object"
+                          },
+                          "envVars": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Server-side variables the evaluator needs configured"
+                          },
+                          "result": {
+                            "type": "object",
+                            "additionalProperties": {},
+                            "description": "What its score, passed and label mean"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "category",
+                          "isGuardrail",
+                          "requiredFields",
+                          "optionalFields",
+                          "settings",
+                          "settings_json_schema",
+                          "envVars",
+                          "result"
+                        ]
+                      },
+                      "description": "Keyed by evaluator id, the value you put in the evaluate path"
+                    }
+                  },
+                  "required": [
+                    "evaluators"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiEvaluationsList",
+        "tags": [
+          "Evaluations"
+        ],
+        "parameters": [],
+        "summary": "List the built-in evaluators",
+        "description": "List every evaluator this server ships with, along with the `data` fields each one needs and the settings it accepts. The keys of `evaluators` are the ids you put in the evaluate path. The list is the same for every caller and needs no credential.",
+        "security": []
+      }
+    },
+    "/api/evaluations/{evaluator}/evaluate": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "processed"
+                        },
+                        "score": {
+                          "type": "number"
+                        },
+                        "passed": {
+                          "type": "boolean"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "string"
+                        },
+                        "cost": {
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "amount"
+                          ],
+                          "description": "What running the evaluator cost"
+                        },
+                        "raw_response": {
+                          "description": "The evaluator's own output, unprocessed"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "skipped"
+                        },
+                        "details": {
+                          "type": "string",
+                          "description": "Why the evaluator declined to score this input"
+                        },
+                        "passed": {
+                          "type": "boolean",
+                          "description": "Always true in guardrail mode, so a skip does not block"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "error"
+                        },
+                        "error_type": {
+                          "type": "string",
+                          "const": "EVALUATOR_ERROR",
+                          "description": "Constant: the evaluator's own type is not exposed"
+                        },
+                        "details": {
+                          "type": "string"
+                        },
+                        "passed": {
+                          "type": "boolean",
+                          "description": "Always true in guardrail mode, so a failure does not block"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "error_type",
+                        "details"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body was not valid JSON, failed validation, or omitted a field this evaluator requires",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks evaluations:manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No evaluator answers to that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiEvaluationsByEvaluatorEvaluate",
+        "tags": [
+          "Evaluations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluator",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Which evaluator to run. Either a built-in id (`ragas/faithfulness`), the slug of a monitor configured in this project, or `evaluators/{slug|id}` for a saved evaluator. `GET /api/evaluations/list` returns the built-in ids."
+          }
+        ],
+        "summary": "Run an evaluator",
+        "description": "Run one evaluator over a single input and get its score back. Built-in evaluators whose id has two segments, such as `ragas/faithfulness`, are addressed with the two-segment form of this path. Bodies up to 30MB are accepted.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them."
+                  },
+                  "settings": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Per-call overrides of the evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults."
+                  },
+                  "trace_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Attaches the result to a trace you already sent"
+                  },
+                  "evaluation_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Supply your own id to make the call idempotent"
+                  },
+                  "evaluator_id": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "name": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Overrides the name the result is recorded under"
+                  },
+                  "as_guardrail": {
+                    "type": "boolean",
+                    "nullable": true,
+                    "description": "Evaluate as a guardrail: a skipped or failed evaluation answers `passed` rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you."
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evaluations/{evaluator}/{subpath}/evaluate": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "processed"
+                        },
+                        "score": {
+                          "type": "number"
+                        },
+                        "passed": {
+                          "type": "boolean"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "string"
+                        },
+                        "cost": {
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "amount"
+                          ],
+                          "description": "What running the evaluator cost"
+                        },
+                        "raw_response": {
+                          "description": "The evaluator's own output, unprocessed"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "skipped"
+                        },
+                        "details": {
+                          "type": "string",
+                          "description": "Why the evaluator declined to score this input"
+                        },
+                        "passed": {
+                          "type": "boolean",
+                          "description": "Always true in guardrail mode, so a skip does not block"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "error"
+                        },
+                        "error_type": {
+                          "type": "string",
+                          "const": "EVALUATOR_ERROR",
+                          "description": "Constant: the evaluator's own type is not exposed"
+                        },
+                        "details": {
+                          "type": "string"
+                        },
+                        "passed": {
+                          "type": "boolean",
+                          "description": "Always true in guardrail mode, so a failure does not block"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "error_type",
+                        "details"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body was not valid JSON, failed validation, or omitted a field this evaluator requires",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks evaluations:manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No evaluator answers to that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiEvaluationsByEvaluatorBySubpathEvaluate",
+        "tags": [
+          "Evaluations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluator",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "First segment of the evaluator id, such as `ragas`"
+          },
+          {
+            "in": "path",
+            "name": "subpath",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Second segment of the evaluator id, such as `faithfulness`"
+          }
+        ],
+        "summary": "Run a namespaced evaluator",
+        "description": "Run one evaluator whose id has two segments, such as `ragas/faithfulness` or `langevals/valid_format`. Identical to the single-segment form in every other respect; the id is simply split across two path segments.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them."
+                  },
+                  "settings": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Per-call overrides of the evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults."
+                  },
+                  "trace_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Attaches the result to a trace you already sent"
+                  },
+                  "evaluation_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Supply your own id to make the call idempotent"
+                  },
+                  "evaluator_id": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "name": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Overrides the name the result is recorded under"
+                  },
+                  "as_guardrail": {
+                    "type": "boolean",
+                    "nullable": true,
+                    "description": "Evaluate as a guardrail: a skipped or failed evaluation answers `passed` rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you."
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guardrails/{evaluator}/evaluate": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "processed"
+                        },
+                        "score": {
+                          "type": "number"
+                        },
+                        "passed": {
+                          "type": "boolean"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "string"
+                        },
+                        "cost": {
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "amount"
+                          ],
+                          "description": "What running the evaluator cost"
+                        },
+                        "raw_response": {
+                          "description": "The evaluator's own output, unprocessed"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "skipped"
+                        },
+                        "details": {
+                          "type": "string",
+                          "description": "Why the evaluator declined to score this input"
+                        },
+                        "passed": {
+                          "type": "boolean",
+                          "description": "Always true in guardrail mode, so a skip does not block"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "error"
+                        },
+                        "error_type": {
+                          "type": "string",
+                          "const": "EVALUATOR_ERROR",
+                          "description": "Constant: the evaluator's own type is not exposed"
+                        },
+                        "details": {
+                          "type": "string"
+                        },
+                        "passed": {
+                          "type": "boolean",
+                          "description": "Always true in guardrail mode, so a failure does not block"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "error_type",
+                        "details"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body was not valid JSON, failed validation, or omitted a field this evaluator requires",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks evaluations:manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No evaluator answers to that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Stable failure code, on the failures that carry one"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the code needs to be acted on, such as the missing field"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiGuardrailsByEvaluatorEvaluate",
+        "tags": [
+          "Evaluations"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluator",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Which evaluator to run. Either a built-in id (`ragas/faithfulness`), the slug of a monitor configured in this project, or `evaluators/{slug|id}` for a saved evaluator. `GET /api/evaluations/list` returns the built-in ids."
+          }
+        ],
+        "summary": "Run an evaluator as a guardrail",
+        "description": "Run an evaluator inline and gate on one boolean. Same call as the evaluate path with `as_guardrail` set: every outcome carries `passed`, so an evaluator that skips or fails does not block the request it was guarding. Check `passed` and let the request through when it is true.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them."
+                  },
+                  "settings": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Per-call overrides of the evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults."
+                  },
+                  "trace_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Attaches the result to a trace you already sent"
+                  },
+                  "evaluation_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Supply your own id to make the call idempotent"
+                  },
+                  "evaluator_id": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "name": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Overrides the name the result is recorded under"
+                  },
+                  "as_guardrail": {
+                    "type": "boolean",
+                    "nullable": true,
+                    "description": "Evaluate as a guardrail: a skipped or failed evaluation answers `passed` rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you."
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/experiments/{slug}/run": {
       "post": {
         "responses": {

@@ -106,11 +106,19 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments.",
   },
   {
-    name: "Evaluations v3",
+    name: "Evaluations",
     dirName: "evaluations",
-    pathPrefixes: ["/api/evaluations"],
+    // The guardrail path is the same call in gating mode, so it reads with the
+    // evaluate endpoints rather than in a section of its own.
+    pathPrefixes: ["/api/evaluations", "/api/guardrails"],
     overviewDescription:
-      "Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.",
+      "Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs.",
+    endpointOrder: [
+      "GET /api/evaluations/list",
+      "POST /api/evaluations/{evaluator}/evaluate",
+      "POST /api/evaluations/{evaluator}/{subpath}/evaluate",
+      "POST /api/guardrails/{evaluator}/evaluate",
+    ],
   },
   {
     name: "Experiments",
