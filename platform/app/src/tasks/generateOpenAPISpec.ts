@@ -5,6 +5,7 @@ import path from "path";
 
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
@@ -20,6 +21,7 @@ import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import rawCurrentSpec from "../app/api/openapiLangWatch.json";
+import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 // The two legacy route files below are wired in for the routes they describe
 // and nothing else: `generateSpecs` skips any handler without `describeRoute`,
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
@@ -35,6 +37,7 @@ import { app as miscApp } from "../server/routes/misc";
 // the merge union forever.
 const APP_DERIVED_PREFIXES = [
   "/api/agents",
+  "/api/api-keys",
   "/api/analytics",
   "/api/dashboards",
   "/api/evaluators",
@@ -56,6 +59,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/governance",
   "/api/graphs",
   "/api/me",
+  "/api/projects",
   "/api/prompts",
   "/api/dataset",
   "/api/model-providers",
@@ -130,6 +134,8 @@ export default async function execute() {
   console.log("Generating OpenAPI spec...");
   console.log("Building agents spec...");
   const agentsSpec = await generateSpecs(agentsApp);
+  console.log("Building api keys spec...");
+  const apiKeysSpec = await generateSpecs(apiKeysApp);
   console.log("Building analytics spec...");
   const analyticsSpec = await generateSpecs(analyticsApp);
   console.log("Building dashboards spec...");
@@ -166,6 +172,8 @@ export default async function execute() {
   const modelDefaultsSpec = await generateSpecs(modelDefaultsApp);
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
+  console.log("Building projects spec...");
+  const projectsSpec = await generateSpecs(projectsApp);
   console.log("Building secrets spec...");
   const secretsSpec = await generateSpecs(secretsApp);
   console.log("Building scenarios spec...");
@@ -192,6 +200,7 @@ export default async function execute() {
     [
       currentSpec,
       agentsSpec,
+      apiKeysSpec,
       analyticsSpec,
       dashboardsSpec,
       datasetSpec,
@@ -211,6 +220,7 @@ export default async function execute() {
       monitorsSpec,
       scenarioEventsSpec,
       scenariosSpec,
+      projectsSpec,
       secretsSpec,
       simulationRunsSpec,
       suitesSpec,

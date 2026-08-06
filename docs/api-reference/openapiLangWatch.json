@@ -796,562 +796,6 @@
         }
       }
     },
-    "/api/api-keys": {
-      "get": {
-        "operationId": "listApiKeys",
-        "summary": "List API keys",
-        "description": "List all API keys owned by the authenticated user in this organization. Requires organization:view permission.",
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of API keys",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/ApiKeyInfo"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key token"
-          },
-          "403": {
-            "description": "Insufficient permissions (requires organization:view)"
-          }
-        }
-      },
-      "post": {
-        "operationId": "createApiKey",
-        "summary": "Create an API key",
-        "description": "Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is returned once — store it securely.",
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100,
-                    "description": "Human-readable name for this token"
-                  },
-                  "description": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "description": "Optional description"
-                  },
-                  "expiresAt": {
-                    "type": "string",
-                    "format": "date-time",
-                    "description": "Optional expiration date (ISO 8601)"
-                  },
-                  "bindings": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 20,
-                    "description": "Role bindings that define what this token can access",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "role": {
-                          "type": "string",
-                          "enum": [
-                            "ADMIN",
-                            "MEMBER",
-                            "VIEWER"
-                          ],
-                          "description": "Role to grant"
-                        },
-                        "scopeType": {
-                          "type": "string",
-                          "enum": [
-                            "ORGANIZATION",
-                            "TEAM",
-                            "PROJECT"
-                          ],
-                          "description": "Scope level"
-                        },
-                        "scopeId": {
-                          "type": "string",
-                          "description": "ID of the organization, team, or project"
-                        }
-                      },
-                      "required": [
-                        "role",
-                        "scopeType",
-                        "scopeId"
-                      ]
-                    }
-                  },
-                  "keyType": {
-                    "type": "string",
-                    "enum": [
-                      "personal",
-                      "service"
-                    ],
-                    "default": "personal",
-                    "description": "personal = tied to a user. service = not tied to any user, for automation."
-                  },
-                  "projectIds": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 50,
-                    "description": "For service keys with restricted scope: list of project IDs to grant ADMIN access to. Omit for full org access."
-                  }
-                },
-                "required": [
-                  "name",
-                  "bindings"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "API key created. The token field contains the plaintext key — it is only shown once.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "token": {
-                      "type": "string",
-                      "description": "Plaintext API key token (sk-lw-...). Store securely — shown only once."
-                    },
-                    "apiKey": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key token"
-          },
-          "403": {
-            "description": "Requested binding exceeds the creator's own permissions, or scope does not belong to this organization"
-          },
-          "422": {
-            "description": "Validation error (missing name, empty bindings, etc.)"
-          }
-        }
-      }
-    },
-    "/api/api-keys/{id}": {
-      "delete": {
-        "operationId": "revokeApiKey",
-        "summary": "Revoke an API key",
-        "description": "Revoke (soft-delete) an API key. Revoked keys can no longer authenticate. Requires organization:manage permission.",
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "API key ID"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "API key revoked successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key token"
-          },
-          "403": {
-            "description": "Not authorized to revoke this API key (owned by another user)"
-          },
-          "404": {
-            "description": "API key not found"
-          },
-          "409": {
-            "description": "API key is already revoked"
-          }
-        }
-      }
-    },
-    "/api/projects": {
-      "get": {
-        "operationId": "listProjects",
-        "summary": "List projects",
-        "description": "List all non-archived projects for the organization (paginated). Requires an admin API key with project:view permission.",
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "query",
-            "name": "page",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 1000,
-              "default": 50
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated list of projects",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Project"
-                      }
-                    },
-                    "pagination": {
-                      "$ref": "#/components/schemas/Pagination"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key token"
-          },
-          "403": {
-            "description": "Insufficient permissions for this operation"
-          }
-        }
-      },
-      "post": {
-        "operationId": "createProject",
-        "summary": "Create a project",
-        "description": "Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.",
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255,
-                    "description": "Project name"
-                  },
-                  "teamId": {
-                    "type": "string",
-                    "description": "ID of an existing team to assign the project to"
-                  },
-                  "newTeamName": {
-                    "type": "string",
-                    "maxLength": 255,
-                    "description": "Name for a new team to create and assign the project to"
-                  },
-                  "language": {
-                    "type": "string",
-                    "description": "Programming language (e.g. python, typescript)"
-                  },
-                  "framework": {
-                    "type": "string",
-                    "description": "Framework (e.g. langchain, vercel-ai, openai)"
-                  }
-                },
-                "required": [
-                  "name",
-                  "language",
-                  "framework"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Project created. Returns a scoped service API key for this project.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/Project"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "serviceApiKey": {
-                          "type": "string",
-                          "description": "Scoped service API key with ADMIN on this project (sk-lw-..._...). Store securely — shown only once."
-                        },
-                        "serviceApiKeyId": {
-                          "type": "string",
-                          "description": "ID of the auto-created service key, for management via DELETE /api/api-keys/{id}."
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Team does not belong to this organization"
-          },
-          "401": {
-            "description": "Invalid or missing API key token"
-          },
-          "403": {
-            "description": "Insufficient permissions (requires project:create)"
-          },
-          "409": {
-            "description": "A project with this name already exists in the team"
-          },
-          "422": {
-            "description": "Validation error (missing required fields)"
-          }
-        }
-      }
-    },
-    "/api/projects/{id}": {
-      "get": {
-        "operationId": "getProject",
-        "summary": "Get a project",
-        "description": "Get a project by ID, including its API key. Requires project:view permission.",
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Project ID (project_...)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Project details.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key token"
-          },
-          "403": {
-            "description": "Insufficient permissions for this operation"
-          },
-          "404": {
-            "description": "Project not found"
-          }
-        }
-      },
-      "patch": {
-        "operationId": "updateProject",
-        "summary": "Update a project",
-        "description": "Update project fields. Only provided fields are changed. Requires project:update permission.",
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Project ID"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  },
-                  "language": {
-                    "type": "string"
-                  },
-                  "framework": {
-                    "type": "string"
-                  },
-                  "piiRedactionLevel": {
-                    "type": "string",
-                    "enum": [
-                      "STRICT",
-                      "ESSENTIAL",
-                      "DISABLED"
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated project",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key token"
-          },
-          "403": {
-            "description": "Insufficient permissions (requires project:update)"
-          },
-          "404": {
-            "description": "Project not found"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "archiveProject",
-        "summary": "Archive a project",
-        "description": "Soft-delete (archive) a project. Archived projects are excluded from list responses. Requires project:delete permission.",
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Project ID"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Project archived",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "archivedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key token"
-          },
-          "403": {
-            "description": "Insufficient permissions (requires project:delete)"
-          },
-          "404": {
-            "description": "Project not found"
-          }
-        }
-      }
-    },
     "/api/trace/search": {
       "post": {
         "summary": "Search traces",
@@ -3254,6 +2698,231 @@
           }
         ],
         "description": "Archive an agent (soft-delete)"
+      }
+    },
+    "/api/api-keys": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "List of API keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ApiKeyInfo"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires organization:view)"
+          }
+        },
+        "operationId": "listApiKeys",
+        "parameters": [],
+        "summary": "List API keys",
+        "description": "List all API keys owned by the authenticated user in this organization. Requires organization:view permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
+      },
+      "post": {
+        "responses": {
+          "201": {
+            "description": "API key created. The token field contains the plaintext key — it is only shown once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "description": "Plaintext API key token (sk-lw-...). Store securely — shown only once."
+                    },
+                    "apiKey": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Requested binding exceeds the creator's own permissions, or scope does not belong to this organization"
+          },
+          "422": {
+            "description": "Validation error (missing name, empty bindings, etc.)"
+          }
+        },
+        "operationId": "createApiKey",
+        "parameters": [],
+        "summary": "Create an API key",
+        "description": "Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is returned once — store it securely.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "keyType": {
+                    "type": "string",
+                    "enum": [
+                      "personal",
+                      "service"
+                    ],
+                    "default": "personal",
+                    "description": "A personal key acts as the user who created it and needs explicit bindings. A service key is not tied to a user."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "Human-readable name for this key"
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "description": "ISO 8601 timestamp after which the key stops working"
+                  },
+                  "bindings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "ADMIN",
+                            "MEMBER",
+                            "VIEWER"
+                          ]
+                        },
+                        "scopeType": {
+                          "type": "string",
+                          "enum": [
+                            "ORGANIZATION",
+                            "TEAM",
+                            "PROJECT"
+                          ]
+                        },
+                        "scopeId": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "scopeType",
+                        "scopeId"
+                      ]
+                    },
+                    "maxItems": 20,
+                    "description": "What this key may do, and where. Required for a personal key."
+                  },
+                  "projectIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "maxItems": 50,
+                    "description": "Service keys only: restricts the key to these projects"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/api-keys/{id}": {
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "API key revoked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Not authorized to revoke this API key (owned by another user)"
+          },
+          "404": {
+            "description": "API key not found"
+          },
+          "409": {
+            "description": "API key is already revoked"
+          }
+        },
+        "operationId": "revokeApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "API key ID"
+          }
+        ],
+        "summary": "Revoke an API key",
+        "description": "Revoke (soft-delete) an API key. Revoked keys can no longer authenticate. Requires organization:manage permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/analytics/timeseries": {
@@ -38242,6 +37911,439 @@
           }
         ],
         "description": "Archive (soft-delete) a scenario"
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Paginated list of projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Project"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
+          }
+        },
+        "operationId": "listProjects",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          }
+        ],
+        "summary": "List projects",
+        "description": "List all non-archived projects for the organization (paginated). Requires an admin API key with project:view permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
+      },
+      "post": {
+        "responses": {
+          "201": {
+            "description": "Project created. Returns a scoped service API key for this project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Project"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "serviceApiKey": {
+                          "type": "string",
+                          "description": "Scoped service API key with ADMIN on this project (sk-lw-..._...). Store securely — shown only once."
+                        },
+                        "serviceApiKeyId": {
+                          "type": "string",
+                          "description": "ID of the auto-created service key, for management via DELETE /api/api-keys/{id}."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Team does not belong to this organization"
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires project:create)"
+          },
+          "409": {
+            "description": "A project with this name already exists in the team"
+          },
+          "422": {
+            "description": "Validation error (missing required fields)"
+          }
+        },
+        "operationId": "createProject",
+        "parameters": [],
+        "summary": "Create a project",
+        "description": "Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Project name"
+                  },
+                  "teamId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Id of an existing team to put the project in"
+                  },
+                  "newTeamName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Create a team with this name and put the project in it"
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Programming language, such as python or typescript"
+                  },
+                  "framework": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Framework in use, such as langchain or openai"
+                  }
+                },
+                "required": [
+                  "name",
+                  "language",
+                  "framework"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Project details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        },
+        "operationId": "getProject",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project ID (project_...)"
+          }
+        ],
+        "summary": "Get a project",
+        "description": "Get a project by ID, including its API key. Requires project:view permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
+      },
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "Updated project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires project:update)"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        },
+        "operationId": "updateProject",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project ID"
+          }
+        ],
+        "summary": "Update a project",
+        "description": "Update project fields. Only provided fields are changed. Requires project:update permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "language": {
+                    "type": "string"
+                  },
+                  "framework": {
+                    "type": "string"
+                  },
+                  "teamId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Moves the project to this team"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "Project archived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "archivedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires project:delete)"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        },
+        "operationId": "archiveProject",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project ID"
+          }
+        ],
+        "summary": "Archive a project",
+        "description": "Soft-delete (archive) a project. Archived projects are excluded from list responses. Requires project:delete permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/projects/{id}/api-key": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The project's API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "apiKey": {
+                      "type": "string",
+                      "description": "Send as X-Auth-Token, Bearer, or Basic"
+                    }
+                  },
+                  "required": [
+                    "apiKey"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
+          },
+          "404": {
+            "description": "No project with that id in this organization"
+          }
+        },
+        "operationId": "getProjectApiKey",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project id"
+          }
+        ],
+        "summary": "Get the project API key",
+        "description": "Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with. Requires an admin API key holding project:update on this project.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/projects/{id}/regenerate-api-key": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "The new API key. The previous one no longer authenticates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "apiKey": {
+                      "type": "string",
+                      "description": "Send as X-Auth-Token, Bearer, or Basic"
+                    }
+                  },
+                  "required": [
+                    "apiKey"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
+          },
+          "404": {
+            "description": "No project with that id in this organization"
+          }
+        },
+        "operationId": "regenerateProjectApiKey",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project id"
+          }
+        ],
+        "summary": "Regenerate the project API key",
+        "description": "Issue a new API key for the project and invalidate the previous one immediately. Anything still sending the old key starts failing authentication as soon as this returns, so roll it out before calling this. Requires an admin API key holding project:manage.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/secrets": {

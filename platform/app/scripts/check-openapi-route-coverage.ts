@@ -292,16 +292,6 @@ export const UNPUBLISHED = [
     category: "gap",
     why: "SCIM 2.0 user and group provisioning for enterprise directories. Enterprise buyers do look for it in the reference; it lands with the management API work, where the rest of the provisioning surface is",
   },
-  {
-    match: "GET /api/projects/{id}/api-key",
-    category: "gap",
-    why: "annotated already, but /api/projects entries in the document are hand-authored and richer than the app generates, so switching the family to app-derived would lose the schemas it publishes today; enriching those describeRoute calls is the prerequisite",
-  },
-  {
-    match: "POST /api/projects/{id}/regenerate-api-key",
-    category: "gap",
-    why: "same prerequisite as reading the project API key",
-  },
 ] as const satisfies readonly Exclusion[];
 
 interface OpenApiDocument {

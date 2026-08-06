@@ -1212,7 +1212,9 @@
               "api-reference/projects/list-projects",
               "api-reference/projects/create-project",
               "api-reference/projects/get-project",
+              "api-reference/projects/get-api-key",
               "api-reference/projects/update-project",
+              "api-reference/projects/regenerate-api-key",
               "api-reference/projects/archive-project"
             ]
           },
