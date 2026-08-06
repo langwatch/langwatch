@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/netports"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // System is the real OS-backed implementation of app.System.
@@ -207,4 +208,113 @@ func (System) TotalMemory() uint64 {
 		}
 	}
 	return 0
+}
+
+// MemStat samples the machine's memory-pressure signals.
+//
+// Compressor occupancy and swap, not summed RSS: GroupRSS sums `ps` output,
+// which double-counts shared pages and overstates by several GB. The parsing
+// lives in domain, because the arithmetic is the part that is easy to get
+// wrong and the shelling out is not.
+//
+// A signal that cannot be read stays zero, which classifies green. That is
+// deliberate — a governor that cannot see the machine must not throttle it.
+func (s System) MemStat() domain.MemStat {
+	m := domain.MemStat{TotalBytes: s.TotalMemory()}
+	if runtime.GOOS != "darwin" {
+		return m
+	}
+	if out, err := exec.Command("vm_stat").Output(); err == nil {
+		if pageSize, occupied, ok := domain.ParseVMStat(string(out)); ok {
+			m.CompressedBytes = occupied * pageSize
+		}
+	}
+	if out, err := exec.Command("sysctl", "-n", "vm.swapusage").Output(); err == nil {
+		if used, total, ok := domain.ParseSwapUsage(string(out)); ok {
+			m.SwapUsedBytes, m.SwapTotalBytes = used, total
+		}
+	}
+	return m
+}
+
+// DemoteGroup moves every process in pid's group into the throttled background
+// band, and RestoreGroup moves them back out.
+//
+// It walks the group rather than signaling the launcher, because the policy is
+// inherited by processes forked AFTER it is set — it does not reach back into a
+// tree that is already running, and a live stack is exactly that: vite, node
+// and workers already spawned under the launcher. Signaling the launcher alone
+// would demote the launcher alone.
+func (s System) DemoteGroup(pid int) { s.retierGroup(pid, "-b") }
+
+// RestoreGroup undoes DemoteGroup. A process spawned while its stack was
+// demoted inherits the band, so restoring walks the group again rather than
+// trying to remember what was demoted.
+func (s System) RestoreGroup(pid int) { s.retierGroup(pid, "-B") }
+
+func (System) retierGroup(pid int, flag string) {
+	if runtime.GOOS != "darwin" || pid <= 0 {
+		return
+	}
+	for _, member := range groupMembers(pid) {
+		// Best effort per process: one that exits between listing and signaling
+		// is not an error, and must not stop the rest of the group being moved.
+		_ = exec.Command("taskpolicy", flag, "-p", strconv.Itoa(member)).Run()
+	}
+}
+
+// groupMembers lists every live pid sharing pid's process group.
+func groupMembers(pid int) []int {
+	out, err := exec.Command("ps", "-o", "pgid=", "-p", strconv.Itoa(pid)).Output()
+	if err != nil {
+		return nil
+	}
+	pgid := strings.TrimSpace(string(out))
+	if pgid == "" {
+		return nil
+	}
+	all, err := exec.Command("ps", "-ax", "-o", "pgid=,pid=").Output()
+	if err != nil {
+		return nil
+	}
+	var members []int
+	for line := range strings.SplitSeq(string(all), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 || fields[0] != pgid {
+			continue
+		}
+		if member, err := strconv.Atoi(fields[1]); err == nil {
+			members = append(members, member)
+		}
+	}
+	return members
+}
+
+// OrphanedWorkers lists test-worker processes whose parent is PID 1 — on macOS
+// that is launchd, and it means an interrupted run left them behind.
+//
+// haven already sweeps orphans at every `up` (procsupervisor.reapOrphans); this
+// is the same rule on the daemon's tick, widened to the vitest workers that
+// CLAUDE.md currently asks people to pkill by hand. The rule is deliberately
+// narrow: matching the worker path AND being owned by nobody. Anything needing
+// a judgment about whether a process is still wanted stays manual.
+func (System) OrphanedWorkers(marker string) []int {
+	out, err := exec.Command("ps", "-ax", "-o", "ppid=,pid=,command=").Output()
+	if err != nil {
+		return nil
+	}
+	var orphans []int
+	for line := range strings.SplitSeq(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 || fields[0] != "1" {
+			continue
+		}
+		if !strings.Contains(line, marker) {
+			continue
+		}
+		if pid, err := strconv.Atoi(fields[1]); err == nil {
+			orphans = append(orphans, pid)
+		}
+	}
+	return orphans
 }
