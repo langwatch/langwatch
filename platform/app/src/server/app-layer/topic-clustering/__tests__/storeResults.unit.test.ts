@@ -49,10 +49,6 @@ vi.mock("~/server/metrics", () => ({
   getPayloadSizeHistogram: vi.fn().mockReturnValue({ observe: vi.fn() }),
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  defaultClickHouseClientResolver: vi.fn(),
-}));
-
 vi.mock("fetch-h2", () => ({ fetch: vi.fn() }));
 
 import { storeResults } from "../clustering";

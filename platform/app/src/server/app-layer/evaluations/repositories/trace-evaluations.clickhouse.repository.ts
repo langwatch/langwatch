@@ -9,7 +9,6 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { defaultClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { safeJsonParse } from "~/utils/safeJsonParse";
 import type { ClickHouseEvaluationRunRow } from "../../../evaluations/evaluation-run.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "../../../evaluations/evaluation-run.mappers";
@@ -302,11 +301,4 @@ function asPlainObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
-}
-
-/** Production default: the standard per-project resolver. */
-export function createDefaultTraceEvaluationsRepository(): TraceEvaluationsClickHouseRepository {
-  return new TraceEvaluationsClickHouseRepository(
-    defaultClickHouseClientResolver,
-  );
 }

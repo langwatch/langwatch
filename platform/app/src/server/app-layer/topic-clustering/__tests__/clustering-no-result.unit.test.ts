@@ -22,6 +22,9 @@ const { assignTopicMock, recordTopicsMock, stagedLangevalsFetchMock } =
   }));
 
 const mockClickHouseQuery = vi.fn();
+/** The resolver the caller threads in — the production seam, injected here
+ *  rather than reached by mocking the client module. */
+const resolveClickHouseClient = vi.fn();
 
 vi.mock("~/server/db", () => ({
   prisma: {
@@ -36,10 +39,6 @@ vi.mock("~/server/db", () => ({
     },
     cost: { create: vi.fn() },
   },
-}));
-
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  defaultClickHouseClientResolver: vi.fn(),
 }));
 
 // The deployment shape that triggers the bug: no clustering endpoint at all.
@@ -82,7 +81,6 @@ vi.mock("../../../langevals/stagedFetch", () => ({
   stagedLangevalsFetch: stagedLangevalsFetchMock,
 }));
 
-import { defaultClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { clusterTopicsForProject, storeResults } from "../clustering";
 
@@ -115,7 +113,7 @@ describe("clusterTopicsForProject", () => {
     vi.mocked(prisma.project.findUnique).mockResolvedValue(
       makeProject() as any,
     );
-    vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
+    resolveClickHouseClient.mockResolvedValue({
       query: mockClickHouseQuery,
     } as any);
   });
@@ -133,13 +131,19 @@ describe("clusterTopicsForProject", () => {
       });
 
       it("deletes no topics", async () => {
-        await clusterTopicsForProject("proj-1");
+        await clusterTopicsForProject({
+          projectId: "proj-1",
+          resolveClickHouseClient,
+        });
 
         expect(prisma.topic.deleteMany).not.toHaveBeenCalled();
       });
 
       it("reports the run as skipped for missing configuration", async () => {
-        const outcome = await clusterTopicsForProject("proj-1");
+        const outcome = await clusterTopicsForProject({
+          projectId: "proj-1",
+          resolveClickHouseClient,
+        });
 
         expect(outcome.skippedReason).toBe("not_configured");
         // The run must not read as productive work: reporting traces
@@ -149,7 +153,10 @@ describe("clusterTopicsForProject", () => {
       });
 
       it("stops the page walk rather than paging into the same wall", async () => {
-        const outcome = await clusterTopicsForProject("proj-1");
+        const outcome = await clusterTopicsForProject({
+          projectId: "proj-1",
+          resolveClickHouseClient,
+        });
 
         expect(outcome.nextSearchAfter).toBeUndefined();
       });

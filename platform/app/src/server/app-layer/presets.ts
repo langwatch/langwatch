@@ -180,6 +180,7 @@ import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/ev
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositories/monitor-performance.clickhouse.repository";
 import { NullMonitorPerformanceRepository } from "./evaluations/repositories/monitor-performance.repository";
+import { TraceEvaluationsClickHouseRepository } from "./evaluations/repositories/trace-evaluations.clickhouse.repository";
 import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter-options.clickhouse.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
@@ -341,6 +342,13 @@ export function initializeDefaultApp(options?: {
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
+
+  // Clustering reads ClickHouse directly (its query has no repository yet), so
+  // it takes the resolver as a parameter. Bound once here, then handed to both
+  // the event-sourcing run port and the App, so no caller re-derives one.
+  const runClusteringPage: AppDependencies["topicClustering"]["runPage"] = (
+    params,
+  ) => clusterTopicsForProject({ ...params, resolveClickHouseClient });
 
   const redis = config.skipRedis
     ? null
@@ -527,6 +535,12 @@ export function initializeDefaultApp(options?: {
           : new NullMonitorPerformanceRepository(),
       ),
       "MonitorPerformanceService",
+    ),
+    // Unconditional on `clickhouseEnabled` for the same reason the analytics
+    // service is: the resolver throws at query time when ClickHouse isn't
+    // configured, and this repository already degrades that to an empty read.
+    traceEvaluations: new TraceEvaluationsClickHouseRepository(
+      resolveClickHouseClient,
     ),
   };
 
@@ -897,6 +911,7 @@ export function initializeDefaultApp(options?: {
     evaluations: { runs: evaluations.runs },
     traces: { spans: spanStorage },
     traceSummaryRepository: repositories.traceSummaryFold,
+    resolveClickHouseClient,
   });
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
@@ -1061,9 +1076,10 @@ export function initializeDefaultApp(options?: {
     topicClustering: {
       runPort: {
         runClusteringPage: ({ projectId, searchAfter, runId, page }) =>
-          clusterTopicsForProject(projectId, searchAfter ?? undefined, {
-            runId,
-            page,
+          runClusteringPage({
+            projectId,
+            searchAfter: searchAfter ?? undefined,
+            runContext: { runId, page },
           }),
       },
     },
@@ -1384,6 +1400,7 @@ export function initializeDefaultApp(options?: {
         new PrismaTopicClusteringStatusRepository(prisma),
       ),
       topics,
+      runPage: runClusteringPage,
     },
     gateway: {
       budgets: gatewayBudgetRepository,
@@ -1603,6 +1620,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       performance: new MonitorPerformanceService(
         new NullMonitorPerformanceRepository(),
       ),
+      traceEvaluations: new TraceEvaluationsClickHouseRepository(async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      }),
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     analytics: {
@@ -1653,6 +1673,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         new PrismaTopicClusteringStatusRepository(testPrisma),
       ),
       topics: new TopicService(new PrismaTopicRepository(testPrisma)),
+      runPage: () => {
+        throw new Error("Topic clustering is not available in the test app");
+      },
     },
     gateway: {
       budgets: undefined,

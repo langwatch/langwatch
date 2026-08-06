@@ -323,11 +323,10 @@ describe("evaluation inputs offload (integration)", () => {
       // The v1 read service resolves the marker at the read boundary. Inject
       // the same stored-objects service the write used (its client is the test
       // client via the getClickHouseClientForProject mock).
-      // The repository is injected rather than left to its default. The
-      // default builds one over `defaultClickHouseClientResolver`, which lives
-      // inside clickhouseClient.ts and calls `getClickHouseClientForProject`
-      // as a local binding - so the module mock above does NOT intercept it,
-      // and the read would quietly go to the real resolver and answer null.
+      // The repository is injected rather than taken from the App: without
+      // one the service reads `getApp().evaluations.traceEvaluations`, which
+      // this test never boots, and its resolver would not be the test client
+      // anyway.
       const service = new EvaluationService(
         ({ projectId, inputs }) =>
           resolveInputsMarker({ projectId, inputs, storedObjects }),

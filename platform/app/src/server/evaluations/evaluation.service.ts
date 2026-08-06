@@ -1,9 +1,7 @@
 import { getLangWatchTracer } from "langwatch";
+import { getApp } from "~/server/app-layer/app";
 import { resolveInputsMarker } from "~/server/app-layer/evaluations/evaluation-inputs-offload";
-import {
-  createDefaultTraceEvaluationsRepository,
-  type TraceEvaluationsRepository,
-} from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
+import type { TraceEvaluationsRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type { Protections } from "~/server/traces/protections";
 import type { TraceEvaluation } from "./evaluation-run.types";
@@ -41,14 +39,27 @@ const defaultResolveInputsMarker: ResolveEvaluationInputsMarker = ({
 export class EvaluationService {
   private readonly tracer = getLangWatchTracer("langwatch.evaluations.service");
   private readonly resolveInputsMarker: ResolveEvaluationInputsMarker;
-  private readonly repository: TraceEvaluationsRepository;
+  private readonly injectedRepository?: TraceEvaluationsRepository;
+  private cachedRepository?: TraceEvaluationsRepository;
 
   constructor(
     resolveInputsMarkerFn: ResolveEvaluationInputsMarker = defaultResolveInputsMarker,
-    repository: TraceEvaluationsRepository = createDefaultTraceEvaluationsRepository(),
+    repository?: TraceEvaluationsRepository,
   ) {
     this.resolveInputsMarker = resolveInputsMarkerFn;
-    this.repository = repository;
+    this.injectedRepository = repository;
+  }
+
+  /**
+   * The evaluations repository, taken lazily from
+   * `getApp().evaluations.traceEvaluations` — the one the composition root
+   * built over its ClickHouse resolver. Lazy because this service is
+   * constructed inside `TraceService`, including on read paths and in unit
+   * tests that never reach an evaluations query and never boot an App.
+   */
+  private get repository(): TraceEvaluationsRepository {
+    if (this.injectedRepository) return this.injectedRepository;
+    return (this.cachedRepository ??= getApp().evaluations.traceEvaluations);
   }
 
   static create(): EvaluationService {

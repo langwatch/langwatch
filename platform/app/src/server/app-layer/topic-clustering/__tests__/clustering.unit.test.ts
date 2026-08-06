@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockClickHouseQuery = vi.fn();
+/** The resolver the caller threads in — the production seam, injected here
+ *  rather than reached by mocking the client module. */
+const resolveClickHouseClient = vi.fn();
 
 vi.mock("~/server/db", () => ({
   prisma: {
@@ -8,10 +11,6 @@ vi.mock("~/server/db", () => ({
     topic: { findMany: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn() },
     cost: { create: vi.fn() },
   },
-}));
-
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  defaultClickHouseClientResolver: vi.fn(),
 }));
 
 vi.mock("~/env.mjs", () => ({
@@ -55,7 +54,6 @@ vi.mock("~/server/langevals/stagedFetch", () => ({
   }),
 }));
 
-import { defaultClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { stagedLangevalsFetch } from "../../../langevals/stagedFetch";
 import {
@@ -84,7 +82,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
+      resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -99,7 +97,10 @@ describe("clusterTopicsForProject", () => {
         json: () => Promise.resolve([]),
       });
 
-      const outcome = await clusterTopicsForProject("proj-1");
+      const outcome = await clusterTopicsForProject({
+        projectId: "proj-1",
+        resolveClickHouseClient,
+      });
 
       expect(mockClickHouseQuery).toHaveBeenCalledTimes(2); // counts + search
       expect(outcome.skippedReason).toBe("not_enough_traces");
@@ -114,7 +115,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
+      resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -137,7 +138,10 @@ describe("clusterTopicsForProject", () => {
         json: () => Promise.resolve(emptyPage),
       });
 
-      const outcome = await clusterTopicsForProject("proj-1");
+      const outcome = await clusterTopicsForProject({
+        projectId: "proj-1",
+        resolveClickHouseClient,
+      });
 
       expect(outcome.skippedReason).toBe("not_enough_traces");
       expect(outcome.nextSearchAfter).toEqual([now - 14 * 1000, "trace-14"]);
@@ -150,7 +154,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
+      resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -172,7 +176,10 @@ describe("clusterTopicsForProject", () => {
         json: () => Promise.resolve(chRows),
       });
 
-      await clusterTopicsForProject("proj-1");
+      await clusterTopicsForProject({
+        projectId: "proj-1",
+        resolveClickHouseClient,
+      });
 
       // clustering service (langevals) was called
       expect(stagedLangevalsFetch).toHaveBeenCalled();
@@ -184,13 +191,16 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(defaultClickHouseClientResolver).mockRejectedValue(
+      resolveClickHouseClient.mockRejectedValue(
         new Error("ClickHouse not available for tenant proj-1"),
       );
 
-      await expect(clusterTopicsForProject("proj-1")).rejects.toThrow(
-        "ClickHouse client not available for project proj-1",
-      );
+      await expect(
+        clusterTopicsForProject({
+          projectId: "proj-1",
+          resolveClickHouseClient,
+        }),
+      ).rejects.toThrow("ClickHouse client not available for project proj-1");
     });
   });
 
@@ -210,7 +220,7 @@ describe("clusterTopicsForProject", () => {
         makeProject() as any,
       );
       vi.mocked(prisma.topic.findMany).mockResolvedValue(freshTopics as any);
-      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
+      resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -220,7 +230,10 @@ describe("clusterTopicsForProject", () => {
           Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
 
-      const outcome = await clusterTopicsForProject("proj-1");
+      const outcome = await clusterTopicsForProject({
+        projectId: "proj-1",
+        resolveClickHouseClient,
+      });
 
       expect(outcome.skippedReason).toBe("recently_clustered");
       expect(mockClickHouseQuery).toHaveBeenCalledTimes(1); // counts only
@@ -231,7 +244,7 @@ describe("clusterTopicsForProject", () => {
         makeProject() as any,
       );
       vi.mocked(prisma.topic.findMany).mockResolvedValue(freshTopics as any);
-      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
+      resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -244,10 +257,11 @@ describe("clusterTopicsForProject", () => {
         json: () => Promise.resolve([]),
       });
 
-      const outcome = await clusterTopicsForProject("proj-1", [
-        1700000000000,
-        "trace-xyz",
-      ]);
+      const outcome = await clusterTopicsForProject({
+        projectId: "proj-1",
+        searchAfter: [1700000000000, "trace-xyz"],
+        resolveClickHouseClient,
+      });
 
       expect(outcome.skippedReason).not.toBe("recently_clustered");
       expect(mockClickHouseQuery).toHaveBeenCalledTimes(2); // counts + search
@@ -259,7 +273,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
+      resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -275,7 +289,11 @@ describe("clusterTopicsForProject", () => {
       });
 
       const searchAfter: [number, string] = [1700000000000, "trace-xyz"];
-      await clusterTopicsForProject("proj-1", searchAfter);
+      await clusterTopicsForProject({
+        projectId: "proj-1",
+        searchAfter,
+        resolveClickHouseClient,
+      });
 
       // Verify the search query included cursor params
       const searchCall = mockClickHouseQuery.mock.calls[1]!;
@@ -294,7 +312,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(defaultClickHouseClientResolver).mockResolvedValue({
+      resolveClickHouseClient.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -333,7 +351,10 @@ describe("clusterTopicsForProject", () => {
           ]),
       });
 
-      await clusterTopicsForProject("proj-1");
+      await clusterTopicsForProject({
+        projectId: "proj-1",
+        resolveClickHouseClient,
+      });
 
       // Traces with empty/null input should be filtered, leaving 10
       const fetchCall = vi.mocked(stagedLangevalsFetch).mock.calls[0];

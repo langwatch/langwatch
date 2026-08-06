@@ -11,6 +11,12 @@ const logger = createLogger("langwatch:clickhouse:routing");
  * Resolver function that returns the appropriate ClickHouseClient for a given
  * tenant (projectId). Repositories use this instead of holding a fixed client,
  * enabling per-tenant routing to private ClickHouse instances.
+ *
+ * The type is exported; a resolver is not. One is built in the composition
+ * root (`presets.ts`) and travels from there by injection, so the only ways to
+ * reach a client are a repository the App hands out and the App's own
+ * resolver. An exported resolver would be a third door that any module could
+ * open by import, which is the reason there isn't one.
  */
 export type ClickHouseClientResolver = (
   tenantId: string,
@@ -111,22 +117,6 @@ export async function getClickHouseClientForProject(
 
   return getClickHouseClientForOrganization(orgId);
 }
-
-/**
- * Default per-project `ClickHouseClientResolver`: the same
- * throws-if-unavailable contract every repository resolver already follows,
- * defined once here instead of hand-copied at every call site that needs a
- * fallback when no explicit resolver is injected (tests inject their own).
- */
-export const defaultClickHouseClientResolver: ClickHouseClientResolver = async (
-  tenantId: string,
-): Promise<ClickHouseClient> => {
-  const client = await getClickHouseClientForProject(tenantId);
-  if (!client) {
-    throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-  }
-  return client;
-};
 
 /**
  * Returns the appropriate ClickHouse client for a given organization.

@@ -22,10 +22,6 @@ vi.mock("~/server/db", () => ({
   },
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  defaultClickHouseClientResolver: vi.fn(),
-}));
-
 vi.mock("~/env.mjs", () => ({
   env: { LANGEVALS_ENDPOINT: "http://langevals.test" },
 }));

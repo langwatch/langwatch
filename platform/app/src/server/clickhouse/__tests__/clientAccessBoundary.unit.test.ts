@@ -17,7 +17,7 @@
  *     place tenant scoping, windowed reads and query shape can be enforced at
  *     all, instead of a convention forty files are free to ignore.
  *
- * Rule 2 has a backlog. Thirty-nine files predated the rule, and rewriting them all at
+ * Rule 2 has a backlog: the files that predated the rule, which rewriting all at
  * once would be a worse change than the one it fixes. They are named below, and
  * the list is a ratchet: a file not on it fails, and a file on it that no longer
  * needs to be fails too, so the list can only shrink. Nothing new gets in.
@@ -42,17 +42,22 @@ const CONSTRUCTS_CLIENT = /\bcreateClient\s*\(/;
 // `@clickhouse/client/web` import constructs exactly the same client.
 const DRIVER_MODULE = /from\s+["']@clickhouse\/client(?:\/[^"']+)?["']/;
 
-/**
- * The functions that hand out a live client.
- *
- * `defaultClickHouseClientResolver` is one of them. It is a shared
- * throws-if-unavailable wrapper around `getClickHouseClientForProject`, which
- * makes it a genuine improvement over the four hand-copied closures it
- * replaced - and still a way to hold a client. Naming it here is what keeps
- * "we deduplicated the resolver" from quietly becoming "we exempted it".
- */
+/** The functions that hand out a live client. */
 const RESOLVES_CLIENT =
-  /\b(getClickHouseClientForProject|getClickHouseClientForOrganization|getSharedClickHouseClient|getAllClickHouseInstances|defaultClickHouseClientResolver)\b/;
+  /\b(getClickHouseClientForProject|getClickHouseClientForOrganization|getSharedClickHouseClient|getAllClickHouseInstances)\b/;
+
+/**
+ * A shared exported resolver is the same escape hatch again, one import away
+ * from anywhere: `clickhouseClient.ts` once exported one, and four files held
+ * a client through it without ever naming a function above. The resolver TYPE
+ * is exported and a resolver VALUE is not - the one value is built in
+ * `presets.ts` and travels by injection - so this asserts the module declares
+ * no exported binding of that type. Re-add one and this fails.
+ */
+const EXPORTS_A_RESOLVER_VALUE =
+  /export\s+(?:const|let|var|(?:async\s+)?function)\s+\w+[^\n;=]*:\s*ClickHouseClientResolver\b/;
+
+const CLIENT_MODULE = "src/server/clickhouse/clickhouseClient.ts";
 
 /**
  * `getApp().clickhouse.resolveClient` is the same escape hatch wearing the
@@ -121,8 +126,6 @@ function mayResolveByLocation(path: string): boolean {
  */
 const RESOLVES_DIRECTLY_BACKLOG = new Set([
   "ee/governance/services/activity-monitor/activityMonitor.service.ts",
-  "src/server/app-layer/automations/graph-trigger-heartbeat.ts",
-  "src/server/app-layer/topic-clustering/clustering.ts",
   "src/server/experiments-v3/services/experiment-run.service.ts",
   "src/server/traces/clickhouse-trace.service.ts",
 ]);
@@ -190,6 +193,19 @@ function scan(): ScanResult {
 
 describe("the ClickHouse client access boundary", () => {
   const { files: scanned, walked } = scan();
+
+  describe("when the client module is read", () => {
+    it("exports the resolver type, never a resolver", () => {
+      const source = readFileSync(join(PACKAGE_ROOT, CLIENT_MODULE), "utf8");
+
+      expect(
+        EXPORTS_A_RESOLVER_VALUE.test(source),
+        `${CLIENT_MODULE} exports a ClickHouseClientResolver value. Build the one ` +
+          "resolver in src/server/app-layer/presets.ts and inject it; an exported " +
+          "one is a door into ClickHouse that skips both getApp() and repositories.",
+      ).toBe(false);
+    });
+  });
 
   // Counts the files READ, not the files matched. The matched count is the
   // backlog, and the backlog is meant to reach zero - asserting on it would

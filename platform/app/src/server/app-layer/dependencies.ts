@@ -41,6 +41,7 @@ import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
+import type { TraceEvaluationsRepository } from "./evaluations/repositories/trace-evaluations.clickhouse.repository";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
@@ -64,6 +65,10 @@ import type { SimulationRunService } from "./simulations/simulation-run.service"
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
+import type {
+  ClusteringPageOutcome,
+  ClusteringRunContext,
+} from "./topic-clustering/clustering";
 import type { TopicService } from "./topic-clustering/topic.service";
 import type { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
@@ -112,6 +117,9 @@ export interface AppDependencies {
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
     performance: MonitorPerformanceService;
+    /** Per-trace evaluation reads. Built over the composition root's
+     *  ClickHouse resolver, like every other repository here. */
+    traceEvaluations: TraceEvaluationsRepository;
   };
   dspySteps: {
     steps: DspyStepService;
@@ -146,6 +154,16 @@ export interface AppDependencies {
   topicClustering: {
     status: TopicClusteringStatusService;
     topics: TopicService;
+    /**
+     * One clustering page, already bound to the composition root's ClickHouse
+     * resolver. Callers outside the event-sourcing runtime take the page from
+     * here instead of resolving a client of their own.
+     */
+    runPage: (params: {
+      projectId: string;
+      searchAfter?: [number, string];
+      runContext?: ClusteringRunContext;
+    }) => Promise<ClusteringPageOutcome>;
   };
   /**
    * The gateway's ClickHouse-backed repositories. Undefined on a deployment
