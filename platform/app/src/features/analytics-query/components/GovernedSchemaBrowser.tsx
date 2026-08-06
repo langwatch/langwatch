@@ -158,7 +158,16 @@ function DatasetEntry({
         <Box aria-hidden="true" display="flex" color="fg.subtle">
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </Box>
-        <Text fontFamily="mono" fontSize="12px" fontWeight="600" minWidth={0}>
+        <Text
+          fontFamily="mono"
+          fontSize="12px"
+          fontWeight="600"
+          minWidth={0}
+          whiteSpace="nowrap"
+          overflow="hidden"
+          textOverflow="ellipsis"
+          title={dataset.name}
+        >
           {dataset.name}
         </Text>
         <Box flex="1" />
