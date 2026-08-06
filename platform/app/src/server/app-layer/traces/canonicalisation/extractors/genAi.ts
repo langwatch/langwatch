@@ -274,11 +274,17 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // flat alias onto it for ANY span (the Mastra extractor only runs for
     // Mastra spans). asNumber handles the stringy form too. setAttrIfAbsent:
     // the canonical dotted form wins when both are present.
+    //
+    // This block and the three below it read with get() and only consume the
+    // source key once the value has actually been used: a value this extractor
+    // cannot interpret stays in the bag and still reaches the span, rather than
+    // being deleted and never written back.
     // ─────────────────────────────────────────────────────────────────────────
     const cachedInputTokens = asNumber(
-      attrs.take(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS),
+      attrs.get(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS),
     );
     if (cachedInputTokens !== null) {
+      attrs.delete(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS);
       ctx.setAttrIfAbsent(
         ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
         cachedInputTokens,
@@ -294,9 +300,10 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // mapper keeps reading one key; the new key wins when both are present.
     // ─────────────────────────────────────────────────────────────────────────
     const reasoningOutputTokens = asNumber(
-      attrs.take(ATTR_KEYS.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS),
+      attrs.get(ATTR_KEYS.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS),
     );
     if (reasoningOutputTokens !== null) {
+      attrs.delete(ATTR_KEYS.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS);
       ctx.setAttr(
         ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
         reasoningOutputTokens,
@@ -312,7 +319,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // time_to_first_token already on the span wins.
     // ─────────────────────────────────────────────────────────────────────────
     const timeToFirstChunkSeconds = asNumber(
-      attrs.take(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK),
+      attrs.get(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK),
     );
     if (
       timeToFirstChunkSeconds !== null &&
@@ -320,6 +327,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       ctx.out[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN] === undefined &&
       !attrs.has(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN)
     ) {
+      attrs.delete(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK);
       ctx.setAttr(
         ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN,
         timeToFirstChunkSeconds * 1000,
@@ -333,9 +341,9 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // canonical attribute (lands in span params via the span mapper); no
     // dedicated metric column.
     // ─────────────────────────────────────────────────────────────────────────
-    const rawStream = attrs.take(ATTR_KEYS.GEN_AI_REQUEST_STREAM);
-    const stream = asBoolean(rawStream);
+    const stream = asBoolean(attrs.get(ATTR_KEYS.GEN_AI_REQUEST_STREAM));
     if (stream !== null) {
+      attrs.delete(ATTR_KEYS.GEN_AI_REQUEST_STREAM);
       ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_STREAM, stream);
       ctx.recordRule(`${this.id}:request.stream`);
     }
