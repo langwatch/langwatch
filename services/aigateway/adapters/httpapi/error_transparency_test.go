@@ -266,7 +266,7 @@ func TestRouter_UpstreamRetryable429_ForwardedWithHeaders(t *testing.T) {
 	assert.JSONEq(t, rateLimitBody, rec.Body.String())
 }
 
-// @scenario "A provider-set marker header cannot survive the writeJSONResponse passthrough lane"
+// @scenario "A provider-set marker header cannot survive the passthrough lane"
 func TestRouter_WriteJSONResponse_StripsSpoofedMarkerHeader(t *testing.T) {
 	const geminiErrBody = `{"error":{"code":429,"message":"quota exceeded","status":"RESOURCE_EXHAUSTED"}}`
 	provider := &mockProvider{

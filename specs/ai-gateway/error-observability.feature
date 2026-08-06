@@ -74,6 +74,15 @@ Feature: Gateway errors are logged with fault attribution
     When the error response is written
     Then the client-rejection counter does not move
 
+  # A key sitting at its configured ceiling sustains rejections by design, and
+  # rate limiting already has its own counter with its own dimension label.
+  @unit
+  Scenario: A rate-limited caller is not counted as a client reject
+    Given an authenticated request is denied by a gateway rate limit
+    When the error response is written
+    Then the client-rejection counter does not move
+    And the denial is carried by the dedicated rate-limit counter instead
+
   @unit
   Scenario: A rejection on an unmetered path is still written
     Given a request that never passed through the metrics middleware fails

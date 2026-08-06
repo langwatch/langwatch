@@ -113,6 +113,34 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And its metadata contains only the HTTP status and body kind
     And operators can distinguish the shapes without recording their contents
 
+  @unit
+  Scenario: Every upstream HTTP status maps to a stable reason code
+    Given a provider rejection carries no identifier-shaped discriminant
+    When the relay derives the handled reason from the HTTP status
+    Then every client-error and server-error status yields a named reason
+    And two failures with the same status always carry the same reason
+
+  @unit
+  Scenario: A provider body's shape is classified for safe logging
+    Given a provider rejection arrives as JSON, HTML, plain text, binary, or empty
+    When the relay classifies the body
+    Then the classification records only the kind, never the contents
+    And HTML is recognised whether declared by the header or sniffed from the body
+
+  @unit
+  Scenario: A stream error with no HTTP status still carries a reason
+    Given a model call fails inside a 200 event stream
+    When the relay captures the in-stream failure
+    Then the capture carries a stable stream-error reason
+    And it never leaves the failure without a reason to classify on
+
+  @unit
+  Scenario: The gateway's provider header rides into an untyped capture
+    Given the gateway names the provider that produced a forwarded rejection
+    When the relay captures that rejection as an upstream error
+    Then the provider's name is kept in the capture's metadata
+    And an operator can tell which provider said no without the body
+
   # A provider can coincidentally emit the same type/code/message triplet as
   # herr. Shape is not provenance. herr.WriteHTTP marks LangWatch-authored
   # envelopes with a response header whose value must match the body code; the
@@ -124,6 +152,28 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Then the relay treats it as untrusted provider JSON
     And its message and metadata are discarded
     But a marked LangWatch envelope round-trips losslessly
+
+  # The marker proves who wrote the envelope, not who wrote the sentence
+  # inside it: the gateway's own upstream-relay codes carry text derived from
+  # the provider's response, so the relay drops their prose while keeping the
+  # typed code and reasons.
+  @unit
+  Scenario: Upstream-relayed prose is scrubbed from marked provider_error envelopes
+    Given a marked LangWatch envelope carries a gateway upstream-relay code
+    When the relay decodes it as a trusted handled error
+    Then its message and tips are dropped before the capture
+    And a marked envelope for a gateway-authored rejection keeps its message
+
+  # A real envelope can arrive unmarked: an older gateway pod mid-rollout, or
+  # a hop that strips the header. Trust stays strict, but the mismatch must be
+  # diagnosable rather than a silent downgrade to generic copy.
+  @unit
+  Scenario: A stripped or mismatched marker on an envelope-shaped body is diagnosable
+    Given a rejection body has the exact shape of a LangWatch envelope
+    But its marker is absent or names a different code
+    When the relay refuses to trust it
+    Then a warning records the body's code and the marker's value
+    And no message content enters that warning
 
   @unit
   Scenario: Untrusted provider prose never enters relay logs

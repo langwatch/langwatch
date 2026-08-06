@@ -166,7 +166,6 @@ func TestProviderErrorCode_RejectsProseAndMalformedJSON(t *testing.T) {
 	}
 }
 
-// @scenario "maxProviderCodeBytes is the only length authority for a provider code"
 func TestProviderErrorCode_LengthBoundIsMaxProviderCodeBytesAlone(t *testing.T) {
 	tooLong := `{"code":"` + strings.Repeat("a", maxProviderCodeBytes+1) + `"}`
 	if got := providerErrorCode([]byte(tooLong)); got != "" {
