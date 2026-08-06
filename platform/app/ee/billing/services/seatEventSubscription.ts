@@ -393,19 +393,22 @@ export const createSeatEventSubscriptionFns = ({
         Currency.USD) as Currency;
       const billingInterval = seatItem.price.recurring?.interval ?? "month";
 
-      // What `always_invoice` bills on confirmation: every proration line on the
-      // previewed invoice. The rest of the preview is next cycle's recurring and
-      // metered usage, which this change does not charge for now.
+      // The invoice total, which for an `always_invoice` preview IS the
+      // immediate invoice: it carries only the proration lines, not next
+      // cycle's recurring and metered usage.
       //
-      // Deliberately NOT netted against a second, unchanged preview. That
-      // subtraction isolated the incremental seat cost, which is not the number
-      // charged: `always_invoice` also bills prorations the subscription was
-      // already carrying (from a mid-cycle billing anchor, say), so netting them
-      // out quoted less than the card is debited.
-      let prorationCents = 0;
-      for (const line of preview.lines.data) {
-        if (line.proration) prorationCents += line.amount;
-      }
+      // Deliberately the total rather than a sum over `lines.data`. Summing
+      // line amounts is wrong twice: those amounts are pre-tax, so a customer
+      // billed in a tax-exclusive currency was quoted a fifth under what their
+      // card is debited; and `lines` is a paginated sublist, so a subscription
+      // carrying enough pending prorations silently drops the ones past the
+      // first page.
+      //
+      // Signed, so a seat reduction previews as a credit. (`amount_due` would
+      // net off any credit the account is already holding, but it also clamps
+      // a negative invoice to zero, which turns "you get 320 back" into
+      // "nothing happens".)
+      const prorationCents = preview.total;
 
       // Recurring total: new seat count × per-seat price
       const unitAmountCents = seatItem.price.unit_amount ?? 0;

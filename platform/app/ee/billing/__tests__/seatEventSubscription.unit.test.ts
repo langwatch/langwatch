@@ -140,12 +140,7 @@ describe("seatEventSubscription", () => {
       it("returns formatted proration amount and recurring total for USD", async () => {
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "usd",
-          lines: {
-            data: [
-              { proration: true, amount: 1500 },
-              { proration: false, amount: 5000 },
-            ],
-          },
+          total: 1500,
         });
 
         const result = await service.previewProration({
@@ -171,7 +166,7 @@ describe("seatEventSubscription", () => {
 
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "eur",
-          lines: { data: [{ proration: true, amount: 2000 }] },
+          total: 2000,
         });
 
         const result = await service.previewProration({
@@ -187,7 +182,7 @@ describe("seatEventSubscription", () => {
       it("formats whole amounts without decimals", async () => {
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "usd",
-          lines: { data: [{ proration: true, amount: 5000 }] },
+          total: 5000,
         });
 
         const result = await service.previewProration({
@@ -203,7 +198,7 @@ describe("seatEventSubscription", () => {
       it("formats fractional amounts with two decimal places", async () => {
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "usd",
-          lines: { data: [{ proration: true, amount: 1450 }] },
+          total: 1450,
         });
 
         const result = await service.previewProration({
@@ -215,17 +210,18 @@ describe("seatEventSubscription", () => {
       });
 
       /** @scenario "Amount due counts prorations the subscription already carried" */
-      it("counts prorations the subscription already carried, because confirming bills those too", async () => {
+      it("quotes the whole previewed invoice, including prorations already pending", async () => {
         // A mid-cycle billing anchor leaves pending prorations on the
         // subscription. `always_invoice` charges them alongside the seat
-        // change, so netting them out under-quotes what the card is debited.
+        // change, so anything less than the invoice total under-quotes what
+        // the card is debited.
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "usd",
+          total: 4000,
           lines: {
             data: [
               { proration: true, amount: 3000 },
               { proration: true, amount: 1000 },
-              { proration: false, amount: 9900 },
             ],
           },
         });
@@ -238,11 +234,58 @@ describe("seatEventSubscription", () => {
         expect(result.amountDueCents).toBe(4000);
       });
 
+      /** @scenario "Amount due includes tax where the currency is taxed on top" */
+      it("quotes the taxed total, not the pre-tax line amounts", async () => {
+        // Line amounts are pre-tax. Where tax is exclusive (USD here), summing
+        // them quoted a fifth under what the card is debited.
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          subtotal: 2458,
+          tax: 516,
+          total: 2974,
+          lines: {
+            data: [
+              { proration: true, amount: -4917 },
+              { proration: true, amount: 7375 },
+            ],
+          },
+        });
+
+        const result = await service.previewProration({
+          organizationId: "org_1",
+          newTotalSeats: 3,
+        });
+
+        expect(result.amountDueCents).toBe(2974);
+        expect(result.formattedAmountDue).toBe("$29.74");
+      });
+
+      /** @scenario "Amount due survives an invoice whose lines span more than one page" */
+      it("quotes the whole invoice even when its lines are paginated", async () => {
+        // `lines` is a paginated sublist, so a subscription carrying enough
+        // pending prorations silently dropped everything past the first page.
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          total: 140000,
+          lines: {
+            has_more: true,
+            data: [{ proration: true, amount: 10000 }],
+          },
+        });
+
+        const result = await service.previewProration({
+          organizationId: "org_1",
+          newTotalSeats: 3,
+        });
+
+        expect(result.amountDueCents).toBe(140000);
+      });
+
       /** @scenario "Reducing seats previews a credit rather than an amount owed" */
       it("reports a seat reduction as a signed credit", async () => {
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "usd",
-          lines: { data: [{ proration: true, amount: -2500 }] },
+          total: -2500,
         });
 
         const result = await service.previewProration({
@@ -257,7 +300,7 @@ describe("seatEventSubscription", () => {
       it("previews the seat change through the Create Preview Invoice API, in one call", async () => {
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "usd",
-          lines: { data: [] },
+          total: 0,
         });
 
         await service.previewProration({
@@ -286,7 +329,7 @@ describe("seatEventSubscription", () => {
         );
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "eur",
-          lines: { data: [{ proration: true, amount: 63991 }] },
+          total: 63991,
         });
         stripe.subscriptions.update.mockResolvedValue({});
       });
@@ -400,7 +443,7 @@ describe("seatEventSubscription", () => {
         stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "usd",
-          lines: { data: [] },
+          total: 0,
         });
 
         await service.previewProration({
@@ -427,7 +470,7 @@ describe("seatEventSubscription", () => {
         stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription());
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "usd",
-          lines: { data: [] },
+          total: 0,
         });
 
         await service.previewProration({

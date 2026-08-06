@@ -50,6 +50,20 @@ Feature: Proration Preview Before Seat Update
     When I preview a seat decrease
     Then the amount due is negative
 
+  # Where tax is added on top of the price rather than included in it, the
+  # amounts on the invoice's own lines are pre-tax.
+  @unit
+  Scenario: Amount due includes tax where the currency is taxed on top
+    Given the organization is billed in a currency where tax is added on top
+    When I preview a seat increase
+    Then the amount due is the taxed total the customer will be charged
+
+  @unit
+  Scenario: Amount due survives an invoice whose lines span more than one page
+    Given the previewed invoice has more lines than fit on one page
+    When I preview a seat increase
+    Then the amount due covers the whole invoice
+
   # Subscriptions migrated to flexible billing are rejected outright by the
   # Upcoming Invoice API on every API version.
   @unit
