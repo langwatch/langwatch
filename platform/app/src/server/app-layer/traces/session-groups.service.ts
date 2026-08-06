@@ -1,5 +1,6 @@
 import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
+import { assignSessionsToPullRequests } from "../coding-agent/pull-request-assignment";
 import type {
   SessionGroupCursor,
   SessionGroupRow,
@@ -76,6 +77,20 @@ export interface SessionGroupCodingAgentDto {
   gitBranch: string | null;
   gitWorktree: string | null;
   title: string | null;
+  /**
+   * The pull request this session's work belongs to, decided by the tenure
+   * rule over the branch's mapped pull requests. Null for a session with no
+   * git context, a repository the organization's GitHub connection does not
+   * reach, or a branch whose pull request has not been opened yet.
+   */
+  pullRequest: SessionGroupPullRequestDto | null;
+}
+
+/** Identity only: the number, where it lives, and what it is called. */
+export interface SessionGroupPullRequestDto {
+  number: number;
+  htmlUrl: string;
+  title: string;
 }
 
 export interface SessionGroupDto {
@@ -136,7 +151,45 @@ export interface CodingAgentSessionLookup {
     projectId: string;
     sessionId: string;
     startedAtMs?: number;
-  }): Promise<SessionGroupCodingAgentDto | null>;
+  }): Promise<Omit<SessionGroupCodingAgentDto, "pullRequest"> | null>;
+}
+
+/**
+ * The narrow slice of the pull-request mapping this read needs: every pull
+ * request the page's branches have ever hosted, in one call. The neighbours
+ * matter as much as the matches: the tenure rule cannot tell where one pull
+ * request's era ends without the one that succeeded it.
+ */
+export interface GithubPullRequestLookup {
+  findForBranches(args: {
+    organizationId: string;
+    keys: ReadonlyArray<{
+      repositoryHost: string;
+      repositoryFullName: string;
+      headBranch: string;
+    }>;
+  }): Promise<
+    Array<{
+      repositoryHost: string;
+      repositoryFullName: string;
+      headBranch: string;
+      prNumber: number;
+      htmlUrl: string;
+      title: string;
+      prCreatedAt: Date;
+      prClosedAt: Date | null;
+      prMergedAt: Date | null;
+    }>
+  >;
+}
+
+/** Never links a session to a pull request. The default, and the test preset. */
+export class NullGithubPullRequestLookup implements GithubPullRequestLookup {
+  async findForBranches(): Promise<
+    Awaited<ReturnType<GithubPullRequestLookup["findForBranches"]>>
+  > {
+    return [];
+  }
 }
 
 /**
@@ -288,6 +341,15 @@ export class SessionGroupsService {
   constructor(
     private readonly repository: SessionGroupsRepository,
     private readonly codingAgentSessions: CodingAgentSessionLookup,
+    private readonly pullRequests: GithubPullRequestLookup = new NullGithubPullRequestLookup(),
+    /**
+     * The lens is project-scoped but pull requests are org-scoped, so the join
+     * needs the owning organization. Returns undefined for an orphan project,
+     * which simply leaves every row unlinked.
+     */
+    private readonly resolveOrganizationId: (
+      projectId: string,
+    ) => Promise<string | undefined> = async () => undefined,
   ) {}
 
   async getSessionGroups(
@@ -319,6 +381,11 @@ export class SessionGroupsService {
     const enrichments = await this.enrich({
       tenantId: params.tenantId,
       rows: visibleRows,
+    });
+    await this.linkPullRequests({
+      tenantId: params.tenantId,
+      rows: visibleRows,
+      enrichments,
     });
 
     const cutoffMs = params.visibilityCutoffMs ?? null;
@@ -389,6 +456,9 @@ export class SessionGroupsService {
                     gitBranch: emptyToNull(session.gitBranch),
                     gitWorktree: emptyToNull(session.gitWorktree),
                     title: emptyToNull(session.title),
+                    // Filled in by linkPullRequests, in one batched lookup for
+                    // the whole page rather than one per row.
+                    pullRequest: null,
                   }
                 : null,
             )
@@ -399,4 +469,123 @@ export class SessionGroupsService {
     }
     return results;
   }
+
+  /**
+   * Attach each session to the pull request its branch's history says it
+   * belongs to, for the whole page in ONE lookup.
+   *
+   * Best-effort like the enrichment it decorates: an organization that never
+   * connected GitHub, a repository no installation reaches, and a failed read
+   * all leave the rows unlinked rather than failing the list.
+   */
+  private async linkPullRequests({
+    tenantId,
+    rows,
+    enrichments,
+  }: {
+    tenantId: string;
+    rows: SessionGroupRow[];
+    enrichments: (SessionGroupCodingAgentDto | null)[];
+  }): Promise<void> {
+    const linkable = rows
+      .map((row, index) => ({ row, coding: enrichments[index] ?? null }))
+      .filter(
+        (
+          entry,
+        ): entry is {
+          row: SessionGroupRow;
+          coding: SessionGroupCodingAgentDto;
+        } =>
+          entry.coding !== null &&
+          Boolean(entry.coding.repositoryOwner) &&
+          Boolean(entry.coding.repositoryName) &&
+          Boolean(entry.coding.gitBranch),
+      );
+    if (linkable.length === 0) return;
+
+    try {
+      const organizationId = await this.resolveOrganizationId(tenantId);
+      if (!organizationId) return;
+
+      const keys = new Map<string, PullRequestBranchKey>();
+      for (const { coding } of linkable) {
+        const key = branchKeyOf(coding);
+        if (!keys.has(keyOf(key))) keys.set(keyOf(key), key);
+      }
+
+      const pullRequests = await this.pullRequests.findForBranches({
+        organizationId,
+        keys: [...keys.values()],
+      });
+      if (pullRequests.length === 0) return;
+
+      // The tenure rule is per-branch, and two repositories can share a branch
+      // name, so it runs once per (host, repository) bucket rather than over
+      // the page as a whole.
+      const byRepository = new Map<
+        string,
+        { sessions: typeof linkable; branch: PullRequestBranchKey }
+      >();
+      for (const entry of linkable) {
+        const key = branchKeyOf(entry.coding);
+        const bucket = `${key.repositoryHost} ${key.repositoryFullName}`;
+        const existing = byRepository.get(bucket);
+        if (existing) existing.sessions.push(entry);
+        else byRepository.set(bucket, { sessions: [entry], branch: key });
+      }
+
+      for (const [bucket, { sessions }] of byRepository) {
+        const candidates = pullRequests.filter(
+          (pull) =>
+            `${pull.repositoryHost} ${pull.repositoryFullName}` === bucket,
+        );
+        if (candidates.length === 0) continue;
+        const assignments = assignSessionsToPullRequests({
+          sessions: sessions.map(({ row, coding }) => ({
+            sessionId: row.conversationId,
+            startedAtMs: row.startedAtMs,
+            headBranch: coding.gitBranch!,
+          })),
+          pullRequests: candidates.map((pull) => ({
+            prNumber: pull.prNumber,
+            headBranch: pull.headBranch,
+            prCreatedAtMs: pull.prCreatedAt.getTime(),
+            prClosedAtMs: pull.prClosedAt?.getTime() ?? null,
+            prMergedAtMs: pull.prMergedAt?.getTime() ?? null,
+          })),
+        });
+        for (const { row, coding } of sessions) {
+          const prNumber = assignments.get(row.conversationId);
+          const match = candidates.find((pull) => pull.prNumber === prNumber);
+          if (!match) continue;
+          coding.pullRequest = {
+            number: match.prNumber,
+            htmlUrl: match.htmlUrl,
+            title: match.title,
+          };
+        }
+      }
+    } catch {
+      // Unlinked is a correct answer; a failed join must not take the list down.
+    }
+  }
+}
+
+interface PullRequestBranchKey {
+  repositoryHost: string;
+  repositoryFullName: string;
+  headBranch: string;
+}
+
+const keyOf = (key: PullRequestBranchKey): string =>
+  `${key.repositoryHost} ${key.repositoryFullName} ${key.headBranch}`;
+
+/** The session's git identity as the mapping stores it: default host, lowercased repository. */
+function branchKeyOf(coding: SessionGroupCodingAgentDto): PullRequestBranchKey {
+  return {
+    repositoryHost: coding.repositoryHost ?? "github.com",
+    repositoryFullName:
+      `${coding.repositoryOwner}/${coding.repositoryName}`.toLowerCase(),
+    headBranch: coding.gitBranch!,
+  };
 }

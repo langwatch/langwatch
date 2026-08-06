@@ -14,7 +14,10 @@ import {
   type CodingAgentSessionListReadOutcome,
   observeCodingAgentSessionListReadDuration,
 } from "~/server/metrics";
-import type { CodingAgentSessionRepository } from "./coding-agent-session.repository";
+import type {
+  CodingAgentBranchSessionRow,
+  CodingAgentSessionRepository,
+} from "./coding-agent-session.repository";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
 
@@ -162,6 +165,25 @@ interface ClickHouseWriteRecord {
 
 /** UInt64 columns ride as strings — see the interface docblock. */
 const big = (n: number): string => String(Math.max(0, Math.round(n)));
+
+function toBranchSessionRow(
+  record: Record<string, unknown>,
+): CodingAgentBranchSessionRow {
+  return {
+    sessionId: String(record.SessionId ?? ""),
+    tenantId: String(record.TenantId ?? ""),
+    startedAtMs: parseClickHouseDateTimeMs(String(record.StartedAt ?? "")),
+    inputTokens: asNumber(record.InputTokens),
+    outputTokens: asNumber(record.OutputTokens),
+    cacheReadTokens: asNumber(record.CacheReadTokens),
+    cacheCreationTokens: asNumber(record.CacheCreationTokens),
+    costUsd: asNumber(record.CostUsd),
+    agent: String(record.Agent ?? ""),
+    models: asStringArray(record.Models),
+    userId: String(record.UserId ?? ""),
+    gitBranch: String(record.GitBranch ?? ""),
+  };
+}
 
 function toRecord({
   row,
@@ -658,6 +680,129 @@ export class CodingAgentSessionClickHouseRepository
       .slice(0, limit);
   }
 
+  /**
+   * The sessions that ran on one repository's branches, across several
+   * projects of ONE organization: the read behind pull-request usage.
+   *
+   * `TenantId IN (...)` comes first, as every read of this table does. Several
+   * tenants share one query here because a pull request's cost spans the
+   * projects of the organization that owns it, and per-tenant ClickHouse
+   * routing is per-ORGANIZATION, so every id in the list resolves to the same
+   * endpoint; the first one picks it, exactly as the gateway spend reads do.
+   * The service is what guarantees the list belongs to a single organization.
+   *
+   * `startedAtFromMs` is required. `StartedAt` is the partition key, and this
+   * read is not anchored on a session id, so without a lower bound it opens
+   * every partition the retention holds, cold storage included. The caller
+   * passes a bound wide enough to cover a pull request's whole life; there is
+   * no upper bound, because a pull request open today is still accruing.
+   *
+   * The dedup is the table's own IN-tuple pattern, unwindowed for the reason
+   * `findManyRecent` documents at length: `StartedAt` moves, so bounding the
+   * dedup scope can resolve a session to a superseded version.
+   *
+   * Only the columns the rollup adds up are selected, plus the scalar keys the
+   * shared tie-break ranks on. The two array-length keys it also knows about
+   * are deliberately absent, because they would mean reading `MetricSeries` and
+   * `AppliedEventIds` for every session of a busy repository to break a tie
+   * that `nextVersionStamp` already makes unreachable. `preferredOf` treats an
+   * absent column as "no progress", so the ranking degrades to its scalar keys
+   * rather than to arbitrary.
+   */
+  async listByRepositoryBranch({
+    tenantIds,
+    repositoryHost,
+    repositoryOwner,
+    repositoryName,
+    branches,
+    startedAtFromMs,
+  }: {
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]> {
+    if (tenantIds.length === 0 || branches.length === 0) return [];
+    for (const tenantId of tenantIds) {
+      EventUtils.validateTenantId(
+        { tenantId },
+        "CodingAgentSessionClickHouseRepository.listByRepositoryBranch",
+      );
+    }
+    const client = await this.resolveClient(tenantIds[0]!);
+
+    const result = await client.query({
+      query: `
+        SELECT
+          SessionId,
+          TenantId,
+          StartedAt,
+          InputTokens,
+          OutputTokens,
+          CacheReadTokens,
+          CacheCreationTokens,
+          CostUsd,
+          Agent,
+          Models,
+          UserId,
+          GitBranch,
+          LastEventOccurredAt,
+          ModelCalls,
+          ToolCalls,
+          Prompts
+        FROM ${TABLE_NAME}
+        WHERE TenantId IN {tenantIds:Array(String)}
+          AND RepositoryHost = {repositoryHost:String}
+          AND lower(RepositoryOwner) = {repositoryOwner:String}
+          AND lower(RepositoryName) = {repositoryName:String}
+          AND GitBranch IN {branches:Array(String)}
+          AND StartedAt >= fromUnixTimestamp64Milli({from:Int64})
+          AND (TenantId, SessionId, UpdatedAt) IN (
+            SELECT TenantId, SessionId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId IN {tenantIds:Array(String)}
+            GROUP BY TenantId, SessionId
+          )
+        ORDER BY StartedAt ASC
+      `,
+      query_params: {
+        tenantIds,
+        repositoryHost,
+        // Case-folded on both sides. A session stores the remote's casing
+        // verbatim, while the pull-request mapping stores its repository
+        // lowercased, so an exact match here would silently drop every
+        // repository whose owner or name is not already lower case. Neither
+        // column is in the sort key, so folding costs no pruning; `TenantId`
+        // and `StartedAt` still do all of it.
+        repositoryOwner: repositoryOwner.toLowerCase(),
+        repositoryName: repositoryName.toLowerCase(),
+        // NOT folded: git branch names are case sensitive, and `feat/X` is a
+        // different branch from `feat/x`.
+        branches,
+        from: startedAtFromMs,
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<Record<string, unknown>>();
+    // Deduped per tenant, not across the whole result: the shared helper keys
+    // on SessionId alone, which is right for a single-tenant read but would
+    // collapse two organizations' projects that happen to share a provider
+    // session id into one row here, silently dropping the other's cost.
+    const byTenant = new Map<string, Record<string, unknown>[]>();
+    for (const row of rows) {
+      const tenantId = String(row.TenantId ?? "");
+      const list = byTenant.get(tenantId) ?? [];
+      list.push(row);
+      byTenant.set(tenantId, list);
+    }
+    return [...byTenant.values()].flatMap((tenantRows) =>
+      dedupToLatestPerSession(tenantRows).map(toBranchSessionRow),
+    );
+  }
+
   async upsertBatch(
     entries: Array<{
       row: CodingAgentSessionRow;
@@ -768,7 +913,7 @@ const asNumberMap = (value: unknown): Record<string, number> =>
  * Insertion order is not relied on — the caller re-sorts — so this only has to
  * pick the right version, not preserve a position.
  */
-function dedupToLatestPerSession(
+export function dedupToLatestPerSession(
   records: Record<string, unknown>[],
 ): Record<string, unknown>[] {
   const bySession = new Map<string, Record<string, unknown>>();

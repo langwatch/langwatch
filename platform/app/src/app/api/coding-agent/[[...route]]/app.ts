@@ -1,11 +1,17 @@
 import { ValidationError } from "@langwatch/handled-error";
+import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import { batchScopePermissions } from "~/server/api/rbac";
 import { createProjectApp, requires } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { MAX_SESSION_EVENTS_PAGE_SIZE } from "~/server/app-layer/coding-agent/coding-agent-session.service";
 import type { SessionEventsCursor } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
+import { GithubPullRequestNotMappedError } from "~/server/app-layer/github/errors";
+import type { Session } from "~/server/auth";
+import { prisma } from "~/server/db";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 import { baseResponses } from "../../shared/base-responses";
@@ -254,6 +260,226 @@ function decodeCursor(raw: string): SessionEventsCursor | null {
   } catch {
     return null;
   }
+}
+
+const usageRowSchema = z.object({
+  projectId: z.string(),
+  userLabel: z.string(),
+  agent: z.string(),
+  models: z.array(z.string()),
+  sessionsCount: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheReadTokens: z.number(),
+  cacheCreationTokens: z.number(),
+  totalTokens: z.number(),
+  costUsd: z.number().nullable(),
+});
+
+const pullRequestUsageResponseSchema = z.object({
+  pullRequest: z.object({
+    repositoryHost: z.string(),
+    repositoryFullName: z.string(),
+    prNumber: z.number(),
+    headBranch: z.string(),
+    htmlUrl: z.string(),
+    state: z.string(),
+    isDraft: z.boolean(),
+    authorLogin: z.string().nullable(),
+    prCreatedAtMs: z.number(),
+    prClosedAtMs: z.number().nullable(),
+    prMergedAtMs: z.number().nullable(),
+  }),
+  rows: z.array(usageRowSchema),
+  totals: z.object({
+    sessionsCount: z.number(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    cacheReadTokens: z.number(),
+    cacheCreationTokens: z.number(),
+    totalTokens: z.number(),
+    costUsd: z.number().nullable(),
+  }),
+});
+
+const usageQuerySchema = z.object({
+  /** "owner/name". Case is folded by the mapping store, so either works. */
+  repository: z.string().regex(/^[^/\s]+\/[^/\s]+$/, {
+    message: "repository must be owner/name",
+  }),
+  pullRequest: z.coerce.number().int().positive(),
+  /** Defaults to github.com, the only host the mapping covers today. */
+  host: z.string().min(1).default("github.com"),
+});
+
+// GET /pull-request-usage: what one pull request cost in assistant usage,
+// across every project of the organization the CALLER may read. Numbers and
+// names only: no session title, no prompt, no file list.
+secured.access(requires("traces:view")).get(
+  "/pull-request-usage",
+  describeRoute({
+    description:
+      "Assistant usage for one pull request: sessions, tokens and cost, " +
+      "grouped by project, reported user and agent, over the pull request's " +
+      "whole lifetime rather than a time window. Requires a personal-project " +
+      "API key; rows appear only for projects the calling user may view, and " +
+      "cost only for those they may price.",
+    parameters: [
+      {
+        name: "repository",
+        in: "query",
+        required: true,
+        schema: { type: "string" },
+        description: 'The repository as "owner/name".',
+      },
+      {
+        name: "pullRequest",
+        in: "query",
+        required: true,
+        schema: { type: "integer" },
+        description: "The pull request number.",
+      },
+      {
+        name: "host",
+        in: "query",
+        required: false,
+        schema: { type: "string", default: "github.com" },
+      },
+    ],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "The pull request's usage rollup",
+        content: {
+          "application/json": {
+            schema: resolver(pullRequestUsageResponseSchema),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const callerUserId = resolvePersonalCaller({
+      project,
+      apiKeyUserId: c.get("apiKeyUserId"),
+    });
+
+    const query = usageQuerySchema.safeParse({
+      repository: c.req.query("repository"),
+      pullRequest: c.req.query("pullRequest"),
+      host: c.req.query("host"),
+    });
+    if (!query.success) throw ValidationError.fromZodError(query.error);
+
+    const organizationId = await resolveOrganizationId(project.id);
+    if (!organizationId) {
+      throw new GithubPullRequestNotMappedError({
+        repositoryFullName: query.data.repository,
+        prNumber: query.data.pullRequest,
+      });
+    }
+
+    const scope = await resolveCallerProjectScope({
+      userId: callerUserId,
+      organizationId,
+    });
+
+    return c.json(
+      await getApp().codingAgents.pullRequestUsage.getPullRequestUsage({
+        organizationId,
+        repositoryHost: query.data.host,
+        repositoryFullName: query.data.repository,
+        prNumber: query.data.pullRequest,
+        ...scope,
+      }),
+    );
+  },
+);
+
+/**
+ * The user behind a personal-project key.
+ *
+ * The rollup answers with whatever the CALLER may read across the whole
+ * organization, so it needs a person, not just a project. A shared/team key
+ * names no single person, and a user-bound key pointed at somebody else's
+ * personal workspace would otherwise borrow their identity. Those are the two
+ * guards `/api/me/usage` applies, for the same reason.
+ */
+function resolvePersonalCaller({
+  project,
+  apiKeyUserId,
+}: {
+  project: { isPersonal: boolean | null; ownerUserId: string | null };
+  apiKeyUserId: string | undefined;
+}): string {
+  if (!project.isPersonal || !project.ownerUserId) {
+    throw new HTTPException(400, {
+      message:
+        "GET /api/coding-agent/pull-request-usage requires a personal-project API key. Use the API key from your personal workspace.",
+    });
+  }
+  if (apiKeyUserId && apiKeyUserId !== project.ownerUserId) {
+    throw new HTTPException(403, {
+      message:
+        "This API key cannot read another user's pull request usage. Use a key scoped to your own personal workspace.",
+    });
+  }
+  return project.ownerUserId;
+}
+
+/**
+ * The organization's projects split by what this caller may do with each: read
+ * traces, and price them. Two separate cuts on purpose: a project the caller
+ * may read but not price still contributes its tokens, with a null cost.
+ *
+ * Resolved through the same `batchScopePermissions` the in-app surfaces use, so
+ * the REST answer and the page's answer cannot drift, and in a fixed number of
+ * queries rather than one per project.
+ */
+async function resolveCallerProjectScope({
+  userId,
+  organizationId,
+}: {
+  userId: string;
+  organizationId: string;
+}): Promise<{ permittedProjectIds: string[]; costProjectIds: string[] }> {
+  const projects = await prisma.project.findMany({
+    where: { team: { organizationId }, archivedAt: null },
+    select: { id: true, teamId: true },
+  });
+  if (projects.length === 0) {
+    return { permittedProjectIds: [], costProjectIds: [] };
+  }
+
+  const projectTeamId = Object.fromEntries(
+    projects.map((project) => [project.id, project.teamId]),
+  );
+  const ctx = {
+    prisma,
+    // Minimal session shape: the resolver only reads user.id.
+    session: { user: { id: userId }, expires: "" } satisfies Session,
+  };
+  const args = {
+    organizationId,
+    teamIds: [],
+    projectIds: projects.map((project) => project.id),
+    projectTeamId,
+  };
+  const [viewable, priceable] = await Promise.all([
+    batchScopePermissions(ctx, { ...args, permission: "traces:view" }),
+    batchScopePermissions(ctx, { ...args, permission: "cost:view" }),
+  ]);
+
+  const permittedProjectIds = projects
+    .map((project) => project.id)
+    .filter((id) => viewable.projects.get(id) === true);
+  return {
+    permittedProjectIds,
+    costProjectIds: permittedProjectIds.filter(
+      (id) => priceable.projects.get(id) === true,
+    ),
+  };
 }
 
 export const app = secured.hono;

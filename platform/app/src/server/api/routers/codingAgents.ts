@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { checkProjectPermission } from "../rbac";
 
 /** Default look-back for the personal usage card: the trailing 30 days. */
@@ -68,4 +69,41 @@ export const codingAgentsRouter = createTRPCRouter({
         limit: input.limit ?? 50,
       });
     }),
+
+  /**
+   * What each of the project's pull requests cost, plus the branches whose
+   * pull request has not been opened (or mapped) yet, plus whether GitHub is
+   * connected at all, in one query, because the page needs all three to decide
+   * what to render, and three round trips would show it in three stages.
+   */
+  pullRequestUsage: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input }) => {
+      const app = getApp();
+      const usage =
+        await app.codingAgents.pullRequestUsage.getForPersonalProject({
+          projectId: input.projectId,
+        });
+      return { ...usage, connection: await connectionFor(input.projectId) };
+    }),
 });
+
+/**
+ * Whether the project's organization has GitHub connected, and where to start
+ * an install. Mirrors `github.getConnectionStatus`'s install link so a page
+ * that has this answer never needs the organization-scoped query too.
+ */
+async function connectionFor(projectId: string): Promise<{
+  connected: boolean;
+  installUrl: string | null;
+}> {
+  const organizationId = await resolveOrganizationId(projectId);
+  if (!organizationId) return { connected: false, installUrl: null };
+  const installations =
+    await getApp().github.installations.getAllForOrganization(organizationId);
+  return {
+    connected: installations.length > 0,
+    installUrl: `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`,
+  };
+}

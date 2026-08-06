@@ -71,6 +71,7 @@ import { DataRetentionPolicyService } from "../data-retention/policy/dataRetenti
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { EventSourcing } from "../event-sourcing";
+import { Deferred } from "../event-sourcing/deferred";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
@@ -99,6 +100,7 @@ import {
 import { ExperimentService } from "../experiments/experiment.service";
 import { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import { InviteService } from "../invites/invite.service";
+import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { getLicenseHandler } from "../subscriptionHandler";
 import { EventUsageService } from "../traces/event-usage.service";
@@ -129,6 +131,7 @@ import { createRedisConnectionFromConfig } from "./clients/redis.factory";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
 import { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import { CodingAgentSessionClickHouseRepository } from "./coding-agent/repositories/coding-agent-session.clickhouse.repository";
 import { NullCodingAgentSessionRepository } from "./coding-agent/repositories/coding-agent-session.repository";
 import {
@@ -170,10 +173,14 @@ import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluati
 import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositories/monitor-performance.clickhouse.repository";
 import { NullMonitorPerformanceRepository } from "./evaluations/repositories/monitor-performance.repository";
 import { GithubInstallationsService } from "./github/github-installations.service";
+import { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
+import { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
 import { getGithubAppConfig } from "./github/githubAppConfig";
 import { GithubAppTokenService, type RedisLike } from "./github/githubAppToken";
 import { PrismaGithubInstallationsRepository } from "./github/repositories/github-installations.prisma.repository";
 import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
+import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
+import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -979,11 +986,24 @@ export function initializeDefaultApp(options?: {
       });
   }
 
+  // The coding-agent pipeline's pull-request mapping reactor fires against a
+  // service composed further down (it needs the GitHub connection, which needs
+  // Redis and Prisma), so the registry is handed the callable proxy now and the
+  // real implementation is wired once it exists.
+  const requestBranchMapping = new Deferred<
+    GithubPullRequestMappingService["requestBranchMapping"]
+  >("requestBranchMapping");
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
     redis: redis!,
     broadcast,
+    codingAgent: {
+      pullRequestMapping: {
+        requestBranchMapping: (params) => requestBranchMapping.fn(params),
+      },
+    },
     langy: {
       buffer: langyTokenBuffer,
       handoffStore: langyHandoffStore,
@@ -1075,9 +1095,19 @@ export function initializeDefaultApp(options?: {
     // client's overloaded `set` signature just isn't structurally assignable.
     (redis ?? null) as unknown as RedisLike | null,
   );
+  // Set once the mapping service exists, below. The installation hook and the
+  // service form a cycle (the hook backfills through the service, the service
+  // resolves installations through the connection), and this is where it is
+  // broken: the hook only ever runs long after composition.
+  let githubPullRequestMapping: GithubPullRequestMappingService | null = null;
   const githubInstallations = new GithubInstallationsService(
     new PrismaGithubInstallationsRepository(prisma),
     githubAppTokens,
+    // Connecting GitHub is the moment a whole history of folded sessions
+    // becomes mappable. Without this the organization would see nothing until
+    // someone ran a new session on each branch.
+    ({ organizationId }) =>
+      githubPullRequestMapping?.runBackfillForOrganization({ organizationId }),
   );
 
   // Langy turn-start orchestration (ADR-046): the pipeline the
@@ -1216,12 +1246,57 @@ export function initializeDefaultApp(options?: {
     "CodingAgentSessionService",
   );
 
+  // Pull-request linkage. The mapping service is the write side (branch to
+  // pull requests, negative-cached), the status service the live read, and the
+  // usage service the organization-first rollup the Pull Requests page and the
+  // REST endpoint share.
+  const githubPullRequestsRepository = new PrismaGithubPullRequestsRepository(
+    prisma,
+  );
+  githubPullRequestMapping = new GithubPullRequestMappingService({
+    repository: githubPullRequestsRepository,
+    installations: githubInstallations,
+    appTokens: githubAppTokens,
+    resolveOrganizationId,
+    findProjectIds: async (organizationId) =>
+      (
+        await prisma.project.findMany({
+          where: { team: { organizationId }, archivedAt: null },
+          select: { id: true },
+        })
+      ).map((project) => project.id),
+    sessions: codingAgentSessions,
+  });
+  requestBranchMapping.resolve((params) =>
+    githubPullRequestMapping!.requestBranchMapping(params),
+  );
+
+  const githubPullRequestStatus = new GithubPullRequestStatusService({
+    repository: githubPullRequestsRepository,
+    installations: githubInstallations,
+    appTokens: githubAppTokens,
+    redis: (redis ?? null) as unknown as RedisLike | null,
+  });
+
+  const pullRequestUsage = new PullRequestUsageService({
+    pullRequests: githubPullRequestsRepository,
+    sessions: repositories.codingAgentSession,
+    personalSessions: codingAgentSessions,
+    installations: githubInstallations,
+    resolveOrganizationId,
+  });
+
   const sessionGroups = traced(
     new SessionGroupsService(
       clickhouseEnabled
         ? new SessionGroupsClickHouseRepository(resolveClickHouseClient)
         : new NullSessionGroupsRepository(),
       codingAgentSessions,
+      {
+        findForBranches: (args) =>
+          githubPullRequestsRepository.findAllByBranchKeys(args),
+      },
+      resolveOrganizationId,
     ),
     "SessionGroupsService",
   );
@@ -1346,9 +1421,21 @@ export function initializeDefaultApp(options?: {
     },
     codingAgents: {
       sessions: codingAgentSessions,
+      pullRequestUsage: traced(pullRequestUsage, "PullRequestUsageService"),
     },
     github: {
       installations: traced(githubInstallations, "GithubInstallationsService"),
+      pullRequests: {
+        mapping: traced(
+          githubPullRequestMapping,
+          "GithubPullRequestMappingService",
+        ),
+        status: traced(
+          githubPullRequestStatus,
+          "GithubPullRequestStatusService",
+        ),
+        repository: githubPullRequestsRepository,
+      },
     },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
@@ -1442,6 +1529,30 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     traceSessions: new NullCodingAgentTraceSessionRepository(),
     metricSeries: new NullSessionMetricSeriesRepository(),
     sessionEvents: new NullCodingAgentSessionEventsRepository(),
+  });
+  // Pull-request linkage against an unconfigured App and null stores: every
+  // read answers empty, every write is a no-op, and no test can accidentally
+  // reach github.com.
+  const testGithubAppTokens = new GithubAppTokenService("", "", null);
+  const testGithubInstallations = new GithubInstallationsService(
+    new NullGithubInstallationsRepository(),
+    testGithubAppTokens,
+  );
+  const testPullRequestsRepository = new NullGithubPullRequestsRepository();
+  const testGithubPullRequestMapping = new GithubPullRequestMappingService({
+    repository: testPullRequestsRepository,
+    installations: testGithubInstallations,
+    appTokens: testGithubAppTokens,
+    resolveOrganizationId: async () => undefined,
+    findProjectIds: async () => [],
+    sessions: testCodingAgentSessions,
+  });
+  const testPullRequestUsage = new PullRequestUsageService({
+    pullRequests: testPullRequestsRepository,
+    sessions: new NullCodingAgentSessionRepository(),
+    personalSessions: testCodingAgentSessions,
+    installations: testGithubInstallations,
+    resolveOrganizationId: async () => undefined,
   });
   return new App({
     config,
@@ -1567,12 +1678,20 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     codingAgents: {
       sessions: testCodingAgentSessions,
+      pullRequestUsage: testPullRequestUsage,
     },
     github: {
-      installations: new GithubInstallationsService(
-        new NullGithubInstallationsRepository(),
-        new GithubAppTokenService("", "", null),
-      ),
+      installations: testGithubInstallations,
+      pullRequests: {
+        mapping: testGithubPullRequestMapping,
+        status: new GithubPullRequestStatusService({
+          repository: testPullRequestsRepository,
+          installations: testGithubInstallations,
+          appTokens: testGithubAppTokens,
+          redis: null,
+        }),
+        repository: testPullRequestsRepository,
+      },
     },
     langy: {
       conversations: LangyConversationService.create(

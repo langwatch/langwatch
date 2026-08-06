@@ -174,6 +174,7 @@ function makeService({
     findBySessionIdWithApplied: async () =>
       row ? { row, appliedEventIds: [] } : null,
     findManyRecent: async () => listed,
+    listByRepositoryBranch: async () => [],
   };
   const traceSessions: CodingAgentTraceSessionRepository = {
     ensure: async () => {},
@@ -208,6 +209,7 @@ describe("CodingAgentSessionService", () => {
           findBySessionId: async () => null,
           findBySessionIdWithApplied: async () => null,
           findManyRecent: async () => [],
+          listByRepositoryBranch: async () => [],
         },
         traceSessions: {
           ensure: async () => {},
@@ -397,6 +399,7 @@ describe("CodingAgentSessionService", () => {
           },
           findBySessionIdWithApplied: async () => null,
           findManyRecent: async () => [],
+          listByRepositoryBranch: async () => [],
         };
         const service = new CodingAgentSessionService({
           sessions,

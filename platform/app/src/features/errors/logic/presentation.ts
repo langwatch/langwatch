@@ -1263,6 +1263,13 @@ const presentations = {
     title: "GitHub is rate limiting requests",
     describe: () => "Try again in a few minutes.",
   },
+  github_pr_not_mapped: {
+    // Two causes, one sentence each: the repository was never connected, or it
+    // was and the mapping has not run yet. Both are waits, not mistakes.
+    title: "That pull request isn't linked yet",
+    describe: () =>
+      "Connect the repository in Settings, Integrations, or wait a few minutes for the linking to catch up.",
+  },
   virtual_key_not_found: {
     title: "Virtual key not found",
     describe: () =>

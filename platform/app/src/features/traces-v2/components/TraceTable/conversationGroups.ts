@@ -46,6 +46,20 @@ export interface ConversationGroup {
   gitWorktree?: string | null;
   title?: string | null;
   titleRedacted?: boolean;
+  /**
+   * The pull request this session's work belongs to, decided server-side from
+   * the branch's pull-request history. Null when the session has no git
+   * context, the repository is not connected, or the branch has no pull
+   * request yet.
+   */
+  pullRequest?: ConversationPullRequest | null;
+}
+
+/** Identity only: the number, where it lives, and what it is called. */
+export interface ConversationPullRequest {
+  number: number;
+  htmlUrl: string;
+  title: string;
 }
 
 /** Evaluation outcomes summed across one conversation's traces. */

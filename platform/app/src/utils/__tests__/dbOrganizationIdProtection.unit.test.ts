@@ -361,6 +361,47 @@ describe("guardOrganizationId — the GitHub connection's tables", () => {
     });
   });
 
+  describe("when the background sweep reads every organization's due branches", () => {
+    const sweepWhere = () => ({
+      notFoundAt: { not: null },
+      recheckAfter: { lte: new Date() },
+      lastRequestedAt: { gt: new Date(Date.now() - 7 * 86_400_000) },
+    });
+
+    it("does NOT throw, the sweep's own shape is the bound", async () => {
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: { where: sweepWhere() },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("THROWS when the same shape is replayed as a write", async () => {
+      for (const action of ["updateMany", "deleteMany"] as const) {
+        await expect(
+          runGuard({
+            model: "GithubBranchPullRequestCheck",
+            action,
+            args: { where: sweepWhere() },
+          }),
+        ).rejects.toThrow();
+      }
+    });
+
+    it("THROWS when the activity clause is dropped, widening the read", async () => {
+      const { lastRequestedAt: _dropped, ...narrower } = sweepWhere();
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: { where: narrower },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
   describe("when reading the connection by its GitHub installation id", () => {
     it("does NOT throw — an installation id names exactly one organization", async () => {
       await expect(

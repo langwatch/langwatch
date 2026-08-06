@@ -28,10 +28,13 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   checkOrganizationPermission,
+  checkProjectPermission,
   type PermissionMiddleware,
 } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
 import { GithubNotConnectedError } from "~/server/app-layer/github/errors";
+import { MAX_STATUS_REFS } from "~/server/app-layer/github/github-pull-request-status.service";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 async function ensureOrganizationMember(
@@ -121,6 +124,43 @@ export const githubRouter = createTRPCRouter({
       return getApp().github.installations.listRepositoriesForOrganization(
         input.organizationId,
       );
+    }),
+
+  /**
+   * The current status of the pull requests on a page, read live from GitHub
+   * (Redis-cached for a minute) with the stored snapshot as the fallback.
+   *
+   * Project-scoped rather than organization-scoped, because that is how the
+   * caller reaches it: they are looking at a project's sessions, and the
+   * organization is resolved here from the project rather than taken from the
+   * client, so a caller cannot ask about another tenant's pull requests by
+   * naming its id.
+   */
+  pullRequestLiveStatus: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        refs: z
+          .array(
+            z.object({
+              repositoryHost: z.string().min(1),
+              repositoryFullName: z.string().min(1),
+              prNumber: z.number().int().positive(),
+            }),
+          )
+          .max(MAX_STATUS_REFS),
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input }) => {
+      const organizationId = await resolveOrganizationId(input.projectId);
+      if (!organizationId) return { statuses: [] };
+      const statuses =
+        await getApp().github.pullRequests.status.getLiveStatuses({
+          organizationId,
+          refs: input.refs,
+        });
+      return { statuses };
     }),
 
   disconnect: protectedProcedure

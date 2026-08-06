@@ -40,6 +40,7 @@ export interface SessionGroupPayloadItem {
     title: string | null;
     /** True only when a title existed and the viewer may not read it. */
     titleRedacted: boolean;
+    pullRequest: { number: number; htmlUrl: string; title: string } | null;
   } | null;
 }
 
@@ -107,6 +108,7 @@ function codingAgentFields(
   | "gitWorktree"
   | "title"
   | "titleRedacted"
+  | "pullRequest"
 > {
   if (codingAgent === null) {
     return {
@@ -119,6 +121,7 @@ function codingAgentFields(
       gitWorktree: null,
       title: null,
       titleRedacted: false,
+      pullRequest: null,
     };
   }
   return {
@@ -131,6 +134,7 @@ function codingAgentFields(
     gitWorktree: codingAgent.gitWorktree,
     title: codingAgent.title,
     titleRedacted: codingAgent.titleRedacted,
+    pullRequest: codingAgent.pullRequest ?? null,
   };
 }
 

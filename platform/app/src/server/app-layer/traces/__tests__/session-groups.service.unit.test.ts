@@ -59,6 +59,7 @@ function codingAgentRow(
     compactions: 0,
     peakContextTokens: 0,
     subAgents: 0,
+    pullRequest: null,
     repositoryHost: "",
     repositoryOwner: "",
     repositoryName: "",
@@ -77,6 +78,7 @@ const NO_GIT_CONTEXT = {
   gitBranch: null,
   gitWorktree: null,
   title: null,
+  pullRequest: null,
 };
 
 class FakeRepository implements SessionGroupsRepository {

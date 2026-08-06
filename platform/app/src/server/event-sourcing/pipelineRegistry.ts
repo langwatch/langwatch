@@ -106,6 +106,10 @@ import {
   CodingAgentTraceSessionAppendStore,
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
+import {
+  createPullRequestMappingReactor,
+  type PullRequestMappingReactorDeps,
+} from "./pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor";
 import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
 import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
@@ -348,6 +352,15 @@ export interface PipelineRegistryDeps {
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  codingAgent?: {
+    /**
+     * Maps a folded session's branch to its pull requests. Late-bound: the
+     * mapping service is composed after the registry (it needs the GitHub
+     * connection), so presets passes a `Deferred`'s callable proxy here.
+     * Omitted where there is no GitHub connection to ask.
+     */
+    pullRequestMapping: PullRequestMappingReactorDeps;
+  };
 }
 
 /**
@@ -829,6 +842,13 @@ export class PipelineRegistry {
           new CodingAgentSessionEventsAppendStore(
             this.deps.repositories.codingAgentSessionEvents,
           ),
+        ...(this.deps.codingAgent
+          ? {
+              pullRequestMappingReactor: createPullRequestMappingReactor(
+                this.deps.codingAgent.pullRequestMapping,
+              ),
+            }
+          : {}),
       }),
     );
   }

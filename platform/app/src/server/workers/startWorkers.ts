@@ -119,6 +119,25 @@ async function bootSpendSpikeAnomalyWorker(
   logger.info("spend spike anomaly worker ready");
 }
 
+// Pull-request linkage recheck: a 10-minute tick that re-asks GitHub about the
+// branches that mapped to nothing, so a pull request opened after the session
+// went quiet is still found (specs/coding-agent/pull-request-linkage.feature).
+async function bootGithubBranchRecheckWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { getApp } = await import("~/server/app-layer/app");
+  const { startGithubBranchRecheckWorker } = await import(
+    "~/server/app-layer/github/github-branch-recheck.worker"
+  );
+  const pullRequests = getApp().github.pullRequests;
+  const branchRecheckWorker = startGithubBranchRecheckWorker({
+    repository: pullRequests.repository,
+    mapping: pullRequests.mapping,
+  });
+  shutdownHandles.push(() => branchRecheckWorker.stop());
+  logger.info("github branch recheck worker ready");
+}
+
 // Self-hosted daily usage telemetry (no-op on SaaS or when
 // DISABLE_USAGE_STATS is set).
 async function bootUsageStatsWorker(
@@ -500,6 +519,7 @@ export async function startWorkers(
     // boot; heartbeat recovery belongs to the direct liveness subscriber.
     await bootAnomalyWorker(shutdownHandles);
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
+    await bootGithubBranchRecheckWorker(shutdownHandles);
     await bootUsageStatsWorker(shutdownHandles);
     if (shouldStartMetricsServer) {
       await bootMetricsServer(shutdownHandles);

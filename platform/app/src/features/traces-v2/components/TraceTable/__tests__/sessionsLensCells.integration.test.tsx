@@ -74,6 +74,7 @@ function serverSession(
       compactions: 4,
       peakContextTokens: 173_000,
       subAgents: 2,
+      pullRequest: null,
       repositoryHost: "github.com",
       repositoryOwner: "acme",
       repositoryName: "widgets",

@@ -43,6 +43,7 @@ function codingAgentPayload(
     compactions: 0,
     peakContextTokens: 0,
     subAgents: 0,
+    pullRequest: null,
     repositoryHost: null,
     repositoryOwner: null,
     repositoryName: null,

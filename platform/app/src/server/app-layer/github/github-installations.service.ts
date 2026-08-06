@@ -324,6 +324,76 @@ export class GithubInstallationsService {
   }
 
   /**
+   * The installation that can reach `repositoryFullName`, and that repository's
+   * numeric id on GitHub: the pair every read-only pull-request call needs.
+   * Null when GitHub is unconfigured, the organization has no usable
+   * installation, or none of them covers the repository.
+   *
+   * Shares `resolveRepositoryIdOrHeal` with the mint path, so it resolves the
+   * same way: the cached selection first, a live listing for an "all"
+   * installation, and a confirmed-dead installation healed away rather than
+   * blocking the live one behind it.
+   */
+  async resolveInstallationForRepository({
+    organizationId,
+    repositoryFullName,
+  }: {
+    organizationId: string;
+    repositoryFullName: string;
+  }): Promise<{ installationId: string; repositoryId: string } | null> {
+    if (!this.configured) return null;
+    const installations =
+      await this.repo.findAllForOrganization(organizationId);
+    for (const inst of installations.filter((i) => !i.suspendedAt)) {
+      const resolved = await this.resolveRepositoryIdOrHeal(
+        inst,
+        repositoryFullName,
+      );
+      if (resolved.repoId) {
+        return {
+          installationId: inst.installationId,
+          repositoryId: resolved.repoId,
+        };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Whether the organization's connection covers `repositoryFullName`, decided
+   * from what is already stored: an "all" installation covers every repository
+   * on its own account, a "selected" one covers exactly its cached list. No
+   * GitHub call, so a page listing many repositories costs nothing.
+   *
+   * Deliberately optimistic for "all": the account login is matched against the
+   * repository's owner, which is what the customer sees on GitHub, and a
+   * repository they cannot actually reach still fails honestly at the mapping
+   * call. Deliberately pessimistic for "selected" with no cached list, which
+   * means the install-time fetch failed and we genuinely do not know.
+   */
+  async coversRepository({
+    organizationId,
+    repositoryFullName,
+  }: {
+    organizationId: string;
+    repositoryFullName: string;
+  }): Promise<boolean> {
+    const wanted = repositoryFullName.toLowerCase();
+    const owner = wanted.split("/")[0] ?? "";
+    const installations =
+      await this.repo.findAllForOrganization(organizationId);
+    return installations
+      .filter((i) => !i.suspendedAt)
+      .some((inst) =>
+        inst.repositorySelection === "all"
+          ? inst.accountLogin.toLowerCase() === owner
+          : (inst.repositories ?? []).some(
+              (r) => r.fullName.toLowerCase() === wanted,
+            ),
+      );
+  }
+
+  /**
    * Mint the per-turn installation token Langy hands the worker.
    *
    * Repo resolution (agent-infers, control

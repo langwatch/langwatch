@@ -20,12 +20,16 @@ import type {
 } from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
 import type { GithubInstallationsService } from "./github/github-installations.service";
+import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
+import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
+import type { GithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
@@ -127,6 +131,8 @@ export interface AppDependencies {
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {
     sessions: CodingAgentSessionService;
+    /** What a pull request cost in assistant usage, RBAC-scoped. */
+    pullRequestUsage: PullRequestUsageService;
   };
   /**
    * The organization's GitHub connection, consumed by Langy for writes and by
@@ -134,6 +140,15 @@ export interface AppDependencies {
    */
   github: {
     installations: GithubInstallationsService;
+    /**
+     * Branch to pull-request linkage: the mapping that discovers and stores
+     * them, the live status read, and the store both sit on.
+     */
+    pullRequests: {
+      mapping: GithubPullRequestMappingService;
+      status: GithubPullRequestStatusService;
+      repository: GithubPullRequestsRepository;
+    };
   };
   /** ADR-046: Langy conversations as an event-sourced projection. */
   langy: {

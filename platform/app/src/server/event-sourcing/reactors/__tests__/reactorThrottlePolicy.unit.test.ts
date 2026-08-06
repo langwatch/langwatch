@@ -11,6 +11,7 @@ vi.mock("@langwatch/observability", () => ({
 
 import { createGovernanceKpisSyncReactor } from "@ee/governance/reactors/governanceKpisSync.reactor";
 import { createGovernanceOcsfEventsSyncReactor } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+import { createPullRequestMappingReactor } from "../../pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor";
 import { createProjectMetadataReactor } from "../../pipelines/trace-processing/reactors/projectMetadata.reactor";
 import { createSpanStorageBroadcastReactor } from "../../pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "../../pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
@@ -66,6 +67,17 @@ const windowed = [
     reactor: createGovernanceOcsfEventsSyncReactor(
       anyDeps,
     ) as unknown as AnyReactor,
+  },
+  {
+    name: "pullRequestMapping",
+    // Lag a developer watching for their branch's pull request would feel.
+    // The hours-long protection for GitHub is the durable branch bookkeeping
+    // in the mapping service, not this window.
+    windowMs: 30_000,
+    dedupTtlMs: 30_000,
+    reactor: createPullRequestMappingReactor({
+      requestBranchMapping: async () => {},
+    }) as unknown as AnyReactor,
   },
 ] as const satisfies readonly {
   name: string;

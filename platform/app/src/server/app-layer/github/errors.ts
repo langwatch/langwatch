@@ -80,6 +80,33 @@ export class GithubRepositoryNotAccessibleError extends HandledError {
 }
 
 /**
+ * The pull request the caller asked about has no mapping: either no
+ * installation covers its repository, or the branch has not been looked up
+ * yet. Both are things the customer can act on, one by connecting the
+ * repository and the other by waiting, which is why this is named rather than
+ * left to degrade into "unknown".
+ */
+export class GithubPullRequestNotMappedError extends NotFoundError {
+  declare readonly code: "github_pr_not_mapped";
+
+  constructor(
+    {
+      repositoryFullName,
+      prNumber,
+    }: { repositoryFullName: string; prNumber: number },
+    options: { reasons?: readonly Error[] } = {},
+  ) {
+    super(
+      "github_pr_not_mapped",
+      "pull request",
+      `${repositoryFullName}#${prNumber}`,
+      options,
+    );
+    this.name = "GithubPullRequestNotMappedError";
+  }
+}
+
+/**
  * GitHub is rate limiting us. The transport-level fact is
  * `GithubRateLimitedError` in githubAppToken.ts; this is the customer-facing
  * half, raised only where a person is waiting on the answer. `fault` is the
