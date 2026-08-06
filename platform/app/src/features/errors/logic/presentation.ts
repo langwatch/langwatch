@@ -815,11 +815,28 @@ const presentations = {
     title: "Billing is busy right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  billing_quote_expired: {
+    // fault: customer. Nothing broke — the dialog sat open long enough that
+    // the amount we quoted is no longer the amount that would be charged, so
+    // we refuse rather than charge a different number than the one on screen.
+    // The action is to reopen, which is a real action the customer can take.
+    title: "This quote is out of date",
+    describe: () =>
+      "Nothing was charged. Close this and open it again to see the current amount.",
+  },
   seat_billing_unavailable: {
     // fault: provider. The payment provider didn't answer. Nothing was
     // charged, and saying so is the first thing anyone wants to know.
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
+  },
+  subscription_ambiguous: {
+    // fault: platform. Two live plans on one account, which only an operator
+    // can have created and only an operator can resolve. Nothing was charged,
+    // and that is the first thing the customer wants to know on a money path.
+    title: "Seat changes need a hand from us",
+    describe: () =>
+      "This account has more than one active plan, so we didn't change anything or charge you. Contact support and we'll sort it out.",
   },
   subscription_not_linked: {
     // fault: platform. The plan is active but our record of it was never

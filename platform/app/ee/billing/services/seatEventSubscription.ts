@@ -7,7 +7,9 @@ import {
 import { nanoid } from "nanoid";
 import type Stripe from "stripe";
 import {
+  AmbiguousSubscriptionError,
   NoActiveSubscriptionError,
+  QuoteExpiredError,
   SubscriptionItemNotFoundError,
   SubscriptionNotLinkedError,
 } from "../errors";
@@ -68,6 +70,27 @@ export const createSeatEventSubscriptionFns = ({
 
     const linked = (subscription: (typeof candidates)[number]) =>
       subscription.stripeSubscriptionId !== null;
+
+    const active = candidates.filter(
+      (s) => s.status === SubscriptionStatus.ACTIVE,
+    );
+
+    // Two live plans on one account: refuse, do not choose. There is no unique
+    // index on `organizationId`, and the backoffice form writes ACTIVE rows
+    // with no uniqueness check, so this state is reachable and the row that
+    // still carries a provider id is not reliably the one the operator meant
+    // to keep. Charging either is a coin flip against a customer's card.
+    if (active.length > 1) {
+      logger.error(
+        {
+          organizationId,
+          subscriptionIds: active.map((s) => s.id),
+          linkedCount: active.filter(linked).length,
+        },
+        "[billing] Organization has multiple active subscriptions; refusing to guess which one a seat change belongs to",
+      );
+      throw new AmbiguousSubscriptionError(active.length);
+    }
 
     // A live subscription we can act on beats everything.
     const activeLinked = candidates.find(
@@ -148,15 +171,51 @@ export const createSeatEventSubscriptionFns = ({
     stripeSubscription,
     seatItem,
     quantity,
+    prorationDate,
   }: {
     stripeSubscription: Stripe.Subscription;
     seatItem: Stripe.SubscriptionItem;
     quantity: number;
+    prorationDate: number;
   }) => ({
     ...(stripeSubscription.canceled_at ? { cancel_at_period_end: false } : {}),
     items: [{ id: seatItem.id, quantity }],
     proration_behavior: "always_invoice" as const,
+    // Prorations are priced by the moment they are applied, so a quote issued
+    // at one instant and confirmed at another are two different amounts. The
+    // quote issues this timestamp and the confirmation sends it back, which
+    // makes the charge reproduce the number the customer read rather than
+    // merely resemble it.
+    proration_date: prorationDate,
   });
+
+  /**
+   * How long a quote may be confirmed against the instant it priced.
+   *
+   * Long enough to read a dialog and decide; short enough that the pinned
+   * instant is still a fair description of "now". Past this the confirmation
+   * is refused and the customer gets a fresh quote — see {@link QuoteExpiredError}.
+   */
+  const QUOTE_VALIDITY_SECONDS = 15 * 60;
+
+  /**
+   * The instant to price a seat change at.
+   *
+   * With no quote to honour (the background seat sync, which nobody is
+   * watching a number for) this is simply now. With one, it is the instant the
+   * quote priced — unless that is stale or in the future, which no quote we
+   * issued can be.
+   */
+  const resolveProrationDate = (quotedAt: number | undefined) => {
+    const now = Math.floor(Date.now() / 1000);
+    if (quotedAt === undefined) return now;
+
+    const age = now - quotedAt;
+    if (age < 0 || age > QUOTE_VALIDITY_SECONDS) {
+      throw new QuoteExpiredError();
+    }
+    return quotedAt;
+  };
 
   return {
     async createSeatEventCheckout({
@@ -330,13 +389,23 @@ export const createSeatEventSubscriptionFns = ({
     async updateSeatEventItems({
       organizationId,
       totalMembers,
+      quotedAt,
     }: {
       organizationId: string;
       totalMembers: number;
+      /**
+       * The instant a quote for this change was priced, from
+       * {@link previewProration}. Omitted by callers acting without a quote on
+       * screen, which are then priced at the moment they run.
+       */
+      quotedAt?: number;
     }) {
       // Every failure below throws rather than returning `{ success: false }`:
       // a silent false used to resolve the mutation as a success, so the UI
       // toasted "Seats updated successfully" over a seat count that never moved.
+      // Before the provider is touched, so an expired quote costs nothing.
+      const prorationDate = resolveProrationDate(quotedAt);
+
       const { subscription, stripeSubscription, seatItem } =
         await loadSeatChangeTarget(organizationId);
 
@@ -349,6 +418,7 @@ export const createSeatEventSubscriptionFns = ({
           stripeSubscription,
           seatItem,
           quantity: totalMembers,
+          prorationDate,
         }),
       );
 
@@ -372,6 +442,8 @@ export const createSeatEventSubscriptionFns = ({
       organizationId: string;
       newTotalSeats: number;
     }) {
+      const prorationDate = resolveProrationDate(undefined);
+
       const { subscription, stripeSubscription, seatItem } =
         await loadSeatChangeTarget(organizationId);
 
@@ -386,6 +458,7 @@ export const createSeatEventSubscriptionFns = ({
           stripeSubscription,
           seatItem,
           quantity: newTotalSeats,
+          prorationDate,
         }),
       });
 
@@ -404,11 +477,35 @@ export const createSeatEventSubscriptionFns = ({
       // carrying enough pending prorations silently drops the ones past the
       // first page.
       //
-      // Signed, so a seat reduction previews as a credit. (`amount_due` would
-      // net off any credit the account is already holding, but it also clamps
-      // a negative invoice to zero, which turns "you get 320 back" into
-      // "nothing happens".)
-      const prorationCents = preview.total;
+      // Signed, so a seat reduction previews as a credit rather than as zero.
+      const invoiceTotalCents = preview.total;
+
+      // What the card is debited, which is not the invoice total. `amount_due`
+      // is the total after any credit the account is already holding is spent
+      // against it, and it is the figure the charge is raised for. Measured on
+      // the same purchase, one account clean and one holding 200.00 of credit:
+      //
+      //   clean     total 293.70   amount_due 293.70   charged 293.70
+      //   credited  total 293.70   amount_due  93.70   charged  93.70
+      //
+      // So quoting the total tells a customer with a balance they are about to
+      // pay 293.70 while their card is charged 93.70. Both numbers are true;
+      // only one of them is what "Due today" means.
+      //
+      // `amount_due` is not simply the better field, though — it clamps a
+      // negative invoice to zero, so a seat REDUCTION previewing a total of
+      // -587.39 reports 0 and the dialog would say nothing happens over a
+      // 587.39 credit. Hence the branch: a credit is described by the signed
+      // total, a charge by the amount actually due.
+      const isCredit = invoiceTotalCents < 0;
+      const prorationCents = isCredit ? invoiceTotalCents : preview.amount_due;
+
+      // Credit spent on this invoice, so the dialog can explain a "Due today"
+      // that is smaller than the change itself. Zero on a clean account, and
+      // never reported for a credit (nothing is drawn down by one).
+      const creditAppliedCents = isCredit
+        ? 0
+        : invoiceTotalCents - preview.amount_due;
 
       // Recurring total: new seat count × per-seat price.
       //
@@ -444,8 +541,15 @@ export const createSeatEventSubscriptionFns = ({
         // seats previews a negative amount.
         amountDueCents: prorationCents,
         formattedAmountDue: format(prorationCents),
+        // Null rather than a formatted zero: the dialog should say nothing at
+        // all about credit on an account that has none.
+        formattedCreditApplied:
+          creditAppliedCents > 0 ? format(creditAppliedCents) : null,
         formattedRecurringTotal: format(recurringTotalCents),
         billingInterval,
+        // The instant this quote priced. Sent back on confirm so the charge is
+        // computed against the same moment the customer was shown.
+        quotedAt: prorationDate,
       };
     },
 

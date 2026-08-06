@@ -50,6 +50,16 @@ Feature: Proration Preview Before Seat Update
     When I preview a seat decrease
     Then the amount due is negative
 
+  # An account can be holding credit from an earlier change. The invoice total
+  # and the amount the card is charged then differ by that credit, and only one
+  # of them is what "Due today" means.
+  @unit
+  Scenario: Due today is the amount the card is charged, not the invoice total
+    Given the organization is holding account credit
+    When I preview a seat increase
+    Then the amount due is the invoice total less the credit spent on it
+    And the preview reports how much credit was applied
+
   # Where tax is added on top of the price rather than included in it, the
   # amounts on the invoice's own lines are pre-tax.
   @unit
@@ -102,6 +112,32 @@ Feature: Proration Preview Before Seat Update
     And the organization's active subscription has no billing-provider link
     When I preview a seat change
     Then the failure is reported as a subscription that is not linked
+
+  # Nothing in checkout produces two live plans on one account — the backoffice
+  # form does, writing any status against any organization with no uniqueness
+  # check behind it. The row that still carries a provider link is not reliably
+  # the one meant to survive, so charging it is a coin flip against a card.
+  @unit
+  Scenario: Two active subscriptions refuse a seat change rather than picking one
+    Given the organization has two active subscriptions
+    When I preview or confirm a seat change
+    Then the change is refused as an account we cannot tell apart
+    And nothing is sent to the billing provider
+
+  # Mid-term changes are priced by the moment they are applied, so a quote and
+  # a confirmation made at different instants are different amounts.
+  @unit
+  Scenario: The charge prices the same instant the quote did
+    Given I confirm a seat change against a quote issued a moment ago
+    When the change is sent to the billing provider
+    Then it is priced at the instant the quote was issued
+
+  @unit
+  Scenario: A quote too old to honour is refused rather than repriced
+    Given the confirmation dialog has been open past the quote's validity
+    When I confirm the seat change
+    Then the change is refused as an out-of-date quote
+    And nothing is sent to the billing provider
 
   @unit
   Scenario: A live subscription outranks a more recent cancelled one

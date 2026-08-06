@@ -170,6 +170,62 @@ export class SubscriptionNotLinkedError extends HandledError {
 }
 
 /**
+ * The organization carries more than one live subscription, so there is no
+ * single record a seat change can be charged against.
+ *
+ * Nothing in the checkout or webhook path produces this — both only ever turn
+ * ACTIVE a row resolved by its provider id. It comes from the backoffice
+ * subscription form, which writes any status against any organization with no
+ * uniqueness check and no constraint behind it (there is no unique index on
+ * `organizationId`).
+ *
+ * We refuse rather than pick. Preferring the linked row charges whichever
+ * subscription happens to still carry a provider id, which on a money path is
+ * a guess wearing a rule: the operator who added the second row may well have
+ * meant it to supersede the first. Guessing here bills the wrong plan
+ * silently; refusing costs a support message and nothing else.
+ */
+export class AmbiguousSubscriptionError extends HandledError {
+  declare readonly code: "subscription_ambiguous";
+
+  constructor(count: number) {
+    super(
+      "subscription_ambiguous",
+      "This account has more than one active plan, so we can't tell which one to change",
+      { httpStatus: 409, fault: "platform", meta: { count } },
+    );
+    this.name = "AmbiguousSubscriptionError";
+  }
+}
+
+/**
+ * The customer confirmed a seat change against a quote that is too old to
+ * charge.
+ *
+ * The billing provider prices a mid-term change by the moment it is applied,
+ * so a quote and a confirmation made at different times are different amounts.
+ * We pin the confirmation to the instant the quote was issued; past a short
+ * window that pin is refused rather than honoured, because the further it
+ * drifts the more it charges for time the customer already paid for — and past
+ * a period boundary it is a different bill entirely.
+ *
+ * `customer` fault: nothing failed, the dialog simply sat open. Reopening it
+ * produces a fresh quote.
+ */
+export class QuoteExpiredError extends HandledError {
+  declare readonly code: "billing_quote_expired";
+
+  constructor() {
+    super(
+      "billing_quote_expired",
+      "This quote is out of date — reopen it to see the current amount",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "QuoteExpiredError";
+  }
+}
+
+/**
  * The subscription exists but is missing the line item we needed to change.
  *
  * Same drift as {@link NoActiveSubscriptionError}, one level further in. The

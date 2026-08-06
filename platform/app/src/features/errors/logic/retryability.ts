@@ -29,6 +29,12 @@ const PERMANENT_ERROR_CODES = new Set<AppErrorCode>([
   // "Plans are managed outside the app." There is no billing provider in a
   // self-hosted deployment.
   "subscription_service_unavailable",
+  // "Contact support and we'll sort it out." Two live plans on one account;
+  // only an operator can decide which one survives.
+  "subscription_ambiguous",
+  // "Close this and open it again." A replay sends the same stale quote and
+  // gets the same refusal — the fix is a new quote, not another attempt.
+  "billing_quote_expired",
 ]);
 
 /**

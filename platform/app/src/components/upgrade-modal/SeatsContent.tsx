@@ -18,8 +18,10 @@ type ProrationQueryResult =
       data?: {
         amountDueCents: number;
         formattedAmountDue: string;
+        formattedCreditApplied: string | null;
         formattedRecurringTotal: string;
         billingInterval: string;
+        quotedAt: number;
       };
       isLoading: boolean;
       isError: boolean;
@@ -128,6 +130,20 @@ function SeatsProrationPreview({
             </Text>
           </HStack>
 
+          {/* Why "Due today" is smaller than the change itself. Without this
+              line an account holding credit reads a charge it cannot account
+              for, and the natural conclusion is that the number is wrong. */}
+          {data.formattedCreditApplied && (
+            <HStack justify="space-between" paddingX={2}>
+              <Text fontWeight="normal" fontSize="sm" color="gray.500">
+                Account credit applied
+              </Text>
+              <Text fontWeight="normal" fontSize="sm" color="gray.500">
+                −{data.formattedCreditApplied}
+              </Text>
+            </HStack>
+          )}
+
           <HStack justify="space-between" paddingX={2}>
             <Text fontWeight="normal" fontSize="md" color="gray.500">
               New billing amount
@@ -171,7 +187,7 @@ export function SeatsContent({
   const handleConfirm = async () => {
     setIsConfirming(true);
     try {
-      await variant.onConfirm();
+      await variant.onConfirm(prorationQuery?.data?.quotedAt);
       onClose();
     } catch (err) {
       showErrorToast({
