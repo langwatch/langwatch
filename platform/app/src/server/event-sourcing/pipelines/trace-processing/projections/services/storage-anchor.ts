@@ -52,6 +52,11 @@ export const MAX_ANCHOR_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
  * `now` is injected rather than read here so folds stay testable; callers pass
  * `Date.now()`, which is what `AbstractFoldProjection.apply` already uses to
  * stamp `updatedAt`.
+ *
+ * Positional, unlike the rest of this module: a type predicate has to name a
+ * parameter, so it cannot be written against a destructured binding, and the
+ * narrowing is load-bearing at both call sites below - each returns or stores
+ * the candidate as a `number` on the strength of it.
  */
 export function isUsableAnchorMs(
   value: number | undefined,
@@ -66,10 +71,13 @@ export function isUsableAnchorMs(
  * that EVERY step is validated: the partition column must never be the epoch,
  * and a fallback that is trusted rather than checked is how it would become one.
  */
-export function firstUsableAnchor(
-  candidates: readonly (number | undefined)[],
-  now: number,
-): number {
+export function firstUsableAnchor({
+  candidates,
+  now,
+}: {
+  candidates: readonly (number | undefined)[];
+  now: number;
+}): number {
   for (const candidate of candidates) {
     if (isUsableAnchorMs(candidate, now)) return candidate;
   }

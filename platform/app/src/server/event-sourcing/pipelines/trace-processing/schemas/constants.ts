@@ -223,6 +223,26 @@ export const TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR =
  */
 export const TRACE_SUMMARY_PROJECTION_VERSION_LATEST = "2026-08-06" as const;
 
+/**
+ * Whether a stored row was written at or after the storage-anchor split
+ * (ADR-087, migration 00072) - that is, whether its `OccurredAt` is the frozen
+ * anchor and its span timing baseline lives in `EarliestSpanStartMs`.
+ *
+ * Gated on the PRE-split stamp rather than on the latest one. An equality
+ * against the latest stamp is correct only until the next version bump, at
+ * which point every already-anchored row reclassifies as legacy and the
+ * decoders start reporting the storage anchor as the trace's start - the exact
+ * inflation the split was made to prevent. Stamps are calendar dates, so
+ * lexicographic order is chronological, and an absent stamp sorts below every
+ * real one and stays on the legacy path, which is what an unstamped row means.
+ *
+ * Same shape as the `Version < TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT`
+ * predicate the analytics fold already gates on.
+ */
+export function isStorageAnchoredVersion(version: string | undefined): boolean {
+  return (version ?? "") > TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR;
+}
+
 /** Reactors skip traces older than this threshold to avoid re-processing during resyncs. */
 export const STALE_TRACE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 

@@ -174,6 +174,28 @@ describe("given the trace-summary row carries a storage anchor", () => {
       expect(result?.occurredAt).toBe(baselineMs);
       expect(result?.storageAnchorMs).toBe(anchorMs);
     });
+
+    /** @scenario "A summary written after the change reports its spans' start, not its filing time" */
+    it("keeps reading the baseline from its own column after a later version bump", async () => {
+      const { repo } = makeRepo(() => [
+        {
+          ...heavyRow,
+          // A stamp this branch does not know about, standing in for the next
+          // ordinary schema bump. It is still post-split, so the anchor must not
+          // be handed back as the trace's start.
+          Version: "2027-03-01",
+          OccurredAt: anchorMs,
+          EarliestSpanStartMs: baselineMs,
+        },
+      ]);
+
+      const result = await repo.findByTraceId("tenant-1", "t1", {
+        window: { fromMs: anchorMs - 1_000, toMs: anchorMs + 1_000 },
+      });
+
+      expect(result?.occurredAt).toBe(baselineMs);
+      expect(result?.storageAnchorMs).toBe(anchorMs);
+    });
   });
 
   describe("when a state is written back", () => {

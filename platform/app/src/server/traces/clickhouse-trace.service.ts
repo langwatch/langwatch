@@ -23,7 +23,7 @@ import {
   mapClickHouseEvaluationToTraceEvaluation,
   mapTraceEvaluationsToLegacyEvaluations,
 } from "~/server/evaluations/evaluation-run.mappers";
-import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type {
   NormalizedSpan,
   NormalizedSpanKind,
@@ -3348,7 +3348,7 @@ function traceSummaryTimesFromRow(row: TraceSummaryRow): {
   storageAnchorMs: number;
   occurredAt: number;
 } {
-  const isAnchored = row.ts_Version === TRACE_SUMMARY_PROJECTION_VERSION_LATEST;
+  const isAnchored = isStorageAnchoredVersion(row.ts_Version);
   return {
     storageAnchorMs: row.ts_OccurredAt,
     occurredAt: isAnchored

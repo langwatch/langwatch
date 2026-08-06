@@ -587,10 +587,10 @@ export function projectAnalyticsStateToRow({
     // first write. What the ADR argues for instead (the event log's accept time
     // threaded into the row) is sequencing item 6 and needs the human sign-off
     // recorded there; it is not this change's to take.
-    occurredAtMs: firstUsableAnchor(
-      [state.storageAnchorMs, state.createdAt],
+    occurredAtMs: firstUsableAnchor({
+      candidates: [state.storageAnchorMs, state.createdAt],
       now,
-    ),
+    }),
     earliestSpanStartMs: state.occurredAt,
     createdAtMs: state.createdAt,
     updatedAtMs: state.updatedAt,

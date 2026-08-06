@@ -1,5 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { FacetQuery } from "../facet-registry";
 import type { TraceSummaryData } from "../types";
@@ -1022,10 +1022,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       // A row at an older stamp predates the split and carries both in the one
       // column, which is why this is version-gated rather than a bare read.
       storageAnchorMs: Number(row.OccurredAt),
-      occurredAt:
-        row.Version === TRACE_SUMMARY_PROJECTION_VERSION_LATEST
-          ? Number(row.EarliestSpanStartMs ?? 0)
-          : Number(row.OccurredAt),
+      occurredAt: isStorageAnchoredVersion(row.Version)
+        ? Number(row.EarliestSpanStartMs ?? 0)
+        : Number(row.OccurredAt),
       createdAt: Number(row.CreatedAt),
       updatedAt: Number(row.UpdatedAt),
       LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),

@@ -91,6 +91,10 @@ function summaryRow(traceId: string, occurredAtMs: number) {
 /**
  * The three reads `fetchTracesWithSpansJoined` fires when the caller supplies no
  * time range: the light min/max resolve, the summary read, then the span read.
+ *
+ * Routed by query shape rather than by call order, so a read gained or dropped
+ * upstream surfaces here as an unmatched query rather than as the wrong payload
+ * handed to the wrong read two frames away.
  */
 function mockReads({
   resolved,
@@ -100,10 +104,14 @@ function mockReads({
   summaries: ReturnType<typeof summaryRow>[];
 }) {
   mockClickHouseQuery.mockReset();
-  mockClickHouseQuery
-    .mockResolvedValueOnce({ json: () => Promise.resolve([resolved]) })
-    .mockResolvedValueOnce({ json: () => Promise.resolve(summaries) })
-    .mockResolvedValueOnce({ json: () => Promise.resolve([]) });
+  mockClickHouseQuery.mockImplementation(({ query }: { query: string }) => {
+    const rows = query.includes("AS fromMs")
+      ? [resolved]
+      : query.includes("FROM stored_spans AS t")
+        ? []
+        : summaries;
+    return Promise.resolve({ json: () => Promise.resolve(rows) });
+  });
 }
 
 /**

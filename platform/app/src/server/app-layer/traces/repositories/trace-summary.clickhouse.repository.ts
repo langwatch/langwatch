@@ -3,7 +3,10 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { firstUsableAnchor } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/storage-anchor";
-import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import {
+  isStorageAnchoredVersion,
+  TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
@@ -53,7 +56,10 @@ type ClickHouseSummaryWriteRecord = WithDateWrites<
  * deliberate.
  */
 function storageAnchorForWrite(data: TraceSummaryData): number {
-  return firstUsableAnchor([data.storageAnchorMs, data.createdAt], Date.now());
+  return firstUsableAnchor({
+    candidates: [data.storageAnchorMs, data.createdAt],
+    now: Date.now(),
+  });
 }
 
 interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
@@ -508,13 +514,13 @@ export class TraceSummaryClickHouseRepository
       // The one exception is a PRE-SPLIT row, where the two were the same column
       // and `OccurredAt` is the `min(span start)` this field wants. Taking it
       // there is what lets the population heal without a refold; taking it
-      // anywhere else is the inflation bug above. Anything not stamped at the
-      // current version predates the split, so the branch is a single equality
-      // (see TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR).
-      occurredAt:
-        record.Version === TRACE_SUMMARY_PROJECTION_VERSION_LATEST
-          ? Number(record.EarliestSpanStartMs ?? 0)
-          : record.OccurredAt,
+      // anywhere else is the inflation bug above. The branch asks whether the
+      // stamp is at or after the split, not whether it is the current one, so a
+      // later bump cannot reclassify anchored rows (see
+      // isStorageAnchoredVersion).
+      occurredAt: isStorageAnchoredVersion(record.Version)
+        ? Number(record.EarliestSpanStartMs ?? 0)
+        : record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
