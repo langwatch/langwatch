@@ -44,10 +44,12 @@ Feature: Pulled provider usage becomes visible, attributed cost
     Then the reported cost reflects the corrected figure
     And the earlier figure is not added on top
 
+  @unit
   Scenario: An exact provider cost is marked exact
     When a provider reports an exact cost for a usage record
     Then the record is marked exact
 
+  @unit
   Scenario: A self-priced usage record is marked estimate
     When a provider gives only usage quantities that we price ourselves
     Then the record is marked estimate
