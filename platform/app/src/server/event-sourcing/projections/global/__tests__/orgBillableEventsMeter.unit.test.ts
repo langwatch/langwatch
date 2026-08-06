@@ -207,7 +207,10 @@ describe("orgBillableEventsMeterStore", () => {
 
       await orgBillableEventsMeterStore.append(record, dummyContext);
 
-      expect(mockInsert).toHaveBeenCalledWith(record, "org-1");
+      expect(mockInsert).toHaveBeenCalledWith({
+        record,
+        organizationId: "org-1",
+      });
     });
   });
 
