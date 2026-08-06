@@ -24,7 +24,6 @@ import { nanoid } from "nanoid";
 import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { fromZodError } from "zod-validation-error";
-import { evaluatorTempNameMap } from "~/components/checks/EvaluatorSelection";
 import { LEGACY_PAIRWISE_EVALUATOR_TYPE } from "~/experiments-v3/types";
 import { resolveDispatchEvaluatorType } from "~/experiments-v3/utils/normalizeComparison";
 import type { Workflow } from "~/optimization_studio/types/dsl";
@@ -43,6 +42,7 @@ import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
 import { prisma } from "~/server/db";
+import { evaluatorTempNameMap } from "~/server/evaluations/evaluatorDisplayNames";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluationResult,

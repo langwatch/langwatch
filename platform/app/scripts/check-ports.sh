@@ -88,9 +88,12 @@ if [ "${#conflicts[@]}" -eq 0 ]; then
   exit 0
 fi
 
-# Find the next free PORT slot in increments of 10. We need vite/api/metrics
-# free; the gateway port is reuse-OK (start.sh shares it across worktrees)
-# so we don't gate the suggestion on it being free.
+# Find the next free PORT slot in increments of 10. We need vite/api free, plus
+# worker metrics only when this topology actually binds it — gating on a port
+# the single-process default never opens would skip usable slots, and in the
+# degenerate case (every candidate's metrics port busy) would leave no
+# suggestion at all. The gateway port is reuse-OK (start.sh shares it across
+# worktrees) so we don't gate the suggestion on it being free.
 suggested_port=""
 slot="$PORT"
 for _ in $(seq 1 30); do
@@ -100,7 +103,7 @@ for _ in $(seq 1 30); do
   metrics_p=$((slot - 2561))
   if [ -z "$(port_holder "$vite_p")" ] && \
      [ -z "$(port_holder "$api_p")" ] && \
-     [ -z "$(port_holder "$metrics_p")" ]; then
+     { [ "$IN_PROCESS_WORKERS" = "true" ] || [ -z "$(port_holder "$metrics_p")" ]; }; then
     suggested_port="$slot"
     break
   fi

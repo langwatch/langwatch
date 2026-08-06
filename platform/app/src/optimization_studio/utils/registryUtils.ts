@@ -1,5 +1,5 @@
-import { evaluatorTempNameMap } from "../../components/checks/EvaluatorSelection";
 import type { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
+import { evaluatorTempNameMap } from "../../server/evaluations/evaluatorDisplayNames";
 import type { EvaluatorTypes } from "../../server/evaluations/evaluators";
 import type { Evaluator, Field } from "../types/dsl";
 

@@ -82,6 +82,7 @@ import {
   initializeInProcessApp,
   initializeWebApp,
 } from "./server/app-layer/presets";
+import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
 import {
   getWorkerMetricsPort,
   isMetricsAuthorized,
@@ -199,7 +200,12 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // In production, resolve the built client assets directory
   const clientDistDir = dev ? null : path.join(dir, "dist/client");
 
-  const securityHeaders = buildSecurityHeaders({ dev });
+  // ADR-086: getAssetBase() throws here at boot when the base is misconfigured
+  // — fail fast rather than serve broken asset URLs.
+  const securityHeaders = buildSecurityHeaders({
+    dev,
+    assetOrigin: assetBaseOrigin(getAssetBase()),
+  });
 
   // Optional HTTPS + HTTP/2 path for local dev. Set
   // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on
