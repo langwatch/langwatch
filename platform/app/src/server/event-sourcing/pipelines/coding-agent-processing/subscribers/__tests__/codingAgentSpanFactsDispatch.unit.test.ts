@@ -966,6 +966,30 @@ describe("codingAgentSpanFactsDispatch", () => {
         ).rejects.toThrow(/cannot read the staged "span_received" body/);
         expect(dispatched).toHaveLength(0);
       });
+
+      /**
+       * `typeof [] === "object"`, so an array body reaches the gate, has no
+       * `name`, and is declined as an ordinary span unless it is refused here.
+       */
+      /** @scenario a staged shape from a newer build is refused, never quietly completed */
+      it("refuses an array in place of the span object", async () => {
+        const { subscriber, dispatched } = makeSubscriber();
+        const { data: _dropped, ...envelope } = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-array-body",
+        });
+
+        await expect(
+          subscriber.handle(
+            {
+              ...envelope,
+              data: { span: [] },
+            } as unknown as TraceProcessingEvent,
+            context,
+          ),
+        ).rejects.toThrow(/cannot read the staged "span_received" body/);
+        expect(dispatched).toHaveLength(0);
+      });
     });
 
     describe("when the payload is an event kind this build knows but declines", () => {

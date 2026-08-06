@@ -196,7 +196,9 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
  */
 function hasReadableSpanBody(event: SpanReceivedEvent): boolean {
   const span = (event.data as { span?: unknown } | undefined)?.span;
-  return typeof span === "object" && span !== null;
+  // `typeof [] === "object"`, and an array has no `name`, so an array body
+  // would reach the gate and be declined as an ordinary span.
+  return typeof span === "object" && span !== null && !Array.isArray(span);
 }
 
 /**
