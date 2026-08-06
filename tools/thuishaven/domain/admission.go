@@ -109,7 +109,7 @@ func (r AdmissionRequest) fitsInsideFloor() bool {
 	return r.ObservedDuration*2 < r.Caller.CacheFloor()
 }
 
-// DecideAdmission implements ADR-087's precedence table.
+// DecideAdmission implements ADR-090's precedence table.
 //
 // Red is the only level that refuses, and only when no slot is free — it
 // throttles admission, it does not stop the machine working. Amber's job is to

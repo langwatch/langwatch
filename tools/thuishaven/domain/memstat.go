@@ -17,7 +17,7 @@ import (
 // understates the compressor by four times on the machines this governor exists
 // for, and the level then never fires. And "Pages occupied by compressor" is a
 // different number from "Pages stored in compressor": on the machine that
-// motivated ADR-087 they read 128k and 679k, so reading the wrong line
+// motivated ADR-090 they read 128k and 679k, so reading the wrong line
 // overstates by five times.
 func ParseVMStat(out string) (pageSizeBytes, occupiedPages uint64, ok bool) {
 	for line := range strings.SplitSeq(out, "\n") {

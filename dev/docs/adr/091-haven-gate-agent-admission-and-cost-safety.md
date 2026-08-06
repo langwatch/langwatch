@@ -1,16 +1,16 @@
-# ADR-088: haven answers the agent's tool call; it never drives the agent
+# ADR-091: haven answers the agent's tool call; it never drives the agent
 
 **Date:** 2026-08-06
 
 **Status:** Proposed
 
-**Relates to:** [ADR-087](./087-machine-wide-resource-governance-for-parallel-agents.md) (the governor this is the entry point to), [ADR-064](./064-haven-cli-redesign.md) (the CLI surface `haven gate` and `haven run` join).
+**Relates to:** [ADR-090](./090-machine-wide-resource-governance-for-parallel-agents.md) (the governor this is the entry point to), [ADR-064](./064-haven-cli-redesign.md) (the CLI surface `haven gate` and `haven run` join).
 
 **Behavioural contract:** [specs/claude/agent-admission-gate.feature](../../../specs/claude/agent-admission-gate.feature), [specs/claude/llm-cost-safety.feature](../../../specs/claude/llm-cost-safety.feature).
 
 ## Context
 
-ADR-087 gives the machine a governor. The governor is useless if nothing consults it, and the things that need to consult it are ten Claude Code sessions that cannot see each other, were not started by haven, and must not be started by haven.
+ADR-090 gives the machine a governor. The governor is useless if nothing consults it, and the things that need to consult it are ten Claude Code sessions that cannot see each other, were not started by haven, and must not be started by haven.
 
 Claude Code's hook surface is the seam. Hooks fire before tool calls, including inside sub-agents, and the direction of control is the one we want: the agent calls haven, haven answers, haven never invokes the agent.
 
@@ -34,7 +34,7 @@ There is a related cost the spawn cap prices better than RAM does: a cache entry
 
 ## Decision
 
-**`haven gate` is a hook, registered at the user level so it covers every session on the machine.** It reads one JSON payload on stdin, answers, exits. It has two duties sharing one seam: machine admission (ADR-087) and prompt-cost safety.
+**`haven gate` is a hook, registered at the user level so it covers every session on the machine.** It reads one JSON payload on stdin, answers, exits. It has two duties sharing one seam: machine admission (ADR-090) and prompt-cost safety.
 
 **It registers for more than `PreToolUse`, and the Decision names them.** Admission and command-shaped cost checks are `PreToolUse`. Settings and instruction changes that arrive without a tool call are `ConfigChange` and `InstructionsLoaded`. Turn-shaped observations are `PostToolBatch` and `Stop`. Sub-agent accounting is `SubagentStart` and `SubagentStop`. A check with no event that can observe it is not specced.
 
@@ -92,7 +92,7 @@ A hook entry appears in the user-level `.claude/settings.json`, outside the repo
 
 Narrowing reaches only auto-approving sessions. Under `default` permission mode the gate is an observer that can refuse but not rewrite, and the specs say so rather than implying uniform reach.
 
-`haven doctor` gains admission counters shared with ADR-087.
+`haven doctor` gains admission counters shared with ADR-090.
 
 The rewrap has to carry the caller's identity to `haven run`, since that is what decides the wait ceiling — and **it must not be spelled `--agent`.** That flag already exists across the haven CLI meaning "produce plain, token-free output", and ADR-064's second rule is one meaning per flag everywhere. A new spelling is needed for "this run belongs to a sub-agent, so give it the five-minute ceiling". `haven run` and `haven gate` are themselves free: neither name is taken by the current surface.
 

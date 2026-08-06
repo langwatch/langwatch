@@ -1,4 +1,4 @@
-# ADR-087: A developer laptop running many agents needs one governor, not many limits
+# ADR-090: A developer laptop running many agents needs one governor, not many limits
 
 **Date:** 2026-08-06
 
@@ -57,7 +57,7 @@ This is also where CLAUDE.md's warning is answered rather than waved at. Its gui
 
 **Narrowed runs still consume admission**, and their worker count divides by the runs actually in flight rather than by the configured limit. Otherwise ten agents each start narrowed, nothing bounds the total, and the original burst reappears at full spec compliance.
 
-**A run is admitted exactly once, and the outer holder wins.** `haven run --class heavy` (new, arriving with [ADR-088](./088-haven-gate-agent-admission-and-cost-safety.md)) holds a slot and exports a marker; `check-queue.mjs` sees it and stands down for that run. This is the rule #6598 already uses for `haven typecheck`, which passes `CHECK_SLOTS=0` for exactly this reason. Without it a rewrapped test run takes an outer slot and then waits for an inner one, and at a limit of 1 it waits for itself.
+**A run is admitted exactly once, and the outer holder wins.** `haven run --class heavy` (new, arriving with [ADR-091](./091-haven-gate-agent-admission-and-cost-safety.md)) holds a slot and exports a marker; `check-queue.mjs` sees it and stands down for that run. This is the rule #6598 already uses for `haven typecheck`, which passes `CHECK_SLOTS=0` for exactly this reason. Without it a rewrapped test run takes an outer slot and then waits for an inner one, and at a limit of 1 it waits for itself.
 
 **One precedence table decides admission, and every scenario maps to a row of it.**
 
@@ -112,6 +112,6 @@ Nothing here touches CI. `CHECK_SLOTS` is already off under CI and a runner runn
 
 - PR #6598 — the counter this extends. **Not yet merged**: it adds `dev/scripts/check-queue.mjs` and `specs/setup/check-slots.feature`, so this ADR is stacked on it and that spec link resolves only once it lands.
 - [specs/setup/haven-resource-caps.feature](../../../specs/setup/haven-resource-caps.feature) — the per-service caps this sits above
-- [ADR-088](./088-haven-gate-agent-admission-and-cost-safety.md) — the hook that lets an agent's tool call reach this governor
+- [ADR-091](./091-haven-gate-agent-admission-and-cost-safety.md) — the hook that lets an agent's tool call reach this governor
 - `platform/app/vitest.config.ts` — the `vmForks` choice and the 573 MB/fork measurement this ADR's arithmetic rests on
 - Measured, not assumed: across 40 transcripts (14,121 cache-writing requests, ~53M cache-write tokens) sub-agents write `ephemeral_5m` 100% of the time and main sessions write `ephemeral_1h` 100% of the time, with no request writing both; a compiled Go panic exits 2; `taskpolicy` supports `-B` (un-demote), `-p` (running process), and `-m` (spawn-time jetsam memory limit)

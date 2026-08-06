@@ -2,7 +2,7 @@ package domain
 
 import "testing"
 
-// Real output from the machine that motivated ADR-087, trimmed to the lines
+// Real output from the machine that motivated ADR-090, trimmed to the lines
 // that matter. Using the genuine article rather than an invented shape is the
 // point: the two traps this parser exists for (16 KiB pages, and "occupied"
 // versus "stored") are only visible in real output.

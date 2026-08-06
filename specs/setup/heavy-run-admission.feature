@@ -8,7 +8,7 @@ Feature: Heavy runs are admitted, queued, or refused
   # `format` behind one machine-wide counter in dev/scripts/check-queue.mjs.
   # That spec and that script arrive with PR #6598, which is OPEN AND UNMERGED
   # at the time of writing — this feature is stacked on it and neither the file
-  # reference above nor the scenarios below resolve until it lands. See ADR-087
+  # reference above nor the scenarios below resolve until it lands. See ADR-090
   # for the precedence table these scenarios are rows of.
   #
   # 1. TESTS WERE NOT ON THE COUNTER, and they are the larger problem. Measured
@@ -84,7 +84,7 @@ Feature: Heavy runs are admitted, queued, or refused
 
   # --- Admitted exactly once ---
 
-  # ADR-088's gate rewraps an agent's command under `haven run --class heavy`,
+  # ADR-091's gate rewraps an agent's command under `haven run --class heavy`,
   # which holds a slot of its own. The wrapped command is still a package script
   # that routes through this counter, so without a handoff the outer run waits
   # for the inner one and at a limit of 1 it waits for itself. #6598 already
@@ -104,7 +104,7 @@ Feature: Heavy runs are admitted, queued, or refused
 
   # --- Queueing is the default answer ---
 
-  @unit @unimplemented
+  @unit
   Scenario: A main-session run with no slot free waits
     Given pressure is green and no slot is free
     And the run was started by a main session rather than a sub-agent
@@ -112,7 +112,7 @@ Feature: Heavy runs are admitted, queued, or refused
     Then it waits for a slot rather than being narrowed
     Because a main session holds the one-hour cache, so the wait costs nothing
 
-  @unit @unimplemented
+  @unit
   Scenario: A main session keeps the long failsafe
     Given a heavy run started by a main session
     When it waits for a slot
@@ -121,7 +121,7 @@ Feature: Heavy runs are admitted, queued, or refused
 
   # --- Narrowing, for the population that actually expires ---
 
-  @unit @unimplemented
+  @unit
   Scenario: A short sub-agent run is narrowed instead of queued
     Given no slot is free
     And the run was started by a sub-agent, which holds the five-minute cache
@@ -136,7 +136,7 @@ Feature: Heavy runs are admitted, queued, or refused
   # integration config already clamps to one worker locally, so there is
   # nothing to narrow and any attempt to narrow it is at best inert and at
   # worst trips that guard. Narrowing is therefore a unit-test lever only.
-  @unit @unimplemented
+  @unit
   Scenario: An integration run is never narrowed
     Given no slot is free
     And the run is an integration suite
@@ -144,7 +144,7 @@ Feature: Heavy runs are admitted, queued, or refused
     Then its worker count is left entirely alone
     And it queues instead, because its files are serial by construction
 
-  @unit @unimplemented
+  @unit
   Scenario: A long sub-agent run is queued anyway
     Given no slot is free
     And the run was started by a sub-agent
@@ -153,20 +153,20 @@ Feature: Heavy runs are admitted, queued, or refused
     Then it waits for a slot
     Because its cache is lost by running, so narrowing buys nothing
 
-  @unit @unimplemented
+  @unit
   Scenario: A command haven has never seen is queued
     Given a command with no recorded duration
     When it finds no free slot
     Then it queues rather than narrowing
 
-  @unit @unimplemented
+  @unit
   Scenario: A caller that cannot be identified is treated as a sub-agent
     Given a heavy run whose caller cannot be identified
     When it finds no free slot
     Then the five-minute ceiling applies to it
     Because misreading a sub-agent as a main session restores the long park it exists to prevent
 
-  @unit @unimplemented
+  @unit
   Scenario: A narrowed run still takes a slot
     Given a run that is narrowed rather than queued
     When it starts
@@ -174,13 +174,13 @@ Feature: Heavy runs are admitted, queued, or refused
     And its worker count divides by the runs actually in flight, not by the configured limit
     So ten narrowed runs cannot reproduce the burst this feature exists to prevent
 
-  @unit @unimplemented
+  @unit
   Scenario: A run that cannot be narrowed always queues
     Given a typecheck, which is a single process with nothing to divide
     When it finds no free slot
     Then it queues
 
-  @unit @unimplemented
+  @unit
   Scenario: A caller's own worker count is respected but still admitted
     Given a test command that already specifies its worker count
     When it goes through the counter
@@ -189,14 +189,14 @@ Feature: Heavy runs are admitted, queued, or refused
 
   # --- Refusal ---
 
-  @unit @unimplemented
+  @unit
   Scenario: At critical pressure a run with no slot is refused
     Given pressure is red and no slot is free
     When a heavy run starts
     Then it does not run and does not queue
     And it exits with a distinct status and a reason naming the pressure and the queue depth
 
-  @unit @unimplemented
+  @unit
   Scenario: At critical pressure a run with a slot free still proceeds
     Given pressure is red and a slot is free
     When a heavy run starts
@@ -205,14 +205,14 @@ Feature: Heavy runs are admitted, queued, or refused
 
   # --- A tightened ceiling, only where it is earned ---
 
-  @unit @unimplemented
+  @unit
   Scenario: A sub-agent is not held past its five-minute floor
     Given a heavy run started by a sub-agent
     When it waits for a slot
     Then the wait is capped below five minutes
     And when the cap is reached it proceeds rather than waiting longer
 
-  @unit @unimplemented
+  @unit
   Scenario: An interactive run keeps the long failsafe
     Given a run started from a terminal
     When it waits for a slot
