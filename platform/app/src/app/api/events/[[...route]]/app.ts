@@ -6,9 +6,11 @@ import { fromZodError, type ZodError } from "zod-validation-error";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import {
-  generateTrackedEventId,
   predefinedEventsSchemas,
   predefinedEventTypes,
+} from "~/server/app-layer/events/predefinedEvents.schema";
+import {
+  generateTrackedEventId,
   recordTrackedEventSpan,
 } from "~/server/app-layer/events/track-event.service";
 import {
