@@ -52,7 +52,6 @@
 		"../../mcp/typescript",
 		".next",
 		".next-saas",
-		"dist",
 		"**/*.snippet.*",
 		"src/**/codegen/snippets/**/*",
 		"packages/insanity-check/**/*",
