@@ -24,6 +24,67 @@ const normalize = (value: string | undefined): string =>
     .toLowerCase()
     .replace(/[\s-]+/g, "_");
 
+/**
+ * Every identifier the auth layer uses for "those are not the credentials for
+ * this account". `user_not_found` belongs in here on purpose: telling a
+ * stranger which addresses have accounts is an enumeration oracle, so it must
+ * be indistinguishable from a wrong password everywhere this set is read.
+ */
+const CREDENTIAL_REJECTION_KEYS = new Set([
+  "invalid_email_or_password",
+  "credentialssignin",
+  "user_not_found",
+]);
+
+/**
+ * The auth layer's way of saying "those are not the credentials for this
+ * account", as opposed to a rate limit, an address mismatch, or our side
+ * falling over, each of which needs its own wording.
+ *
+ * The sign-up screen branches on this: it retries the sign-in with whatever the
+ * customer typed, and a credential rejection is the one outcome that means the
+ * address belongs to an account they cannot open. Reads the same set the
+ * wording below does, so the two answers cannot drift.
+ */
+export const isCredentialRejection = ({
+  code,
+  message,
+}: {
+  code?: string;
+  message?: string;
+}): boolean =>
+  CREDENTIAL_REJECTION_KEYS.has(normalize(code) || normalize(message));
+
+/** The wording for each identifier worth naming beyond a credential rejection. */
+const KEYED_MESSAGES: Record<string, string> = {
+  // Naming the concept ("origin", "trusted origins") would only help someone
+  // who already knows the answer. The address bar is the thing this reader can
+  // actually look at.
+  invalid_origin:
+    "LangWatch is set up for a different web address than the one you are using. Check the address and try again.",
+  user_already_exists:
+    "An account with that email already exists. Try signing in instead.",
+  email_not_verified: "Verify your email address before signing in.",
+};
+
+/**
+ * Failures named by their status class rather than an identifier: a rate limit
+ * and a server-side fault each get their own sentence, everything else falls
+ * through to the message-or-fallback handling.
+ */
+const statusClassMessage = (
+  status: number | undefined,
+  key: string,
+): string | null => {
+  if (status === 429 || key.includes("too_many")) {
+    return "Too many attempts. Wait a minute and try again.";
+  }
+  if (status !== undefined && status >= 500) {
+    return "Something went wrong on our side. Try again in a moment.";
+  }
+  return null;
+};
+
 export const authFailureMessage = ({
   code,
   message,
@@ -38,29 +99,12 @@ export const authFailureMessage = ({
 }): string => {
   const key = normalize(code) || normalize(message);
 
-  switch (key) {
-    // `user_not_found` gets the same wording on purpose: telling a stranger
-    // which addresses have accounts is an enumeration oracle.
-    case "invalid_email_or_password":
-    case "credentialssignin":
-    case "user_not_found":
-      return "Invalid email or password.";
-    case "invalid_origin":
-      // Naming the concept ("origin", "trusted origins") would only help
-      // someone who already knows the answer. The address bar is the thing
-      // this reader can actually look at.
-      return "LangWatch is set up for a different web address than the one you are using. Check the address and try again.";
-    case "user_already_exists":
-      return "An account with that email already exists. Try signing in instead.";
-    case "email_not_verified":
-      return "Verify your email address before signing in.";
+  if (CREDENTIAL_REJECTION_KEYS.has(key)) {
+    return "Invalid email or password.";
   }
-
-  if (status === 429 || key.includes("too_many")) {
-    return "Too many attempts. Wait a minute and try again.";
-  }
-  if (status !== undefined && status >= 500) {
-    return "Something went wrong on our side. Try again in a moment.";
+  const keyed = KEYED_MESSAGES[key] ?? statusClassMessage(status, key);
+  if (keyed) {
+    return keyed;
   }
 
   // An unmapped message can still be a real sentence worth showing ("Password

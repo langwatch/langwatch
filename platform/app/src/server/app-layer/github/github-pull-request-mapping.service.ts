@@ -230,36 +230,74 @@ export class GithubPullRequestMappingService {
 
     for (const projectId of projectIds) {
       if (targets.size >= BACKFILL_BRANCH_CAP) break;
-      let sessions: BackfillSessionRow[];
-      try {
-        sessions = await this.deps.sessions.listRecent({
-          projectId,
-          fromMs,
-          toMs,
-          limit: BACKFILL_SESSIONS_PER_PROJECT,
-        });
-      } catch (error) {
-        logger.warn(
-          { error, organizationId, projectId },
-          "backfill could not read a project's sessions",
-        );
-        continue;
-      }
-      for (const session of sessions) {
-        if (targets.size >= BACKFILL_BRANCH_CAP) break;
-        const target = this.targetFromSession({ organizationId, session });
-        if (!target) continue;
-        const key = [
-          target.repositoryHost,
-          target.repositoryOwner,
-          target.repositoryName,
-          target.headBranch,
-        ].join(" ");
-        if (!targets.has(key)) targets.set(key, target);
-      }
+      const sessions = await this.readSessionsForBackfill({
+        organizationId,
+        projectId,
+        fromMs,
+        toMs,
+      });
+      this.collectBranchTargets({ organizationId, sessions, targets });
     }
 
     await this.mapAllWithConcurrency([...targets.values()]);
+  }
+
+  /**
+   * One project's recent sessions. A project whose sessions cannot be read is
+   * skipped rather than failing the whole backfill.
+   */
+  private async readSessionsForBackfill({
+    organizationId,
+    projectId,
+    fromMs,
+    toMs,
+  }: {
+    organizationId: string;
+    projectId: string;
+    fromMs: number;
+    toMs: number;
+  }): Promise<BackfillSessionRow[]> {
+    try {
+      return await this.deps.sessions.listRecent({
+        projectId,
+        fromMs,
+        toMs,
+        limit: BACKFILL_SESSIONS_PER_PROJECT,
+      });
+    } catch (error) {
+      logger.warn(
+        { error, organizationId, projectId },
+        "backfill could not read a project's sessions",
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Add each session's branch to `targets`, deduped by repository and branch,
+   * stopping at the cap so one busy organization cannot enqueue unbounded work.
+   */
+  private collectBranchTargets({
+    organizationId,
+    sessions,
+    targets,
+  }: {
+    organizationId: string;
+    sessions: BackfillSessionRow[];
+    targets: Map<string, BranchMappingTarget>;
+  }): void {
+    for (const session of sessions) {
+      if (targets.size >= BACKFILL_BRANCH_CAP) break;
+      const target = this.targetFromSession({ organizationId, session });
+      if (!target) continue;
+      const key = [
+        target.repositoryHost,
+        target.repositoryOwner,
+        target.repositoryName,
+        target.headBranch,
+      ].join("\0");
+      if (!targets.has(key)) targets.set(key, target);
+    }
   }
 
   private targetFromSession({

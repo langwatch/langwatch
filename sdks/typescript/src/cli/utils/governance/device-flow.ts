@@ -10,6 +10,7 @@
 
 import * as os from "node:os";
 import { setTimeout as wait } from "node:timers/promises";
+import { normalizeEndpoint } from "../../../internal/endpoint";
 
 export interface DeviceCode {
   device_code: string;
@@ -302,7 +303,7 @@ async function postJSON<T>(opts: DeviceFlowOptions, path: string, body: unknown)
 }
 
 function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<Response> {
-  const url = opts.baseUrl.replace(/\/+$/, "") + path;
+  const url = normalizeEndpoint(opts.baseUrl) + path;
   const f = opts.fetchImpl ?? fetch;
   return f(url, {
     method: "POST",
@@ -312,7 +313,7 @@ function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<
       // Origin enforcement on the server requires this for non-browser
       // clients. The base URL is the same as the control plane, so
       // mirroring it as Origin satisfies the same-origin gate.
-      Origin: opts.baseUrl.replace(/\/+$/, ""),
+      Origin: normalizeEndpoint(opts.baseUrl),
     },
     body: JSON.stringify(body ?? {}),
   });

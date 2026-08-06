@@ -2,6 +2,7 @@ import chalk from "chalk";
 import open from "open";
 
 import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
+import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
  * `langwatch open [path]` — open the LangWatch app in the user's
@@ -28,7 +29,7 @@ export const openCommand = async (
     process.exit(1);
   }
 
-  const base = cfg.control_plane_url.replace(/\/+$/, "");
+  const base = normalizeEndpoint(cfg.control_plane_url);
   let target: string;
   if (options.path) {
     const trimmed = options.path.replace(/^\/+/, "");

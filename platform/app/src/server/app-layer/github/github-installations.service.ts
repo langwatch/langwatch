@@ -298,29 +298,43 @@ export class GithubInstallationsService {
     const seen = new Set<string>();
     const out: GithubRepository[] = [];
     for (const inst of usable) {
-      try {
-        const repos = await this.appTokens.listInstallationRepositories(
-          inst.installationId,
-        );
-        for (const r of repos) {
-          if (seen.has(r.fullName)) continue;
-          seen.add(r.fullName);
-          out.push(r);
-        }
-      } catch (error) {
-        if (error instanceof GithubRateLimitedError) {
-          throw new GithubApiRateLimitedError(
-            { retryAfterSec: error.retryAfterSec },
-            { reasons: [error] },
-          );
-        }
-        logger.warn(
-          { error, installationId: inst.installationId },
-          "failed to list repositories for installation",
-        );
+      const repos = await this.listRepositoriesForInstallation(
+        inst.installationId,
+      );
+      for (const repo of repos) {
+        if (seen.has(repo.fullName)) continue;
+        seen.add(repo.fullName);
+        out.push(repo);
       }
     }
     return out;
+  }
+
+  /**
+   * One installation's repositories, or none at all.
+   *
+   * A rate limit is rethrown, because the next installation would hit it too
+   * and a short list would read as a complete one. Any other failure leaves
+   * this installation out and lets the rest still answer.
+   */
+  private async listRepositoriesForInstallation(
+    installationId: string,
+  ): Promise<GithubRepository[]> {
+    try {
+      return await this.appTokens.listInstallationRepositories(installationId);
+    } catch (error) {
+      if (error instanceof GithubRateLimitedError) {
+        throw new GithubApiRateLimitedError(
+          { retryAfterSec: error.retryAfterSec },
+          { reasons: [error] },
+        );
+      }
+      logger.warn(
+        { error, installationId },
+        "failed to list repositories for installation",
+      );
+      return [];
+    }
   }
 
   /**

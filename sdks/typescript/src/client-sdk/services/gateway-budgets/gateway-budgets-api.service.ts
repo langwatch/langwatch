@@ -2,7 +2,15 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   collectCursorPages,
+  walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import {
+  idempotentCreateInit,
+  mutationInit,
+  type IdempotentCreateOptions,
+  type MutationOptions,
+  type ObservedRequestInit,
+} from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -51,6 +59,8 @@ export interface GatewayBudget {
   provider_key: string | null;
   current_period_started_at: string;
   resets_at: string;
+  /** Instant the cycle is phased from; null means calendar aligned. */
+  cycle_anchor_at: string | null;
   last_reset_at: string | null;
   archived_at: string | null;
   created_at: string;
@@ -62,18 +72,23 @@ export interface GatewayBudget {
   end_users_over?: number;
 }
 
-export interface GatewayBudgetList {
-  budgets: GatewayBudget[];
+/**
+ * One page of the budget listing, exactly as the wire serves it.
+ *
+ * Budgets come back in an envelope where virtual keys come back as a bare
+ * array because `spend_available` is a correctness flag about the whole page,
+ * and an array cannot carry it.
+ */
+export interface GatewayBudgetPage {
+  data: GatewayBudget[];
   /**
-   * False when spend could not be totalled — render "unavailable" rather
-   * than trusting `spent_usd` as real spend. Across a whole walk this is
-   * false when ANY page could not total spend.
+   * False when spend could not be totalled: render "unavailable" rather
+   * than trusting `spent_usd` as real spend.
    */
   spend_available: boolean;
   /**
    * Pass back as `cursor` for the next page. Null means the walk is
-   * exhausted; a FULL page does not by itself mean there is more. Always
-   * null from `list()`, which walks to exhaustion before returning.
+   * exhausted; a FULL page does not by itself mean there is more.
    */
   next_cursor: string | null;
 }
@@ -103,6 +118,24 @@ export interface CreateGatewayBudgetInput {
   timezone?: string | null;
   /** ModelProvider id to pin the budget to one provider. */
   provider_key?: string | null;
+  /**
+   * RFC3339 instant that phases the budget's cycle instead of the calendar:
+   * a `month` budget anchored `2026-01-17T09:00:00Z` rolls every 17th at
+   * 09:00 UTC. Omit for calendar alignment. Immutable once created, and
+   * rejected on the windows that never cycle (`total`, `manual`).
+   */
+  cycle_anchor_at?: string;
+  /**
+   * Your own identifier for this budget. Lets you look it up by the id your
+   * system already has instead of storing ours alongside it.
+   */
+  external_id?: string | null;
+  /**
+   * Free-form string labels, up to 40 of them. Sent WHOLE on an update: the
+   * map you pass replaces the stored one rather than merging into it, and
+   * `{}` clears it.
+   */
+  metadata?: Record<string, string>;
 }
 
 export interface UpdateGatewayBudgetInput {
@@ -124,6 +157,14 @@ export class GatewayBudgetsApiError extends Error {
   }
 }
 
+/**
+ * Client for the gateway budget surface (/api/gateway/v1).
+ *
+ * Entity types and the create/update bodies mirror the wire verbatim, so
+ * their fields are lowercase snake_case. Call options this SDK invents (query
+ * filters, per-call behaviour, action arguments) are camelCase like the rest
+ * of the SDK.
+ */
 export class GatewayBudgetsApiService {
   private readonly endpoint: string;
   private readonly apiKey: string;
@@ -145,9 +186,15 @@ export class GatewayBudgetsApiService {
     };
   }
 
-  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
+  private async request<T>(
+    operation: string,
+    path: string,
+    init?: ObservedRequestInit,
+  ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
+      // A hung control plane must fail the command, not freeze it.
+      signal: init?.signal ?? AbortSignal.timeout(30_000),
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
     });
     if (!response.ok) {
@@ -170,6 +217,7 @@ export class GatewayBudgetsApiService {
       });
       throw new GatewayBudgetsApiError(message, operation, parsedBody);
     }
+    init?.onResponse?.(response);
     return (await response.json()) as T;
   }
 
@@ -186,8 +234,11 @@ export class GatewayBudgetsApiService {
     scopeTypes?: BudgetScopeKind[];
     cursor?: string;
     limit?: number;
-  }): Promise<GatewayBudgetList> {
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
+  }): Promise<GatewayBudgetPage> {
     const params = new URLSearchParams();
+    if (options?.externalId) params.set("external_id", options.externalId);
     if (options?.scopeTypes?.length) {
       params.set("scope_type", options.scopeTypes.join(","));
     }
@@ -200,7 +251,7 @@ export class GatewayBudgetsApiService {
       next_cursor?: string | null;
     }>("list gateway budgets", `/api/gateway/v1/budgets${query}`);
     return {
-      budgets: data,
+      data,
       spend_available,
       next_cursor: next_cursor ?? null,
     };
@@ -211,20 +262,29 @@ export class GatewayBudgetsApiService {
    * types, optionally filtered by `scopeTypes`.
    *
    * The endpoint pages; this follows `next_cursor` until it comes back null,
-   * so the result is the complete listing and its own `next_cursor` is always
-   * null. Callers that count, total, or decide an all-clear on this list need
-   * that completeness for correctness, not just for display.
+   * so the result is the complete listing and carries no cursor of its own.
+   * Callers that count, total, or decide an all-clear on this list need that
+   * completeness for correctness, not just for display.
    *
    * `limit` sizes each request in the walk, it does NOT cap what comes back.
    * `cursor` resumes an interrupted walk. Take a single page with
-   * `listPage()`.
+   * `listPage()`, or stream the walk with `iterate()`.
+   *
+   * A plain array, like every other exhaustive `list()` in the SDK: a walk
+   * that ran to the end has no cursor left to report. Null `spent_usd` /
+   * `spent_nano_usd` on a row is not by itself "spend unavailable": an
+   * `attributed_user` template row serves null deliberately, because one
+   * allowance per person has no single total. Use `listPage()` when you need
+   * `spend_available` stated outright.
    */
   async list(options?: {
     scopeTypes?: BudgetScopeKind[];
     cursor?: string;
     limit?: number;
-  }): Promise<GatewayBudgetList> {
-    const pages = await collectCursorPages<GatewayBudgetList>({
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
+  }): Promise<GatewayBudget[]> {
+    const pages = await collectCursorPages<GatewayBudgetPage>({
       startCursor: options?.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
@@ -237,40 +297,103 @@ export class GatewayBudgetsApiService {
           scopeTypes: options?.scopeTypes,
           cursor,
           limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+          externalId: options?.externalId,
         }),
     });
-    return {
-      budgets: pages.flatMap((page) => page.budgets),
-      // One page that could not total spend makes the whole listing's spend
-      // unreal, so the set's honest answer is the pessimistic one.
-      spend_available: pages.every((page) => page.spend_available),
-      next_cursor: null,
-    };
+    return pages.flatMap((page) => page.data);
   }
 
-  async create(input: CreateGatewayBudgetInput): Promise<GatewayBudget> {
+  /**
+   * Every non-archived budget, one row at a time, fetching each page only
+   * when the consumer reaches it.
+   *
+   * A null `spent_usd` means spend could not be totalled rather than that
+   * nothing was spent.
+   */
+  async *iterate(options?: {
+    scopeTypes?: BudgetScopeKind[];
+    cursor?: string;
+    limit?: number;
+    /** Exact match on your own identifier, not a prefix or a search. */
+    externalId?: string;
+  }): AsyncGenerator<GatewayBudget> {
+    const pages = walkCursorPages<GatewayBudgetPage>({
+      startCursor: options?.cursor,
+      nextCursorOf: (page) => page.next_cursor,
+      onEndlessWalk: (reason) =>
+        new GatewayBudgetsApiError(
+          `Failed to list gateway budgets: ${reason}.`,
+          "list gateway budgets",
+        ),
+      fetchPage: (cursor) =>
+        this.listPage({
+          scopeTypes: options?.scopeTypes,
+          cursor,
+          limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+          externalId: options?.externalId,
+        }),
+    });
+    for await (const page of pages) {
+      yield* page.data;
+    }
+  }
+
+  /**
+   * One budget by id, in the same row shape the listing serves.
+   *
+   * Archived budgets are not served, so a budget that existed yesterday can
+   * answer 404 today. A null `spent_usd` means spend could not be totalled
+   * rather than that nothing was spent, which is the same signal the listing
+   * carries as `spend_available`.
+   */
+  async get(id: string): Promise<GatewayBudget> {
+    const { budget } = await this.request<{
+      budget: GatewayBudget;
+      spend_available: boolean;
+    }>(
+      `get gateway budget "${id}"`,
+      `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,
+    );
+    return budget;
+  }
+
+  async create(
+    input: CreateGatewayBudgetInput,
+    options?: IdempotentCreateOptions,
+  ): Promise<GatewayBudget> {
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       "create gateway budget",
       "/api/gateway/v1/budgets",
-      { method: "POST", body: JSON.stringify(input) },
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        ...idempotentCreateInit(options),
+      },
     );
     return budget;
   }
 
-  async update(id: string, input: UpdateGatewayBudgetInput): Promise<GatewayBudget> {
+  async update(
+    id: string,
+    input: UpdateGatewayBudgetInput,
+    options?: MutationOptions,
+  ): Promise<GatewayBudget> {
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       `update gateway budget "${id}"`,
       `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,
-      { method: "PATCH", body: JSON.stringify(input) },
+      { method: "PATCH", body: JSON.stringify(input), ...mutationInit(options) },
     );
     return budget;
   }
 
-  async archive(id: string): Promise<GatewayBudget> {
+  async archive(
+    id: string,
+    options?: MutationOptions,
+  ): Promise<GatewayBudget> {
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       `archive gateway budget "${id}"`,
       `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,
-      { method: "DELETE" },
+      { method: "DELETE", ...mutationInit(options) },
     );
     return budget;
   }
@@ -281,7 +404,7 @@ export class GatewayBudgetsApiService {
    */
   async reset(
     id: string,
-    options: { endUserId?: string; reason?: string } = {},
+    options: { endUserId?: string; reason?: string } & MutationOptions = {},
   ): Promise<GatewayBudget> {
     const query = options.endUserId
       ? `?end_user_id=${encodeURIComponent(options.endUserId)}`
@@ -293,6 +416,7 @@ export class GatewayBudgetsApiService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(options.reason ? { reason: options.reason } : {}),
+        ...mutationInit(options),
       },
     );
     return budget;

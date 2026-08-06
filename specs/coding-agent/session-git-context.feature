@@ -5,7 +5,7 @@
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber.ts (declared-agent labeling, title stamp)
 #   platform/app/src/server/app-layer/traces/canonicalisation/extractors/claudeCode.ts                                (title extraction from the response body)
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-session.derivation.ts (fold semantics)
-#   platform/app/src/server/clickhouse/migrations/00072_coding_agent_sessions_git_context.sql                          (session columns)
+#   platform/app/src/server/clickhouse/migrations/00075_coding_agent_sessions_git_context.sql                          (session columns)
 #
 # Related specs:
 #   specs/coding-agent/session-aggregate.feature                     , the session fold this enriches

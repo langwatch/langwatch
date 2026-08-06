@@ -15,39 +15,48 @@ T = TypeVar("T", bound="Pagination")
 class Pagination:
     """
     Attributes:
-        scroll_id (str | Unset):  Example: 123.
-        total_hits (int | Unset):  Example: 1254.
+        page (int | Unset):
+        limit (int | Unset):
+        total (int | Unset):
     """
 
-    scroll_id: str | Unset = UNSET
-    total_hits: int | Unset = UNSET
+    page: int | Unset = UNSET
+    limit: int | Unset = UNSET
+    total: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        scroll_id = self.scroll_id
+        page = self.page
 
-        total_hits = self.total_hits
+        limit = self.limit
+
+        total = self.total
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
-        if scroll_id is not UNSET:
-            field_dict["scrollId"] = scroll_id
-        if total_hits is not UNSET:
-            field_dict["totalHits"] = total_hits
+        if page is not UNSET:
+            field_dict["page"] = page
+        if limit is not UNSET:
+            field_dict["limit"] = limit
+        if total is not UNSET:
+            field_dict["total"] = total
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        scroll_id = d.pop("scrollId", UNSET)
+        page = d.pop("page", UNSET)
 
-        total_hits = d.pop("totalHits", UNSET)
+        limit = d.pop("limit", UNSET)
+
+        total = d.pop("total", UNSET)
 
         pagination = cls(
-            scroll_id=scroll_id,
-            total_hits=total_hits,
+            page=page,
+            limit=limit,
+            total=total,
         )
 
         pagination.additional_properties = d

@@ -338,19 +338,34 @@ export function mapSessionGroupRowToDto({
 }
 
 export class SessionGroupsService {
-  constructor(
-    private readonly repository: SessionGroupsRepository,
-    private readonly codingAgentSessions: CodingAgentSessionLookup,
-    private readonly pullRequests: GithubPullRequestLookup = new NullGithubPullRequestLookup(),
-    /**
-     * The lens is project-scoped but pull requests are org-scoped, so the join
-     * needs the owning organization. Returns undefined for an orphan project,
-     * which simply leaves every row unlinked.
-     */
-    private readonly resolveOrganizationId: (
-      projectId: string,
-    ) => Promise<string | undefined> = async () => undefined,
-  ) {}
+  private readonly repository: SessionGroupsRepository;
+  private readonly codingAgentSessions: CodingAgentSessionLookup;
+  private readonly pullRequests: GithubPullRequestLookup;
+  /**
+   * The lens is project-scoped but pull requests are org-scoped, so the join
+   * needs the owning organization. Returns undefined for an orphan project,
+   * which simply leaves every row unlinked.
+   */
+  private readonly resolveOrganizationId: (
+    projectId: string,
+  ) => Promise<string | undefined>;
+
+  constructor({
+    repository,
+    codingAgentSessions,
+    pullRequests = new NullGithubPullRequestLookup(),
+    resolveOrganizationId = async () => undefined,
+  }: {
+    repository: SessionGroupsRepository;
+    codingAgentSessions: CodingAgentSessionLookup;
+    pullRequests?: GithubPullRequestLookup;
+    resolveOrganizationId?: (projectId: string) => Promise<string | undefined>;
+  }) {
+    this.repository = repository;
+    this.codingAgentSessions = codingAgentSessions;
+    this.pullRequests = pullRequests;
+    this.resolveOrganizationId = resolveOrganizationId;
+  }
 
   async getSessionGroups(
     params: SessionGroupsParams,
@@ -487,20 +502,7 @@ export class SessionGroupsService {
     rows: SessionGroupRow[];
     enrichments: (SessionGroupCodingAgentDto | null)[];
   }): Promise<void> {
-    const linkable = rows
-      .map((row, index) => ({ row, coding: enrichments[index] ?? null }))
-      .filter(
-        (
-          entry,
-        ): entry is {
-          row: SessionGroupRow;
-          coding: SessionGroupCodingAgentDto;
-        } =>
-          entry.coding !== null &&
-          Boolean(entry.coding.repositoryOwner) &&
-          Boolean(entry.coding.repositoryName) &&
-          Boolean(entry.coding.gitBranch),
-      );
+    const linkable = linkableSessions({ rows, enrichments });
     if (linkable.length === 0) return;
 
     try {
@@ -522,52 +524,97 @@ export class SessionGroupsService {
       // The tenure rule is per-branch, and two repositories can share a branch
       // name, so it runs once per (host, repository) bucket rather than over
       // the page as a whole.
-      const byRepository = new Map<
-        string,
-        { sessions: typeof linkable; branch: PullRequestBranchKey }
-      >();
-      for (const entry of linkable) {
-        const key = branchKeyOf(entry.coding);
-        const bucket = `${key.repositoryHost} ${key.repositoryFullName}`;
-        const existing = byRepository.get(bucket);
-        if (existing) existing.sessions.push(entry);
-        else byRepository.set(bucket, { sessions: [entry], branch: key });
-      }
-
-      for (const [bucket, { sessions }] of byRepository) {
+      for (const [bucket, sessions] of bucketByRepository(linkable)) {
         const candidates = pullRequests.filter(
           (pull) =>
             `${pull.repositoryHost} ${pull.repositoryFullName}` === bucket,
         );
         if (candidates.length === 0) continue;
-        const assignments = assignSessionsToPullRequests({
-          sessions: sessions.map(({ row, coding }) => ({
-            sessionId: row.conversationId,
-            startedAtMs: row.startedAtMs,
-            headBranch: coding.gitBranch!,
-          })),
-          pullRequests: candidates.map((pull) => ({
-            prNumber: pull.prNumber,
-            headBranch: pull.headBranch,
-            prCreatedAtMs: pull.prCreatedAt.getTime(),
-            prClosedAtMs: pull.prClosedAt?.getTime() ?? null,
-            prMergedAtMs: pull.prMergedAt?.getTime() ?? null,
-          })),
-        });
-        for (const { row, coding } of sessions) {
-          const prNumber = assignments.get(row.conversationId);
-          const match = candidates.find((pull) => pull.prNumber === prNumber);
-          if (!match) continue;
-          coding.pullRequest = {
-            number: match.prNumber,
-            htmlUrl: match.htmlUrl,
-            title: match.title,
-          };
-        }
+        linkOneRepository({ sessions, candidates });
       }
     } catch {
       // Unlinked is a correct answer; a failed join must not take the list down.
     }
+  }
+}
+
+/** A page row paired with the coding-agent enrichment that can be linked. */
+interface LinkableSession {
+  row: SessionGroupRow;
+  coding: SessionGroupCodingAgentDto;
+}
+
+type PullRequestCandidate = Awaited<
+  ReturnType<GithubPullRequestLookup["findForBranches"]>
+>[number];
+
+/**
+ * The rows carrying enough git identity to stand a chance of matching: owner,
+ * repository and branch. Anything short of all three can never be linked.
+ */
+function linkableSessions({
+  rows,
+  enrichments,
+}: {
+  rows: SessionGroupRow[];
+  enrichments: (SessionGroupCodingAgentDto | null)[];
+}): LinkableSession[] {
+  const linkable: LinkableSession[] = [];
+  rows.forEach((row, index) => {
+    const coding = enrichments[index] ?? null;
+    if (!coding?.repositoryOwner) return;
+    if (!coding.repositoryName || !coding.gitBranch) return;
+    linkable.push({ row, coding });
+  });
+  return linkable;
+}
+
+/** Group the linkable sessions by the (host, repository) they ran against. */
+function bucketByRepository(
+  linkable: LinkableSession[],
+): Map<string, LinkableSession[]> {
+  const byRepository = new Map<string, LinkableSession[]>();
+  for (const entry of linkable) {
+    const key = branchKeyOf(entry.coding);
+    const bucket = `${key.repositoryHost} ${key.repositoryFullName}`;
+    const existing = byRepository.get(bucket);
+    if (existing) existing.push(entry);
+    else byRepository.set(bucket, [entry]);
+  }
+  return byRepository;
+}
+
+/** Run the tenure rule over one repository's sessions and stamp the winners. */
+function linkOneRepository({
+  sessions,
+  candidates,
+}: {
+  sessions: LinkableSession[];
+  candidates: PullRequestCandidate[];
+}): void {
+  const assignments = assignSessionsToPullRequests({
+    sessions: sessions.map(({ row, coding }) => ({
+      sessionId: row.conversationId,
+      startedAtMs: row.startedAtMs,
+      headBranch: coding.gitBranch!,
+    })),
+    pullRequests: candidates.map((pull) => ({
+      prNumber: pull.prNumber,
+      headBranch: pull.headBranch,
+      prCreatedAtMs: pull.prCreatedAt.getTime(),
+      prClosedAtMs: pull.prClosedAt?.getTime() ?? null,
+      prMergedAtMs: pull.prMergedAt?.getTime() ?? null,
+    })),
+  });
+  for (const { row, coding } of sessions) {
+    const prNumber = assignments.get(row.conversationId);
+    const match = candidates.find((pull) => pull.prNumber === prNumber);
+    if (!match) continue;
+    coding.pullRequest = {
+      number: match.prNumber,
+      htmlUrl: match.htmlUrl,
+      title: match.title,
+    };
   }
 }
 

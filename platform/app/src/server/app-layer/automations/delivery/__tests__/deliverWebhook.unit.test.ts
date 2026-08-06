@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WebhookDeliveryInput } from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import type {
+  sendWebhook,
+  WebhookSendResult,
+} from "~/server/webhooks/sendWebhook";
 import { deliverWebhook } from "../deliverWebhook";
-import type { sendWebhook, WebhookSendResult } from "../sendWebhook";
 
 const base = {
   projectId: "proj_1",

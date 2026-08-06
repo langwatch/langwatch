@@ -32,6 +32,7 @@ import { InvitesTable } from "../../components/members/InvitesTable";
 import SettingsLayout from "../../components/SettingsLayout";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
+import { MemberSeatUsage } from "../../components/settings/MemberSeatUsage";
 import { useDepartmentColumn } from "../../components/settings/useDepartmentColumn";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
@@ -186,6 +187,7 @@ function MembersList({
                 },
               });
             });
+          void queryClient.limits.getUsage.invalidate();
           void queryClient.licenseEnforcement.checkLimit.invalidate();
         },
         onError: () => {
@@ -213,6 +215,7 @@ function MembersList({
             tags: { organizationId: organization.id },
           });
         });
+      void queryClient.limits.getUsage.invalidate();
       void queryClient.licenseEnforcement.checkLimit.invalidate();
     },
   });
@@ -314,6 +317,12 @@ function MembersList({
             </HStack>
           )}
         </HStack>
+        {hasOrganizationManagePermission && (
+          <MemberSeatUsage
+            organizationId={organization.id}
+            activePlan={activePlan}
+          />
+        )}
         <Card.Root width="full" overflow="hidden">
           {/*
             Card wraps the table in overflowX="auto" so the row never

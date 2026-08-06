@@ -16,6 +16,47 @@ import type { RoleService } from "~/server/role/role.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { assertNoPersonalTeamScope } from "./personal-team-scope";
 
+type ScopeRows = {
+  orgs: Array<{ id: string; name: string }>;
+  teams: Array<{ id: string; name: string; isPersonal: boolean }>;
+  projects: Array<{
+    id: string;
+    name: string;
+    isPersonal: boolean;
+    team: { isPersonal: boolean };
+  }>;
+};
+
+/**
+ * The scope rows as the two list surfaces need them: a name per scope, and the
+ * set of scopes that are somebody's personal workspace.
+ *
+ * Either flag is enough to call a project personal. The two are meant to agree,
+ * and a reader that insisted on both would offer a half-migrated row as
+ * manageable access, which is the one answer that is wrong either way.
+ */
+function foldScopeRows({ orgs, teams, projects }: ScopeRows): {
+  scopeNames: Map<string, string>;
+  personalScopeIds: Set<string>;
+} {
+  const scopeNames = new Map<string, string>();
+  for (const scope of [...orgs, ...teams, ...projects]) {
+    scopeNames.set(scope.id, scope.name);
+  }
+
+  const personalScopeIds = new Set<string>();
+  for (const team of teams) {
+    if (team.isPersonal) personalScopeIds.add(team.id);
+  }
+  for (const project of projects) {
+    if (project.isPersonal || project.team.isPersonal) {
+      personalScopeIds.add(project.id);
+    }
+  }
+
+  return { scopeNames, personalScopeIds };
+}
+
 export class RoleBindingService {
   constructor(
     // TODO: complex queries (listForUser, listForOrg, etc.) should be moved to the repository
@@ -78,6 +119,83 @@ export class RoleBindingService {
     }
   }
 
+  /**
+   * The display name of every scope these bindings name, and which of those
+   * scopes are somebody's personal workspace.
+   *
+   * A personal workspace is not access an administrator granted or can take
+   * away: it is provisioned with the member, holds only them, and every write
+   * against it is refused (see `assertNoPersonalTeamScope`). So the two lists
+   * an administrator manages access from leave it out, rather than putting a
+   * row on the members page for every member of the organization with a control
+   * behind it that cannot succeed. What a member may do inside their own
+   * workspace follows from their organization role, which those pages already
+   * show. `getMyAccessBreakdown` is a member reading their own access rather
+   * than a management surface, so it keeps listing it.
+   *
+   * Scope lookups stay filtered by organization as defense in depth against a
+   * stray binding whose scopeId points outside it (historical data, failed
+   * migrations), even though the bindings are already filtered by it.
+   */
+  private async resolveScopes({
+    bindings,
+    organizationId,
+  }: {
+    bindings: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    organizationId: string;
+  }): Promise<{
+    scopeNames: Map<string, string>;
+    personalScopeIds: Set<string>;
+  }> {
+    return foldScopeRows(
+      await this.findScopeRows({ bindings, organizationId }),
+    );
+  }
+
+  /** The scoped rows these bindings point at, one query per scope type. */
+  private async findScopeRows({
+    bindings,
+    organizationId,
+  }: {
+    bindings: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    organizationId: string;
+  }): Promise<ScopeRows> {
+    const idsOfType = (scopeType: RoleBindingScopeType) =>
+      bindings.filter((b) => b.scopeType === scopeType).map((b) => b.scopeId);
+
+    const orgIds = idsOfType(RoleBindingScopeType.ORGANIZATION);
+    const teamIds = idsOfType(RoleBindingScopeType.TEAM);
+    const projectIds = idsOfType(RoleBindingScopeType.PROJECT);
+
+    const [orgs, teams, projects] = await Promise.all([
+      orgIds.length > 0
+        ? this.prisma.organization.findMany({
+            where: { id: { in: orgIds } },
+            select: { id: true, name: true },
+          })
+        : [],
+      teamIds.length > 0
+        ? this.prisma.team.findMany({
+            where: { id: { in: teamIds }, organizationId },
+            select: { id: true, name: true, isPersonal: true },
+          })
+        : [],
+      projectIds.length > 0
+        ? this.prisma.project.findMany({
+            where: { id: { in: projectIds }, team: { organizationId } },
+            select: {
+              id: true,
+              name: true,
+              isPersonal: true,
+              team: { select: { isPersonal: true } },
+            },
+          })
+        : [],
+    ]);
+
+    return { orgs, teams, projects };
+  }
+
   async listForUser({
     organizationId,
     userId,
@@ -93,53 +211,24 @@ export class RoleBindingService {
       orderBy: { createdAt: "asc" },
     });
 
-    const orgIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
-      .map((b) => b.scopeId);
-    const teamIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
-      .map((b) => b.scopeId);
-    const projectIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
-      .map((b) => b.scopeId);
+    const { scopeNames, personalScopeIds } = await this.resolveScopes({
+      bindings,
+      organizationId,
+    });
 
-    const [orgs, teams, projects] = await Promise.all([
-      orgIds.length > 0
-        ? this.prisma.organization.findMany({
-            where: { id: { in: orgIds } },
-            select: { id: true, name: true },
-          })
-        : [],
-      teamIds.length > 0
-        ? this.prisma.team.findMany({
-            where: { id: { in: teamIds }, organizationId },
-            select: { id: true, name: true },
-          })
-        : [],
-      projectIds.length > 0
-        ? this.prisma.project.findMany({
-            where: { id: { in: projectIds }, team: { organizationId } },
-            select: { id: true, name: true },
-          })
-        : [],
-    ]);
-
-    const scopeNames = new Map<string, string>();
-    for (const o of orgs) scopeNames.set(o.id, o.name);
-    for (const t of teams) scopeNames.set(t.id, t.name);
-    for (const p of projects) scopeNames.set(p.id, p.name);
-
-    return bindings.map((b) => ({
-      id: b.id,
-      userId: b.userId,
-      role: b.role,
-      customRoleId: b.customRoleId,
-      customRoleName: b.customRole?.name ?? null,
-      scopeType: b.scopeType,
-      scopeId: b.scopeId,
-      scopeName: scopeNames.get(b.scopeId) ?? null,
-      createdAt: b.createdAt,
-    }));
+    return bindings
+      .filter((b) => !personalScopeIds.has(b.scopeId))
+      .map((b) => ({
+        id: b.id,
+        userId: b.userId,
+        role: b.role,
+        customRoleId: b.customRoleId,
+        customRoleName: b.customRole?.name ?? null,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+        scopeName: scopeNames.get(b.scopeId) ?? null,
+        createdAt: b.createdAt,
+      }));
   }
 
   async listForOrg({ organizationId }: { organizationId: string }) {
@@ -163,46 +252,13 @@ export class RoleBindingService {
       orderBy: { createdAt: "asc" },
     });
 
-    const orgIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
-      .map((b) => b.scopeId);
-    const teamIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
-      .map((b) => b.scopeId);
-    const projectIds = bindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
-      .map((b) => b.scopeId);
+    const { scopeNames, personalScopeIds } = await this.resolveScopes({
+      bindings,
+      organizationId,
+    });
+    const manageable = bindings.filter((b) => !personalScopeIds.has(b.scopeId));
 
-    // Keep scope-name lookups symmetric with listForUser and defense-in-depth
-    // against any stray binding whose scopeId points outside the org (historical
-    // data, failed migrations). Bindings are already filtered by organizationId.
-    const [orgs, teams, projects] = await Promise.all([
-      orgIds.length > 0
-        ? this.prisma.organization.findMany({
-            where: { id: { in: orgIds } },
-            select: { id: true, name: true },
-          })
-        : [],
-      teamIds.length > 0
-        ? this.prisma.team.findMany({
-            where: { id: { in: teamIds }, organizationId },
-            select: { id: true, name: true },
-          })
-        : [],
-      projectIds.length > 0
-        ? this.prisma.project.findMany({
-            where: { id: { in: projectIds }, team: { organizationId } },
-            select: { id: true, name: true },
-          })
-        : [],
-    ]);
-
-    const scopeNames = new Map<string, string>();
-    for (const o of orgs) scopeNames.set(o.id, o.name);
-    for (const t of teams) scopeNames.set(t.id, t.name);
-    for (const p of projects) scopeNames.set(p.id, p.name);
-
-    const groupIds = bindings
+    const groupIds = manageable
       .filter((b) => b.groupId != null)
       .map((b) => b.groupId!);
     const groupMemberships =
@@ -222,7 +278,7 @@ export class RoleBindingService {
       membersByGroup.get(m.groupId)!.push(m.userId);
     }
 
-    return bindings.map((b) => ({
+    return manageable.map((b) => ({
       id: b.id,
       userId: b.userId,
       userName: b.user?.name ?? null,
@@ -429,7 +485,10 @@ export class RoleBindingService {
     }
 
     await this.repo.validateScopeInOrg({ organizationId, scopeType, scopeId });
-    await assertNoPersonalTeamScope(this.prisma, [{ scopeType, scopeId }]);
+    await assertNoPersonalTeamScope({
+      client: this.prisma,
+      scopes: [{ scopeType, scopeId }],
+    });
     await this.validatePrincipalInOrganization({
       organizationId,
       userId,
@@ -472,7 +531,7 @@ export class RoleBindingService {
     if (!binding) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
     }
-    await assertNoPersonalTeamScope(this.prisma, [binding]);
+    await assertNoPersonalTeamScope({ client: this.prisma, scopes: [binding] });
     await this.validateCustomRolesAssignable({
       organizationId,
       bindings: [{ role, customRoleId }],
@@ -500,7 +559,7 @@ export class RoleBindingService {
     if (!binding) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
     }
-    await assertNoPersonalTeamScope(this.prisma, [binding]);
+    await assertNoPersonalTeamScope({ client: this.prisma, scopes: [binding] });
     await this.prisma.roleBinding.delete({ where: { id: bindingId } });
     return { success: true };
   }
@@ -536,7 +595,10 @@ export class RoleBindingService {
         scopeId: b.scopeId,
       });
     }
-    await assertNoPersonalTeamScope(this.prisma, bindingsToCreate);
+    await assertNoPersonalTeamScope({
+      client: this.prisma,
+      scopes: bindingsToCreate,
+    });
     await this.validateCustomRolesAssignable({
       organizationId,
       bindings: bindingsToCreate,
@@ -554,7 +616,7 @@ export class RoleBindingService {
             message: "One or more bindings not found",
           });
         }
-        await assertNoPersonalTeamScope(tx, existing);
+        await assertNoPersonalTeamScope({ client: tx, scopes: existing });
         await tx.roleBinding.deleteMany({
           where: { id: { in: bindingIdsToDelete }, organizationId },
         });
@@ -614,7 +676,10 @@ export class RoleBindingService {
         scopeId: b.scopeId,
       });
     }
-    await assertNoPersonalTeamScope(this.prisma, bindingsToCreate);
+    await assertNoPersonalTeamScope({
+      client: this.prisma,
+      scopes: bindingsToCreate,
+    });
     await this.validateCustomRolesAssignable({
       organizationId,
       bindings: bindingsToCreate,
@@ -657,7 +722,7 @@ export class RoleBindingService {
             message: "One or more bindings not found",
           });
         }
-        await assertNoPersonalTeamScope(tx, existing);
+        await assertNoPersonalTeamScope({ client: tx, scopes: existing });
         await tx.roleBinding.deleteMany({
           where: { id: { in: bindingIdsToDelete }, organizationId, groupId },
         });

@@ -46,8 +46,11 @@ function fakeRedis(): RedisLike & { store: Map<string, string> } {
       return store.delete(k) ? 1 : 0;
     },
     // Implements the compare-and-delete release script: eval(script, 1, key, token).
-    async eval(_script, _numKeys, key, token) {
-      if (store.get(key) === token) {
+    // Takes the trailing arguments as the rest parameter RedisLike declares,
+    // rather than naming them, so the fake keeps the real client's shape.
+    async eval(_script, _numKeys, ...args) {
+      const [key, token] = args;
+      if (key && store.get(key) === token) {
         store.delete(key);
         return 1;
       }

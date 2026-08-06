@@ -62,22 +62,18 @@ export const spendSummaryCommand = async (options: {
     // covers part of the window is worse than no checksum at all. `--limit`
     // is the page size; the walk is always the whole window.
     const data: SpendSummaryRow[] = [];
-    let cursor: string | undefined;
-    do {
-      const page = await service.summaries({
-        groupBy,
-        from: fromMs,
-        to: toMs,
-        projectId: options.project,
-        cursor,
-        limit:
-          options.limit !== undefined
-            ? parsePositiveInt(options.limit, "--limit")
-            : undefined,
-      });
-      data.push(...page.data);
-      cursor = page.next_cursor ?? undefined;
-    } while (cursor);
+    for await (const row of service.iterSummaries({
+      groupBy,
+      from: fromMs,
+      to: toMs,
+      projectId: options.project,
+      limit:
+        options.limit !== undefined
+          ? parsePositiveInt(options.limit, "--limit")
+          : undefined,
+    })) {
+      data.push(row);
+    }
     const settled = data.reduce((sum, row) => sum + row.settled_count, 0);
     spinner.succeed(
       `${data.length} ${groupBy === "virtual_key" ? "keys" : "end users"}${settled > 0 ? chalk.yellow(`, ${settled} settled request${settled !== 1 ? "s" : ""} unpriced`) : ""}`,

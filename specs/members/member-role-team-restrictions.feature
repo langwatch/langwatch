@@ -177,14 +177,22 @@ Feature: Member Role Team Restrictions
     Then the change should remain pending
     And the persisted organization role should stay "Member" until I click "Save"
 
+  # The correction reaches the teams the organization shares, not the workspace
+  # each member gets to themselves. That workspace has a single admin, its
+  # owner, so including it would ask the organization to remove a team's last
+  # admin and the whole save would be refused. See
+  # specs/ai-gateway/governance/personal-workspace-integrity.feature for the
+  # scenarios that hold that line.
+
   @integration @unimplemented
-  Scenario: Saving a Lite Member update enforces Viewer team role in every team
+  Scenario: Saving a Lite Member update enforces Viewer team role in every shared team
     Given I am editing a member with organization role "Member"
     And the member has team roles "Admin" and "Member"
     When I change the organization role to "Lite Member"
     And I click "Save"
     Then the member should be saved as "Lite Member"
-    And all of the member team roles should be "Viewer"
+    And all of the member shared team roles should be "Viewer"
+    And their own personal workspace should be untouched
 
   @integration @unimplemented
   Scenario: API rejects non-Viewer team role assignments for Lite Members

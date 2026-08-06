@@ -175,11 +175,46 @@ describe("createResilientClickHouseClient()", () => {
     ] as const;
 
     for (const { label, message } of transientCases) {
-      it(`retries the insert for ${label}`, async () => {
-        const insert = vi
+      it(`retries the read for ${label}`, async () => {
+        const query = vi
           .fn()
           .mockRejectedValueOnce(new Error(message))
-          .mockResolvedValueOnce(undefined);
+          .mockResolvedValueOnce({ response_headers: {} });
+        const client = {
+          query,
+          insert: vi.fn(),
+        } as unknown as ClickHouseClient;
+
+        const wrapper = createResilientClickHouseClient({
+          client,
+          maxRetries: 2,
+          baseDelayMs: 1,
+          maxDelayMs: 1,
+        });
+
+        await wrapper.query({ query: "SELECT 1" } as any);
+
+        expect(query).toHaveBeenCalledTimes(2);
+        expect(mockIncrementQueryCount).toHaveBeenCalledWith(
+          "SELECT",
+          "success",
+        );
+      });
+    }
+
+    describe("when an insert hits the same transient failure", () => {
+      it("does not retry it, because the queue already will", async () => {
+        // Every insert is issued from a queued job that retries the whole job,
+        // so a retry here multiplies attempts rather than adding resilience -
+        // and these are async inserts with deduplication off, so a failure
+        // raised after the server buffered the batch can duplicate rows.
+        const insert = vi
+          .fn()
+          .mockRejectedValue(
+            new Error(
+              "Code: 202. DB::Exception: Too many simultaneous queries.",
+            ),
+          );
         const client = {
           query: vi.fn(),
           insert,
@@ -192,14 +227,13 @@ describe("createResilientClickHouseClient()", () => {
           maxDelayMs: 1,
         });
 
-        await wrapper.insert({ table: "events", values: [] } as any);
+        await expect(
+          wrapper.insert({ table: "events", values: [] } as any),
+        ).rejects.toThrow(/Too many simultaneous queries/);
 
-        expect(insert).toHaveBeenCalledTimes(2);
-        expect(mockIncrementQueryCount).toHaveBeenCalledWith(
-          "INSERT",
-          "success",
-        );
+        expect(insert).toHaveBeenCalledTimes(1);
+        expect(mockIncrementQueryCount).toHaveBeenCalledWith("INSERT", "error");
       });
-    }
+    });
   });
 });

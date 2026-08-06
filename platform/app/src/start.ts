@@ -9,6 +9,7 @@ import {
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
+import { resolveAppPackageRoot } from "./server/appPackageRoot";
 
 /**
  * Auto-mints a self-signed cert pair for the local dev HTTPS+HTTP/2 server.
@@ -81,6 +82,7 @@ import {
   initializeInProcessApp,
   initializeWebApp,
 } from "./server/app-layer/presets";
+import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
 import {
   getWorkerMetricsPort,
   isMetricsAuthorized,
@@ -117,7 +119,7 @@ export const metricsMiddleware = promBundle({
   },
 });
 
-export const startApp = async (dir = path.dirname(__dirname)) => {
+export const startApp = async (dir = resolveAppPackageRoot()) => {
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
 
@@ -198,7 +200,12 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // In production, resolve the built client assets directory
   const clientDistDir = dev ? null : path.join(dir, "dist/client");
 
-  const securityHeaders = buildSecurityHeaders({ dev });
+  // ADR-086: getAssetBase() throws here at boot when the base is misconfigured
+  // — fail fast rather than serve broken asset URLs.
+  const securityHeaders = buildSecurityHeaders({
+    dev,
+    assetOrigin: assetBaseOrigin(getAssetBase()),
+  });
 
   // Optional HTTPS + HTTP/2 path for local dev. Set
   // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on

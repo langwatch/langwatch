@@ -22,11 +22,17 @@ if TYPE_CHECKING:
     from ..models.post_api_prompts_by_id_sync_response_200_prompt_outputs_item import (
         PostApiPromptsByIdSyncResponse200PromptOutputsItem,
     )
+    from ..models.post_api_prompts_by_id_sync_response_200_prompt_parameters import (
+        PostApiPromptsByIdSyncResponse200PromptParameters,
+    )
     from ..models.post_api_prompts_by_id_sync_response_200_prompt_prompting_technique import (
         PostApiPromptsByIdSyncResponse200PromptPromptingTechnique,
     )
     from ..models.post_api_prompts_by_id_sync_response_200_prompt_response_format import (
         PostApiPromptsByIdSyncResponse200PromptResponseFormat,
+    )
+    from ..models.post_api_prompts_by_id_sync_response_200_prompt_tags_item import (
+        PostApiPromptsByIdSyncResponse200PromptTagsItem,
     )
 
 
@@ -52,6 +58,8 @@ class PostApiPromptsByIdSyncResponse200Prompt:
         inputs (list[PostApiPromptsByIdSyncResponse200PromptInputsItem]):
         outputs (list[PostApiPromptsByIdSyncResponse200PromptOutputsItem]):
         model (str):
+        tags (list[PostApiPromptsByIdSyncResponse200PromptTagsItem]):
+        parameters (PostApiPromptsByIdSyncResponse200PromptParameters):
         author_id (None | str | Unset):
         commit_message (None | str | Unset):
         temperature (float | Unset):
@@ -76,6 +84,8 @@ class PostApiPromptsByIdSyncResponse200Prompt:
     inputs: list[PostApiPromptsByIdSyncResponse200PromptInputsItem]
     outputs: list[PostApiPromptsByIdSyncResponse200PromptOutputsItem]
     model: str
+    tags: list[PostApiPromptsByIdSyncResponse200PromptTagsItem]
+    parameters: PostApiPromptsByIdSyncResponse200PromptParameters
     author_id: None | str | Unset = UNSET
     commit_message: None | str | Unset = UNSET
     temperature: float | Unset = UNSET
@@ -126,6 +136,13 @@ class PostApiPromptsByIdSyncResponse200Prompt:
 
         model = self.model
 
+        tags = []
+        for tags_item_data in self.tags:
+            tags_item = tags_item_data.to_dict()
+            tags.append(tags_item)
+
+        parameters = self.parameters.to_dict()
+
         author_id: None | str | Unset
         if isinstance(self.author_id, Unset):
             author_id = UNSET
@@ -173,6 +190,8 @@ class PostApiPromptsByIdSyncResponse200Prompt:
                 "inputs": inputs,
                 "outputs": outputs,
                 "model": model,
+                "tags": tags,
+                "parameters": parameters,
             }
         )
         if author_id is not UNSET:
@@ -206,11 +225,17 @@ class PostApiPromptsByIdSyncResponse200Prompt:
         from ..models.post_api_prompts_by_id_sync_response_200_prompt_outputs_item import (
             PostApiPromptsByIdSyncResponse200PromptOutputsItem,
         )
+        from ..models.post_api_prompts_by_id_sync_response_200_prompt_parameters import (
+            PostApiPromptsByIdSyncResponse200PromptParameters,
+        )
         from ..models.post_api_prompts_by_id_sync_response_200_prompt_prompting_technique import (
             PostApiPromptsByIdSyncResponse200PromptPromptingTechnique,
         )
         from ..models.post_api_prompts_by_id_sync_response_200_prompt_response_format import (
             PostApiPromptsByIdSyncResponse200PromptResponseFormat,
+        )
+        from ..models.post_api_prompts_by_id_sync_response_200_prompt_tags_item import (
+            PostApiPromptsByIdSyncResponse200PromptTagsItem,
         )
 
         d = dict(src_dict)
@@ -263,6 +288,15 @@ class PostApiPromptsByIdSyncResponse200Prompt:
             outputs.append(outputs_item)
 
         model = d.pop("model")
+
+        tags = []
+        _tags = d.pop("tags")
+        for tags_item_data in _tags:
+            tags_item = PostApiPromptsByIdSyncResponse200PromptTagsItem.from_dict(tags_item_data)
+
+            tags.append(tags_item)
+
+        parameters = PostApiPromptsByIdSyncResponse200PromptParameters.from_dict(d.pop("parameters"))
 
         def _parse_author_id(data: object) -> None | str | Unset:
             if data is None:
@@ -325,6 +359,8 @@ class PostApiPromptsByIdSyncResponse200Prompt:
             inputs=inputs,
             outputs=outputs,
             model=model,
+            tags=tags,
+            parameters=parameters,
             author_id=author_id,
             commit_message=commit_message,
             temperature=temperature,

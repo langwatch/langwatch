@@ -30,6 +30,7 @@ import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
+import { FilterService } from "~/server/filters/filter.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
@@ -172,6 +173,7 @@ import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/ev
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositories/monitor-performance.clickhouse.repository";
 import { NullMonitorPerformanceRepository } from "./evaluations/repositories/monitor-performance.repository";
+import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter-options.clickhouse.repository";
 import { GithubInstallationsService } from "./github/github-installations.service";
 import { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
 import { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
@@ -782,6 +784,7 @@ export function initializeDefaultApp(options?: {
     ? {
         processStore: repositories.processStore,
         endpoints: webhookEndpointService,
+        prisma,
         getPlan: (organizationId: string) =>
           planProvider.getActivePlan({ organizationId }),
       }
@@ -1287,17 +1290,17 @@ export function initializeDefaultApp(options?: {
   });
 
   const sessionGroups = traced(
-    new SessionGroupsService(
-      clickhouseEnabled
+    new SessionGroupsService({
+      repository: clickhouseEnabled
         ? new SessionGroupsClickHouseRepository(resolveClickHouseClient)
         : new NullSessionGroupsRepository(),
       codingAgentSessions,
-      {
+      pullRequests: {
         findForBranches: (args) =>
           githubPullRequestsRepository.findAllByBranchKeys(args),
       },
       resolveOrganizationId,
-    ),
+    }),
     "SessionGroupsService",
   );
 
@@ -1418,6 +1421,13 @@ export function initializeDefaultApp(options?: {
         new PrismaTopicClusteringStatusRepository(prisma),
       ),
       topics,
+    },
+    filters: {
+      options: new FilterService(
+        clickhouseEnabled
+          ? new FilterOptionsClickHouseRepository(resolveClickHouseClient)
+          : null,
+      ),
     },
     codingAgents: {
       sessions: codingAgentSessions,
@@ -1580,10 +1590,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           "TraceListService",
         ),
         sessionGroups: traced(
-          new SessionGroupsService(
-            new NullSessionGroupsRepository(),
-            testCodingAgentSessions,
-          ),
+          new SessionGroupsService({
+            repository: new NullSessionGroupsRepository(),
+            codingAgentSessions: testCodingAgentSessions,
+          }),
           "SessionGroupsService",
         ),
         spans: traced(
@@ -1676,6 +1686,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
       topics: new TopicService(new PrismaTopicRepository(testPrisma)),
     },
+    filters: { options: new FilterService(null) },
     codingAgents: {
       sessions: testCodingAgentSessions,
       pullRequestUsage: testPullRequestUsage,

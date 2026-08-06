@@ -52,6 +52,29 @@ type IncomingMessage =
   | { type: "github-connected"; login: string }
   | { type: "github-error"; message: string };
 
+/**
+ * The settled result a popup message carries, or null when the message says
+ * nothing this hook acts on. Anything arriving from the popup is untrusted, so
+ * each field is checked rather than assumed.
+ */
+function connectResultOf(
+  data: IncomingMessage | undefined,
+): ConnectResult | null {
+  if (!data || typeof data !== "object") return null;
+  if (data.type === "github-connected" && typeof data.login === "string") {
+    return { ok: true, login: data.login };
+  }
+  if (data.type === "github-error") {
+    return {
+      ok: false,
+      reason: "failed",
+      error:
+        typeof data.message === "string" ? data.message : "connection failed",
+    };
+  }
+  return null;
+}
+
 export function useGitHubConnectPopup() {
   const popupRef = useRef<Window | null>(null);
   const resolverRef = useRef<((r: ConnectResult) => void) | null>(null);
@@ -69,22 +92,10 @@ export function useGitHubConnectPopup() {
   useEffect(() => {
     function onMessage(ev: MessageEvent) {
       if (ev.origin !== window.location.origin) return;
-      const data = ev.data as IncomingMessage | undefined;
-      if (!data || typeof data !== "object") return;
-      if (data.type === "github-connected" && typeof data.login === "string") {
-        resolverRef.current?.({ ok: true, login: data.login });
-        cleanup();
-      } else if (data.type === "github-error") {
-        resolverRef.current?.({
-          ok: false,
-          reason: "failed",
-          error:
-            typeof data.message === "string"
-              ? data.message
-              : "connection failed",
-        });
-        cleanup();
-      }
+      const result = connectResultOf(ev.data as IncomingMessage | undefined);
+      if (!result) return;
+      resolverRef.current?.(result);
+      cleanup();
     }
     window.addEventListener("message", onMessage);
     return () => {

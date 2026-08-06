@@ -229,6 +229,63 @@ func TestLoadConfig_RefusesConflictingOTelEndpointNames(t *testing.T) {
 	}
 }
 
+// Whether ControlPlane.BaseURL came from an operator or from the
+// compatibility default decides whether Serve logs a boot warning at start.
+// Both the canonical and the legacy control-plane env var count as
+// explicit; an unset gateway falls back to the compatibility default while
+// reporting that it did. Three dedicated tests rather than a table so each
+// binds unambiguously to its own scenario.
+
+// @scenario "the gateway reports the control-plane URL as not explicitly configured when it was defaulted"
+func TestLoadConfig_ControlPlaneBaseURLNotExplicitByDefault(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.ControlPlane.BaseURLExplicit {
+		t.Error("ControlPlane.BaseURLExplicit = true, want false when neither LW_GATEWAY_BASE_URL nor the legacy var is set")
+	}
+	if cfg.ControlPlane.BaseURL != "http://localhost:5560" {
+		t.Errorf("ControlPlane.BaseURL = %q, want the compatibility default", cfg.ControlPlane.BaseURL)
+	}
+}
+
+// @scenario "the gateway reports the control-plane URL as explicitly configured when LW_GATEWAY_BASE_URL is set"
+func TestLoadConfig_ControlPlaneBaseURLExplicitCanonical(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_BASE_URL", "http://localhost:7580")
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if !cfg.ControlPlane.BaseURLExplicit {
+		t.Error("ControlPlane.BaseURLExplicit = false, want true when LW_GATEWAY_BASE_URL is set")
+	}
+}
+
+// @scenario "the gateway reports the control-plane URL as explicitly configured when the legacy control-plane URL variable is set"
+func TestLoadConfig_ControlPlaneBaseURLExplicitLegacy(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("GATEWAY_CONTROL_PLANE_URL", "http://legacy.example.com")
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if !cfg.ControlPlane.BaseURLExplicit {
+		t.Error("ControlPlane.BaseURLExplicit = false, want true when the legacy GATEWAY_CONTROL_PLANE_URL is set")
+	}
+}
+
 // clearGatewayEnv unsets every env var the alias layer or Hydrate inspects,
 // so each test starts from a clean slate. t.Setenv handles per-test scope on
 // what we explicitly set; this clears the bleed-through from the harness env.

@@ -133,8 +133,8 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: {{ .Values.app.otel.serviceName | default "langwatch-app" | quote }}
 
-            - name: NEXTAUTH_URL
-              value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
+            {{/* NEXTAUTH_URL comes from langwatch.sharedEnv: every process
+                 needs the same answer for what this installation is called. */}}
             - name: NEXTAUTH_URL_INTERNAL
               value: "http://localhost:{{ .Values.app.service.port | default 5560 }}"
 
@@ -147,6 +147,14 @@ spec:
             # through a different URL.
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.app.http.langwatchEndpoint | default (printf "http://localhost:%v" (.Values.app.service.port | default 5560)) | quote }}
+
+            # Content-hashed asset base (ADR-086). Empty by default → assets are
+            # served same-origin from the pod. Set to a commit-prefixed CDN base
+            # so a rolling deploy never strands a browser on a stale-chunk 404.
+            {{- if .Values.app.assetBase }}
+            - name: LANGWATCH_ASSET_BASE
+              value: {{ .Values.app.assetBase | quote }}
+            {{- end }}
 
             # Cron API key
             {{- if .Values.app.cronApiKey.secretKeyRef.name }}
@@ -167,17 +175,6 @@ spec:
                 secretKeyRef:
                   name: {{ include "langwatch.appSecretName" . }}
                   key: cronApiKey
-            {{- end }}
-
-            # Email configuration
-            {{- if .Values.app.email.enabled }}
-            - name: EMAIL_DEFAULT_FROM
-              value: {{ .Values.app.email.defaultFrom | quote }}
-            - name: EMAIL_PROVIDER
-              value: {{ .Values.app.email.provider | quote }}
-            {{- if eq .Values.app.email.provider "sendgrid" }}
-            {{- include "langwatch.secretOrValue" (dict "envName" "SENDGRID_API_KEY" "fieldValues" .Values.app.email.providers.sendgrid.apiKey) | nindent 12 }}
-            {{- end }}
             {{- end }}
 
             # AI Gateway virtual-key pepper (control-plane only).

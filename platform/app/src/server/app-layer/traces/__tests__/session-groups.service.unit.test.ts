@@ -158,12 +158,12 @@ describe("SessionGroupsService", () => {
     /** @scenario Coding agent enrichment attaches model calls and compactions */
     it("attaches coding-agent counters when a session row exists and leaves others null", async () => {
       const calls: string[] = [];
-      const service = new SessionGroupsService(
-        new FakeRepository(
+      const service = new SessionGroupsService({
+        repository: new FakeRepository(
           [makeRow(), makeRow({ conversationId: "session-b" })],
           2,
         ),
-        lookupReturning(
+        codingAgentSessions: lookupReturning(
           {
             "session-a": codingAgentRow({
               modelCalls: 41,
@@ -174,7 +174,7 @@ describe("SessionGroupsService", () => {
           },
           calls,
         ),
-      );
+      });
 
       const result = await service.getSessionGroups({
         tenantId: TENANT,
@@ -195,12 +195,12 @@ describe("SessionGroupsService", () => {
 
     /** @scenario Coding agent enrichment carries repository, branch, worktree and title */
     it("carries the repository, branch, worktree and title, empty where unreported", async () => {
-      const service = new SessionGroupsService(
-        new FakeRepository(
+      const service = new SessionGroupsService({
+        repository: new FakeRepository(
           [makeRow(), makeRow({ conversationId: "session-b" })],
           2,
         ),
-        lookupReturning({
+        codingAgentSessions: lookupReturning({
           "session-a": codingAgentRow({
             repositoryHost: "github.com",
             repositoryOwner: "acme",
@@ -213,7 +213,7 @@ describe("SessionGroupsService", () => {
           // empty strings, and the lens reads them as nothing reported.
           "session-b": codingAgentRow(),
         }),
-      );
+      });
 
       const result = await service.getSessionGroups({
         tenantId: TENANT,
@@ -240,14 +240,14 @@ describe("SessionGroupsService", () => {
     });
 
     it("keeps the list alive when an enrichment lookup throws", async () => {
-      const service = new SessionGroupsService(
-        new FakeRepository([makeRow()]),
-        {
+      const service = new SessionGroupsService({
+        repository: new FakeRepository([makeRow()]),
+        codingAgentSessions: {
           async getBySessionId() {
             throw new Error("clickhouse hiccup");
           },
         },
-      );
+      });
 
       const result = await service.getSessionGroups({
         tenantId: TENANT,
@@ -260,10 +260,10 @@ describe("SessionGroupsService", () => {
     });
 
     it("maps every rollup field onto the DTO", async () => {
-      const service = new SessionGroupsService(
-        new FakeRepository([makeRow()], 1),
-        lookupReturning({}),
-      );
+      const service = new SessionGroupsService({
+        repository: new FakeRepository([makeRow()], 1),
+        codingAgentSessions: lookupReturning({}),
+      });
 
       const result = await service.getSessionGroups({
         tenantId: TENANT,
@@ -301,10 +301,10 @@ describe("SessionGroupsService", () => {
         makeRow({ conversationId: "s-2", lastActivityMs: 200 }),
         makeRow({ conversationId: "s-3", lastActivityMs: 100 }),
       ];
-      const service = new SessionGroupsService(
-        new FakeRepository(rows, 3),
-        lookupReturning({}),
-      );
+      const service = new SessionGroupsService({
+        repository: new FakeRepository(rows, 3),
+        codingAgentSessions: lookupReturning({}),
+      });
 
       const result = await service.getSessionGroups({
         tenantId: TENANT,
@@ -331,7 +331,10 @@ describe("SessionGroupsService", () => {
         makeRow({ conversationId: "s-3", totalCost: 1 }),
       ];
       const repository = new FakeRepository(rows, 3);
-      const service = new SessionGroupsService(repository, lookupReturning({}));
+      const service = new SessionGroupsService({
+        repository,
+        codingAgentSessions: lookupReturning({}),
+      });
 
       const result = await service.getSessionGroups({
         tenantId: TENANT,
@@ -356,7 +359,10 @@ describe("SessionGroupsService", () => {
   describe("when the sort column is unknown", () => {
     it("falls back to last activity", async () => {
       const repository = new FakeRepository([makeRow()]);
-      const service = new SessionGroupsService(repository, lookupReturning({}));
+      const service = new SessionGroupsService({
+        repository,
+        codingAgentSessions: lookupReturning({}),
+      });
 
       await service.getSessionGroups({
         tenantId: TENANT,
@@ -376,7 +382,10 @@ describe("SessionGroupsService", () => {
     /** @scenario A session cursor from another sort is refused */
     it("refuses the read instead of paging through another order", async () => {
       const repository = new FakeRepository([makeRow()]);
-      const service = new SessionGroupsService(repository, lookupReturning({}));
+      const service = new SessionGroupsService({
+        repository,
+        codingAgentSessions: lookupReturning({}),
+      });
       const cursor = encodeSessionGroupsCursor({
         sortValue: 5,
         conversationId: "s-2",
@@ -400,7 +409,10 @@ describe("SessionGroupsService", () => {
   describe("when the cursor was minted under the same sort", () => {
     it("passes the keyset boundary through to the repository", async () => {
       const repository = new FakeRepository([makeRow()]);
-      const service = new SessionGroupsService(repository, lookupReturning({}));
+      const service = new SessionGroupsService({
+        repository,
+        codingAgentSessions: lookupReturning({}),
+      });
       const cursor = encodeSessionGroupsCursor({
         sortValue: 5,
         conversationId: "s-2",
@@ -425,15 +437,15 @@ describe("SessionGroupsService", () => {
 
   describe("when a session's last activity is older than the visibility cutoff", () => {
     it("teases the previews and keeps the totals", async () => {
-      const service = new SessionGroupsService(
-        new FakeRepository([
+      const service = new SessionGroupsService({
+        repository: new FakeRepository([
           makeRow({
             lastActivityMs: 1000,
             input: "a very long captured prompt that must not leak in full",
           }),
         ]),
-        lookupReturning({}),
-      );
+        codingAgentSessions: lookupReturning({}),
+      });
 
       const result = await service.getSessionGroups({
         tenantId: TENANT,
@@ -454,9 +466,9 @@ describe("SessionGroupsService", () => {
     it("teases the generated title the same way, and leaves the git context whole", async () => {
       const title =
         "Rebuild the flaky session fold test and its ClickHouse fixture";
-      const service = new SessionGroupsService(
-        new FakeRepository([makeRow({ lastActivityMs: 1000 })]),
-        lookupReturning({
+      const service = new SessionGroupsService({
+        repository: new FakeRepository([makeRow({ lastActivityMs: 1000 })]),
+        codingAgentSessions: lookupReturning({
           "session-a": codingAgentRow({
             title,
             repositoryOwner: "acme",
@@ -464,7 +476,7 @@ describe("SessionGroupsService", () => {
             gitBranch: "feat/git-context",
           }),
         }),
-      );
+      });
 
       const result = await service.getSessionGroups({
         tenantId: TENANT,

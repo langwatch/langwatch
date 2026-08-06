@@ -131,13 +131,18 @@ function popupHtml(
 }
 
 // Render the setup error path consistently across popup and redirect modes.
-function setupError(
+function setupError({
+  c,
+  state,
+  errorMessage,
+  status,
+}: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  c: any,
-  state: GithubInstallStatePayload | null,
-  errorMessage: string,
-  status: number,
-): Response {
+  c: any;
+  state: GithubInstallStatePayload | null;
+  errorMessage: string;
+  status: number;
+}): Response {
   if (state && state.mode === "redirect") {
     const returnTo = safeReturnTo(state.returnTo);
     return c.redirect(withGithubError(returnTo, errorMessage), 302);
@@ -231,22 +236,76 @@ async function handleSetup(c: any): Promise<Response> {
   const state = verifyState(c.req.query("state") ?? null);
   const installationId = c.req.query("installation_id");
   if (!state || !installationId) {
-    return setupError(c, state, "Invalid state or missing installation", 400);
+    return setupError({
+      c,
+      state,
+      errorMessage: "Invalid state or missing installation",
+      status: 400,
+    });
   }
 
+  const rejection = await rejectUnauthorizedSetup({ c, state });
+  if (rejection) return rejection;
+
+  const returnTo = safeReturnTo(state.returnTo);
+
+  let accountLogin: string;
+  try {
+    ({ accountLogin } = await getApp().github.installations.recordInstallation({
+      installationId,
+      organizationId: state.organizationId,
+    }));
+  } catch (err) {
+    await reportInstallationFailure({ err, state });
+    const publicMsg = publicGithubErrorMessage();
+    return state.mode === "popup"
+      ? popupHtml(c, popupErrorHtml(publicMsg), 502)
+      : c.redirect(withGithubError(returnTo, publicMsg), 302);
+  }
+
+  await recordInstallAudit({ state, installationId, accountLogin });
+
+  if (state.mode === "popup") {
+    return popupHtml(c, popupResponseHtml(accountLogin), 200);
+  }
+  return c.redirect(returnTo, 302);
+}
+
+/**
+ * Every re-check standing between /install and GitHub's redirect back here.
+ * Returns the response that rejects the flow, or null to let it proceed.
+ */
+async function rejectUnauthorizedSetup({
+  c,
+  state,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  c: any;
+  state: GithubInstallStatePayload;
+}): Promise<Response | null> {
   // Re-bind the session to the state's user.
   const session = await getServerAuthSession({
     req: c.req.raw as NextRequestShim,
   });
   if (!session?.user || session.user.id !== state.userId) {
-    return setupError(c, state, "Session changed mid-flow", 401);
+    return setupError({
+      c,
+      state,
+      errorMessage: "Session changed mid-flow",
+      status: 401,
+    });
   }
 
   // Burn the single-use nonce (skips when Redis was down at /install).
   if (state.nonceRegistered) {
     const consumed = await consumeGithubInstallNonce(state.nonce);
     if (consumed === false) {
-      return setupError(c, state, "Installation link already used", 401);
+      return setupError({
+        c,
+        state,
+        errorMessage: "Installation link already used",
+        status: 401,
+      });
     }
   }
 
@@ -257,7 +316,12 @@ async function handleSetup(c: any): Promise<Response> {
       organizationId: state.organizationId,
     }))
   ) {
-    return setupError(c, state, "Not a member of this organization", 403);
+    return setupError({
+      c,
+      state,
+      errorMessage: "Not a member of this organization",
+      status: 403,
+    });
   }
 
   // Re-check the connect permission too: the caller's role may have been
@@ -270,53 +334,68 @@ async function handleSetup(c: any): Promise<Response> {
       "organization:manage",
     ))
   ) {
-    return setupError(c, state, "Forbidden", 403);
+    return setupError({ c, state, errorMessage: "Forbidden", status: 403 });
   }
 
-  const returnTo = safeReturnTo(state.returnTo);
+  return null;
+}
 
-  let accountLogin: string;
+/**
+ * Record why the installation could not be written.
+ *
+ * A cross-tenant takeover attempt (installation already owned by another org)
+ * is a security event, not an ordinary failure: audit it against the acting
+ * user/org so it is visible. The caller still returns the generic message, so
+ * nothing leaks about whether the installation id exists.
+ */
+async function reportInstallationFailure({
+  err,
+  state,
+}: {
+  err: unknown;
+  state: GithubInstallStatePayload;
+}): Promise<void> {
+  if (!(err instanceof GithubInstallationConflictError)) {
+    logger.warn({ err }, "github installation record failed");
+    return;
+  }
+  logger.warn(
+    {
+      installationId: err.installationId,
+      attemptedOrganizationId: err.attemptedOrganizationId,
+      userId: state.userId,
+    },
+    "blocked cross-tenant github installation rebind attempt",
+  );
   try {
-    ({ accountLogin } = await getApp().github.installations.recordInstallation({
-      installationId,
+    await auditLog({
+      userId: state.userId,
       organizationId: state.organizationId,
-    }));
-  } catch (err) {
-    // A cross-tenant takeover attempt (installation already owned by another
-    // org) is a security event, not an ordinary failure: audit it against the
-    // acting user/org so it is visible, but still return the generic message
-    // so the caller learns nothing about whether the installation id exists.
-    if (err instanceof GithubInstallationConflictError) {
-      logger.warn(
-        {
-          installationId: err.installationId,
-          attemptedOrganizationId: err.attemptedOrganizationId,
-          userId: state.userId,
-        },
-        "blocked cross-tenant github installation rebind attempt",
-      );
-      try {
-        await auditLog({
-          userId: state.userId,
-          organizationId: state.organizationId,
-          action: "github.connection.install.rejected_cross_tenant",
-          args: { installationId: err.installationId },
-        });
-      } catch (auditErr) {
-        logger.warn(
-          { err: auditErr },
-          "audit log write failed after blocked rebind",
-        );
-      }
-    } else {
-      logger.warn({ err }, "github installation record failed");
-    }
-    const publicMsg = publicGithubErrorMessage();
-    return state.mode === "popup"
-      ? popupHtml(c, popupErrorHtml(publicMsg), 502)
-      : c.redirect(withGithubError(returnTo, publicMsg), 302);
+      action: "github.connection.install.rejected_cross_tenant",
+      args: { installationId: err.installationId },
+    });
+  } catch (auditErr) {
+    logger.warn(
+      { err: auditErr },
+      "audit log write failed after blocked rebind",
+    );
   }
+}
 
+/**
+ * The installation is already recorded by the time this runs, so honour the
+ * success over audit completeness; a failed write stays operator-visible
+ * through this logger.
+ */
+async function recordInstallAudit({
+  state,
+  installationId,
+  accountLogin,
+}: {
+  state: GithubInstallStatePayload;
+  installationId: string;
+  accountLogin: string;
+}): Promise<void> {
   try {
     await auditLog({
       userId: state.userId,
@@ -325,18 +404,11 @@ async function handleSetup(c: any): Promise<Response> {
       args: { installationId, accountLogin },
     });
   } catch (err) {
-    // The installation is already recorded — honour the success over audit
-    // completeness (operator-visible via this logger).
     logger.warn(
       { err, organizationId: state.organizationId },
-      "audit log write failed after github install — installation persisted",
+      "audit log write failed after github install, installation persisted",
     );
   }
-
-  if (state.mode === "popup") {
-    return popupHtml(c, popupResponseHtml(accountLogin), 200);
-  }
-  return c.redirect(returnTo, 302);
 }
 
 // GitHub webhook events: installation created/deleted/suspend/unsuspend and

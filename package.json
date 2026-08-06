@@ -34,6 +34,7 @@
     "packages/server/dist/",
     "packages/api/",
     "packages/automations/",
+    "packages/clickhouse-client/",
     "packages/handled-error/",
     "packages/langy/",
     "packages/observability/",

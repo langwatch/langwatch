@@ -44,6 +44,55 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Gate for the two DEPENDENCY scanners only. gitleaks, trufflehog and
+  # semgrep stay ungated on purpose: a credential or an injection can arrive
+  # in any file type, including the ones a language filter would exclude, so
+  # a secret/SAST scanner that only runs on "relevant" paths is a scanner
+  # with a documented blind spot. govulncheck and pip-audit have no such
+  # property — they read a manifest, so on a PR that touches no Go and no
+  # Python manifest they can only report what the last run already reported.
+  #
+  # Non-PR events force both filters true, the same rule
+  # .github/actions/detect-changes and go-services.yaml already use. That
+  # keeps the weekly cron (where the report-only scanners are actually
+  # actioned), merge_group, push and workflow_dispatch running everything.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ github.event_name != 'pull_request' || steps.filter.outputs.go }}
+      python: ${{ github.event_name != 'pull_request' || steps.filter.outputs.python }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          persist-credentials: false
+          # dorny/paths-filter reads the PR diff from the API; nothing here
+          # touches the working tree.
+          sparse-checkout: .github
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          # NO NEGATION PATTERNS — dorny ORs a filter's patterns, so a lone
+          # `!x` matches everything. See specs/ci/path-filters.feature.
+          filters: |
+            # `**/*.go` is a superset of what govulncheck walks
+            # (./services/... ./pkg/... ./cmd/... ./tools/...), which is what
+            # keeps this filter correct when a new Go root appears.
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'go.work'
+              - 'go.work.sum'
+              - '.github/workflows/code-scanners.yml'
+            # pip-audit reads requirements files and the two audited
+            # pyprojects; `**/pyproject.toml` is deliberately wider than the
+            # two it audits today so a newly audited manifest is covered.
+            python:
+              - '**/requirements*.txt'
+              - '**/pyproject.toml'
+              - '.github/workflows/code-scanners.yml'
+
   secrets:
     name: secrets (gitleaks + trufflehog)
     runs-on: ubuntu-latest
@@ -168,6 +217,8 @@ jobs:
 
   go-advisories:
     name: govulncheck (blocking)
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -200,6 +251,8 @@ jobs:
 
   python-advisories:
     name: pip-audit (report-only)
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

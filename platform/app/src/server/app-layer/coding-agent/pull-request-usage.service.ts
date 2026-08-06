@@ -356,46 +356,70 @@ function groupRows({
   sessions: CodingAgentBranchSessionRow[];
   costProjects: ReadonlySet<string>;
 }): PullRequestUsageRow[] {
-  const grouped = new Map<
-    string,
-    PullRequestUsageRow & { modelSet: Set<string> }
-  >();
+  const grouped = new Map<string, GroupedUsageRow>();
 
   for (const session of sessions) {
-    const key = [session.tenantId, session.userId, session.agent].join(" ");
+    const key = [session.tenantId, session.userId, session.agent].join("\0");
+    // A project carrying no cost data contributes tokens but leaves cost null,
+    // rather than reporting an unpriced session as one that cost nothing.
     const priced = costProjects.has(session.tenantId);
     const existing = grouped.get(key);
-    if (!existing) {
-      grouped.set(key, {
-        projectId: session.tenantId,
-        userLabel: session.userId,
-        agent: session.agent,
-        models: [],
-        modelSet: new Set(session.models),
-        sessionsCount: 1,
-        inputTokens: session.inputTokens,
-        outputTokens: session.outputTokens,
-        cacheReadTokens: session.cacheReadTokens,
-        cacheCreationTokens: session.cacheCreationTokens,
-        totalTokens: tokensOf(session),
-        costUsd: priced ? session.costUsd : null,
-      });
-      continue;
-    }
-    existing.sessionsCount += 1;
-    existing.inputTokens += session.inputTokens;
-    existing.outputTokens += session.outputTokens;
-    existing.cacheReadTokens += session.cacheReadTokens;
-    existing.cacheCreationTokens += session.cacheCreationTokens;
-    existing.totalTokens += tokensOf(session);
-    if (priced) existing.costUsd = (existing.costUsd ?? 0) + session.costUsd;
-    for (const model of session.models) existing.modelSet.add(model);
+    if (existing) addSessionToGroup({ group: existing, session, priced });
+    else grouped.set(key, startGroup({ session, priced }));
   }
 
   return [...grouped.values()].map(({ modelSet, ...row }) => ({
     ...row,
     models: [...modelSet].sort(),
   }));
+}
+
+/**
+ * A group while it is still accumulating. `modelSet` dedupes models as sessions
+ * arrive and is folded into the sorted `models` array once the group is closed.
+ */
+type GroupedUsageRow = PullRequestUsageRow & { modelSet: Set<string> };
+
+function startGroup({
+  session,
+  priced,
+}: {
+  session: CodingAgentBranchSessionRow;
+  priced: boolean;
+}): GroupedUsageRow {
+  return {
+    projectId: session.tenantId,
+    userLabel: session.userId,
+    agent: session.agent,
+    models: [],
+    modelSet: new Set(session.models),
+    sessionsCount: 1,
+    inputTokens: session.inputTokens,
+    outputTokens: session.outputTokens,
+    cacheReadTokens: session.cacheReadTokens,
+    cacheCreationTokens: session.cacheCreationTokens,
+    totalTokens: tokensOf(session),
+    costUsd: priced ? session.costUsd : null,
+  };
+}
+
+function addSessionToGroup({
+  group,
+  session,
+  priced,
+}: {
+  group: GroupedUsageRow;
+  session: CodingAgentBranchSessionRow;
+  priced: boolean;
+}): void {
+  group.sessionsCount += 1;
+  group.inputTokens += session.inputTokens;
+  group.outputTokens += session.outputTokens;
+  group.cacheReadTokens += session.cacheReadTokens;
+  group.cacheCreationTokens += session.cacheCreationTokens;
+  group.totalTokens += tokensOf(session);
+  if (priced) group.costUsd = (group.costUsd ?? 0) + session.costUsd;
+  for (const model of session.models) group.modelSet.add(model);
 }
 
 function totalsOf(rows: PullRequestUsageRow[]): PullRequestUsageTotals {

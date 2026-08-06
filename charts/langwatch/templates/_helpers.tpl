@@ -293,16 +293,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{/* Validate email provider secrets */}}
-{{- if .Values.app.email.enabled }}
-  {{- if eq .Values.app.email.provider "sendgrid" }}
-    {{- if .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.name }}
-      {{- if empty .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.key }}
-        {{- $errors = append $errors "app.email.providers.sendgrid.apiKey.secretKeyRef.name is set but key is empty" }}
-      {{- end }}
-    {{- else if empty .Values.app.email.providers.sendgrid.apiKey.value }}
-      {{- $errors = append $errors "app.email.enabled is true with sendgrid provider but apiKey is not configured" }}
-    {{- end }}
+{{/* Validate email provider secrets. Whether a gateway is configured at all is
+     langwatch.emailProviderGuard's job; this only catches a half-written
+     secret reference, which names a Secret but no key inside it. That reads as
+     configured to the guard and resolves to nothing at the container, so
+     without this it survives install and fails at the first send.
+
+     Only the selected gateway is checked, since no other gateway's settings
+     are rendered. */}}
+{{- $emailSecretRefs := dict
+      "sendgrid" (list (dict "path" "sendgrid.apiKey" "ref" .Values.app.email.providers.sendgrid.apiKey.secretKeyRef))
+      "resend"   (list (dict "path" "resend.apiKey"   "ref" .Values.app.email.providers.resend.apiKey.secretKeyRef))
+      "smtp"     (list (dict "path" "smtp.url"        "ref" .Values.app.email.providers.smtp.url.secretKeyRef)
+                       (dict "path" "smtp.password"   "ref" .Values.app.email.providers.smtp.password.secretKeyRef)) }}
+{{- range $field := (get $emailSecretRefs .Values.app.email.provider | default list) }}
+  {{- if and $field.ref.name (empty $field.ref.key) }}
+    {{- $errors = append $errors (printf "app.email.providers.%s.secretKeyRef.name is set but key is empty" $field.path) }}
   {{- end }}
 {{- end }}
 
@@ -557,6 +563,51 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/* ============================================================ */}}
+{{/* Email provider guard                                          */}}
+{{/* ============================================================ */}}
+
+{{/* Fail the render when app.email.provider names a gateway that nothing
+     configures. The app treats EMAIL_PROVIDER as authoritative and never falls
+     back to another gateway, so without this the mistake surfaces at the first
+     alert instead of at install time.
+
+     Skipped when extraEnvs or extraEnvFrom are in play: those can carry the
+     provider's settings (an SMTP_URL from a pre-existing Secret, AWS_REGION
+     alongside IRSA credentials) and the chart cannot see inside them. They
+     reach one Deployment each, though, while the gateway is shared by both, so
+     every Deployment that sends email has to have a source of its own for the
+     bypass to hold. */}}
+{{- define "langwatch.emailProviderGuard" -}}
+{{- if hasKey .Values.app.email "enabled" }}
+{{- fail "app.email.enabled no longer exists: naming app.email.provider is what turns email on. Set app.email.provider to sendgrid, ses, smtp or resend and remove app.email.enabled." }}
+{{- end }}
+{{- $provider := .Values.app.email.provider }}
+{{- if $provider }}
+{{- $providers := .Values.app.email.providers }}
+{{- $configured := dict
+      "sendgrid" (or $providers.sendgrid.apiKey.value $providers.sendgrid.apiKey.secretKeyRef.name)
+      "resend"   (or $providers.resend.apiKey.value $providers.resend.apiKey.secretKeyRef.name)
+      "smtp"     (or $providers.smtp.url.value $providers.smtp.url.secretKeyRef.name $providers.smtp.host)
+      "ses"      $providers.ses.region }}
+{{- if not (hasKey $configured $provider) }}
+{{- fail (printf "app.email.provider is %q, which is not one of: sendgrid, ses, smtp, resend." $provider) }}
+{{- end }}
+{{- if not (get $configured $provider) }}
+{{- $needed := list }}
+{{- if not (or .Values.app.extraEnvs .Values.app.extraEnvFrom) }}
+{{- $needed = append $needed "app.extraEnvs / app.extraEnvFrom" }}
+{{- end }}
+{{- if and .Values.workers.enabled (not (or .Values.workers.extraEnvs .Values.workers.extraEnvFrom)) }}
+{{- $needed = append $needed "workers.extraEnvs / workers.extraEnvFrom" }}
+{{- end }}
+{{- if $needed }}
+{{- fail (printf "app.email.provider is %q, but app.email.providers.%s is empty. Configure it, pick another provider, or supply its settings through %s. The web application sends invitations and password resets, the workers send scheduled reports and alert notifications, and each Deployment reads only its own extra environment." $provider $provider (join " and " $needed)) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/* ============================================================ */}}
 {{/* Shared Environment Variables                                  */}}
 {{/* ============================================================ */}}
 {{/* Common env vars shared between app and workers deployments */}}
@@ -567,6 +618,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 - name: BASE_HOST
   value: {{ .Values.app.http.baseHost | default "http://localhost:5560" }}
+
+{{/* The address this installation answers on, and the one BetterAuth measures
+     every callback, redirect and same-origin check against. Shared rather than
+     app-only: the auth module is imported wherever the app code is, so a
+     workers or cronjob process without it boots into
+     "[better-auth] Base URL could not be determined" and builds its links off
+     nothing. Same value everywhere, so no process can disagree with another
+     about what this installation is called. */}}
+- name: NEXTAUTH_URL
+  value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
 
 - name: SKIP_ENV_VALIDATION
   value: {{ .Values.app.features.skipEnvValidation | default false | quote }}
@@ -831,6 +892,63 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # app would enforce different limits on the same organization.
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
+
+# Email gateway. Naming a provider is what turns email on. In sharedEnv rather
+# than the app Deployment because scheduled reports and alert notifications are
+# dispatched by the workers, so a workers pod without a gateway configured
+# fails every send it is responsible for.
+{{- include "langwatch.emailProviderGuard" . }}
+{{- if .Values.app.email.provider }}
+- name: EMAIL_DEFAULT_FROM
+  value: {{ .Values.app.email.defaultFrom | quote }}
+- name: EMAIL_PROVIDER
+  value: {{ .Values.app.email.provider | quote }}
+{{- if eq .Values.app.email.provider "sendgrid" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SENDGRID_API_KEY" "fieldValues" .Values.app.email.providers.sendgrid.apiKey) }}
+{{- end }}
+{{- if eq .Values.app.email.provider "ses" }}
+# USE_AWS_SES is what the mailer checks; credentials come from the pod's IAM
+# role (IRSA) unless AWS_* are supplied via app.extraEnvs.
+- name: USE_AWS_SES
+  value: "true"
+{{- /* Emitted only when set: an empty entry would shadow an AWS_REGION
+       supplied through app.extraEnvs / app.extraEnvFrom. */}}
+{{- if .Values.app.email.providers.ses.region }}
+- name: AWS_REGION
+  value: {{ .Values.app.email.providers.ses.region | quote }}
+{{- end }}
+{{- if .Values.app.email.providers.ses.endpoint }}
+- name: AWS_SES_ENDPOINT
+  value: {{ .Values.app.email.providers.ses.endpoint | quote }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.app.email.provider "smtp" }}
+{{- if or .Values.app.email.providers.smtp.url.value .Values.app.email.providers.smtp.url.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SMTP_URL" "fieldValues" .Values.app.email.providers.smtp.url) }}
+{{- else if .Values.app.email.providers.smtp.host }}
+- name: SMTP_HOST
+  value: {{ .Values.app.email.providers.smtp.host | quote }}
+{{- if .Values.app.email.providers.smtp.port }}
+- name: SMTP_PORT
+  value: {{ .Values.app.email.providers.smtp.port | quote }}
+{{- end }}
+{{- /* Emptiness, not truthiness: `secure: false` is a real setting
+       (force STARTTLS on 465) and must not be dropped. */}}
+{{- if ne (toString .Values.app.email.providers.smtp.secure) "" }}
+- name: SMTP_SECURE
+  value: {{ .Values.app.email.providers.smtp.secure | toString | quote }}
+{{- end }}
+{{- if .Values.app.email.providers.smtp.user }}
+- name: SMTP_USER
+  value: {{ .Values.app.email.providers.smtp.user | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SMTP_PASSWORD" "fieldValues" .Values.app.email.providers.smtp.password) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.app.email.provider "resend" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "RESEND_API_KEY" "fieldValues" .Values.app.email.providers.resend.apiKey) }}
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{/* ============================================================ */}}

@@ -20,6 +20,7 @@ import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
 } from "~/components/me/PersonalTracesEmptyState";
+import { PersonalWorkspaceViewOnlyNotice } from "~/components/me/PersonalWorkspaceViewOnlyNotice";
 import { spentSubline } from "~/components/me/spentSubline";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
@@ -87,6 +88,8 @@ function MyUsagePage() {
       </Head>
 
       <VStack align="stretch" gap={6} width="full">
+        <PersonalWorkspaceViewOnlyNotice />
+
         <VStack
           id={PERSONAL_AI_TOOLS_ANCHOR}
           align="stretch"

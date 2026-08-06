@@ -61,6 +61,16 @@ const str = (
 };
 
 /**
+ * The two plan allowances an admin meets while reconciling seats, in words that
+ * read inside a sentence. Not taken from the license-enforcement labels, which
+ * are column headings ("Team Members") and land badly mid-sentence.
+ */
+const SEAT_LIMIT_LABELS: Record<string, string> = {
+  members: "full member seats",
+  membersLite: "Lite Member seats",
+};
+
+/**
  * Whether any code in the error's reason chain (depth-first, nested included)
  * is one of `codes`.
  *
@@ -161,6 +171,11 @@ const presentations = {
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
     describe: () => "We're on it. Try again in a moment.",
+  },
+  clickhouse_overloaded: {
+    title: "Too much running at once",
+    describe: () =>
+      "We paused this one to keep the rest responsive. Try again.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -270,6 +285,17 @@ const presentations = {
     title: "Optimization step not found",
     describe: () =>
       "It may have been removed along with its run. Reload to see the current steps.",
+  },
+  email_already_registered: {
+    // Reached from the sign-up screen, and the reader there is usually looking
+    // at their own account: either a previous sign-up created it and could not
+    // sign them in, or they were a member before and an invite asked them to
+    // create an account they already have. The screen retries the sign-in for
+    // them first, so by the time this copy renders the password they typed was
+    // not the account's, which leaves exactly two moves worth naming.
+    title: "That email already has an account",
+    describe: () =>
+      "Sign in with it, or reset the password if you don't have it.",
   },
   prompt_not_found: {
     title: "Prompt not found",
@@ -543,6 +569,20 @@ const presentations = {
     title: "Your account doesn't include this",
     describe: () => "Ask an admin on your team to upgrade your access.",
   },
+  personal_workspace_not_managed_here: {
+    // Whoever reads this was managing somebody's access, so the answer has to
+    // say why there is nothing to manage here rather than restate the rule. An
+    // admin changing a seat needs to know the seat is elsewhere and that they
+    // do not have to touch this to change it.
+    title: "That workspace belongs to one person",
+    describe: (error) => {
+      const ownerName = str(error, "ownerName", "");
+      const workspace = ownerName
+        ? `"${ownerName}" is that member's own workspace`
+        : "A personal workspace belongs to one member";
+      return `${workspace}, so its access isn't managed from here. Their organization role already decides what they can do in it. To work together, use a shared team.`;
+    },
+  },
   already_organization_member: {
     // An invite form takes several addresses at once, so the address has to be
     // in the sentence — "one of these is already a member" is not an answer.
@@ -585,7 +625,17 @@ const presentations = {
   },
   resource_limit_exceeded: {
     title: "You've hit a plan limit",
-    describe: () => "Upgrade your plan to raise it.",
+    // Names the allowance and where it stands, because "a plan limit" leaves
+    // the reader to guess which of several they just met. The seat allowances
+    // get the reversible alternative too: an admin who hits one is usually
+    // working down to their plan, and "upgrade" is the answer they came here to
+    // avoid. Most seat refusals arrive as the upgrade modal rather than a toast,
+    // and it says the same thing.
+    describe: (error) => {
+      const label = SEAT_LIMIT_LABELS[str(error, "limitType", "")];
+      if (!label) return "Upgrade your plan to raise it.";
+      return `Your plan's ${label} are all in use. Upgrade to raise the allowance, or disable a membership from the members page to free one, which is reversible.`;
+    },
   },
   // Browser-telemetry ingest (ADR-058). These answer the RUM endpoint rather
   // than a screen, so the reader is usually an engineer with the network tab
@@ -1279,6 +1329,17 @@ const presentations = {
     title: "Budget not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  gateway_budget_cycle_anchor_invalid: {
+    // Names the window back, because the fix is to change one of the two:
+    // drop the anchor, or pick a window that rolls.
+    title: "That window can't start on a chosen date",
+    describe: (error) => {
+      const window = str(error, "window", "");
+      return window
+        ? `A ${window.toLowerCase()} budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.`
+        : "This budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.";
+    },
+  },
   gateway_scope_org_mismatch: {
     // Names the KIND of scope, never the id — the id belongs to a record in
     // another organization, which is exactly what this guard refuses to
@@ -1311,6 +1372,21 @@ const presentations = {
     describe: () =>
       "This deployment doesn't record spend per key, so there's no figure to show.",
   },
+  webhook_endpoint_not_found: {
+    // An archived endpoint reads the same as one that never existed, so the
+    // copy names archiving as the likely cause rather than only the typo.
+    title: "That webhook endpoint isn't there",
+    describe: () =>
+      "It may have been archived, or the id may belong to another organization. List your endpoints to see the ones that are live.",
+  },
+  webhook_endpoint_invalid: {
+    // Names the three things the endpoint form can get wrong, rather than
+    // echoing the server's sentence: `meta.message` on this code can carry
+    // an internal reason, and the customer channel is not where that goes.
+    title: "That webhook endpoint can't be saved",
+    describe: () =>
+      "Check the URL is reachable over HTTPS, that every subscribed event type is one the catalog lists, and that the delivery controls are inside their limits.",
+  },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that
     // governance events were never in it to begin with.
@@ -1328,6 +1404,16 @@ const presentations = {
         ? `Another record in this organization already uses "${externalId}". Pick a different one, or update that record instead.`
         : "Another record in this organization already uses it. Pick a different one, or update that record instead.";
     },
+  },
+  idempotency_error: {
+    // Two refusals share one code because the caller's next move is the same
+    // shape in both cases: stop reusing this key, or wait for the first
+    // request to land. `meta.reason` is what lets the copy say which.
+    title: "That idempotency key can't answer this request",
+    describe: (error) =>
+      str(error, "reason", "") === "in_progress"
+        ? "The first request sent with this key is still running. Wait a moment, then retry with the same key."
+        : "This key was already used for a different request. Send a new key, or repeat the original request exactly.",
   },
   cache_rule_not_found: {
     title: "Cache rule not found",

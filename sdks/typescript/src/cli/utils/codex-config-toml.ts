@@ -24,6 +24,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { normalizeEndpoint } from "../../internal/endpoint";
 
 const BEGIN = "# >>> langwatch otel begin >>>";
 const END = "# <<< langwatch otel end <<<";
@@ -58,7 +59,7 @@ export function displayCodexConfigPath(): string {
  * pass the bare ingestion base (e.g. https://app.langwatch.ai/api/otel).
  */
 export function codexTraceEndpoint(baseEndpoint: string): string {
-	return `${baseEndpoint.replace(/\/+$/, "")}/v1/traces`;
+	return `${normalizeEndpoint(baseEndpoint)}/v1/traces`;
 }
 
 /** Escape a value for a TOML basic (double-quoted) string. */
@@ -311,7 +312,7 @@ export function buildCodexGatewayBlock(
 	inputs: CodexGatewayBlockInputs,
 ): string {
 	const envKey = inputs.envKey ?? "OPENAI_API_KEY";
-	const cleanedBase = inputs.gatewayUrl.replace(/\/+$/, "");
+	const cleanedBase = normalizeEndpoint(inputs.gatewayUrl);
 	const baseUrl = cleanedBase.endsWith("/v1")
 		? cleanedBase
 		: `${cleanedBase}/v1`;

@@ -420,30 +420,44 @@ export class GithubAppTokenService {
   ): Promise<GithubRepository[]> {
     const minted = await this.mintInstallationToken({ installationId });
     const repos: GithubRepository[] = [];
-    let page = 1;
     // Bound the walk so a pathological account can't loop forever.
-    for (; page <= 20; page++) {
-      const res = await this.githubFetch(
-        `${GITHUB_API}/installation/repositories?per_page=100&page=${page}`,
-        { headers: { Authorization: `Bearer ${minted.token}` } },
-      );
-      if (!res.ok) {
-        const rateLimited = readRateLimit(res);
-        if (rateLimited) throw rateLimited;
-        throw new Error(
-          `GitHub GET /installation/repositories failed: ${res.status}`,
-        );
+    for (let page = 1; page <= 20; page++) {
+      const batch = await this.fetchInstallationRepositoryPage({
+        token: minted.token,
+        page,
+      });
+      for (const repo of batch) {
+        repos.push({ id: String(repo.id), fullName: repo.full_name });
       }
-      const body = (await res.json()) as {
-        repositories?: { id: number; full_name: string }[];
-      };
-      const batch = body.repositories ?? [];
-      for (const r of batch) {
-        repos.push({ id: String(r.id), fullName: r.full_name });
-      }
+      // A short page is the last page.
       if (batch.length < 100) break;
     }
     return repos;
+  }
+
+  /** One page of GET /installation/repositories, already error-checked. */
+  private async fetchInstallationRepositoryPage({
+    token,
+    page,
+  }: {
+    token: string;
+    page: number;
+  }): Promise<{ id: number; full_name: string }[]> {
+    const res = await this.githubFetch(
+      `${GITHUB_API}/installation/repositories?per_page=100&page=${page}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) {
+      const rateLimited = readRateLimit(res);
+      if (rateLimited) throw rateLimited;
+      throw new Error(
+        `GitHub GET /installation/repositories failed: ${res.status}`,
+      );
+    }
+    const body = (await res.json()) as {
+      repositories?: { id: number; full_name: string }[];
+    };
+    return body.repositories ?? [];
   }
 
   /**

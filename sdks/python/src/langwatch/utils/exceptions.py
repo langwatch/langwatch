@@ -12,6 +12,22 @@ def _first_string(*candidates: Any) -> Optional[str]:
     return None
 
 
+def extract_api_error_code(body: Any) -> Optional[str]:
+    """The platform's stable discriminant for a failure, or None.
+
+    Reads ``code`` -> ``type`` -> ``kind``; the platform sets all three to the
+    same value (``type`` is the OpenAI-compatible name Go emits), so the order
+    only decides which answers first. Some routes nest the whole thing under
+    ``error``, which is why that is unwrapped first.
+    """
+    if not isinstance(body, Mapping):
+        return None
+    inner = body.get("error")
+    if isinstance(inner, Mapping):
+        body = inner
+    return _first_string(body.get("code"), body.get("type"), body.get("kind"))
+
+
 def extract_api_error_detail(body: Any) -> str:
     """Build a readable detail line from a LangWatch API error body.
 
