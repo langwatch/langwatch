@@ -169,6 +169,81 @@ func TestRedThrottlesAdmissionWithoutStoppingWork(t *testing.T) {
 	})
 }
 
+// @scenario "A wait too long to serve is backgrounded rather than refused"
+// @scenario "A wait that fits the ceiling still blocks"
+func TestAWaitTooLongToServeIsBackgrounded(t *testing.T) {
+	// Long enough that narrowing is off the table, so the choice is purely
+	// between blocking and handing the run back detached.
+	longRun := func() AdmissionRequest {
+		r := base()
+		r.ObservedDuration = 20 * time.Minute
+		r.CanBackground = true
+		return r
+	}
+
+	t.Run("given a sub-agent whose queue is deeper than its ceiling", func(t *testing.T) {
+		r := longRun()
+		r.EstimatedWait = SubAgent.WaitCeiling() + time.Minute
+
+		t.Run("when the run is admitted", func(t *testing.T) {
+			t.Run("it is handed back to run in the background", func(t *testing.T) {
+				if got := DecideAdmission(r); got != Background {
+					t.Fatalf("expected background, got %s", got)
+				}
+			})
+		})
+	})
+
+	t.Run("given a wait that fits inside the ceiling", func(t *testing.T) {
+		r := longRun()
+		r.EstimatedWait = time.Minute
+
+		t.Run("when the run is admitted", func(t *testing.T) {
+			t.Run("it queues inline, because backgrounding breaks causality", func(t *testing.T) {
+				if got := DecideAdmission(r); got != Queue {
+					t.Fatalf("expected queue, got %s", got)
+				}
+			})
+		})
+	})
+
+	t.Run("given a main session, which can afford a much longer wait", func(t *testing.T) {
+		r := longRun()
+		r.Caller = MainSession
+		r.EstimatedWait = 10 * time.Minute
+
+		t.Run("the same wait that would background a sub-agent still queues", func(t *testing.T) {
+			if got := DecideAdmission(r); got != Queue {
+				t.Fatalf("expected queue, got %s", got)
+			}
+		})
+	})
+
+	t.Run("given a caller with nowhere to put a detached run", func(t *testing.T) {
+		r := longRun()
+		r.CanBackground = false
+		r.EstimatedWait = time.Hour
+
+		t.Run("it queues on the ordinary failsafe rather than being backgrounded", func(t *testing.T) {
+			if got := DecideAdmission(r); got != Queue {
+				t.Fatalf("expected queue, got %s", got)
+			}
+		})
+	})
+
+	t.Run("given red pressure and no slot", func(t *testing.T) {
+		r := longRun()
+		r.Pressure = Red
+		r.EstimatedWait = time.Hour
+
+		t.Run("it is refused and not backgrounded, because deferring only moves the burst", func(t *testing.T) {
+			if got := DecideAdmission(r); got != Refuse {
+				t.Fatalf("expected refuse, got %s", got)
+			}
+		})
+	})
+}
+
 // @scenario "A narrowed run still takes a slot"
 func TestNarrowedWorkersDivideByRunsInFlight(t *testing.T) {
 	t.Run("given a full-width run of five workers", func(t *testing.T) {

@@ -168,12 +168,48 @@ Feature: haven answers an agent's tool call before it runs
     Then the presence of an agent id decides it
     And no transcript is parsed to work it out
 
+  # MEASURED: updatedInput can set run_in_background on a Bash call. A probe
+  # confirmed the agent then gets control back immediately, reads haven's
+  # explanation out of the replacement description, and receives a completion
+  # notification with the exit code when the run finishes. That is the closest
+  # thing to a push channel there is — hooks are request/response, and a blocked
+  # agent makes no API calls, so there is nothing to push to.
+  @unit @unimplemented
+  Scenario: A wait too long to serve is backgrounded rather than refused
+    Given no slot is free
+    And the queue is deeper than this caller's wait ceiling
+    When a heavy command is gated
+    Then it is handed back to run in the background
+    And the agent keeps working rather than waiting or retrying
+    Because it was not going to get its result this turn either way
+
+  @unit @unimplemented
+  Scenario: A backgrounded run explains itself in the same breath
+    Given a command the gate has backgrounded
+    When the replacement is handed back
+    Then its description says haven queued it and that it is running in the background
+    So the agent does not read an immediate return as an immediate result
+
+  @unit @unimplemented
+  Scenario: A queued run reports its position while it waits
+    Given a backgrounded run still waiting for a slot
+    When the agent polls the background task
+    Then it sees the current queue position rather than silence
+
+  @unit @unimplemented
+  Scenario: A wait that fits the ceiling still blocks
+    Given no slot is free
+    And the queue is shallower than this caller's wait ceiling
+    When a heavy command is gated
+    Then it queues inline and the call blocks as normal
+    Because backgrounding breaks causality, and is only worth that where the alternative was a refusal
+
   @unit @unimplemented
   Scenario: At critical pressure with no slot free the command is refused
     Given pressure is red and no slot is free
     When a heavy command is gated
-    Then it is denied at once
-    And no wait is started
+    Then it is denied at once, and not backgrounded
+    Because at red the machine cannot take the work at all, so deferring it only moves the burst
 
   @unit @unimplemented
   Scenario: The tool timeout is raised by the wait, not capped at the floor
