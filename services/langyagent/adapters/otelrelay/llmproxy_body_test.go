@@ -411,6 +411,90 @@ func TestLLMProxy_CapturesProviderIdentityOnUntypedFailures(t *testing.T) {
 	}
 }
 
+// @scenario "A stripped or mismatched marker on an envelope-shaped body is diagnosable"
+func TestLLMProxy_WarnsWhenMarkerLooksStripped(t *testing.T) {
+	// The exact herr wire shape (code == type, non-empty message) with NO
+	// marker header at all — the mid-rollout failure mode this guards.
+	body := `{"error":{"type":"no_provider_configured","code":"no_provider_configured","message":"no model provider configured"}}`
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, body)
+	}))
+	defer gateway.Close()
+
+	core, logs := observer.New(zapcore.DebugLevel)
+	relay, err := New(clog.Set(context.Background(), zap.New(core)), Options{})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = relay.Shutdown(ctx)
+	})
+
+	token, _ := relay.Register(WorkerInfo{ConversationID: "c", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+	resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatalf("proxied LLM call: %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	entries := logs.FilterMessage("otelrelay llm handled-error marker missing or mismatched").All()
+	if len(entries) != 1 {
+		t.Fatalf("marker-mismatch warning logged %d times, want 1", len(entries))
+	}
+	fields := entries[0].ContextMap()
+	if fields["body_code"] != "no_provider_configured" {
+		t.Errorf("body_code = %v, want no_provider_configured", fields["body_code"])
+	}
+	if fields["marker"] != "" {
+		t.Errorf("marker = %v, want empty (no header sent)", fields["marker"])
+	}
+}
+
+// @scenario "A stripped or mismatched marker on an envelope-shaped body is diagnosable"
+func TestLLMProxy_DoesNotWarnForOrdinaryProviderBodies(t *testing.T) {
+	// Real provider prose (Anthropic's credit-balance body) coincidentally
+	// sets type == code sometimes, but never carries a marker at all in a
+	// way that should read as "stripped" — there is nothing to strip from a
+	// body the gateway never authored. Covered here mainly so the warning
+	// does not become log noise on every ordinary provider failure.
+	body := `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low."}}`
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, body)
+	}))
+	defer gateway.Close()
+
+	core, logs := observer.New(zapcore.DebugLevel)
+	relay, err := New(clog.Set(context.Background(), zap.New(core)), Options{})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = relay.Shutdown(ctx)
+	})
+
+	token, _ := relay.Register(WorkerInfo{ConversationID: "c", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+	resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatalf("proxied LLM call: %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	entries := logs.FilterMessage("otelrelay llm handled-error marker missing or mismatched").All()
+	if len(entries) != 0 {
+		t.Errorf("marker-mismatch warning logged %d times for ordinary provider prose, want 0", len(entries))
+	}
+}
+
 // @scenario "Untrusted provider prose never enters relay logs"
 func TestLLMProxy_LogsOnlyTheHandledClassification(t *testing.T) {
 	secret := "sk-proj-do-not-record"

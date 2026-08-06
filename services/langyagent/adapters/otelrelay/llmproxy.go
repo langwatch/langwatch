@@ -211,6 +211,7 @@ func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error
 		contentType: resp.Header.Get("Content-Type"),
 	})
 	if !typed {
+		r.warnIfMarkerLooksStripped(entry, resp, peeked)
 		r.logUntypedLLMFailure(entry, failureBody{resp: resp, peeked: peeked}, &e)
 	}
 	if typed {
@@ -224,6 +225,32 @@ func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error
 	entry.setLLMError(e)
 	r.cutRetryLoopOnHardLimit(entry, resp, e)
 	return nil
+}
+
+// warnIfMarkerLooksStripped diagnoses a specific mid-rollout failure mode: a
+// body carrying the exact triplet shape a herr envelope always has (code ==
+// type, both non-empty, a non-empty message) that nonetheless failed
+// isGatewayEnvelope's marker check, because the header was absent or did not
+// match the body's own code. That shape is unlikely by coincidence, so it is
+// worth a warn even though the untyped/no-prose trust decision does not
+// change — logs only the two codes being compared, never the message.
+func (r *Relay) warnIfMarkerLooksStripped(entry *workerEntry, resp *http.Response, peeked []byte) {
+	var envelope herr.ErrorResponse
+	if json.Unmarshal(peeked, &envelope) != nil {
+		return
+	}
+	body := envelope.Error
+	if body.Code == "" || body.Type != body.Code || body.Message == "" {
+		return
+	}
+	handledCode := resp.Header.Get(herr.HandledErrorHeader)
+	if handledCode == body.Code {
+		return // isGatewayEnvelope would have trusted this; nothing stripped.
+	}
+	clog.Get(r.baseCtx).Warn("otelrelay llm handled-error marker missing or mismatched",
+		zap.String("conversation", entry.info.ConversationID),
+		zap.String("body_code", body.Code),
+		zap.String("marker", handledCode))
 }
 
 // failureBody is the raw response plus the bytes captureLLMFailure already
@@ -441,6 +468,10 @@ func decodeLLMErrorBody(peeked []byte, resp upstreamResponse) (e herr.E, typed b
 		// its presence is trustworthy even when the body itself failed to
 		// parse (truncated by a proxy, transport-mangled). Trust the code,
 		// carry nothing else: there is no message to lose.
+		//
+		// herrgen:external — this reads whichever of OUR OWN codes the marker
+		// names; the code itself is already declared (and generated) at its
+		// origin, this is just a dynamic read of that value off a header.
 		return herr.E{Code: herr.Code(resp.handledCode)}, true
 	}
 	return decodeProviderErrorBody(peeked, resp.status, resp.contentType), false
