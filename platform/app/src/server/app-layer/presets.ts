@@ -1704,7 +1704,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       events: new BillableEventsMeterClickHouseRepository(async () => null),
     },
     usageStats: {
-      instance: new InstanceUsageStatsClickHouseRepository(async () => null),
+      instance: new InstanceUsageStatsClickHouseRepository(async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      }),
     },
     scenarios: {
       orphanReconciliation: { client: null, finder: null },

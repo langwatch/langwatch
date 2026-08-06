@@ -33,6 +33,7 @@ export class App {
   readonly filters: AppDependencies["filters"];
   readonly clickhouse: AppDependencies["clickhouse"];
   readonly billing: AppDependencies["billing"];
+  readonly usageStats: AppDependencies["usageStats"];
   readonly scenarios: AppDependencies["scenarios"];
   readonly governance: AppDependencies["governance"];
   readonly billableEvents: AppDependencies["billableEvents"];
@@ -110,6 +111,7 @@ export class App {
     this.filters = deps.filters;
     this.clickhouse = deps.clickhouse;
     this.billing = deps.billing;
+    this.usageStats = deps.usageStats;
     this.scenarios = deps.scenarios;
     this.governance = deps.governance;
     this.billableEvents = deps.billableEvents;
