@@ -27,6 +27,8 @@ type fakeStore struct {
 	pressureWritten bool
 	heavyRuns       int
 	observed        time.Duration
+	hookRoot        string
+	hookCommand     string
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -95,6 +97,10 @@ func (f *fakeStore) HeavyRuns() int { return f.heavyRuns }
 func (f *fakeStore) ClaimHeavyRun(int, string) (func(), error) {
 	f.heavyRuns++
 	return func() { f.heavyRuns-- }, nil
+}
+func (f *fakeStore) EnsureClaudeHook(repoRoot, command string) (bool, error) {
+	f.hookRoot, f.hookCommand = repoRoot, command
+	return true, nil
 }
 func (f *fakeStore) ObservedDuration(string) time.Duration        { return f.observed }
 func (f *fakeStore) ObserveDuration(_ string, took time.Duration) { f.observed = took }

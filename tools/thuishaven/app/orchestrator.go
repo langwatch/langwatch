@@ -152,6 +152,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if err := o.store.WriteOverlay(p.LwDir, st); err != nil {
 		return domain.Stack{}, nil, err
 	}
+	o.ensureGateHook()
 	if err := o.store.SaveStack(st); err != nil {
 		return domain.Stack{}, nil, err
 	}
