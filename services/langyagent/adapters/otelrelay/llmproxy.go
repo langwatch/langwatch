@@ -189,7 +189,11 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 				return nil // capture is best-effort; the proxied response stands.
 			}
 			contentType := resp.Header.Get("Content-Type")
-			e, typed := decodeLLMErrorBody(peeked, resp.Header.Get(herr.HandledErrorHeader), resp.StatusCode, contentType)
+			e, typed := decodeLLMErrorBody(peeked, upstreamResponse{
+				handledCode: resp.Header.Get(herr.HandledErrorHeader),
+				status:      resp.StatusCode,
+				contentType: contentType,
+			})
 			if !typed {
 				// Provider responses are untrusted. Record only the bounded
 				// classification carried by the handled error; authentication
@@ -379,12 +383,21 @@ var providerCodePaths = []string{
 //
 // Unknown prose is intentionally not retained. The caller logs the safe
 // handled classification (status, body kind, and discriminant) instead.
-func decodeLLMErrorBody(peeked []byte, handledCode string, status int, contentType string) (e herr.E, typed bool) {
+// upstreamResponse carries the response metadata decodeLLMErrorBody needs
+// beyond the body bytes, collapsed into one param to stay under the
+// repo's 3-argument limit (revive argument-limit).
+type upstreamResponse struct {
+	handledCode string
+	status      int
+	contentType string
+}
+
+func decodeLLMErrorBody(peeked []byte, resp upstreamResponse) (e herr.E, typed bool) {
 	var envelope herr.ErrorResponse
-	if json.Unmarshal(peeked, &envelope) == nil && isGatewayEnvelope(envelope.Error, handledCode) {
+	if json.Unmarshal(peeked, &envelope) == nil && isGatewayEnvelope(envelope.Error, resp.handledCode) {
 		return herr.FromBody(envelope.Error), true
 	}
-	return decodeProviderErrorBody(peeked, status, contentType), false
+	return decodeProviderErrorBody(peeked, resp.status, resp.contentType), false
 }
 
 // decodeProviderErrorBody captures a body KNOWN to be provider-native, skipping
@@ -431,27 +444,28 @@ func providerErrorCode(body []byte) herr.Code {
 	// code bury the plan-limit signal — it is what disables the first-strike
 	// retry cut in hasHardLimitReason.
 	for _, path := range providerCodePaths {
-		value := gjson.GetBytes(body, path)
-		if value.Type != gjson.String || len(value.Str) > maxProviderCodeBytes ||
-			!providerCodePattern.MatchString(value.Str) {
-			continue
-		}
-		// herrgen:external — this is the provider's identifier, not ours, on
-		// both the lookup and the return below.
-		candidate := herr.Code(value.Str)
-		if hardLimitReasonCodes[candidate] {
+		if candidate, ok := providerCodeCandidate(body, path); ok && hardLimitReasonCodes[candidate] {
 			return candidate
 		}
 	}
 	for _, path := range providerCodePaths {
-		value := gjson.GetBytes(body, path)
-		if value.Type == gjson.String && len(value.Str) <= maxProviderCodeBytes &&
-			providerCodePattern.MatchString(value.Str) {
-			// herrgen:external — this is the provider's identifier, not ours.
-			return herr.Code(value.Str)
+		if candidate, ok := providerCodeCandidate(body, path); ok {
+			return candidate
 		}
 	}
 	return ""
+}
+
+// providerCodeCandidate reads path out of body and reports whether it is a
+// well-formed provider discriminant (a short identifier, not prose).
+func providerCodeCandidate(body []byte, path string) (herr.Code, bool) {
+	value := gjson.GetBytes(body, path)
+	if value.Type != gjson.String || len(value.Str) > maxProviderCodeBytes ||
+		!providerCodePattern.MatchString(value.Str) {
+		return "", false
+	}
+	// herrgen:external — this is the provider's identifier, not ours.
+	return herr.Code(value.Str), true
 }
 
 // upstreamReasonCodes name the upstream HTTP status when the provider's own

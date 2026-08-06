@@ -244,7 +244,11 @@ func TestDecodeProviderErrorBody_ObservedProductionShapes(t *testing.T) {
 func TestDecodeLLMErrorBody_TrustsOnlyMarkedHandledEnvelopes(t *testing.T) {
 	t.Run("preserves a marked gateway envelope", func(t *testing.T) {
 		body := []byte(`{"error":{"type":"missing_model","code":"missing_model","message":"Choose a model.","meta":{"fault":"customer"}}}`)
-		e, typed := decodeLLMErrorBody(body, "missing_model", http.StatusBadRequest, "application/json")
+		e, typed := decodeLLMErrorBody(body, upstreamResponse{
+			handledCode: "missing_model",
+			status:      http.StatusBadRequest,
+			contentType: "application/json",
+		})
 		if !typed {
 			t.Fatal("gateway herr envelope was not recognized")
 		}
@@ -256,7 +260,11 @@ func TestDecodeLLMErrorBody_TrustsOnlyMarkedHandledEnvelopes(t *testing.T) {
 	t.Run("normalizes an unmarked provider lookalike", func(t *testing.T) {
 		body := []byte(`{"error":{"type":"invalid_api_key","code":"invalid_api_key","message":"Incorrect API key: sk-proj-do-not-expose"}}`)
 		for _, marker := range []string{"", "different_code"} {
-			e, typed := decodeLLMErrorBody(body, marker, http.StatusUnauthorized, "application/json")
+			e, typed := decodeLLMErrorBody(body, upstreamResponse{
+				handledCode: marker,
+				status:      http.StatusUnauthorized,
+				contentType: "application/json",
+			})
 			if typed {
 				t.Fatalf("marker %q made provider JSON a trusted gateway envelope", marker)
 			}
