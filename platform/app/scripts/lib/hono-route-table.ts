@@ -27,9 +27,16 @@ export const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 
-/** `:id` segments become `{id}` so a Hono path can be compared to a template. */
+/**
+ * `:id` segments become `{id}` so a Hono path can be compared to a template.
+ *
+ * A parameter may carry a Hono regex constraint — `:id{.+}` matches a slash so
+ * one segment can hold a path-like id. The constraint is Hono's routing detail
+ * and has no OpenAPI equivalent, so it comes off: without this, `:idOrSlug{.+}`
+ * templated to `{idOrSlug}{.+}` and matched no documented path at all.
+ */
 export function honoPathToTemplate(path: string): string {
-  return path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
+  return path.replace(/:([A-Za-z0-9_]+)(\{(?:[^{}]|\{[^{}]*\})*\})?/g, "{$1}");
 }
 
 export function joinRoutePath({

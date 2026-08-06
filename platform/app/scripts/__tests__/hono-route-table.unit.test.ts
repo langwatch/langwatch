@@ -32,6 +32,27 @@ describe("honoPathToTemplate", () => {
       honoPathToTemplate("/api/workflows/:workflowId/:versionId/run"),
     ).toBe("/api/workflows/{workflowId}/{versionId}/run");
   });
+
+  describe("when a parameter carries a Hono regex constraint", () => {
+    /** @scenario "A parameter's routing constraint does not reach the template" */
+    it("drops the constraint, which has no OpenAPI equivalent", () => {
+      // `{.+}` lets one parameter match a slash, so a prompt id can look like
+      // a path. Left in, the template read `{idOrSlug}{.+}` and matched no
+      // documented path at all, so the whole prompts surface read as missing.
+      expect(honoPathToTemplate("/api/prompts/:idOrSlug{.+}")).toBe(
+        "/api/prompts/{idOrSlug}",
+      );
+      expect(honoPathToTemplate("/api/prompts/:id{.+?}/versions")).toBe(
+        "/api/prompts/{id}/versions",
+      );
+    });
+
+    it("still rewrites the parameters around it", () => {
+      expect(honoPathToTemplate("/api/prompts/:id{.+?}/tags/:tag")).toBe(
+        "/api/prompts/{id}/tags/{tag}",
+      );
+    });
+  });
 });
 
 describe("joinRoutePath", () => {

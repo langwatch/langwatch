@@ -308,6 +308,37 @@ export interface RegisteredRoute {
 }
 
 /**
+ * The `/api` basePaths a file's routes are served under.
+ *
+ * Usually the file declares its own. The `app.v1.ts` files do not: they export
+ * a register function that a sibling `app.ts` calls against an app it
+ * constructed, so the basePath lives one file over. Reading only what a file
+ * declares skipped all seven of them and the routes they register -- the whole
+ * prompts, traces and evaluators v1 surfaces -- and a gate with a hole that
+ * shape cannot claim to cover the API.
+ *
+ * Nothing was hidden by it: those routes are documented. But a new one added in
+ * any of those files would never have been caught, which is the failure this
+ * check exists to prevent.
+ */
+function basePathsFor({
+  file,
+  source,
+}: {
+  file: string;
+  source: string;
+}): string[] {
+  const declared = apiBasePathsOf(source);
+  if (declared.length > 0) return declared;
+
+  try {
+    return apiBasePathsOf(readFileSync(join(dirname(file), "app.ts"), "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Every route the codebase registers under an `/api` basePath.
  *
  * A file declaring more than one `/api` basePath contributes each registration
@@ -322,7 +353,7 @@ export function collectRegisteredRoutes(
 
   for (const file of discoverTypeScriptFiles(roots)) {
     const source = readFileSync(file, "utf8");
-    const basePaths = apiBasePathsOf(source);
+    const basePaths = basePathsFor({ file, source });
     if (basePaths.length === 0) continue;
 
     const relative = file.startsWith(`${LANGWATCH_ROOT}/`)

@@ -19,9 +19,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   auditCoverage,
+  collectRegisteredRoutes,
   documentedOperations,
   type Exclusion,
   excludes,
+  HANDLER_ROOTS,
   isEntryModule,
   type RegisteredRoute,
   UNPUBLISHED,
@@ -231,6 +233,36 @@ describe("auditCoverage", () => {
     // The flag is what lets the report say which of the three publishing steps
     // was skipped, rather than leaving the reader to guess.
     expect(result.unexplained[0]?.described).toBe(true);
+  });
+});
+
+describe("collectRegisteredRoutes", () => {
+  describe("given a file whose routes are registered against a sibling's app", () => {
+    /** @scenario "Routes registered in a file with no basePath are still counted" */
+    it("finds them under the sibling's basePath", () => {
+      // The seven `app.v1.ts` files export a register function that their
+      // sibling `app.ts` calls; they declare no basePath of their own. Reading
+      // only what a file declares skipped every route in them.
+      const routes = collectRegisteredRoutes(HANDLER_ROOTS);
+      const fromV1 = routes.filter((route) => route.file.endsWith("app.v1.ts"));
+
+      expect(fromV1.length).toBeGreaterThan(0);
+      for (const route of fromV1) {
+        expect(route.key).toMatch(/^[A-Z]+ \/api\//);
+      }
+    });
+
+    it("gives the prompts v1 surface its real paths", () => {
+      const keys = new Set(
+        collectRegisteredRoutes(HANDLER_ROOTS).map((route) => route.key),
+      );
+
+      expect(keys).toContain("GET /api/prompts");
+      // `:id{.+?}` in the source — the constraint has to come off, or this
+      // reads as `{id}{.+?}` and matches nothing in the document.
+      expect(keys).toContain("GET /api/prompts/{id}");
+      expect(keys).toContain("GET /api/prompts/{id}/versions");
+    });
   });
 });
 

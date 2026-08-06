@@ -53,3 +53,21 @@ Feature: Every public REST route reaches the OpenAPI document
     And its Hono app is not imported by the spec generator
     When the route-coverage check runs
     Then the route is reported as missing from the document
+
+  # The check reads the route table out of the app's own source, so its blind
+  # spots are its own. Two of them made whole families invisible: a file that
+  # registers routes against a sibling's app declares no basePath, and a
+  # parameter carrying a Hono regex constraint templated to a path shape that
+  # matches nothing. Neither hid anything undocumented, but a gate that cannot
+  # see a route cannot notice one going missing, which is the whole claim.
+
+  Scenario: Routes registered in a file with no basePath are still counted
+    Given a file that registers routes against an app its sibling constructed
+    And the file declares no basePath of its own
+    When the route table is read
+    Then its routes are counted under the sibling's basePath
+
+  Scenario: A parameter's routing constraint does not reach the template
+    Given a route whose parameter carries a Hono regex constraint
+    When the route table is read
+    Then the constraint is dropped and the parameter templates on its own
