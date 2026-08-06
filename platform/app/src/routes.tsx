@@ -296,6 +296,10 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/me/devices")),
       },
       {
+        path: "/me/pull-requests",
+        ...page(() => import("./pages/me/pull-requests")),
+      },
+      {
         // Pre-rename path for the devices inventory, kept resolving so old
         // links do not dead-end. A page that renders <Navigate>, not a
         // `loader` redirect: loaders do not run on a cold load of the SPA,

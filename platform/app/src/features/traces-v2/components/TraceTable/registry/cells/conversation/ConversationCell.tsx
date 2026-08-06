@@ -62,15 +62,26 @@ const ExpandToggle: React.FC<{
 );
 
 /**
- * The conversation id, rendered as a link that scopes the All lens to just
- * this conversation. The id IS the filter affordance (the rest of the row
+ * What the row calls the session: the agent's own title when there is one the
+ * viewer may read, otherwise the shortened conversation id. `titleRedacted`
+ * is decided server-side and only read here.
+ */
+export function sessionLabelOf(group: ConversationGroup): string {
+  if (group.title && !group.titleRedacted) return group.title;
+  return truncateId(group.conversationId);
+}
+
+/**
+ * The session's label, rendered as a link that scopes the All lens to just
+ * this conversation. The label IS the filter affordance (the rest of the row
  * opens the drawer), so its click stops propagation; the blue colour plus a
  * hover underline and tooltip signal it acts differently from the row.
  */
 const ConversationIdLabel: React.FC<{
   conversationId: string;
+  label: string;
   comfortable?: boolean;
-}> = ({ conversationId, comfortable = false }) => {
+}> = ({ conversationId, label, comfortable = false }) => {
   const selectLens = useViewStore((s) => s.selectLens);
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
 
@@ -99,9 +110,13 @@ const ConversationIdLabel: React.FC<{
       textStyle="xs"
       fontWeight={comfortable ? "500" : undefined}
       marginTop={comfortable ? "2px" : undefined}
+      // A generated title can run long; the preview beside it keeps the rest
+      // of the row, so the label truncates rather than pushing it out.
+      maxWidth="320px"
+      truncate
       _hover={{ textDecoration: "underline" }}
     >
-      {truncateId(conversationId)}
+      {label}
     </chakra.button>
   );
 };
@@ -119,7 +134,10 @@ export const ConversationCell: CellDef<ConversationGroup> = {
           boxSize="14px"
           marginTop="2px"
         />
-        <ConversationIdLabel conversationId={row.conversationId} />
+        <ConversationIdLabel
+          conversationId={row.conversationId}
+          label={sessionLabelOf(row)}
+        />
         <Box flex={1} minWidth={0}>
           {io.hasContent ? (
             <IOPreview input={io.input} output={io.output} />
@@ -143,7 +161,11 @@ export const ConversationCell: CellDef<ConversationGroup> = {
           boxSize="16px"
           marginTop="3px"
         />
-        <ConversationIdLabel conversationId={row.conversationId} comfortable />
+        <ConversationIdLabel
+          conversationId={row.conversationId}
+          label={sessionLabelOf(row)}
+          comfortable
+        />
         <Box flex={1} minWidth={0}>
           {io.hasContent ? (
             <IOPreview input={io.input} output={io.output} />

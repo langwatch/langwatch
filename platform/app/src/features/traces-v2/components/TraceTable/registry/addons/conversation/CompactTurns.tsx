@@ -244,9 +244,12 @@ function turnCellContent({
             : formatTokens(trace.contextSizeTokens)}
         </MonoCell>
       );
-    // Session-level coding-agent counters have no per-turn meaning.
+    // Session-level coding-agent facts have no per-turn meaning: the
+    // repository and the pull request belong to the whole session.
     case "modelCalls":
     case "compactions":
+    case "repository":
+    case "pullRequest":
       return dash;
     case "model":
       return (

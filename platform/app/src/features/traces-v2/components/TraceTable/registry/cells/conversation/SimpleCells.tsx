@@ -1,4 +1,5 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { chakra, HStack, Text } from "@chakra-ui/react";
+import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { TraceStatus } from "../../../../../types/trace";
 import { formatTokens } from "../../../../../utils/formatters";
@@ -148,3 +149,77 @@ export const CompactionsCell = createCodingAgentCountCell({
   label: "Compactions",
   read: (row) => row.compactions,
 });
+
+/** `owner/name`, or null when the session reported no repository. */
+function repositoryLabelOf(row: ConversationGroup): string | null {
+  if (!row.repositoryOwner || !row.repositoryName) return null;
+  return `${row.repositoryOwner}/${row.repositoryName}`;
+}
+
+/**
+ * Where the session ran. Monospace, like every other identifier on the row,
+ * so an owner/name reads as one token rather than prose.
+ */
+export const RepositoryCell: CellDef<ConversationGroup> = {
+  id: "repository",
+  label: "Repository",
+  render: ({ row }) => {
+    const label = repositoryLabelOf(row);
+    return (
+      <MonoCell truncate whiteSpace={undefined}>
+        {label ?? dash}
+      </MonoCell>
+    );
+  },
+  renderComfortable: ({ row }) => {
+    const label = repositoryLabelOf(row);
+    return (
+      <Text textStyle="xs" color="fg.muted" truncate>
+        {label ?? dash}
+      </Text>
+    );
+  },
+};
+
+/**
+ * The pull request this session's work belongs to. The number links straight
+ * to GitHub and the title rides in the tooltip, so the column stays narrow
+ * while the row still says which pull request it is.
+ */
+const PullRequestLink: React.FC<{
+  pullRequest: NonNullable<ConversationGroup["pullRequest"]>;
+}> = ({ pullRequest }) => (
+  <Tooltip content={pullRequest.title} positioning={{ placement: "top" }}>
+    <chakra.a
+      href={pullRequest.htmlUrl}
+      target="_blank"
+      rel="noreferrer noopener"
+      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      color="blue.fg"
+      textStyle="xs"
+      whiteSpace="nowrap"
+      _hover={{ textDecoration: "underline" }}
+    >
+      #{pullRequest.number}
+    </chakra.a>
+  </Tooltip>
+);
+
+export const PullRequestCell: CellDef<ConversationGroup> = {
+  id: "pullRequest",
+  label: "Pull Request",
+  render: ({ row }) =>
+    row.pullRequest ? (
+      <PullRequestLink pullRequest={row.pullRequest} />
+    ) : (
+      <MonoCell>{dash}</MonoCell>
+    ),
+  renderComfortable: ({ row }) =>
+    row.pullRequest ? (
+      <PullRequestLink pullRequest={row.pullRequest} />
+    ) : (
+      <Text textStyle="xs" color="fg.muted">
+        {dash}
+      </Text>
+    ),
+};

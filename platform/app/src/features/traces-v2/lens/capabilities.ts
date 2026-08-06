@@ -131,6 +131,10 @@ const CONVERSATION_CAPABILITY: LensCapability = {
     { id: "contextSize", label: "Context Size", section: "Standard" },
     { id: "modelCalls", label: "Model Calls", section: "Standard" },
     { id: "compactions", label: "Compactions", section: "Standard" },
+    // Opt-in: the lens is already wide, and only coding-agent sessions carry
+    // a repository or a pull request at all.
+    { id: "repository", label: "Repository", section: "Standard" },
+    { id: "pullRequest", label: "Pull Request", section: "Standard" },
     { id: "model", label: "Model", section: "Standard" },
     { id: "service", label: "Service", section: "Standard" },
     { id: "status", label: "Status", section: "Standard" },

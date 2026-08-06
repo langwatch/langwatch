@@ -375,6 +375,28 @@ const conversationColumnDefs: Record<
     meta: num,
     enableSorting: false,
   }),
+  // Where the session ran and what it produced. The session rollup does not
+  // order by either, so neither offers a sort.
+  repository: convCol.accessor(
+    (row) =>
+      row.repositoryOwner && row.repositoryName
+        ? `${row.repositoryOwner}/${row.repositoryName}`
+        : "",
+    {
+      id: "repository",
+      header: "Repository",
+      size: 180,
+      minSize: 120,
+      enableSorting: false,
+    },
+  ),
+  pullRequest: convCol.accessor((row) => row.pullRequest?.number ?? 0, {
+    id: "pullRequest",
+    header: "Pull Request",
+    size: 115,
+    minSize: 105,
+    enableSorting: false,
+  }),
   model: convCol.accessor("primaryModel", {
     id: "model",
     header: "Model",

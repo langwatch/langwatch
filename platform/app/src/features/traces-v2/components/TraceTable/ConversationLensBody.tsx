@@ -24,7 +24,7 @@ import { TraceTableShell } from "./TraceTableShell";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
 import { VirtualSpacer } from "./VirtualSpacer";
 
-const CONVERSATION_MIN_WIDTH = "880px";
+const CONVERSATION_MIN_WIDTH = "1000px";
 
 // Stable reference so RegistryRow's prop memo doesn't re-render every row
 // each parent render. The expanded session's header row shares this
