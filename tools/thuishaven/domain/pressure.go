@@ -46,9 +46,10 @@ type MemStat struct {
 	SwapTotalBytes  uint64
 }
 
-// Pressure thresholds, as fractions. Picked from observed behaviour on a
+// Pressure thresholds, as fractions. Picked from what was observed on a
 // laptop running several worktrees, not from anything the OS enforces — so
-// they are a heuristic, and ADR-087 says so rather than implying otherwise.
+// they are a heuristic, and ADR-087 says so rather than implying it measured
+// a limit the system actually applies.
 const (
 	amberSwapFraction = 0.40
 	redSwapFraction   = 0.75
@@ -152,7 +153,7 @@ type PressureRecord struct {
 }
 
 // PressureRecordVersion is the current record shape. A reader that does not
-// recognise the version treats the record as absent.
+// know the version treats the record as absent.
 const PressureRecordVersion = 1
 
 // PressureStaleAfter is how old a record may be before it stops being believed.
@@ -160,9 +161,10 @@ const PressureRecordVersion = 1
 // does not blind every reader on the machine.
 const PressureStaleAfter = 90 * time.Second
 
-// ReadPressure interprets a published record. Absent, unparseable, wrong
-// version and stale all resolve to green, which disables narrowing and
-// refusal — and nothing else. Slot counting never depends on this.
+// ReadPressure interprets a published record. Absent, unparseable, stale, or
+// written by a version this build does not know all resolve to green, which
+// disables narrowing and refusal — and nothing else. Slot counting never
+// depends on this.
 func ReadPressure(rec PressureRecord, ok bool, now time.Time) Pressure {
 	if !ok || rec.Version != PressureRecordVersion {
 		return Green

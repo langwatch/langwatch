@@ -50,7 +50,15 @@ There is a related cost the spawn cap prices better than RAM does: a cache entry
 
 **Never exit 2, and never let the runtime choose the exit code.** The gate recovers panics in main, runs no goroutines on the decision path, and translates any abnormal termination into a deferring exit. Stated as a decision because the language default is the failure mode.
 
-**Refusal is a machine-health lever first, and a cache lever only for sub-agents.** A main session keeps its cache through any wait the existing 30-minute failsafe permits, so against that caller the earlier draft's "denying is cheaper than parking" does not hold at all. Against a sub-agent it does, because five minutes is a wait the queue can genuinely exceed. Red refuses either way, because at red the machine cannot take the work regardless of who is asking. A deny is not free — it costs a turn — so the same command is not denied indefinitely.
+**A wait too long to serve becomes a background task, not a refusal.** This is the best available answer to "the queue is deeper than this caller's ceiling", and it is measured rather than assumed: `updatedInput` can set `run_in_background` on a Bash call, and a probe confirms the agent then gets control back immediately, reads haven's explanation out of the replacement `description`, and receives a completion notification with the exit code when the run finishes.
+
+That dominates the alternatives. Blocking parks the agent past its cache floor. Refusing costs a turn and invites a retry that hits the same queue. Backgrounding does the work, keeps the agent free — so its cache never goes cold at all — and tells it the outcome later. While the run sits in the queue, `haven run` writes its position to stdout, so an agent that polls the background task sees live queue depth rather than silence. That is the closest thing to a push channel that exists: hooks are request/response, and a blocked agent makes no API calls, so there is nothing to push to.
+
+**Backgrounding is scoped to the case where the alternative was a refusal**, because it breaks causality: an agent that runs tests and then edits based on the result gets an immediate return and could proceed as though they passed. Where the wait fits inside the caller's ceiling, the run queues inline and blocks, which preserves the ordinary contract. Where it does not, the agent was not going to get its result on this turn either way, so a background task is strictly better than a denial.
+
+**Red still refuses**, because at red the machine cannot take the work at all — backgrounding it would just move the burst a few seconds later.
+
+A deny that does happen is not free — it costs a turn — so the same command is not denied indefinitely.
 
 **On the cost side the gate warns, and each check names its channel.** No primitive shows the model a price and still lets the action proceed — `systemMessage` reaches the developer and not the model, `ask` interrupts the developer, `deny` reaches the model but blocks. Warnings are therefore for the developer. High-certainty, high-value invalidations on a large prefix use `ask`; everything else uses `systemMessage`. Two things get `deny`: a tool call repeating identically with no intervening change, and a sub-agent spawn past the machine-wide cap.
 

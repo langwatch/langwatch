@@ -31,8 +31,22 @@ const (
 	Admit Admission = iota
 	// Narrow runs it now with fewer workers, consuming a slot like any other run.
 	Narrow
-	// Queue waits for a slot.
+	// Queue waits for a slot, blocking the caller. Correct when the wait fits
+	// inside the caller's ceiling.
 	Queue
+	// Background hands the run back to run detached, so the caller keeps working
+	// and is notified when it finishes.
+	//
+	// This is what a wait too long to serve becomes. Blocking would park the
+	// caller past its cache floor; refusing would cost a turn and invite a retry
+	// into the same queue. Backgrounding does the work and reports later, and a
+	// caller that polls sees the queue position meanwhile.
+	//
+	// It is deliberately NOT the answer to a short wait: returning immediately
+	// from a run the caller meant to gate its next step on breaks causality, and
+	// that is only worth risking where the alternative was a refusal — where the
+	// caller was not getting its result this turn regardless.
+	Background
 	// Refuse declines, with a reason.
 	Refuse
 )
@@ -44,6 +58,8 @@ func (a Admission) String() string {
 		return "narrowed"
 	case Queue:
 		return "queued"
+	case Background:
+		return "backgrounded"
 	case Refuse:
 		return "refused"
 	default:
@@ -63,6 +79,14 @@ type AdmissionRequest struct {
 	// It is respected rather than overridden, but the run is still admitted,
 	// queued or refused by the same rules as any other.
 	CallerSetWorkers bool
+	// EstimatedWait is how long this run would sit in the queue. It decides
+	// between blocking and backgrounding: a wait the caller can afford is served
+	// inline, a wait it cannot is handed back detached.
+	EstimatedWait time.Duration
+	// CanBackground is false for a caller with nowhere to put a detached run —
+	// a plain shell invocation rather than a gated tool call. Such a caller
+	// queues instead, on the ordinary failsafe.
+	CanBackground bool
 }
 
 // fitsInsideFloor reports whether a narrowed run would finish before this
@@ -96,13 +120,16 @@ func DecideAdmission(r AdmissionRequest) Admission {
 	if r.Pressure == Red {
 		return Refuse
 	}
-	if r.Caller != SubAgent || !r.Kind.Narrowable() || r.CallerSetWorkers {
-		return Queue
+	if r.Caller == SubAgent && r.Kind.Narrowable() && !r.CallerSetWorkers && r.fitsInsideFloor() {
+		return Narrow
 	}
-	if !r.fitsInsideFloor() {
-		return Queue
+	// A wait the caller cannot afford is handed back detached rather than served
+	// inline. Blocking would park it past its cache floor; refusing would cost a
+	// turn and send it back into the same queue.
+	if r.CanBackground && r.EstimatedWait > r.Caller.WaitCeiling() {
+		return Background
 	}
-	return Narrow
+	return Queue
 }
 
 // NarrowedWorkers is how many workers a narrowed run gets.
