@@ -289,7 +289,7 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When the agent's SDK retries the call
     Then the relay answers the retry with a failure the SDK does not retry
     And it carries the provider's own error payload
-    And the turn fails with the provider's message instead of spinning
+    And the turn fails with the plan-limit card selected by the in-stream reason code
 
   @unit
   Scenario: A clean stream clears the in-stream failure capture
