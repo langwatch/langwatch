@@ -263,12 +263,18 @@ jobs:
           # ingest guard in langwatchPlatformGuard.ts), so blank it here.
           LANGWATCH_API_KEY: ""
         run: |
-          NODE_ENV=production pnpm run start &
+          # Tee both processes to files: a background process's output is only
+          # visible while its starting step runs, so without this a server-side
+          # failure during the test step (e.g. a 500 on /api/otel/v1/traces)
+          # leaves no stack trace anywhere in the job.
+          NODE_ENV=production pnpm run start > /tmp/langwatch-server.log 2>&1 &
           # Start the worker process so the event-sourcing pipeline
           # consumes traces from Redis and writes them to ClickHouse
-          pnpm run start:workers &
+          pnpm run start:workers > /tmp/langwatch-workers.log 2>&1 &
           # Wait for server to be ready
-          timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
+          timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done' || {
+            echo "server never became ready; log follows"; cat /tmp/langwatch-server.log; exit 1;
+          }
           echo "✅ LangWatch server is ready"
 
       # Already installed above alongside the app; nothing further to fetch.
@@ -296,6 +302,14 @@ jobs:
           E2E_TIMEOUT: 120000
           E2E_POLL_TIMEOUT: 120000
         run: pnpm test:e2e
+
+      - name: Dump server and worker logs on failure
+        if: failure()
+        run: |
+          echo "=== /tmp/langwatch-server.log (last 300 lines) ==="
+          tail -300 /tmp/langwatch-server.log || true
+          echo "=== /tmp/langwatch-workers.log (last 100 lines) ==="
+          tail -100 /tmp/langwatch-workers.log || true
 
   sdk-javascript-complete:
     needs: [changes, ci, e2e]
