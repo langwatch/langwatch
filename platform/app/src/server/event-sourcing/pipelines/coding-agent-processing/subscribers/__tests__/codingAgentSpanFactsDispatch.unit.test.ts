@@ -773,7 +773,7 @@ describe("codingAgentSpanFactsDispatch", () => {
 
   describe("given a lifted-derivation staged job (ADR-069)", () => {
     describe("when the job carries the facts already lifted", () => {
-      /** @scenario work whose result is a bounded derivation carries it instead of a pointer */
+      /** @scenario work carrying its finished result completes without reading anything back */
       it("contributes them without reading the span store at all", async () => {
         const { subscriber, dispatched, reads } = makeSubscriber(async () => {
           throw new Error("the store must not be read for a lifted job");
@@ -795,7 +795,7 @@ describe("codingAgentSpanFactsDispatch", () => {
        * dependency that parked 22 groups, so a lifted job must succeed with the
        * store entirely absent, not merely usually.
        */
-      /** @scenario work whose result is a bounded derivation carries it instead of a pointer */
+      /** @scenario work carrying its finished result completes without reading anything back */
       it("succeeds even when the span never lands in the store", async () => {
         const { subscriber, dispatched } = makeSubscriber(async () => null);
 
@@ -809,7 +809,7 @@ describe("codingAgentSpanFactsDispatch", () => {
     });
 
     describe("when the staged body names a different tenant than the envelope", () => {
-      /** @scenario work whose result is a bounded derivation carries it instead of a pointer */
+      /** @scenario work carrying its finished result completes without reading anything back */
       it("contributes under the envelope's tenant, never the body's", async () => {
         const { subscriber, dispatched } = makeSubscriber();
         const lifted = liftedEvent({ spanId: "tool-x-tenant" });

@@ -138,6 +138,7 @@ describe("queryWindowed", () => {
        * healthy one while 22 groups sat blocked.
        */
       /** @scenario a bounded miss is recorded as a miss, not as an answer */
+      /** @scenario a caller that forbids widening stays bounded on a miss */
       it("does not re-run and records the miss as windowed_empty, not hit", async () => {
         const beforeEmpty = await outcomeCount("windowed_empty");
         const beforeHit = await outcomeCount("hit");
@@ -161,7 +162,6 @@ describe("queryWindowed", () => {
        * The counterweight: splitting the empty case must not reclassify the
        * answers. A `none` read that finds its row is still a plain hit.
        */
-      /** @scenario a caller that forbids widening stays bounded on a miss */
       it("still records a hit when the window answers", async () => {
         const beforeHit = await outcomeCount("hit");
         const beforeEmpty = await outcomeCount("windowed_empty");

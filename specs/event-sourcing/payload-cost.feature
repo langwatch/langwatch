@@ -171,7 +171,12 @@ Feature: Payload cost governs the scheduling plane
   # against a store it does not control. Work whose result is a small, bounded
   # derivation can carry the derivation instead — cheap for the same reason a
   # pointer is cheap, and with nothing left to race.
-  @unit
+  #
+  # This is the PRODUCER half, and it is deliberately not live yet: the
+  # deploy-order rule two scenarios up means the consumer half below must be on
+  # every worker for a full release before anything stages this shape. Flip to
+  # @unit when the producer ships (R2).
+  @unimplemented
   Scenario: work whose result is a bounded derivation carries it instead of a pointer
     Given a relevant event whose payload is large
     And the subscriber's whole result is a derivation drawn from a fixed, closed vocabulary
@@ -180,15 +185,28 @@ Feature: Payload cost governs the scheduling plane
     And the queued work does not grow with the size of the payload it came from
     And the subscriber produces its result without reading the payload back
 
+  # The consumer half of the shape above, live one release ahead of it: a
+  # worker must already complete carried-result work correctly — staged by the
+  # NEXT build — before anything produces it.
+  @unit
+  Scenario: work carrying its finished result completes without reading anything back
+    Given queued work that carries the subscriber's finished result
+    When the subscriber processes it
+    Then the result is delivered as it was carried
+    And the payload's store is never read
+    And the work completes even if the payload's store write never landed
+
   # The guard that stops this from becoming "queue the payload again": the
   # vocabulary is closed, so a caller cannot widen it into carrying content by
-  # adding a field that happens to be large.
+  # adding a field that happens to be large. The derivation itself is live in
+  # this release — the full-event path lifts with the same closed vocabulary
+  # the staged shape will carry.
   @unit
   Scenario: a carried derivation never carries content
     Given an event whose payload contains large content alongside small facts
-    When the work is staged as a carried derivation
-    Then the queued work holds the small facts
-    And the queued work holds none of the content
+    When the subscriber's result is derived from that event
+    Then the derivation holds the small facts
+    And the derivation holds none of the content
     And the content remains readable from the payload's canonical store
 
   @unit
