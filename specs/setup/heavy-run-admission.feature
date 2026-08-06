@@ -53,6 +53,17 @@ Feature: Heavy runs are admitted, queued, or refused
   #
   # No inference is needed to tell them apart: the hook payload carries
   # agent_id inside a sub-agent and omits it in a main session.
+  #
+  # NEIGHBOURS, so this file's boundary is explicit rather than discovered
+  # later. specs/setup/memory-footprint.feature is about what a single process
+  # LOADS; specs/setup/in-process-workers-dev.feature is about HOW MANY
+  # processes a stack runs; specs/setup/haven-resource-caps.feature caps the
+  # shared services. This file is about how many heavy runs may start at once,
+  # and touches none of those levers.
+  #
+  # specs/setup/integration-file-serialism.feature owns the integration suite's
+  # own concurrency, and this file must not reach into it — see the
+  # never-narrowed scenario below.
 
   # --- Tests join the existing counter ---
 
@@ -117,6 +128,21 @@ Feature: Heavy runs are admitted, queued, or refused
     And this command has been observed to finish inside five minutes when narrowed
     When a unit test run starts
     Then it is given a smaller worker count and starts immediately
+
+  # specs/setup/integration-file-serialism.feature owns the integration suite's
+  # concurrency and treats a worker count arriving from the environment as
+  # something to withdraw — and, if a second worker appears anyway, as a reason
+  # to fail the run naming the count that re-enabled concurrency. The
+  # integration config already clamps to one worker locally, so there is
+  # nothing to narrow and any attempt to narrow it is at best inert and at
+  # worst trips that guard. Narrowing is therefore a unit-test lever only.
+  @unit @unimplemented
+  Scenario: An integration run is never narrowed
+    Given no slot is free
+    And the run is an integration suite
+    When it is admitted
+    Then its worker count is left entirely alone
+    And it queues instead, because its files are serial by construction
 
   @unit @unimplemented
   Scenario: A long sub-agent run is queued anyway
