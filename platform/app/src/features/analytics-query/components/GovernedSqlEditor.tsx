@@ -14,7 +14,9 @@
  */
 
 import { Box } from "@chakra-ui/react";
+import type { OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
+import { useCallback, useState } from "react";
 
 import { useColorMode } from "~/components/ui/color-mode";
 import dynamic from "~/utils/compat/next-dynamic";
@@ -45,6 +47,22 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   // never swallows a keystroke while the widget is open.
   acceptSuggestionOnCommitCharacter: false,
 };
+
+/**
+ * The editor is as tall as the statement, within reason: a few lines of SQL
+ * get a few lines of editor, and the result below keeps the rest of the page.
+ * The ceiling stops a long statement from pushing the result off screen — past
+ * it the editor scrolls internally.
+ */
+const EDITOR_MIN_HEIGHT = 116;
+const EDITOR_MAX_HEIGHT = 380;
+
+function clampEditorHeight(contentHeight: number): number {
+  return Math.min(
+    EDITOR_MAX_HEIGHT,
+    Math.max(EDITOR_MIN_HEIGHT, contentHeight),
+  );
+}
 
 export interface GovernedSqlEditorProps {
   sql: string;
@@ -83,10 +101,26 @@ export function GovernedSqlEditor({
     ...(onRun ? { onRun } : {}),
   });
 
+  const [editorHeight, setEditorHeight] = useState(EDITOR_MIN_HEIGHT);
+  const handleMountWithHeight: OnMount = useCallback(
+    (instance, monaco) => {
+      handleMount(instance, monaco);
+      // Guarded, like the rest of the mount path: a test double of Monaco
+      // stubs only what its test reads, and a missing sizing API must degrade
+      // to the minimum height rather than crash.
+      if (instance.getContentHeight && instance.onDidContentSizeChange) {
+        const follow = () =>
+          setEditorHeight(clampEditorHeight(instance.getContentHeight()));
+        instance.onDidContentSizeChange(follow);
+        follow();
+      }
+    },
+    [handleMount],
+  );
+
   return (
     <Box
-      height="full"
-      minHeight="220px"
+      height={`${editorHeight}px`}
       overflow="hidden"
       data-testid="governed-sql-editor"
     >
@@ -96,7 +130,7 @@ export function GovernedSqlEditor({
         value={sql}
         theme={theme}
         onChange={(value: string | undefined) => onChange(value ?? "")}
-        onMount={handleMount}
+        onMount={handleMountWithHeight}
         options={EDITOR_OPTIONS}
       />
     </Box>

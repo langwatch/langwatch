@@ -273,9 +273,14 @@ function EmptyState({ onInsertExample }: { onInsertExample?: () => void }) {
       <Text fontSize="14px" fontWeight="600" marginBottom={1}>
         Nothing has run yet
       </Text>
-      <Text fontSize="12.5px" color="fg.muted" lineHeight="1.6" maxWidth="420px">
-        The governed datasets on the left are ready — open one to see what a
-        row means and what you can select. Nothing runs until you press{" "}
+      <Text
+        fontSize="12.5px"
+        color="fg.muted"
+        lineHeight="1.6"
+        maxWidth="420px"
+      >
+        The governed datasets on the left are ready — open one to see what a row
+        means and what you can select. Nothing runs until you press{" "}
         <strong>Run query</strong>.
       </Text>
       {onInsertExample && (
@@ -409,9 +414,7 @@ export function GovernedSqlResultPane({
         {state.inFlight ? (
           <RunningState />
         ) : (
-          <EmptyState
-            {...(onInsertExample ? { onInsertExample } : {})}
-          />
+          <EmptyState {...(onInsertExample ? { onInsertExample } : {})} />
         )}
       </VStack>
     );
@@ -423,6 +426,9 @@ export function GovernedSqlResultPane({
       flex="1"
       minHeight={0}
       gap={0}
+      // When the viewport is too short for the chart floor plus the footer,
+      // the pane scrolls as a whole rather than clipping either.
+      overflowY="auto"
       data-testid="governed-sql-result-pane"
     >
       <HStack
@@ -498,10 +504,16 @@ export function GovernedSqlResultPane({
           {renderChartArea && chartAreaVisited && (
             <Box
               flex="1"
-              minHeight={0}
+              // A floor rather than 0: a chart cut off mid-bar reads as broken,
+              // so past this the panel scrolls instead of shrinking.
+              minHeight="280px"
               overflow="auto"
               role="tabpanel"
-              id={view === "specification" ? panelIdFor("specification") : panelIdFor("chart")}
+              id={
+                view === "specification"
+                  ? panelIdFor("specification")
+                  : panelIdFor("chart")
+              }
               display={view === "table" ? "none" : undefined}
               padding={view === "specification" ? 0 : 4}
             >

@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GovernedSqlEditor } from "../components/GovernedSqlEditor";
 import { governedSchemaModel } from "../logic/governedSchemaModel";
 
+import { GOVERNED_SQL_LANGUAGE_ITEMS } from "../logic/governedSqlLanguageItems";
 import {
   SCHEMA_AVAILABLE_COLUMN_NAMES,
   SCHEMA_DATASET_NAMES,
@@ -34,6 +35,7 @@ interface CompletionProvider {
       detail: string;
       documentation: string;
       insertText: string;
+      sortText?: string;
     }[];
   };
 }
@@ -72,7 +74,8 @@ const harness = vi.hoisted(() => {
       },
     },
     languages: {
-      CompletionItemKind: { Struct: 1, Field: 2 },
+      CompletionItemKind: { Struct: 1, Field: 2, Keyword: 3, Function: 4 },
+      CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
       registerCompletionItemProvider: (
         _language: string,
         provider: unknown,
@@ -167,7 +170,7 @@ describe("the governed SQL editor", () => {
   describe("given the schema endpoint answered for this member", () => {
     describe("when the member invokes completion or hovers an identifier", () => {
       /** @scenario "Monaco assistance derives from the same schema response" */
-      it("offers only the datasets and columns that response carried", async () => {
+      it("offers the schema the response carried, plus the SQL language and nothing else", async () => {
         await renderEditor();
 
         const completion = harness.slots.completion as CompletionProvider;
@@ -176,12 +179,36 @@ describe("the governed SQL editor", () => {
           { lineNumber: 1, column: 1 },
         );
 
+        // Every identifier is the response's own; the only additions are the
+        // static keyword and function lists, which name no dataset or column.
         expect(suggestions.map((item) => item.label).sort()).toEqual(
-          [...SCHEMA_DATASET_NAMES, ...SCHEMA_AVAILABLE_COLUMN_NAMES].sort(),
+          [
+            ...SCHEMA_DATASET_NAMES,
+            ...SCHEMA_AVAILABLE_COLUMN_NAMES,
+            ...GOVERNED_SQL_LANGUAGE_ITEMS.map((item) => item.label),
+          ].sort(),
         );
         expect(
           suggestions.find((item) => item.label === "latency_ms")?.detail,
         ).toBe("Float64");
+      });
+
+      /** @scenario "Typing a keyword offers the keyword" */
+      it("offers SELECT to a member who has typed nothing schema-shaped", async () => {
+        await renderEditor();
+
+        const completion = harness.slots.completion as CompletionProvider;
+        const { suggestions } = completion.provideCompletionItems(
+          harness.model,
+          { lineNumber: 1, column: 1 },
+        );
+
+        const select = suggestions.find((item) => item.label === "SELECT");
+        expect(select?.insertText).toBe("SELECT");
+        // Keywords sort ahead of identifiers on an equal fuzzy match, so
+        // typing "sel" surfaces SELECT before a column starting with the same
+        // letters.
+        expect(select?.sortText).toBe("0 SELECT");
       });
 
       /** @scenario "Monaco assistance derives from the same schema response" */

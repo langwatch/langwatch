@@ -259,6 +259,19 @@ describe("given the governed schema catalog", () => {
         );
       }
     });
+
+    /**
+     * The server pins every query to one tenant, so `TenantId` is a single
+     * repeated value — an example selecting it teaches a member to select a
+     * constant. The column stays published and selectable; only the example
+     * skips it.
+     */
+    it("never puts the tenant scope column in its projection", () => {
+      for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
+        const [projection] = dataset.exampleSql.split("\n");
+        expect(projection, dataset.name).not.toContain("TenantId");
+      }
+    });
   });
 
   /**

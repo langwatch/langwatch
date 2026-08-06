@@ -22,6 +22,13 @@ const QUANTITATIVE_TYPE = /\b(U?Int\d+|Float\d+|Decimal\d*)\b/;
 
 export type StarterEncodingType = "temporal" | "quantitative" | "nominal";
 
+/**
+ * Constant by construction: the server pins every result to one tenant, so a
+ * chart with this on an axis is a single bar of everything. The starter picks
+ * another dimension when there is one; a member may still chart it by hand.
+ */
+const TENANT_COLUMN = "TenantId";
+
 /** How a result column is read when a chart is drawn over it. */
 export function starterEncodingType(type: string): StarterEncodingType {
   if (TEMPORAL_TYPE.test(type)) return "temporal";
@@ -48,7 +55,11 @@ export function starterVegaLiteSpec({
   const quantitative = typed.find(
     (column) => column.encoding === "quantitative",
   );
-  const nominal = typed.find((column) => column.encoding === "nominal");
+  const nominal =
+    typed.find(
+      (column) =>
+        column.encoding === "nominal" && column.name !== TENANT_COLUMN,
+    ) ?? typed.find((column) => column.encoding === "nominal");
   const dimension = temporal ?? nominal;
 
   const base = {

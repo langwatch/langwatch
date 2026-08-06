@@ -102,6 +102,12 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     When the member invokes completion or hovers a governed identifier in the editor
     Then the suggestions and hover details come from the live schema response
 
+  @unit
+  Scenario: Typing a keyword offers the keyword
+    When the member starts typing a statement in the editor
+    Then SQL keywords and reviewed ClickHouse functions are offered alongside schema names
+    And nothing that could write, define, or grant is ever suggested
+
   @integration
   Scenario: A search narrows the schema browser
     Given a schema with many datasets and columns

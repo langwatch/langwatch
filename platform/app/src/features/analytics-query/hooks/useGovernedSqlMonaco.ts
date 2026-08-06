@@ -22,6 +22,7 @@ import {
   governedSqlHoverFor,
 } from "../logic/governedSchemaModel";
 import type { GovernedSqlEditorMarker } from "../logic/governedSqlFailure";
+import { GOVERNED_SQL_LANGUAGE_ITEMS } from "../logic/governedSqlLanguageItems";
 
 type MonacoEditorInstance = editor.IStandaloneCodeEditor;
 
@@ -59,8 +60,8 @@ function completionProvider({
         startColumn: word.startColumn,
         endColumn: word.endColumn,
       };
-      return {
-        suggestions: governedSqlCompletionItems(readSchema()).map((item) => ({
+      const schemaSuggestions = governedSqlCompletionItems(readSchema()).map(
+        (item) => ({
           label: item.label,
           kind:
             item.kind === "dataset"
@@ -70,8 +71,34 @@ function completionProvider({
           detail: item.detail,
           documentation: item.documentation,
           range,
-        })),
-      };
+        }),
+      );
+      // Keywords rank ahead of identifiers on an equal fuzzy match, so a
+      // member typing "sel" is offered SELECT before a column that happens to
+      // start with the same letters.
+      const languageSuggestions = GOVERNED_SQL_LANGUAGE_ITEMS.map((item) =>
+        item.kind === "keyword"
+          ? {
+              label: item.label,
+              kind: monaco.languages.CompletionItemKind.Keyword,
+              insertText: item.label,
+              detail: item.detail,
+              sortText: `0 ${item.label}`,
+              range,
+            }
+          : {
+              label: item.label,
+              kind: monaco.languages.CompletionItemKind.Function,
+              // A snippet, so accepting `count` leaves the cursor between the
+              // parentheses it will want to fill.
+              insertText: `${item.label}($0)`,
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule?.InsertAsSnippet,
+              detail: item.detail,
+              range,
+            },
+      );
+      return { suggestions: [...schemaSuggestions, ...languageSuggestions] };
     },
   };
 }

@@ -158,11 +158,11 @@ function DatasetEntry({
         <Box aria-hidden="true" display="flex" color="fg.subtle">
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </Box>
-        <Text fontFamily="mono" fontSize="12px" fontWeight="600">
+        <Text fontFamily="mono" fontSize="12px" fontWeight="600" minWidth={0}>
           {dataset.name}
         </Text>
         <Box flex="1" />
-        <Text fontSize="10.5px" color="fg.subtle">
+        <Text fontSize="10.5px" color="fg.subtle" whiteSpace="nowrap">
           {dataset.columns.length} columns
         </Text>
       </chakra.button>

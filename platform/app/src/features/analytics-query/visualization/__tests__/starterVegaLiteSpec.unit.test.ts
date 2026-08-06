@@ -113,6 +113,34 @@ describe("the starting chart specification", () => {
         });
       });
 
+      /**
+       * The server pins every result to one tenant, so `TenantId` is constant
+       * and a chart over it is a single bar of everything. The starter reaches
+       * past it when the result offers any other category — and still uses it
+       * when it is the only category there is, because an axis beats none.
+       */
+      it("prefers a category the result can distinguish over the tenant scope column", () => {
+        const spec = starterVegaLiteSpec({
+          columns: [
+            { name: "TenantId", type: "String" },
+            { name: "model", type: "String" },
+          ],
+          datasetName: DATASET,
+        });
+        const encoding = spec.encoding as Record<string, any>;
+        expect(encoding.x).toEqual({ field: "model", type: "nominal" });
+
+        const onlyTenant = starterVegaLiteSpec({
+          columns: [{ name: "TenantId", type: "String" }],
+          datasetName: DATASET,
+        });
+        const tenantEncoding = onlyTenant.encoding as Record<string, any>;
+        expect(tenantEncoding.x).toEqual({
+          field: "TenantId",
+          type: "nominal",
+        });
+      });
+
       it("names only columns the result actually has", () => {
         for (const { columns } of COLUMN_SHAPES) {
           const spec = starterVegaLiteSpec({ columns, datasetName: DATASET });

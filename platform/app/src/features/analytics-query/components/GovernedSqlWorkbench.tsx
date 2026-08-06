@@ -242,13 +242,17 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
       <Box
         flex="1"
         minWidth={0}
+        minHeight={0}
         display="flex"
         flexDirection="column"
         gap={3}
         padding={4}
-        overflowY="auto"
       >
+        {/* The query card hugs its statement; the result card below takes
+            every remaining pixel. This split is the page's shape — inverting
+            it is what buries a result under an empty editor. */}
         <Box
+          flexShrink={0}
           background="bg.panel"
           borderWidth="1px"
           borderColor="border"
@@ -302,7 +306,7 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
           boxShadow="xs"
           overflow="hidden"
           flex="1"
-          minHeight="280px"
+          minHeight={0}
           display="flex"
           flexDirection="column"
         >
