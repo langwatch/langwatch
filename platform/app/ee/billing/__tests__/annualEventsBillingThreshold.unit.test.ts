@@ -60,7 +60,7 @@ describe("applyAnnualEventsBillingThreshold", () => {
     vi.clearAllMocks();
   });
 
-  describe("when the subscription carries an annual events price", () => {
+  describe("given a subscription carrying an annual events price", () => {
     /** @scenario An annual subscription gets a billing threshold after checkout completes */
     it("updates the subscription with the threshold, without moving the anchor", async () => {
       const stripe = makeStripe(
@@ -103,7 +103,7 @@ describe("applyAnnualEventsBillingThreshold", () => {
     });
   });
 
-  describe("when the threshold is already set", () => {
+  describe("given the threshold is already set", () => {
     /** @scenario Applying the threshold twice is a no-op */
     it("makes no update call", async () => {
       const stripe = makeStripe(
@@ -123,7 +123,7 @@ describe("applyAnnualEventsBillingThreshold", () => {
     });
   });
 
-  describe("when the threshold was set by hand to a different amount", () => {
+  describe("given a threshold set by hand to a different amount", () => {
     /** @scenario A manually configured threshold amount is never replaced */
     it("preserves the existing amount and makes no update call", async () => {
       const stripe = makeStripe(
@@ -143,7 +143,7 @@ describe("applyAnnualEventsBillingThreshold", () => {
     });
   });
 
-  describe("when the threshold resets the billing cycle anchor", () => {
+  describe("given a threshold that resets the billing cycle anchor", () => {
     /** @scenario A threshold configured to move the billing anniversary is corrected */
     it("pins the anchor while keeping the existing amount", async () => {
       const stripe = makeStripe(
@@ -192,7 +192,7 @@ describe("applyAnnualEventsBillingThreshold", () => {
     });
   });
 
-  describe("when the subscription has no annual events price", () => {
+  describe("given a subscription with no annual events price", () => {
     it("skips monthly and non-Growth subscriptions untouched", async () => {
       const monthly = makeStripe(
         makeStripeSubscription({
@@ -221,7 +221,7 @@ describe("applyAnnualEventsBillingThreshold", () => {
     });
   });
 
-  describe("when running in dry-run mode", () => {
+  describe("given dry-run mode", () => {
     it("reports applied without calling Stripe", async () => {
       const stripe = makeStripe(
         makeStripeSubscription({

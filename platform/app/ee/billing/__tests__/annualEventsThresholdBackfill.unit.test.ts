@@ -25,7 +25,13 @@ import type { PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { runAnnualEventsThresholdBackfill } from "../stripe/annualEventsThresholdBackfill";
 
-const makeCandidate = (id: string, stripeSubscriptionId: string) => ({
+const makeCandidate = ({
+  id,
+  stripeSubscriptionId,
+}: {
+  id: string;
+  stripeSubscriptionId: string;
+}) => ({
   id,
   plan: "GROWTH_SEAT_USD_ANNUAL",
   stripeSubscriptionId,
@@ -50,7 +56,7 @@ describe("runAnnualEventsThresholdBackfill", () => {
     vi.clearAllMocks();
   });
 
-  describe("when candidates mix annual, monthly, and legacy item shapes", () => {
+  describe("given candidates mixing annual, monthly, and legacy item shapes", () => {
     /** @scenario The backfill applies the threshold only to annual event subscriptions */
     it("updates only subscriptions carrying an annual events price", async () => {
       const subscriptionsInStripe: Record<string, unknown> = {
@@ -80,9 +86,12 @@ describe("runAnnualEventsThresholdBackfill", () => {
         subscriptions: { update: ReturnType<typeof vi.fn> };
       };
       const prisma = makePrisma([
-        makeCandidate("db_1", "sub_annual"),
-        makeCandidate("db_2", "sub_stale_plan"),
-        makeCandidate("db_3", "sub_grandfathered"),
+        makeCandidate({ id: "db_1", stripeSubscriptionId: "sub_annual" }),
+        makeCandidate({ id: "db_2", stripeSubscriptionId: "sub_stale_plan" }),
+        makeCandidate({
+          id: "db_3",
+          stripeSubscriptionId: "sub_grandfathered",
+        }),
       ]);
 
       const tally = await runAnnualEventsThresholdBackfill({
@@ -105,7 +114,7 @@ describe("runAnnualEventsThresholdBackfill", () => {
     });
   });
 
-  describe("when one subscription fails in Stripe", () => {
+  describe("given one subscription that fails in Stripe", () => {
     /** @scenario A failure on one subscription does not stop the backfill */
     it("processes the remaining candidates and counts the failure", async () => {
       const stripe = {
@@ -127,8 +136,8 @@ describe("runAnnualEventsThresholdBackfill", () => {
         subscriptions: { update: ReturnType<typeof vi.fn> };
       };
       const prisma = makePrisma([
-        makeCandidate("db_1", "sub_failing"),
-        makeCandidate("db_2", "sub_healthy"),
+        makeCandidate({ id: "db_1", stripeSubscriptionId: "sub_failing" }),
+        makeCandidate({ id: "db_2", stripeSubscriptionId: "sub_healthy" }),
       ]);
 
       const tally = await runAnnualEventsThresholdBackfill({
@@ -147,7 +156,7 @@ describe("runAnnualEventsThresholdBackfill", () => {
     });
   });
 
-  describe("when running in dry-run mode", () => {
+  describe("given dry-run mode", () => {
     it("reports what would change without calling Stripe update", async () => {
       const stripe = {
         subscriptions: {
@@ -164,7 +173,9 @@ describe("runAnnualEventsThresholdBackfill", () => {
       } as unknown as Stripe & {
         subscriptions: { update: ReturnType<typeof vi.fn> };
       };
-      const prisma = makePrisma([makeCandidate("db_1", "sub_annual")]);
+      const prisma = makePrisma([
+        makeCandidate({ id: "db_1", stripeSubscriptionId: "sub_annual" }),
+      ]);
 
       const tally = await runAnnualEventsThresholdBackfill({
         prisma,
@@ -183,7 +194,7 @@ describe("runAnnualEventsThresholdBackfill", () => {
     });
   });
 
-  describe("when querying candidates", () => {
+  describe("given the candidate query", () => {
     it("filters to active Stripe-linked annual Growth plans", async () => {
       const stripe = {
         subscriptions: { retrieve: vi.fn(), update: vi.fn() },
