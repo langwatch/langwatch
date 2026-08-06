@@ -671,17 +671,28 @@ describe("Feature: Webhook endpoints REST API", () => {
     });
 
     /** @scenario The events log refuses a read with no created range */
-    it("refuses a listing that names no window", async () => {
+    it("refuses a listing that names no window, naming the missing bound", async () => {
       planHasWebhookEndpoints = true;
       // Unbounded, the walk sorts the whole 13-month spend table under FINAL
       // on every page, so the range is part of the contract rather than a
       // filter. Half a range is refused for the same reason as none.
-      const [from, to] = [Date.now() - 60_000, Date.now()];
-      for (const query of ["", `?from=${from}`, `?to=${to}`]) {
+      const now = Date.now();
+      const cases: Array<{ query: string; missing: string }> = [
+        { query: "", missing: "from" },
+        { query: `?from=${now - 60_000}`, missing: "to" },
+        { query: `?to=${now}`, missing: "from" },
+      ];
+      for (const { query, missing } of cases) {
         const res = await app.request(`/api/webhooks/v1/events${query}`, {
           headers: headers(),
         });
-        expect(res.status).toBe(422);
+        const error = await expectCanonicalError(res, {
+          status: 400,
+          type: "bad_request",
+          code: "validation_error",
+        });
+        expect(error.meta?.target).toBe("query");
+        expect(error.meta?.fields).toEqual(expect.arrayContaining([missing]));
       }
     });
 
@@ -693,7 +704,11 @@ describe("Feature: Webhook endpoints REST API", () => {
         `/api/webhooks/v1/events?from=${now}&to=${now - 60_000}`,
         { headers: headers() },
       );
-      expect(res.status).toBe(422);
+      await expectCanonicalError(res, {
+        status: 400,
+        type: "bad_request",
+        code: "validation_error",
+      });
     });
   });
 });

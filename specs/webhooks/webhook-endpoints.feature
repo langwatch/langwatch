@@ -406,10 +406,10 @@ Feature: Webhook endpoints, signed outbound event delivery
     @integration
     Scenario: The events log refuses a read with no created range
       When the log is read with neither bound, or with only one of them
-      Then the read is refused as unprocessable
+      Then the read is refused with the canonical validation error
       And the refusal names the bound that is missing
 
     @integration
     Scenario: The events log refuses an inverted created range
       When the log is read with a range that ends before it starts
-      Then the read is refused as unprocessable
+      Then the read is refused with the canonical validation error
