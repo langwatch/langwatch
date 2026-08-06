@@ -504,3 +504,19 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then response header "X-Langwatch-Gateway-Version" is set to the gateway version string
       And the header is present on 200, 401, 403, 429, 413, 500, 503 — every path
       And operators can cross-ref customer-reported issues to specific gateway builds
+
+  Rule: One inbound body cap, stated once
+
+    # The cap is named in the code every deployment falls back to, in the
+    # Helm value the chart renders into the container, and in the operator
+    # docs a pod gets sized from. Three sources, one number: when they
+    # disagree an operator provisions for the cap the docs promise and the
+    # gateway enforces a different one, and the only symptom is a 413 on a
+    # payload the docs said would fit.
+
+    @unit
+    Scenario: the body cap is the same number in the code, the chart and the docs
+      Given the gateway's default inbound body cap
+      When the Helm chart's rendered value and the self-hosting docs are read
+      Then all three state the same number of bytes
+      And changing any one of them alone fails the build

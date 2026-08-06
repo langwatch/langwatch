@@ -83,7 +83,7 @@ gateway:
   # Edge protection. Cap request body before auth runs so a misconfigured
   # caller can't OOM the pod. 10 MiB fits ~3 MiB prompts plus base64 images.
   security:
-    maxRequestBodyBytes: 10485760                 # 10 MiB
+    maxRequestBodyBytes: 33554432                 # 32 MiB
 ```
 
 The full set of overridable fields lives in `charts/gateway/values.yaml` (canonical for everything not exposed at the umbrella surface). All defaults are production-safe; you should only need to override `controlPlane.baseUrl`, `secrets.existingSecretName`, `ingress.host`, and the OTLP endpoint.
@@ -427,7 +427,7 @@ Edge protection lives under a dedicated `security` stanza separate from per-upst
 ```yaml
 gateway:
   security:
-    maxRequestBodyBytes: 10485760   # 10 MiB, default
+    maxRequestBodyBytes: 33554432   # 32 MiB, default
 ```
 
 Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:

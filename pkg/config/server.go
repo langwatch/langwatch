@@ -12,16 +12,20 @@ import (
 
 const (
 	DefaultGracefulSeconds = 5
-	// DefaultMaxRequestBodyBytes sizes the body cap for large-context LLM
-	// workloads where a single request can legitimately carry tens of MB:
-	// a 10M-token text context JSON-encodes to ~40-50 MB, on top of vision
-	// images and long tool-result blocks. The pipeline reads the body fully
-	// into memory (MaterializeBody) for policy / guardrail / cache
-	// inspection, so peak RAM scales with this cap times in-flight requests
-	// — 128 MiB keeps that bounded for DDoS protection while leaving
-	// headroom over a 10M-token request. Deployments that send multi-hundred-MB
-	// media or run tighter memory should override MAX_REQUEST_BODY_BYTES.
-	DefaultMaxRequestBodyBytes = 128 * 1024 * 1024
+	// DefaultMaxRequestBodyBytes caps inbound request bodies. The pipeline
+	// reads the body fully into memory (MaterializeBody) for policy,
+	// guardrail and cache inspection, so peak RAM scales with this cap
+	// times in-flight requests, and the cap is what keeps a drive-by scan
+	// from pressuring the pod memory limit. 32 MiB fits a 1M-context
+	// multimodal payload with margin under a 512 Mi pod limit. Workloads
+	// that legitimately send more, such as multi-image vision against the
+	// largest context windows, raise SERVER_MAX_REQUEST_BODY_BYTES on the
+	// deployment that needs it rather than everywhere.
+	//
+	// The docs, the Helm chart and this constant state the same number.
+	// TestDefaultMaxRequestBodyBytesMatchesChart pins it against the chart
+	// so the three cannot drift apart again.
+	DefaultMaxRequestBodyBytes = 32 * 1024 * 1024
 	// DefaultNonStreamingHeartbeatInterval bounds how long a non-streaming
 	// response can go completely silent while a large-context completion
 	// is still in flight. Edge proxies in front of the gateway (Cloudflare's
