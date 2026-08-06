@@ -656,11 +656,11 @@ describe("MetricDataPointClickHouseRepository", () => {
       // at the 64-character width the table stores and every timestamp at full
       // millisecond precision. A count-bounded chunker sends this as one
       // request of ~19,900 encoded characters.
-      const requests = await successorRequests(
-        Array.from({ length: 64 }, (_, index) =>
-          pointAt({ series: index + 1, offsetMs: index * 1_000 }),
-        ),
+      const points = Array.from({ length: 64 }, (_, index) =>
+        pointAt({ series: index + 1, offsetMs: index * 1_000 }),
       );
+
+      const requests = await successorRequests(points);
 
       expect(requests.length).toBeGreaterThan(1);
       for (const request of requests) {
@@ -671,13 +671,16 @@ describe("MetricDataPointClickHouseRepository", () => {
           (request.params.seriesIds as string[]).length,
         ).toBeLessThanOrEqual(64);
       }
-      // Split, not dropped: every series still gets asked about exactly once,
-      // which is an identity claim rather than a count — a chunker that asked
-      // twice about one series and never about another also totals 64.
+      // Split, not dropped: every series the chunk carried, each asked about
+      // exactly once. An identity claim rather than a count — a chunker that
+      // asked twice about one series, or once about a series nobody sent,
+      // also totals 64.
       const asked = requests.flatMap(
         (request) => request.params.seriesIds as string[],
       );
-      expect(new Set(asked).size).toBe(64);
+      expect([...new Set(asked)].sort()).toEqual(
+        [...new Set(points.map((point) => point.seriesId))].sort(),
+      );
       expect(asked).toHaveLength(64);
     });
   });
