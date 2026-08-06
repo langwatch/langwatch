@@ -32,6 +32,8 @@ import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
+import { parseSummedNanoUsd } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 
 export interface PersonalUsageWindow {
   /** Inclusive UTC start of the rollup window. */
@@ -155,6 +157,18 @@ export interface PersonalUsageQueryInput {
  * absorbs an un-merged ReplacingMergeTree replay, which a bare `sum` over
  * the raw table would have counted twice.
  *
+ * Money rides `AmountNanoUSD`, the ledger's integer money column, and is
+ * summed there. `AmountUSD` is a `Decimal(18, 6)` that cannot hold a nano
+ * figure: it renders a single debit for an audit read and is never summed,
+ * because rounding each debit to a micro-USD and then adding them is not the
+ * amount anybody spent and the gap grows with request count rather than
+ * cancelling. See `budget.clickhouse.repository.ts`, which is the rule this
+ * follows, and migration 00070.
+ *
+ * `Status = 'success'` matches every other read of this ledger, including the
+ * materialized view behind the budget rollup. A provider error or a
+ * guardrail block writes a row too, and neither is spend the user made.
+ *
  * The aliases are deliberately not the column names they aggregate:
  * ClickHouse resolves an alias back into the same SELECT's WHERE, so
  * `any(OccurredAt) AS OccurredAt` puts an aggregate in the WHERE clause and
@@ -163,19 +177,33 @@ export interface PersonalUsageQueryInput {
 const PRINCIPAL_REQUESTS_SUBQUERY = `
   SELECT
     GatewayRequestId,
-    any(AmountUSD)    AS RequestAmountUSD,
-    any(TokensInput)  AS RequestTokensInput,
-    any(TokensOutput) AS RequestTokensOutput,
-    any(Model)        AS RequestModel,
-    any(OccurredAt)   AS RequestOccurredAt
+    any(AmountNanoUSD) AS RequestAmountNanoUSD,
+    any(TokensInput)   AS RequestTokensInput,
+    any(TokensOutput)  AS RequestTokensOutput,
+    any(Model)         AS RequestModel,
+    any(OccurredAt)    AS RequestOccurredAt
   FROM gateway_budget_ledger_events
   WHERE TenantId = {tenantId:String}
     AND Scope = 'principal'
     AND ScopeId = {userId:String}
+    AND Status = 'success'
     AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
     AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
   GROUP BY GatewayRequestId
 `;
+
+/**
+ * A summed Int64 nano-USD figure as the USD number this surface publishes.
+ *
+ * `toString` on the ClickHouse side and `BigInt` on this one, because a sum
+ * past 2^53 loses its low digits as a JSON number and a wrong money figure is
+ * worse than a loud one. The decimal string is then read out digit by digit
+ * rather than divided, so the USD number is the nearest double to the exact
+ * amount instead of the exact amount plus float division's own drift.
+ */
+function summedNanoUsdToUsd(value: unknown): number {
+  return Number(nanoUsdToDecimalString(parseSummedNanoUsd(value)));
+}
 
 export class PersonalUsageService {
   /**
@@ -354,9 +382,9 @@ export class PersonalUsageService {
       const result = await client.query({
         query: `
           SELECT
-            toDate(RequestOccurredAt) AS Day,
-            sum(RequestAmountUSD)     AS SpentUsd,
-            count()                   AS Requests
+            toDate(RequestOccurredAt)             AS Day,
+            toString(sum(RequestAmountNanoUSD))   AS SpentNanoUsd,
+            count()                               AS Requests
           FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
           GROUP BY Day
           ORDER BY Day
@@ -370,10 +398,10 @@ export class PersonalUsageService {
         },
         format: "JSONEachRow",
       });
-      type Raw = { Day: string; SpentUsd: number; Requests: number };
+      type Raw = { Day: string; SpentNanoUsd: string; Requests: number };
       const rows = (await result.json()) as Raw[];
       return rows.map((r) => {
-        const spentUsd = Number(r.SpentUsd) || 0;
+        const spentUsd = summedNanoUsdToUsd(r.SpentNanoUsd);
         // The gateway ledger records real per-token spend (virtual-key
         // traffic the customer pays for), so it is fully billed.
         return {
@@ -502,12 +530,12 @@ export class PersonalUsageService {
       const result = await client.query({
         query: `
           SELECT
-            RequestModel          AS Label,
-            sum(RequestAmountUSD) AS SpentUsd,
-            count()               AS Requests
+            RequestModel                        AS Label,
+            toString(sum(RequestAmountNanoUSD)) AS SpentNanoUsd,
+            count()                             AS Requests
           FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
           GROUP BY Label
-          ORDER BY SpentUsd DESC
+          ORDER BY sum(RequestAmountNanoUSD) DESC
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
         query_params: {
@@ -518,10 +546,10 @@ export class PersonalUsageService {
         },
         format: "JSONEachRow",
       });
-      type Raw = { Label: string; SpentUsd: number; Requests: number };
+      type Raw = { Label: string; SpentNanoUsd: string; Requests: number };
       const rows = (await result.json()) as Raw[];
       return rows.map((r) => {
-        const spentUsd = Number(r.SpentUsd) || 0;
+        const spentUsd = summedNanoUsdToUsd(r.SpentNanoUsd);
         // Gateway ledger spend is real per-token spend, so fully billed.
         return {
           label: r.Label,
@@ -638,10 +666,10 @@ export class PersonalUsageService {
       const result = await client.query({
         query: `
           SELECT
-            sum(RequestAmountUSD)    AS TotalCost,
-            count()                  AS RequestCount,
-            sum(RequestTokensInput)  AS PromptTokens,
-            sum(RequestTokensOutput) AS CompletionTokens
+            toString(sum(RequestAmountNanoUSD)) AS TotalNanoCost,
+            count()                             AS RequestCount,
+            sum(RequestTokensInput)             AS PromptTokens,
+            sum(RequestTokensOutput)            AS CompletionTokens
           FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
@@ -655,7 +683,7 @@ export class PersonalUsageService {
       });
 
       type RawSummary = {
-        TotalCost: number | null;
+        TotalNanoCost: string | null;
         RequestCount: number | null;
         PromptTokens: number | null;
         CompletionTokens: number | null;
@@ -686,7 +714,7 @@ export class PersonalUsageService {
       const [topRow] = (await topModelResult.json()) as RawTop[];
 
       return {
-        totalCost: Number(row.TotalCost) || 0,
+        totalCost: summedNanoUsdToUsd(row.TotalNanoCost),
         requestCount: Number(row.RequestCount) || 0,
         promptTokens: Number(row.PromptTokens) || 0,
         completionTokens: Number(row.CompletionTokens) || 0,
