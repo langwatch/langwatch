@@ -30,7 +30,7 @@ In stdio mode the API key is required for observability and prompt tools, and do
 | | `--port` | HTTP port (default: `3000`) |
 | `LANGWATCH_MCP_HTTP_HOST` | `--host` | HTTP listen address (default: `127.0.0.1`) |
 | `LANGWATCH_MCP_ALLOWED_ORIGINS` | `--allowedOrigin` | Browser origins allowed to call the HTTP server |
-| `LANGWATCH_MCP_TRUST_PROXY` | | Trust forwarded proxy headers (default: `true`) |
+| `LANGWATCH_MCP_TRUST_PROXY` | | Use `X-Forwarded-For` as the rate limit key (default: off) |
 
 ### HTTP mode
 
@@ -57,15 +57,16 @@ npx @langwatch/mcp-server --http --port 3000 \
 
 #### Running behind a proxy
 
-Forwarded proxy headers are trusted by default, which is what lets the server
-report the external scheme in its OAuth metadata and see the real client
-address behind a load balancer.
+Forwarded proxy headers resolve the external scheme that the OAuth metadata
+document advertises, so they are read by default.
 
-Failed authentication is rate limited per client address, and that address
-comes from those same headers. If the port is reachable without a trusted proxy
-in front of it, a client can put any address in `X-Forwarded-For` and the limit
-stops counting. Set `LANGWATCH_MCP_TRUST_PROXY=false` in that case, which makes
-the server use the socket address instead.
+They do not decide the rate limit. Failed authentication is limited per client
+address, and that address comes from the socket rather than from
+`X-Forwarded-For`, so a client reaching the port directly cannot rotate a header
+to reset its own counter. Behind a real proxy every request shares the proxy's
+socket address, which means the whole proxy is limited as one client. Set
+`LANGWATCH_MCP_TRUST_PROXY=true` there to limit per real client instead, and
+only when the proxy overwrites `X-Forwarded-For` on the way in.
 
 This is defense in depth, not the security boundary. API keys are verified
 against the LangWatch API before a session is created and re-checked on every

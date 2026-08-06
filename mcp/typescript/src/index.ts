@@ -76,14 +76,15 @@ if (argv.http) {
         "Make sure it sits behind a trusted network boundary and that --allowedOrigin " +
         "lists only origins you control."
     );
-    if (process.env.LANGWATCH_MCP_TRUST_PROXY !== "false") {
-      console.warn(
-        "Warning: forwarded proxy headers are trusted, so the per-IP rate limit on " +
-          "failed authentication keys on X-Forwarded-For. With nothing trusted " +
-          "terminating in front of this port, a client can put any address there and " +
-          "the limit stops counting. Set LANGWATCH_MCP_TRUST_PROXY=false in that case."
-      );
-    }
+  }
+  if (process.env.LANGWATCH_MCP_TRUST_PROXY === "true") {
+    console.warn(
+      "Warning: LANGWATCH_MCP_TRUST_PROXY=true, so the rate limit on failed " +
+        "authentication uses the client address from X-Forwarded-For. Keep this " +
+        "on only when a trusted proxy terminates in front of the port and " +
+        "overwrites that header. Otherwise a client can supply any address there " +
+        "and the limit stops counting."
+    );
   }
 } else {
   const transport = new StdioServerTransport();
