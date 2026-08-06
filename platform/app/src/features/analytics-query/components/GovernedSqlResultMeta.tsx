@@ -33,7 +33,10 @@ export function GovernedSqlResultMeta({
       gap={4}
       wrap="wrap"
       data-testid="governed-sql-result-summary"
-      fontSize="12px"
+      fontSize="11.5px"
+      fontFamily="mono"
+      paddingX={4}
+      paddingY={2}
     >
       <Statistic
         value={formatNumber(statistics.rowsReturned)}

@@ -38,10 +38,12 @@ import {
   GOVERNED_SQL_DIAGNOSTIC_CODES,
   getGovernedSqlService,
 } from "~/server/analytics/governed-sql";
+import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag";
 import { baseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:analytics-sql");
@@ -156,6 +158,19 @@ function callerProject({
   return project;
 }
 
+/**
+ * The experimental gate over the whole surface, same flag as the workbench's
+ * tRPC router. Checked per request and server-side only; an API key has no
+ * member behind it, so the project is the distinct identity.
+ */
+async function requireGovernedSqlEnabled(projectId: string): Promise<void> {
+  const enabled = await featureFlagService.isEnabled(
+    "release_governed_sql_workbench",
+    { distinctId: projectId, projectId },
+  );
+  if (!enabled) throw new GovernedSqlNotEnabledError();
+}
+
 export function registerGovernedSqlRoutes(
   secured: ReturnType<typeof createProjectApp>,
 ): void {
@@ -184,6 +199,7 @@ export function registerGovernedSqlRoutes(
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
+      await requireGovernedSqlEnabled(project.id);
       const { sql, parameters } = c.req.valid("json");
 
       logger.info(
@@ -226,6 +242,7 @@ export function registerGovernedSqlRoutes(
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
+      await requireGovernedSqlEnabled(project.id);
 
       return c.json(
         getGovernedSqlService().describeSchema({

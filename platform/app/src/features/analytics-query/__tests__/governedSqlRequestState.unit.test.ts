@@ -290,6 +290,44 @@ describe("the governed SQL request machine", () => {
       });
     });
 
+    describe("when the member cancels the run", () => {
+      /** @scenario "Cancelling an in-flight run keeps the previous result" */
+      it("abandons the request and keeps the previous result on screen", async () => {
+        const { calls, controller } = controllerWith({ sql: "SELECT 1" });
+
+        controller.runQuery();
+        calls[0]!.deferred.resolve(governedSqlResult());
+        await settle();
+        const shown = controller.getState().outcome;
+
+        controller.setSql("SELECT 2");
+        controller.runQuery();
+        expect(controller.getState().inFlight).toBe(true);
+
+        controller.cancel();
+        expect(calls[1]!.signal.aborted).toBe(true);
+        expect(controller.getState().inFlight).toBe(false);
+        expect(controller.getState().outcome).toBe(shown);
+
+        // An answer the transport delivers anyway is a superseded submission's
+        // and changes nothing.
+        calls[1]!.deferred.resolve(governedSqlResult({ truncated: true }));
+        await settle();
+        expect(controller.getState().outcome).toBe(shown);
+
+        // Cancelling is not disposal: the workbench still runs the next draft.
+        controller.runQuery();
+        expect(calls).toHaveLength(3);
+      });
+
+      it("is a no-op when nothing is in flight", () => {
+        const { calls, controller } = controllerWith({ sql: "SELECT 1" });
+        controller.cancel();
+        expect(calls).toHaveLength(0);
+        expect(controller.getState().inFlight).toBe(false);
+      });
+    });
+
     describe("when a cancelled request rejects after the fact", () => {
       /** @scenario "An aborted request never updates the result pane" */
       it("leaves the previously visible result exactly as it was", async () => {

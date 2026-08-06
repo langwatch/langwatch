@@ -160,13 +160,21 @@ export function useGovernedSqlMonaco({
   schema,
   markers,
   registerInsert,
+  onRun,
 }: {
   schema: GovernedSchemaModel;
   markers: readonly GovernedSqlEditorMarker[];
   registerInsert?: (insert: ((text: string) => void) | null) => void;
+  /** Bound to Cmd/Ctrl+Enter inside the editor. */
+  onRun?: () => void;
 }): UseGovernedSqlMonaco {
   const schemaRef = useRef(schema);
   schemaRef.current = schema;
+
+  // Through a ref, so the command Monaco keeps for the life of the editor
+  // always calls the current handler rather than the one from mount time.
+  const onRunRef = useRef(onRun);
+  onRunRef.current = onRun;
 
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
@@ -221,6 +229,15 @@ export function useGovernedSqlMonaco({
     registerInsert?.((text: string) =>
       insertAtCursor({ editor: instance, text }),
     );
+
+    // Guarded, because test doubles of Monaco routinely stub only what a
+    // given test reads — a missing key table must degrade to "no shortcut",
+    // never to a crash on mount.
+    if (monaco.KeyMod && monaco.KeyCode && instance.addCommand) {
+      instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+        onRunRef.current?.();
+      });
+    }
 
     applyMarkers(markers);
   };

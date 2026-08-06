@@ -45,6 +45,8 @@ export interface UseGovernedSqlQuery {
   runQuery: () => void;
   /** Re-sends the submitted snapshot, never the draft. */
   reload: () => void;
+  /** Abandons the in-flight request, keeping the previous result on screen. */
+  cancelQuery: () => void;
 }
 
 export function useGovernedSqlQuery({
@@ -90,6 +92,7 @@ export function useGovernedSqlQuery({
   );
   const runQuery = useCallback(() => controller.runQuery(), [controller]);
   const reload = useCallback(() => controller.reload(), [controller]);
+  const cancelQuery = useCallback(() => controller.cancel(), [controller]);
 
   return {
     state,
@@ -99,5 +102,6 @@ export function useGovernedSqlQuery({
     setParameters,
     runQuery,
     reload,
+    cancelQuery,
   };
 }

@@ -24,10 +24,34 @@ import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import { getGovernedSqlService } from "~/server/analytics/governed-sql";
+import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
+import { featureFlagService } from "~/server/featureFlag";
 
 import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
+
+/**
+ * The experimental gate over the whole surface.
+ *
+ * One flag, checked server-side, so the browser cannot flip it: `availability`
+ * answers false while it is off — which is what hides the navigation entry and
+ * the page — and `schema`/`query` refuse outright, so a caller who skips the
+ * availability question gets the same answer.
+ */
+const GOVERNED_SQL_FLAG = "release_governed_sql_workbench";
+
+const workbenchEnabled = ({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}): Promise<boolean> =>
+  featureFlagService.isEnabled(GOVERNED_SQL_FLAG, {
+    distinctId: userId,
+    projectId,
+  });
 
 /**
  * Longest statement this router accepts.
@@ -62,19 +86,33 @@ const projectScopeSchema = z.object({ projectId: z.string() });
 const availability = protectedProcedure
   .input(projectScopeSchema)
   .use(checkProjectPermission("analytics:view"))
-  .query(() => ({ available: getGovernedSqlService().available }));
+  .query(async ({ ctx, input }) => ({
+    available:
+      (await workbenchEnabled({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+      })) && getGovernedSqlService().available,
+  }));
 
 /** The governed datasets and columns this member's permissions unlock. */
 const schema = protectedProcedure
   .input(projectScopeSchema)
   .use(checkProjectPermission("analytics:view"))
-  .query(async ({ ctx, input }) =>
-    getGovernedSqlService().describeSchema({
+  .query(async ({ ctx, input }) => {
+    if (
+      !(await workbenchEnabled({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+      }))
+    ) {
+      throw new GovernedSqlNotEnabledError();
+    }
+    return getGovernedSqlService().describeSchema({
       protections: await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       }),
-    }),
-  );
+    });
+  });
 
 /**
  * Runs one submitted statement, exactly as written.
@@ -96,6 +134,15 @@ const query = protectedProcedure
   )
   .use(checkProjectPermission("analytics:view"))
   .mutation(async ({ ctx, input }) => {
+    if (
+      !(await workbenchEnabled({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+      }))
+    ) {
+      throw new GovernedSqlNotEnabledError();
+    }
+
     // The project's API key is hashed into the tenant capability the query runs
     // under. It is read server-side and never leaves this function — no field
     // of it appears in the response.

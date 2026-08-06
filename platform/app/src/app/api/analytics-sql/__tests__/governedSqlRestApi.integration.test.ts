@@ -385,6 +385,12 @@ describe("given the governed analytics SQL REST endpoints", () => {
   };
 
   beforeAll(async () => {
+    // The surface ships behind the experimental feature switch, off by
+    // default. The suite runs with it on via the flag's own env override —
+    // the same lever a deployment uses — and the flag-off cases below unset
+    // it for exactly one request.
+    process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+
     // The catalog spans both residences; the governed views over the
     // PostgreSQL-resident half read engine tables that must exist first.
     postgres = await startGovernedPostgres();
@@ -502,6 +508,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
   }, 600_000);
 
   afterAll(async () => {
+    delete process.env.RELEASE_GOVERNED_SQL_WORKBENCH;
     setGovernedSqlService(null);
     // Guarded on the identifier each statement actually uses: `team` gates
     // everything keyed by teamId (and the policy created after it), while
@@ -520,6 +527,40 @@ describe("given the governed analytics SQL REST endpoints", () => {
     }
     await harness?.stop();
     await postgres?.stop();
+  });
+
+  describe("when the governed SQL feature switch is off for the project", () => {
+    /** Runs one request with the switch off, whatever else the suite set. */
+    const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
+      process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "0";
+      try {
+        return await request();
+      } finally {
+        process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+      }
+    };
+
+    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
+    it("refuses the query endpoint with the named refusal and touches no data", async () => {
+      const response = await withFlagOff(async () =>
+        post(openProject, { sql: "SELECT 1" }),
+      );
+      const body = (await response.json()) as Record<string, any>;
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("governed_sql_not_enabled");
+    });
+
+    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
+    it("refuses the schema endpoint the same way", async () => {
+      const response = await withFlagOff(async () =>
+        app.request(schemaPath(openProject), {
+          headers: { "X-Auth-Token": openProject.apiKey },
+        }),
+      );
+      const body = (await response.json()) as Record<string, any>;
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("governed_sql_not_enabled");
+    });
   });
 
   describe("when the caller is not authenticated", () => {

@@ -112,20 +112,30 @@ describe("governed chart mode in real Chromium", () => {
     describe("when the member provides a valid bar specification over the query result dataset", () => {
       /** @scenario "A categorical governed result renders as a chart in a real browser" */
       it("draws one bar per category from the registered dataset, sized by its value", async () => {
-        render(
+        const { rerender } = render(
           <ChakraProvider value={defaultSystem}>
             <GovernedSqlChartMode
               result={RESULT}
               submittedLabel="SELECT evaluator_name, count() AS evaluations"
+              view="specification"
             />
           </ChakraProvider>,
         );
 
-        // The member opens the specification panel and writes their own bar
-        // specification over the starting point.
-        await userEvent.click(screen.getByTestId("vega-spec-editor-toggle"));
+        // The member writes their own bar specification over the starting
+        // point in the Specification view, then returns to the chart — the
+        // same component instance, so the edit survives the switch.
         const editor = await screen.findByTestId("spec-editor-input");
         await userEvent.fill(editor, JSON.stringify(BAR_SPECIFICATION));
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <GovernedSqlChartMode
+              result={RESULT}
+              submittedLabel="SELECT evaluator_name, count() AS evaluations"
+              view="chart"
+            />
+          </ChakraProvider>,
+        );
 
         const drawn = await poll(() => bars().length === RESULT.rows.length);
         expect(screen.queryByTestId("governed-chart-failure")).toBeNull();

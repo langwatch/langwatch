@@ -35,6 +35,31 @@ import { remediation } from "~/server/app-layer/error-remediation";
  * `platform` fault, because nothing the caller does fixes it and a 5xx that
  * defaults to `customer` logs a real outage as routine noise.
  */
+/**
+ * The governed SQL surface is switched off for this project.
+ *
+ * Distinct from {@link GovernedSqlUnavailableError} on purpose: unavailable is
+ * a deployment with no restricted identity to run as (platform fault, 503),
+ * while this is a product decision — the feature flag is off for this project
+ * — which the caller's administrator can change. `customer` fault, 403, and
+ * no incident in the logs.
+ */
+export class GovernedSqlNotEnabledError extends HandledError {
+  declare readonly code: "governed_sql_not_enabled";
+
+  constructor() {
+    super(
+      "governed_sql_not_enabled",
+      "The governed analytics SQL feature is not enabled for this project.",
+      {
+        httpStatus: 403,
+        ...remediation("governed_sql_not_enabled"),
+      },
+    );
+    this.name = "GovernedSqlNotEnabledError";
+  }
+}
+
 export class GovernedSqlUnavailableError extends HandledError {
   declare readonly code: "governed_sql_unavailable";
 

@@ -31,9 +31,17 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     And no client-side environment variable can force the surface on
 
   @integration
+  Scenario: The whole surface stays dark until the experimental feature switch is on
+    Given the governed SQL feature switch is off for the project
+    When the member looks for the Custom query surface
+    Then availability answers unavailable, so neither the navigation entry nor the page offers the workbench
+    And the schema and query endpoints refuse the request with a named, customer-safe refusal
+    And the switch is evaluated on the server, so nothing in the browser can force the surface on
+
+  @integration
   Scenario: An authorized member opens Custom query and sees only their live governed schema
     When the member opens the Custom query page
-    Then the page identifies the editor as governed ClickHouse SQL
+    Then the page identifies the surface as governed and project-scoped
     And the schema browser lists exactly the datasets the schema endpoint returned for them
     And nothing implies access to arbitrary ClickHouse databases or tables
 
@@ -298,6 +306,35 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     When the member edits the Vega-Lite specification
     Then the spec is revalidated and the chart rerendered
     And no query request is issued
+
+  @integration
+  Scenario: The result offers Table, Chart, and Specification readings
+    Given a successful result
+    When the member opens the result
+    Then Table, Chart, and Specification are offered as views of the same result
+    And the Specification view edits the same specification the Chart view draws
+
+  @integration
+  Scenario: The specification view names what the chart policy accepts
+    Given the Specification view is open
+    When the member reads the panel beside the editor
+    Then it says whether the current specification is valid or refused
+    And it names what the policy accepts, including the query_result dataset name
+
+  @integration
+  Scenario: The visible answer wears a state chip naming where it stands
+    Given a submission has settled
+    When the result header renders
+    Then a current result is labelled Current, a truncated one Partial,
+      an outdated one Previous submission, a refusal Refused,
+      and a timeout Timed out
+
+  @unit
+  Scenario: Cancelling an in-flight run keeps the previous result
+    Given a result on screen and a newer submission in flight
+    When the member cancels the run
+    Then the in-flight request is abandoned
+    And the previous result stays on screen unchanged
 
   # ---------------------------------------------------------------------------
   # Vega dependencies, loading, and CSP

@@ -19,7 +19,7 @@
  * @see specs/analytics/governed-sql-workbench.feature
  */
 
-import { Alert, Stack, Text } from "@chakra-ui/react";
+import { HStack, Stack, Text } from "@chakra-ui/react";
 
 import type { GovernedSqlDiagnostic } from "~/server/analytics/governed-sql";
 
@@ -36,28 +36,43 @@ export function GovernedSqlDiagnostics({
   if (diagnostics.length === 0) return null;
 
   return (
-    <Stack gap={2} width="full" data-testid="governed-sql-diagnostics">
+    <Stack gap={0} width="full" data-testid="governed-sql-diagnostics">
       {diagnostics.map((diagnostic, index) => {
         const severity =
           diagnostic.code === TRUNCATION_CODE ? "warning" : "info";
         return (
-          <Alert.Root
+          <HStack
             key={`${diagnostic.code}-${index}`}
-            status={severity}
+            align="flex-start"
+            gap={2}
+            paddingX={4}
+            paddingY={2}
+            borderBottomWidth="1px"
+            borderColor="border"
+            background="bg.subtle"
             data-testid="governed-sql-diagnostic"
             data-diagnostic-code={diagnostic.code}
-            // Chakra carries the status in React context rather than in the
-            // document, so the same value is published here — one expression
-            // feeding both, so the attribute cannot drift from the styling.
+            // One expression feeding both the label and this attribute, so the
+            // published severity cannot drift from the styling.
             data-severity={severity}
           >
-            <Alert.Indicator />
-            <Alert.Content>
-              {/* Unchanged: each message already names the fact that made it
+            <Text
+              flexShrink={0}
+              fontSize="10.5px"
+              fontWeight="700"
+              letterSpacing="0.05em"
+              textTransform="uppercase"
+              color={severity === "warning" ? "orange.fg" : "blue.fg"}
+              marginTop="1px"
+            >
+              {severity === "warning" ? "Warning" : "Notice"}
+            </Text>
+            {/* Unchanged: each message already names the fact that made it
                 fire, and that is the part a shortened version would drop. */}
-              <Text fontSize="12.5px">{diagnostic.message}</Text>
-            </Alert.Content>
-          </Alert.Root>
+            <Text fontSize="11.5px" lineHeight="1.55" color="fg.muted">
+              {diagnostic.message}
+            </Text>
+          </HStack>
         );
       })}
     </Stack>

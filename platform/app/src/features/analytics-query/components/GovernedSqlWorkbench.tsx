@@ -6,10 +6,15 @@
  * to the endpoint exactly as typed, and everything the member is told about it
  * afterwards is the backend's answer rendered through the error registry.
  *
+ * The surface is two cards over a quiet ground: the query card — header row,
+ * editor, parameters — and the result card below it. The schema browser sits
+ * in a flat side panel rather than a third card, so the page reads as one
+ * instrument rather than a stack of boxes.
+ *
  * @see specs/analytics/governed-sql-workbench.feature
  */
 
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Kbd, Spinner, Text } from "@chakra-ui/react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 
@@ -29,7 +34,10 @@ import {
 import { GovernedSchemaBrowser } from "./GovernedSchemaBrowser";
 import { GovernedSqlEditor } from "./GovernedSqlEditor";
 import { GovernedSqlParametersEditor } from "./GovernedSqlParametersEditor";
-import { GovernedSqlResultPane } from "./GovernedSqlResultPane";
+import {
+  GovernedSqlResultPane,
+  type GovernedSqlResultView,
+} from "./GovernedSqlResultPane";
 import { LazyGovernedSqlChartMode } from "./LazyGovernedSqlChartMode";
 
 /** What a refusal gives the editor and the parameters form to work with. */
@@ -81,26 +89,39 @@ export interface GovernedSqlWorkbenchProps {
 }
 
 /**
- * Names the editor and carries the one action that talks to the server.
+ * The query card's header row: the name of the card, and the one action that
+ * talks to the server.
  *
  * The action's label is the request state's own answer, so what the button says
- * and what pressing it does can never disagree.
+ * and what pressing it does can never disagree. While a request is in flight
+ * the row carries a running indicator and Cancel instead; cancelling keeps
+ * whatever result was already on screen.
  */
-function WorkbenchToolbar({
+function QueryCardHeader({
   schemaVisible,
   onToggleSchema,
   actionLabel,
   runnable,
+  inFlight,
   onRun,
+  onCancel,
 }: {
   schemaVisible: boolean;
   onToggleSchema: () => void;
   actionLabel: string;
   runnable: boolean;
+  inFlight: boolean;
   onRun: () => void;
+  onCancel: () => void;
 }) {
   return (
-    <HStack gap={2}>
+    <HStack
+      gap={2}
+      paddingX={3}
+      paddingY={2}
+      borderBottomWidth="1px"
+      borderColor="border"
+    >
       <Button
         size="xs"
         variant="ghost"
@@ -116,17 +137,31 @@ function WorkbenchToolbar({
         </Box>
       </Button>
       <Text fontSize="13px" fontWeight="600">
-        Governed ClickHouse SQL
+        Query
       </Text>
       <Box flex="1" />
-      <Button
-        size="sm"
-        colorPalette="orange"
-        disabled={!runnable}
-        onClick={onRun}
-      >
-        {actionLabel}
-      </Button>
+      <Kbd size="sm" aria-hidden="true">
+        ⌘⏎
+      </Kbd>
+      {inFlight ? (
+        <>
+          <Button size="sm" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button size="sm" colorPalette="orange" disabled opacity={0.85}>
+            <Spinner size="xs" /> Running
+          </Button>
+        </>
+      ) : (
+        <Button
+          size="sm"
+          colorPalette="orange"
+          disabled={!runnable}
+          onClick={onRun}
+        >
+          {actionLabel}
+        </Button>
+      )}
     </HStack>
   );
 }
@@ -167,15 +202,34 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
     [draft.sql, setSql],
   );
 
+  // What the empty state offers: the first dataset's example, written into the
+  // draft. The example text is the schema response's own, so an empty workbench
+  // with no schema simply offers nothing.
+  const exampleSql = schema.model.datasets[0]?.exampleSql;
+  const insertExample = useMemo(
+    () =>
+      exampleSql === undefined ? undefined : () => handleInsert(exampleSql),
+    [exampleSql, handleInsert],
+  );
+
   return (
     <HStack
       align="stretch"
-      gap={4}
+      gap={0}
       width="full"
+      flex="1"
+      minHeight={0}
       data-testid="governed-sql-workbench"
     >
       {schemaVisible && (
-        <Box width="320px" flexShrink={0} overflowY="auto">
+        <Box
+          width="292px"
+          flexShrink={0}
+          overflowY="auto"
+          background="bg.panel"
+          borderRightWidth="1px"
+          borderColor="border"
+        >
           <GovernedSchemaBrowser
             model={schema.model}
             isLoading={schema.isLoading}
@@ -185,58 +239,115 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
         </Box>
       )}
 
-      <VStack align="stretch" gap={3} flex="1" minWidth={0}>
-        <WorkbenchToolbar
-          schemaVisible={schemaVisible}
-          onToggleSchema={() => setSchemaVisible((visible) => !visible)}
-          actionLabel={query.actionLabel}
-          runnable={draft.sql.trim().length > 0 && !query.state.inFlight}
-          // Always the draft, under either label. When the label reads
-          // "Reload" the draft is byte-identical to what produced the visible
-          // result, so this IS a reload — and unlike `reload()` it can never
-          // re-send a superseded submission the member is no longer looking at.
-          onRun={query.runQuery}
-        />
+      <Box
+        flex="1"
+        minWidth={0}
+        display="flex"
+        flexDirection="column"
+        gap={3}
+        padding={4}
+        overflowY="auto"
+      >
+        <Box
+          background="bg.panel"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="10px"
+          boxShadow="xs"
+          overflow="hidden"
+        >
+          <QueryCardHeader
+            schemaVisible={schemaVisible}
+            onToggleSchema={() => setSchemaVisible((visible) => !visible)}
+            actionLabel={query.actionLabel}
+            runnable={draft.sql.trim().length > 0 && !query.state.inFlight}
+            inFlight={query.state.inFlight}
+            // Always the draft, under either label. When the label reads
+            // "Reload" the draft is byte-identical to what produced the visible
+            // result, so this IS a reload — and unlike `reload()` it can never
+            // re-send a superseded submission the member is no longer looking
+            // at.
+            onRun={query.runQuery}
+            onCancel={query.cancelQuery}
+          />
 
-        <GovernedSqlEditor
-          sql={draft.sql}
-          onChange={setSql}
-          schema={schema.model}
-          markers={failure.markers}
-          registerInsert={registerInsert}
-        />
+          <GovernedSqlEditor
+            sql={draft.sql}
+            onChange={setSql}
+            schema={schema.model}
+            markers={failure.markers}
+            registerInsert={registerInsert}
+            onRun={query.runQuery}
+          />
 
-        <GovernedSqlParametersEditor
-          onChange={query.setParameters}
-          missingParameters={failure.missingParameters}
-        />
+          <Box
+            borderTopWidth="1px"
+            borderColor="border"
+            background="bg.subtle"
+            paddingX={3}
+            paddingY={2}
+          >
+            <GovernedSqlParametersEditor
+              onChange={query.setParameters}
+              missingParameters={failure.missingParameters}
+            />
+          </Box>
+        </Box>
 
-        <GovernedSqlResultPane
-          state={query.state}
-          chartSlot={chartSlot(query.state)}
-        />
-      </VStack>
+        <Box
+          background="bg.panel"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="10px"
+          boxShadow="xs"
+          overflow="hidden"
+          flex="1"
+          minHeight="280px"
+          display="flex"
+          flexDirection="column"
+        >
+          <GovernedSqlResultPane
+            state={query.state}
+            onRun={query.runQuery}
+            {...(insertExample ? { onInsertExample: insertExample } : {})}
+            renderChartArea={chartArea(query.state)}
+          />
+        </Box>
+      </Box>
     </HStack>
   );
 }
 
 /**
- * What Chart mode is given: the result on screen, or nothing to chart at all.
+ * What the Chart and Specification tabs are given: the result on screen, or
+ * nothing to chart at all.
  *
  * A refusal and a query that has not run yet both hand back `undefined`, which
- * is Chart mode offered and empty rather than hidden — the pane decides how
- * that reads.
+ * is the tabs offered and empty rather than hidden — the pane decides how that
+ * reads. One render function serves both tabs so the specification being
+ * edited is a single piece of state however the member looks at it.
  */
-function chartSlot(state: GovernedSqlRequestState): ReactNode {
+function chartArea(
+  state: GovernedSqlRequestState,
+):
+  | ((view: GovernedSqlResultView, openSpecification: () => void) => ReactNode)
+  | undefined {
   if (state.outcome?.kind !== "result") return undefined;
+  const { result, snapshot } = state.outcome;
 
-  return (
+  const renderArea = (
+    view: GovernedSqlResultView,
+    openSpecification: () => void,
+  ) => (
     // The lazy boundary, not `GovernedSqlChartMode`: importing that here
     // would put the whole Vega runtime in the entry chunk, and nothing
     // would look wrong (vegaLazyBoundary.unit.test.ts is what would).
     <LazyGovernedSqlChartMode
-      result={state.outcome.result}
-      submittedLabel={chartResultLabel(state.outcome.snapshot.sql)}
+      result={result}
+      submittedLabel={chartResultLabel(snapshot.sql)}
+      view={view === "specification" ? "specification" : "chart"}
+      onOpenSpecification={openSpecification}
     />
   );
+  return renderArea;
 }

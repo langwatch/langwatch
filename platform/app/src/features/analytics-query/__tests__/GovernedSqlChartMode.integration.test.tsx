@@ -89,10 +89,24 @@ const RESULT = {
 const withChakra = (element: ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
 
-const openEditor = async () => {
-  await userEvent.click(screen.getByTestId("vega-spec-editor-toggle"));
-  return screen.findByTestId("spec-editor-input");
+/**
+ * Re-renders the same mounted component with a different view, the way the
+ * result pane's tabs do. Same element type in the same position, so the
+ * specification state survives the switch — which is the point of the shared
+ * component.
+ */
+const switchView = (
+  rerender: (element: ReactElement) => void,
+  view: "chart" | "specification",
+) => {
+  rerender(
+    <ChakraProvider value={defaultSystem}>
+      <GovernedSqlChartMode result={RESULT} view={view} />
+    </ChakraProvider>,
+  );
 };
+
+const findEditor = () => screen.findByTestId("spec-editor-input");
 
 /** Replaces the whole buffer, the way pasting a specification does. */
 const replaceSpec = async (editor: HTMLElement, text: string) => {
@@ -130,12 +144,13 @@ describe("chart mode", () => {
   describe("given a successful governed SQL result", () => {
     describe("when chart mode opens", () => {
       it("starts from a specification that draws the result it is given", async () => {
-        withChakra(<GovernedSqlChartMode result={RESULT} />);
+        const { rerender } = withChakra(<GovernedSqlChartMode result={RESULT} />);
 
         await waitFor(() => expect(vega.state.embeds).toBe(1));
         expect(screen.queryByTestId("governed-chart-failure")).toBeNull();
 
-        const editor = await openEditor();
+        switchView(rerender, "specification");
+        const editor = await findEditor();
         const starter = JSON.parse((editor as HTMLTextAreaElement).value);
         expect(starter.data).toEqual({ name: "query_result" });
         expect(starter.encoding.x.field).toBe("model");
@@ -156,10 +171,11 @@ describe("chart mode", () => {
     describe("when the member edits the specification", () => {
       /** @scenario "Editing the chart specification never reruns SQL" */
       it("revalidates and redraws without issuing a single request", async () => {
-        withChakra(<GovernedSqlChartMode result={RESULT} />);
+        const { rerender } = withChakra(<GovernedSqlChartMode result={RESULT} />);
         await waitFor(() => expect(vega.state.embeds).toBe(1));
-        const editor = await openEditor();
 
+        switchView(rerender, "specification");
+        const editor = await findEditor();
         await replaceSpec(
           editor,
           JSON.stringify({
@@ -172,7 +188,8 @@ describe("chart mode", () => {
           }),
         );
 
-        // The chart was rebuilt for the new specification…
+        // Back on the chart, it is rebuilt for the new specification…
+        switchView(rerender, "chart");
         await waitFor(() => expect(vega.state.embeds).toBe(2));
         // …and nothing asked the database anything.
         expect(requests).toEqual([]);
@@ -180,13 +197,12 @@ describe("chart mode", () => {
 
       /** @scenario "Editing the chart specification never reruns SQL" */
       it("reports what is wrong as it is typed, and keeps reporting nothing when it is fixed", async () => {
-        withChakra(<GovernedSqlChartMode result={RESULT} />);
-        const editor = await openEditor();
+        const { rerender } = withChakra(
+          <GovernedSqlChartMode result={RESULT} view="specification" />,
+        );
+        const editor = await findEditor();
 
         await replaceSpec(editor, "{ not json");
-
-        const failure = await screen.findByTestId("governed-chart-failure");
-        expect(failure.getAttribute("data-failure-code")).toBe("invalid-json");
         expect(
           (await screen.findByTestId("vega-spec-editor-problems")).textContent,
         ).toContain("not valid JSON");
@@ -202,14 +218,9 @@ describe("chart mode", () => {
 
         await waitFor(() =>
           expect(
-            screen
-              .getByTestId("governed-chart-failure")
-              .getAttribute("data-failure-code"),
-          ).toBe("unknown-field"),
+            screen.getByTestId("vega-spec-editor-problems").textContent,
+          ).toContain("nowhere"),
         );
-        expect(
-          screen.getByTestId("vega-spec-editor-problems").textContent,
-        ).toContain("nowhere");
 
         await replaceSpec(
           editor,
@@ -221,18 +232,24 @@ describe("chart mode", () => {
         );
 
         await waitFor(() =>
-          expect(screen.queryByTestId("governed-chart-failure")).toBeNull(),
+          expect(
+            screen.queryByTestId("vega-spec-editor-problems"),
+          ).toBeNull(),
         );
-        expect(screen.queryByTestId("vega-spec-editor-problems")).toBeNull();
+
+        // The chart view agrees: nothing refused, the chart draws.
+        switchView(rerender, "chart");
+        await waitFor(() => expect(vega.state.embeds).toBe(1));
+        expect(screen.queryByTestId("governed-chart-failure")).toBeNull();
         expect(requests).toEqual([]);
       });
 
       /** @scenario "The workbench ships no polling, persistence, export, or agent surface" */
       it("writes the specification nowhere: it lives as long as the result is on screen", async () => {
         const { unmount } = withChakra(
-          <GovernedSqlChartMode result={RESULT} />,
+          <GovernedSqlChartMode result={RESULT} view="specification" />,
         );
-        const editor = await openEditor();
+        const editor = await findEditor();
 
         await replaceSpec(
           editor,
@@ -245,8 +262,10 @@ describe("chart mode", () => {
       });
 
       it("gives the starting specification back on request", async () => {
-        withChakra(<GovernedSqlChartMode result={RESULT} />);
-        const editor = await openEditor();
+        withChakra(
+          <GovernedSqlChartMode result={RESULT} view="specification" />,
+        );
+        const editor = await findEditor();
         const starter = (editor as HTMLTextAreaElement).value;
 
         await replaceSpec(editor, "{}");
@@ -256,6 +275,32 @@ describe("chart mode", () => {
 
         await waitFor(() =>
           expect((editor as HTMLTextAreaElement).value).toBe(starter),
+        );
+      });
+    });
+
+    describe("when the member reads the specification view's policy panel", () => {
+      /** @scenario "The specification view names what the chart policy accepts" */
+      it("says where the specification stands and what the policy accepts", async () => {
+        withChakra(
+          <GovernedSqlChartMode result={RESULT} view="specification" />,
+        );
+
+        const panel = screen.getByTestId("vega-spec-policy-panel");
+        // The starter specification is valid, and the panel says so.
+        expect(panel.textContent).toContain("Valid");
+        // The reference names the one dataset a specification may read.
+        expect(panel.textContent).toContain("query_result");
+        expect(panel.textContent).toContain("The policy accepts");
+
+        const editor = await findEditor();
+        await replaceSpec(editor, "{ not json");
+
+        // A refusal flips the panel and names what it refers to.
+        await waitFor(() =>
+          expect(
+            screen.getByTestId("vega-spec-policy-panel").textContent,
+          ).toContain("Refused"),
         );
       });
     });

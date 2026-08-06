@@ -68,7 +68,13 @@ function stateWith({
 function renderPane(state: GovernedSqlRequestState, chartSlot?: ReactNode) {
   render(
     <ChakraProvider value={defaultSystem}>
-      <GovernedSqlResultPane state={state} chartSlot={chartSlot} />
+      <GovernedSqlResultPane
+        state={state}
+        onRun={vi.fn()}
+        {...(chartSlot === undefined
+          ? {}
+          : { renderChartArea: () => chartSlot })}
+      />
     </ChakraProvider>,
   );
 }
@@ -136,11 +142,12 @@ describe("the governed SQL result pane", () => {
           }),
         );
 
-        const notice = screen.getByTestId("governed-sql-stale-notice");
-        expect(notice).toHaveTextContent("Previous submission");
-        expect(notice).toHaveTextContent(
-          "This is the result of the query you last ran, not of the query in the editor.",
-        );
+        expect(
+          screen.getByTestId("governed-sql-result-chip"),
+        ).toHaveTextContent("Previous submission");
+        expect(
+          screen.getByTestId("governed-sql-stale-notice"),
+        ).toHaveTextContent("The statement changed after this ran");
       });
 
       it("drops the label once the draft matches the snapshot that produced the result", () => {
@@ -180,7 +187,7 @@ describe("the governed SQL result pane", () => {
         );
 
         expect(
-          screen.getByTestId("governed-sql-stale-notice"),
+          screen.getByTestId("governed-sql-result-chip"),
         ).toHaveTextContent("Previous submission");
       });
     });
@@ -235,7 +242,7 @@ describe("the governed SQL result pane", () => {
         expect(copy.titleOnScreen).toBeInTheDocument();
         expect(copy.descriptionOnScreen).toBeInTheDocument();
         expect(copy.slugOnScreen).not.toBeInTheDocument();
-        expect(screen.getByText("Line 3, column 12")).toBeInTheDocument();
+        expect(screen.getByText("line 3 : 12")).toBeInTheDocument();
       });
 
       /** @scenario "A statement the validator cannot parse renders registry copy at its location" */
@@ -260,7 +267,7 @@ describe("the governed SQL result pane", () => {
         expect(copy.titleOnScreen).toBeInTheDocument();
         expect(copy.descriptionOnScreen).toBeInTheDocument();
         expect(copy.slugOnScreen).not.toBeInTheDocument();
-        expect(screen.queryByText(/^Line /)).not.toBeInTheDocument();
+        expect(screen.queryByText(/^line \d/)).not.toBeInTheDocument();
         expect(
           screen.getByText(
             "The refusal did not say where in the statement the problem is.",
@@ -439,6 +446,122 @@ describe("the governed SQL result pane", () => {
     });
   });
 
+  describe("given a successful result and a chart area", () => {
+    describe("when the member walks the three views", () => {
+      /** @scenario "The result offers Table, Chart, and Specification readings" */
+      it("offers Table, Chart, and Specification over the same result", async () => {
+        renderPane(
+          stateWith({
+            answer: { kind: "result", result: governedSqlResult() },
+          }),
+          <div data-testid="chart-slot">chart</div>,
+        );
+
+        expect(screen.getByRole("tab", { name: "Table" })).toBeInTheDocument();
+        expect(screen.getByRole("tab", { name: "Chart" })).toBeInTheDocument();
+        expect(
+          screen.getByRole("tab", { name: "Specification" }),
+        ).toBeInTheDocument();
+
+        await selectResultMode("Chart");
+        expect(screen.getByTestId("chart-slot")).toBeInTheDocument();
+        // One mounted area serves Chart and Specification, so the
+        // specification is a single piece of state however it is viewed.
+        await userEvent.click(
+          screen.getByRole("tab", { name: "Specification" }),
+        );
+        expect(screen.getAllByTestId("chart-slot")).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("given each way a submission can settle", () => {
+    describe("when the result header renders", () => {
+      /** @scenario "The visible answer wears a state chip naming where it stands" */
+      it("labels current, partial, stale, refused, and timed out answers", () => {
+        const chip = () =>
+          screen.getByTestId("governed-sql-result-chip").textContent;
+
+        const { unmount: unmountCurrent } = render(
+          <ChakraProvider value={defaultSystem}>
+            <GovernedSqlResultPane
+              state={stateWith({
+                answer: { kind: "result", result: governedSqlResult() },
+              })}
+              onRun={vi.fn()}
+            />
+          </ChakraProvider>,
+        );
+        expect(chip()).toBe("Current");
+        unmountCurrent();
+
+        const { unmount: unmountPartial } = render(
+          <ChakraProvider value={defaultSystem}>
+            <GovernedSqlResultPane
+              state={stateWith({
+                answer: {
+                  kind: "result",
+                  result: governedSqlResult({ truncated: true }),
+                },
+              })}
+              onRun={vi.fn()}
+            />
+          </ChakraProvider>,
+        );
+        expect(chip()).toBe("Partial");
+        unmountPartial();
+
+        const { unmount: unmountStale } = render(
+          <ChakraProvider value={defaultSystem}>
+            <GovernedSqlResultPane
+              state={stateWith({
+                answer: { kind: "result", result: governedSqlResult() },
+                draftSql: `${SUBMITTED_SQL} LIMIT 10`,
+              })}
+              onRun={vi.fn()}
+            />
+          </ChakraProvider>,
+        );
+        expect(chip()).toBe("Previous submission");
+        unmountStale();
+
+        const { unmount: unmountRefused } = render(
+          <ChakraProvider value={defaultSystem}>
+            <GovernedSqlResultPane
+              state={stateWith({
+                answer: {
+                  kind: "error",
+                  error: handledErrorEnvelope({
+                    code: "governed_sql_not_permitted",
+                    meta: { violations: [] },
+                  }),
+                },
+              })}
+              onRun={vi.fn()}
+            />
+          </ChakraProvider>,
+        );
+        expect(chip()).toBe("Refused");
+        unmountRefused();
+
+        render(
+          <ChakraProvider value={defaultSystem}>
+            <GovernedSqlResultPane
+              state={stateWith({
+                answer: {
+                  kind: "error",
+                  error: handledErrorEnvelope({ code: "query_timeout" }),
+                },
+              })}
+              onRun={vi.fn()}
+            />
+          </ChakraProvider>,
+        );
+        expect(chip()).toBe("Timed out");
+      });
+    });
+  });
+
   describe("given a wide result the byte ceiling truncated well below the row ceiling", () => {
     /** Far under the 10,000-row ceiling: the bytes ran out first. */
     const truncatedResult = () =>
@@ -504,7 +627,7 @@ describe("the governed SQL result pane", () => {
         renderPane(stateWith({ answer: null, inFlight: true }));
 
         expect(screen.getByTestId("governed-sql-loading")).toHaveTextContent(
-          "Running the query",
+          "Validating, scoping to this project, and reading",
         );
         expect(screen.queryByRole("table")).not.toBeInTheDocument();
       });

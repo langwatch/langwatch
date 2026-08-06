@@ -174,7 +174,7 @@ describe("the Custom query page", () => {
 
         expect(screen.getByText("Custom query")).toBeInTheDocument();
         expect(
-          await screen.findByText("Governed ClickHouse SQL"),
+          await screen.findByText("Governed · project-scoped"),
         ).toBeInTheDocument();
         expect(
           screen.getByTestId("governed-sql-workbench"),

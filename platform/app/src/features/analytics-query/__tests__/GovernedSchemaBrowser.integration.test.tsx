@@ -31,8 +31,24 @@ function renderBrowser(onInsert = vi.fn()) {
   return { onInsert };
 }
 
+/**
+ * The dataset toggle's accessible name is its visible row — the mono dataset
+ * name plus the column count beside it — so it is matched by prefix.
+ */
+function datasetToggle(datasetName: string) {
+  return screen.getByRole("button", {
+    name: new RegExp(`^${datasetName.replace(/\./g, "\\.")}`),
+  });
+}
+
+function queryDatasetToggle(datasetName: string) {
+  return screen.queryByRole("button", {
+    name: new RegExp(`^${datasetName.replace(/\./g, "\\.")}`),
+  });
+}
+
 function expand(datasetName: string) {
-  fireEvent.click(screen.getByRole("button", { name: datasetName }));
+  fireEvent.click(datasetToggle(datasetName));
 }
 
 describe("the governed schema browser", () => {
@@ -43,7 +59,7 @@ describe("the governed schema browser", () => {
         renderBrowser();
 
         for (const name of SCHEMA_DATASET_NAMES) {
-          expect(screen.getByRole("button", { name })).toBeInTheDocument();
+          expect(datasetToggle(name)).toBeInTheDocument();
         }
         // Nothing suggests reachable ClickHouse beyond those datasets.
         expect(screen.queryByText(/system\./)).not.toBeInTheDocument();
@@ -63,19 +79,19 @@ describe("the governed schema browser", () => {
           screen.getByText("One row per trace, rolled up by day."),
         ).toBeInTheDocument();
         expect(
-          screen.getByText("Grain: one row per trace per day"),
+          screen.getByText("one row per trace per day"),
         ).toBeInTheDocument();
         expect(
-          screen.getByText("Freshness: up to 15 minutes behind ingestion"),
+          screen.getByText("up to 15 minutes behind ingestion"),
+        ).toBeInTheDocument();
+        expect(screen.getByText("time: occurred_on")).toBeInTheDocument();
+        expect(
+          screen.getByText("Joins on trace_id, project_id"),
         ).toBeInTheDocument();
         expect(
-          screen.getByText("Time column: occurred_on"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText("Join keys: trace_id, project_id"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText(/FROM analytics\.traces_daily/),
+          screen.getByRole("button", {
+            name: "Insert example query for analytics.traces_daily",
+          }),
         ).toBeInTheDocument();
       });
 
@@ -86,9 +102,12 @@ describe("the governed schema browser", () => {
 
         const column = screen.getByTestId("governed-schema-column-latency_ms");
         expect(within(column).getByText("Float64")).toBeInTheDocument();
-        expect(
-          within(column).getByText("End to end latency of the trace."),
-        ).toBeInTheDocument();
+        // The description rides on the row's tooltip rather than a line of its
+        // own, so the list stays scannable.
+        expect(column).toHaveAttribute(
+          "title",
+          "End to end latency of the trace.",
+        );
         // The unit symbol verbatim, not spelled out: the copy rules exempt
         // standard symbols, and the browser must not invent a rendering the
         // schema response did not carry.
@@ -104,9 +123,11 @@ describe("the governed schema browser", () => {
           "governed-schema-column-total_cost",
         );
         expect(withheld).toHaveAttribute("aria-disabled", "true");
-        expect(
-          within(withheld).getByText("Needs permission to see costs."),
-        ).toBeInTheDocument();
+        expect(within(withheld).getByText("no access")).toBeInTheDocument();
+        expect(withheld).toHaveAttribute(
+          "title",
+          "Needs permission to see costs.",
+        );
         expect(
           screen.queryByRole("button", { name: "Insert column total_cost" }),
         ).not.toBeInTheDocument();
@@ -120,15 +141,8 @@ describe("the governed schema browser", () => {
 
     describe("when the member picks something to write into the editor", () => {
       /** @scenario "The member inserts schema elements into the editor" */
-      it("inserts the dataset name, the column name, or the example query", () => {
+      it("inserts the column name or the example query", () => {
         const { onInsert } = renderBrowser();
-
-        fireEvent.click(
-          screen.getByRole("button", {
-            name: "Insert dataset analytics.traces_daily",
-          }),
-        );
-        expect(onInsert).toHaveBeenCalledWith("analytics.traces_daily");
 
         expand("analytics.traces_daily");
 
@@ -159,13 +173,9 @@ describe("the governed schema browser", () => {
           target: { value: "latency" },
         });
 
+        expect(datasetToggle("analytics.traces_daily")).toBeInTheDocument();
         expect(
-          screen.getByRole("button", { name: "analytics.traces_daily" }),
-        ).toBeInTheDocument();
-        expect(
-          screen.queryByRole("button", {
-            name: "analytics.evaluations_daily",
-          }),
+          queryDatasetToggle("analytics.evaluations_daily"),
         ).not.toBeInTheDocument();
 
         expand("analytics.traces_daily");

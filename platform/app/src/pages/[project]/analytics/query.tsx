@@ -10,7 +10,7 @@
  * @see specs/analytics/governed-sql-workbench.feature
  */
 
-import { Box, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Spinner } from "@chakra-ui/react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -43,6 +43,13 @@ export function CustomQueryPage() {
     <DashboardLayout>
       <PageLayout.Header>
         <PageLayout.Heading>Custom query</PageLayout.Heading>
+        <Badge
+          size="sm"
+          variant="outline"
+          title="Every statement is validated, scoped to this project, and row- and byte-limited by the server"
+        >
+          Governed · project-scoped
+        </Badge>
       </PageLayout.Header>
 
       {resolving ? (
@@ -50,14 +57,14 @@ export function CustomQueryPage() {
           <Spinner />
         </Box>
       ) : available ? (
-        <Box width="full" paddingX={6} paddingY={4}>
-          <VStack align="stretch" gap={4} width="full">
-            <Text color="fg.muted" fontSize="13px">
-              Write governed ClickHouse SQL over the analytics datasets you can
-              reach.
-            </Text>
-            <GovernedSqlWorkbench projectId={projectId} />
-          </VStack>
+        <Box
+          width="full"
+          flex="1"
+          minHeight={0}
+          display="flex"
+          flexDirection="column"
+        >
+          <GovernedSqlWorkbench projectId={projectId} />
         </Box>
       ) : (
         // The backend's own unavailable state, worded by the error registry

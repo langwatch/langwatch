@@ -59,6 +59,8 @@ export interface GovernedSqlEditorProps {
    * it; before it arrives the workbench appends instead.
    */
   registerInsert?: (insert: ((text: string) => void) | null) => void;
+  /** Runs the draft. Bound to Cmd/Ctrl+Enter inside the editor. */
+  onRun?: () => void;
 }
 
 export function GovernedSqlEditor({
@@ -67,6 +69,7 @@ export function GovernedSqlEditor({
   schema,
   markers,
   registerInsert,
+  onRun,
 }: GovernedSqlEditorProps) {
   const { colorMode } = useColorMode();
   // Monaco's bundled VS Code themes verbatim, matching every other editor in
@@ -77,15 +80,13 @@ export function GovernedSqlEditor({
     schema,
     markers,
     ...(registerInsert ? { registerInsert } : {}),
+    ...(onRun ? { onRun } : {}),
   });
 
   return (
     <Box
       height="full"
-      minHeight="240px"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="8px"
+      minHeight="220px"
       overflow="hidden"
       data-testid="governed-sql-editor"
     >

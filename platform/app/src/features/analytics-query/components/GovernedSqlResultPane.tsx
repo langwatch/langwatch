@@ -10,16 +10,22 @@
  * presented as current. Reading an old table while writing the next query is
  * normal; being unable to tell which query produced it is the bug.
  *
- * ## Result modes
+ * ## Result views
  *
- * Table and Chart are two readings of one already-fetched result, so switching
- * between them is local state and nothing else — this component takes the
- * result as a prop and owns no query. Chart mode renders {@link
- * GovernedSqlResultPaneProps.chartSlot}; until that slot is supplied the tab is
- * still offered and still carries the statistics and diagnostics below, because
- * those belong to the result rather than to either reading of it. Keeping them
- * outside the tab panels is what makes "a truncation warning is visible in both
- * modes" true by construction rather than by remembering to repeat it.
+ * Table, Chart and Specification are three readings of one already-fetched
+ * result, so switching between them is local state and nothing else — this
+ * component takes the result as a prop and owns no query. Chart and
+ * Specification are rendered through {@link
+ * GovernedSqlResultPaneProps.renderChartArea}: one render function for both, so
+ * the specification being edited is a single piece of state however the member
+ * looks at it. The area is mounted on the first visit to either view and kept
+ * mounted (hidden) afterwards — mounting is what loads the Vega runtime, and
+ * unmounting is what would throw away an edited specification.
+ *
+ * The statistics and diagnostics live below the views, because they belong to
+ * the result rather than to any reading of it. Keeping them outside the view
+ * panels is what makes "a truncation warning is visible in every view" true by
+ * construction rather than by remembering to repeat it.
  *
  * @see dev/docs/best_practices/error-handling.md
  * @see specs/analytics/governed-sql-workbench.feature
@@ -28,20 +34,21 @@
 import {
   Badge,
   Box,
+  Button,
   HStack,
   Spinner,
   Stack,
-  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useId, useState } from "react";
 
 import { HandledErrorAlert } from "~/features/errors";
 import type { GovernedSqlQueryResult } from "~/server/analytics/governed-sql";
 import { formatNumber } from "~/utils/formatNumber";
 
 import {
+  GOVERNED_SQL_TIMEOUT_CODE,
   GOVERNED_SQL_UNPARSEABLE_CODE,
   type GovernedSqlFailure,
   readGovernedSqlFailure,
@@ -54,17 +61,82 @@ import { GovernedSqlDiagnostics } from "./GovernedSqlDiagnostics";
 import { GovernedSqlResultMeta } from "./GovernedSqlResultMeta";
 import { GovernedSqlResultTable } from "./GovernedSqlResultTable";
 
-/** The mode a first successful result opens in. */
-const DEFAULT_RESULT_MODE = "table";
+/** The three readings of a result. */
+export type GovernedSqlResultView = "table" | "chart" | "specification";
+
+/** The view a first successful result opens in. */
+const DEFAULT_RESULT_VIEW: GovernedSqlResultView = "table";
 
 export interface GovernedSqlResultPaneProps {
   state: GovernedSqlRequestState;
+  /** Submits the draft. The stale notice offers it as "run the new draft". */
+  onRun: () => void;
+  /** Writes an example statement into the editor, when the schema offers one. */
+  onInsertExample?: () => void;
   /**
-   * Chart mode's content, supplied by whoever owns the chart. Absent, Chart
-   * mode is offered and empty rather than hidden — the statistics and
-   * diagnostics under it are the same either way.
+   * Chart and Specification content, supplied by whoever owns the chart.
+   * Called with the active view and a way to switch to the Specification view;
+   * absent, both views are offered and empty rather than hidden.
    */
-  chartSlot?: ReactNode;
+  renderChartArea?: (
+    view: GovernedSqlResultView,
+    openSpecification: () => void,
+  ) => ReactNode;
+}
+
+/**
+ * One word for where the visible answer stands, worn as a pill in the result
+ * header. The title carries the sentence the word abbreviates.
+ */
+interface ResultChip {
+  readonly label: string;
+  readonly palette: "green" | "orange" | "red";
+  readonly title: string;
+}
+
+function resultChip({
+  state,
+  failure,
+  stale,
+}: {
+  state: GovernedSqlRequestState;
+  failure: GovernedSqlFailure | undefined;
+  stale: boolean;
+}): ResultChip | undefined {
+  if (state.outcome?.kind === "error" && failure) {
+    return failure.code === GOVERNED_SQL_TIMEOUT_CODE
+      ? {
+          label: "Timed out",
+          palette: "orange",
+          title: "The database stopped the read at its time ceiling",
+        }
+      : {
+          label: "Refused",
+          palette: "red",
+          title: "The server refused this statement before reading any data",
+        };
+  }
+  if (state.outcome?.kind !== "result") return undefined;
+  if (stale) {
+    return {
+      label: "Previous submission",
+      palette: "orange",
+      title:
+        "The visible result belongs to the statement as it was when it ran",
+    };
+  }
+  if (state.outcome.result.truncated) {
+    return {
+      label: "Partial",
+      palette: "orange",
+      title: "The response ceiling cut this result short",
+    };
+  }
+  return {
+    label: "Current",
+    palette: "green",
+    title: "This result matches the draft in the editor",
+  };
 }
 
 /**
@@ -83,37 +155,62 @@ function ViolationList({ failure }: { failure: GovernedSqlFailure }) {
   if (failure.violations.length === 0) return null;
 
   return (
-    <Stack gap={1} paddingLeft={1}>
+    <Stack gap={2}>
       {failure.violations.map((violation, index) => (
-        <Box key={`${violation.code}-${index}`}>
-          <Text fontSize="12.5px">{violation.message}</Text>
+        <HStack
+          key={`${violation.code}-${index}`}
+          align="flex-start"
+          gap={3}
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="8px"
+          background="red.subtle"
+          paddingX={3}
+          paddingY={2}
+        >
           {violation.at && (
-            <Text fontSize="12px" color="fg.muted">
-              Line {violation.at.line}, column {violation.at.column}
+            <Text
+              fontFamily="mono"
+              fontSize="11.5px"
+              fontWeight="700"
+              color="red.fg"
+              flexShrink={0}
+            >
+              line {violation.at.line} : {violation.at.column}
             </Text>
           )}
-        </Box>
+          <Text fontSize="12.5px" lineHeight="1.55">
+            {violation.message}
+          </Text>
+        </HStack>
       ))}
     </Stack>
   );
 }
 
-function StaleNotice() {
+function StaleNotice({ onRun }: { onRun: () => void }) {
   return (
-    <HStack
-      gap={2}
-      align="center"
+    <Text
+      fontSize="12.5px"
+      color="fg.muted"
       data-testid="governed-sql-stale-notice"
       role="status"
     >
-      <Badge size="sm" variant="subtle">
-        Previous submission
-      </Badge>
-      <Text fontSize="12.5px" color="fg.muted">
-        This is the result of the query you last ran, not of the query in the
-        editor.
-      </Text>
-    </HStack>
+      The statement changed after this ran —{" "}
+      <Button
+        variant="plain"
+        size="xs"
+        height="auto"
+        padding={0}
+        fontSize="12.5px"
+        fontWeight="600"
+        color="orange.fg"
+        textDecoration="underline"
+        onClick={onRun}
+      >
+        run the new draft
+      </Button>
+    </Text>
   );
 }
 
@@ -132,14 +229,19 @@ function TruncationBanner({ result }: { result: GovernedSqlQueryResult }) {
   return (
     <HStack
       gap={2}
-      align="center"
+      align="flex-start"
       role="status"
       data-testid="governed-sql-truncation-banner"
+      background="orange.subtle"
+      borderBottomWidth="1px"
+      borderColor="border"
+      paddingX={4}
+      paddingY={2}
     >
-      <Badge size="sm" variant="subtle" colorPalette="orange">
+      <Text fontSize="12px" fontWeight="700" color="orange.fg" flexShrink={0}>
         Partial result
-      </Badge>
-      <Text fontSize="12.5px" color="fg.muted">
+      </Text>
+      <Text fontSize="12px" color="fg.muted" lineHeight="1.5">
         Showing the first {formatNumber(result.statistics.rowsReturned)} rows.
         The rest of the answer did not fit in the response — aggregate or narrow
         the query to see it.
@@ -148,10 +250,138 @@ function TruncationBanner({ result }: { result: GovernedSqlQueryResult }) {
   );
 }
 
+/** Nothing has run yet. The workbench's front door, not an error. */
+function EmptyState({ onInsertExample }: { onInsertExample?: () => void }) {
+  return (
+    <VStack
+      flex="1"
+      justify="center"
+      align="center"
+      padding={8}
+      textAlign="center"
+      gap={0}
+    >
+      <Text
+        fontFamily="mono"
+        fontSize="24px"
+        color="fg.subtle"
+        marginBottom={3}
+        aria-hidden="true"
+      >
+        SELECT …
+      </Text>
+      <Text fontSize="14px" fontWeight="600" marginBottom={1}>
+        Nothing has run yet
+      </Text>
+      <Text fontSize="12.5px" color="fg.muted" lineHeight="1.6" maxWidth="420px">
+        The governed datasets on the left are ready — open one to see what a
+        row means and what you can select. Nothing runs until you press{" "}
+        <strong>Run query</strong>.
+      </Text>
+      {onInsertExample && (
+        <Button
+          size="sm"
+          colorPalette="orange"
+          marginTop={4}
+          onClick={onInsertExample}
+        >
+          Start from an example
+        </Button>
+      )}
+    </VStack>
+  );
+}
+
+/** A first request in flight, with nothing older to keep on screen. */
+function RunningState() {
+  return (
+    <VStack
+      flex="1"
+      justify="center"
+      align="center"
+      padding={8}
+      gap={2}
+      data-testid="governed-sql-loading"
+    >
+      <Spinner size="sm" color="orange.solid" />
+      <Text fontSize="12.5px" color="fg.muted">
+        Validating, scoping to this project, and reading…
+      </Text>
+      <Text fontSize="11px" color="fg.subtle">
+        Cancel keeps the previous result untouched.
+      </Text>
+    </VStack>
+  );
+}
+
+/** The pill strip that switches between readings of the result. */
+function ViewTabs({
+  view,
+  onViewChange,
+  panelIdFor,
+}: {
+  view: GovernedSqlResultView;
+  onViewChange: (view: GovernedSqlResultView) => void;
+  panelIdFor: (view: GovernedSqlResultView) => string;
+}) {
+  const entries: readonly { value: GovernedSqlResultView; label: string }[] = [
+    { value: "table", label: "Table" },
+    { value: "chart", label: "Chart" },
+    { value: "specification", label: "Specification" },
+  ];
+
+  return (
+    <HStack
+      role="tablist"
+      aria-label="Result view"
+      gap={0}
+      padding="2px"
+      background="bg.subtle"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="7px"
+    >
+      {entries.map((entry) => {
+        const selected = entry.value === view;
+        return (
+          <Button
+            key={entry.value}
+            role="tab"
+            aria-selected={selected}
+            aria-controls={panelIdFor(entry.value)}
+            size="xs"
+            height="24px"
+            variant="plain"
+            borderRadius="5px"
+            fontWeight="600"
+            background={selected ? "bg.panel" : "transparent"}
+            color={selected ? "fg" : "fg.muted"}
+            boxShadow={selected ? "xs" : "none"}
+            onClick={() => onViewChange(entry.value)}
+          >
+            {entry.label}
+          </Button>
+        );
+      })}
+    </HStack>
+  );
+}
+
 export function GovernedSqlResultPane({
   state,
-  chartSlot,
+  onRun,
+  onInsertExample,
+  renderChartArea,
 }: GovernedSqlResultPaneProps) {
+  const [view, setView] = useState<GovernedSqlResultView>(DEFAULT_RESULT_VIEW);
+  // Mounting the chart area is what loads the Vega runtime, so it waits for
+  // the first visit to Chart or Specification — and then stays mounted, hidden,
+  // because unmounting would throw away an edited specification.
+  const [chartAreaVisited, setChartAreaVisited] = useState(false);
+  const panelIdBase = useId();
+  const panelIdFor = (target: GovernedSqlResultView) =>
+    `${panelIdBase}-${target}`;
+
   const stale = isGovernedSqlResultStale(state);
   const failure =
     state.outcome?.kind === "error"
@@ -159,31 +389,81 @@ export function GovernedSqlResultPane({
       : undefined;
   const result =
     state.outcome?.kind === "result" ? state.outcome.result : undefined;
+  const chip = resultChip({ state, failure, stale });
+
+  const changeView = (next: GovernedSqlResultView) => {
+    if (next !== "table") setChartAreaVisited(true);
+    setView(next);
+  };
+  const openSpecification = () => changeView("specification");
+
+  if (state.outcome === null) {
+    return (
+      <VStack
+        align="stretch"
+        flex="1"
+        minHeight={0}
+        gap={0}
+        data-testid="governed-sql-result-pane"
+      >
+        {state.inFlight ? (
+          <RunningState />
+        ) : (
+          <EmptyState
+            {...(onInsertExample ? { onInsertExample } : {})}
+          />
+        )}
+      </VStack>
+    );
+  }
 
   return (
     <VStack
       align="stretch"
-      gap={3}
-      width="full"
+      flex="1"
+      minHeight={0}
+      gap={0}
       data-testid="governed-sql-result-pane"
     >
-      {stale && <StaleNotice />}
+      <HStack
+        gap={3}
+        paddingX={3}
+        paddingY={2}
+        borderBottomWidth="1px"
+        borderColor="border"
+        flexShrink={0}
+      >
+        {result && (
+          <ViewTabs
+            view={view}
+            onViewChange={changeView}
+            panelIdFor={panelIdFor}
+          />
+        )}
+        {chip && (
+          <Badge
+            size="sm"
+            variant="subtle"
+            colorPalette={chip.palette}
+            borderRadius="full"
+            title={chip.title}
+            data-testid="governed-sql-result-chip"
+          >
+            {chip.label}
+          </Badge>
+        )}
+        {stale && <StaleNotice onRun={onRun} />}
+        <Box flex="1" />
+        {state.inFlight && (
+          <HStack gap={2} color="fg.muted" data-testid="governed-sql-loading">
+            <Spinner size="xs" />
+            <Text fontSize="12px">Running…</Text>
+          </HStack>
+        )}
+      </HStack>
 
-      {state.inFlight && (
-        <HStack gap={2} color="fg.muted" data-testid="governed-sql-loading">
-          <Spinner size="sm" />
-          <Text fontSize="13px">Running the query</Text>
-        </HStack>
-      )}
-
-      {!state.inFlight && state.outcome === null && (
-        <Text fontSize="13px" color="fg.muted">
-          Run a query to see its result here.
-        </Text>
-      )}
-
-      {state.outcome?.kind === "error" && failure && (
-        <Stack gap={2}>
+      {state.outcome.kind === "error" && failure && (
+        <Stack gap={3} padding={5} overflowY="auto">
           <HandledErrorAlert
             error={state.outcome.error}
             fallbackTitle="Couldn't run the query"
@@ -204,28 +484,35 @@ export function GovernedSqlResultPane({
         <>
           {result.truncated && <TruncationBanner result={result} />}
 
-          <Tabs.Root
-            defaultValue={DEFAULT_RESULT_MODE}
-            size="sm"
-            variant="line"
-            width="full"
+          <Box
+            flex="1"
+            minHeight={0}
+            overflow="auto"
+            role="tabpanel"
+            id={panelIdFor("table")}
+            display={view === "table" ? undefined : "none"}
           >
-            <Tabs.List>
-              <Tabs.Trigger value="table">Table</Tabs.Trigger>
-              <Tabs.Trigger value="chart">Chart</Tabs.Trigger>
-            </Tabs.List>
-            <Tabs.Content value="table" paddingX={0}>
-              <GovernedSqlResultTable result={result} />
-            </Tabs.Content>
-            <Tabs.Content value="chart" paddingX={0}>
-              {chartSlot}
-            </Tabs.Content>
-          </Tabs.Root>
+            <GovernedSqlResultTable result={result} />
+          </Box>
 
-          {/* Outside the panels: both belong to the result, not to a reading
-              of it, so neither mode can be the reason one goes unread. */}
-          <GovernedSqlResultMeta statistics={result.statistics} />
-          <GovernedSqlDiagnostics diagnostics={result.diagnostics} />
+          {renderChartArea && chartAreaVisited && (
+            <Box
+              flex="1"
+              minHeight={0}
+              overflow="auto"
+              role="tabpanel"
+              id={view === "specification" ? panelIdFor("specification") : panelIdFor("chart")}
+              display={view === "table" ? "none" : undefined}
+              padding={view === "specification" ? 0 : 4}
+            >
+              {renderChartArea(view, openSpecification)}
+            </Box>
+          )}
+
+          <Box borderTopWidth="1px" borderColor="border" flexShrink={0}>
+            <GovernedSqlDiagnostics diagnostics={result.diagnostics} />
+            <GovernedSqlResultMeta statistics={result.statistics} />
+          </Box>
         </>
       )}
     </VStack>

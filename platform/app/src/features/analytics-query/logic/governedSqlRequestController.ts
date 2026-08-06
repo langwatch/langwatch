@@ -62,6 +62,13 @@ export interface GovernedSqlRequestController {
    * This stays the seam for a data-only refresh of the last request.
    */
   reload(): void;
+  /**
+   * Abandons the in-flight request, keeping whatever result was already on
+   * screen. A no-op when nothing is in flight. The aborted request's answer,
+   * should the transport deliver one anyway, carries a superseded submission id
+   * and is dropped by the reducer.
+   */
+  cancel(): void;
   /** Aborts anything in flight and stops publishing. */
   dispose(): void;
 }
@@ -147,6 +154,13 @@ export function createGovernedSqlRequestController({
       const { submitted } = state;
       if (!submitted) return;
       send(submitted);
+    },
+
+    cancel() {
+      if (!state.inFlight) return;
+      pending?.abort();
+      pending = null;
+      apply({ type: "abandoned" });
     },
 
     // Deliberately reusable rather than one-shot: a controller outlives a

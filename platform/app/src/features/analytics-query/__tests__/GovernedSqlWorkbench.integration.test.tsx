@@ -141,9 +141,13 @@ describe("the governed SQL workbench", () => {
       it("names the editor and lists exactly the datasets the endpoint returned", async () => {
         await renderWorkbench();
 
-        expect(screen.getByText("Governed ClickHouse SQL")).toBeInTheDocument();
+        expect(screen.getByText("Query")).toBeInTheDocument();
         for (const name of SCHEMA_DATASET_NAMES) {
-          expect(screen.getByRole("button", { name })).toBeInTheDocument();
+          expect(
+            screen.getByRole("button", {
+              name: new RegExp(`^${name.replace(/\./g, "\\.")}`),
+            }),
+          ).toBeInTheDocument();
         }
         expect(harness.mutation).not.toHaveBeenCalled();
       });

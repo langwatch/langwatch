@@ -7,6 +7,9 @@
  * carries no affordance that would put its name in the editor, because the
  * validator would refuse it.
  *
+ * Presented as a flat panel: dataset rows that expand in place, columns as
+ * click-to-insert rows, and the dataset's example statement one button away.
+ *
  * @see specs/analytics/governed-sql-workbench.feature
  */
 
@@ -14,7 +17,7 @@ import {
   Badge,
   Box,
   Button,
-  Code,
+  chakra,
   HStack,
   Spinner,
   Stack,
@@ -24,7 +27,6 @@ import {
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { CopyButton } from "~/components/CopyButton";
 import { SearchInput } from "~/components/ui/SearchInput";
 import { HandledErrorAlert } from "~/features/errors";
 
@@ -70,46 +72,58 @@ function ColumnRow({
   const disabled = !column.available;
 
   return (
-    <Box
-      paddingY={1}
+    <chakra.button
+      type="button"
+      display="flex"
+      alignItems="center"
+      gap={1.5}
+      width="full"
+      paddingX={1.5}
+      paddingY={0.5}
+      borderRadius="5px"
+      textAlign="left"
+      cursor={disabled ? "not-allowed" : "pointer"}
+      opacity={disabled ? 0.5 : 1}
+      _hover={disabled ? {} : { background: "bg.muted" }}
       aria-disabled={disabled || undefined}
-      opacity={disabled ? 0.55 : 1}
+      aria-label={
+        disabled
+          ? `Column ${column.name}, not available to your role`
+          : `Insert column ${column.name}`
+      }
+      title={
+        disabled
+          ? gateSentence(column.gates)
+          : (column.description ?? `Insert ${column.name} at the cursor`)
+      }
+      onClick={() => {
+        if (!disabled) onInsert(column.qualifiedName);
+      }}
       data-testid={`governed-schema-column-${column.name}`}
     >
-      <HStack gap={2} align="baseline">
-        <Text fontFamily="mono" fontSize="13px">
-          {column.name}
-        </Text>
-        <Badge size="sm" variant="subtle">
-          {column.type}
+      <Text fontFamily="mono" fontSize="11.5px">
+        {column.name}
+      </Text>
+      {column.unit && (
+        <Badge
+          size="xs"
+          variant="subtle"
+          colorPalette="orange"
+          fontSize="9.5px"
+        >
+          {column.unit}
         </Badge>
-        {column.unit && (
-          <Text fontSize="12px" color="fg.muted">
-            {column.unit}
-          </Text>
-        )}
-        {!disabled && (
-          <Button
-            size="xs"
-            variant="ghost"
-            aria-label={`Insert column ${column.name}`}
-            onClick={() => onInsert(column.qualifiedName)}
-          >
-            Insert
-          </Button>
-        )}
-      </HStack>
-      {column.description && (
-        <Text fontSize="12px" color="fg.muted">
-          {column.description}
-        </Text>
       )}
+      <Box flex="1" />
       {disabled && (
-        <Text fontSize="12px" color="fg.muted">
-          {gateSentence(column.gates)}
-        </Text>
+        <Badge size="xs" variant="outline" fontSize="9.5px" color="fg.muted">
+          no access
+        </Badge>
       )}
-    </Box>
+      <Text fontFamily="mono" fontSize="10px" color="fg.subtle">
+        {column.type}
+      </Text>
+    </chakra.button>
   );
 }
 
@@ -125,97 +139,62 @@ function DatasetEntry({
   onInsert: (text: string) => void;
 }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="8px"
-      padding={2}
-      width="full"
-    >
-      <HStack gap={1} width="full">
-        <Button
-          variant="ghost"
-          size="sm"
-          flex="1"
-          justifyContent="flex-start"
-          aria-expanded={expanded}
-          onClick={onToggle}
-        >
-          <Box aria-hidden="true" display="flex">
-            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </Box>
-          <Text fontFamily="mono" fontSize="13px">
-            {dataset.name}
-          </Text>
-        </Button>
-        <Button
-          size="xs"
-          variant="ghost"
-          aria-label={`Insert dataset ${dataset.name}`}
-          onClick={() => onInsert(dataset.name)}
-        >
-          Insert
-        </Button>
-        <CopyButton
-          value={dataset.name}
-          label="Dataset name"
-          aria-label={`Copy dataset ${dataset.name}`}
-        />
-      </HStack>
+    <Box width="full">
+      <chakra.button
+        type="button"
+        display="flex"
+        alignItems="center"
+        gap={2}
+        width="full"
+        paddingX={2}
+        paddingY={1.5}
+        borderRadius="6px"
+        textAlign="left"
+        cursor="pointer"
+        _hover={{ background: "bg.muted" }}
+        aria-expanded={expanded}
+        onClick={onToggle}
+      >
+        <Box aria-hidden="true" display="flex" color="fg.subtle">
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        </Box>
+        <Text fontFamily="mono" fontSize="12px" fontWeight="600">
+          {dataset.name}
+        </Text>
+        <Box flex="1" />
+        <Text fontSize="10.5px" color="fg.subtle">
+          {dataset.columns.length} columns
+        </Text>
+      </chakra.button>
 
       {expanded && (
-        <Stack gap={2} paddingX={2} paddingTop={2}>
-          <Text fontSize="13px" color="fg.muted">
+        <Stack gap={2} paddingLeft={6} paddingRight={2} paddingBottom={3}>
+          <Text fontSize="11.5px" lineHeight="1.5" color="fg.muted">
             {dataset.description}
           </Text>
-          <Stack gap={0.5} fontSize="12px" color="fg.muted">
-            <Text>Grain: {dataset.grain}</Text>
-            <Text>Freshness: {dataset.freshness}</Text>
-            <Text>Time column: {dataset.timeColumn}</Text>
-            <Text>
-              Join keys:{" "}
-              {dataset.joinKeys.length > 0
-                ? dataset.joinKeys.join(", ")
-                : "none"}
-            </Text>
-          </Stack>
-
-          <Box>
-            <HStack gap={1} justifyContent="space-between">
-              <Text fontSize="12px" fontWeight="600">
-                Example query
-              </Text>
-              <HStack gap={0}>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  aria-label={`Insert example query for ${dataset.name}`}
-                  onClick={() => onInsert(dataset.exampleSql)}
-                >
-                  Insert
-                </Button>
-                <CopyButton
-                  value={dataset.exampleSql}
-                  label="Example query"
-                  aria-label={`Copy example query for ${dataset.name}`}
-                />
-              </HStack>
-            </HStack>
-            <Code
-              display="block"
-              whiteSpace="pre-wrap"
-              fontSize="11.5px"
-              padding={2}
-              borderRadius="6px"
+          <HStack gap={1} wrap="wrap">
+            <Badge size="xs" variant="surface" fontSize="10px">
+              {dataset.grain}
+            </Badge>
+            <Badge size="xs" variant="surface" fontSize="10px">
+              {dataset.freshness}
+            </Badge>
+            <Badge
+              size="xs"
+              variant="surface"
+              fontSize="10px"
+              title="Bound this column with a range to keep the scan narrow"
             >
-              {dataset.exampleSql}
-            </Code>
-          </Box>
-
-          <Box>
-            <Text fontSize="12px" fontWeight="600">
-              Columns
+              time: {dataset.timeColumn}
+            </Badge>
+          </HStack>
+          {dataset.joinKeys.length > 0 && (
+            <Text fontSize="10.5px" color="fg.subtle">
+              Joins on {dataset.joinKeys.join(", ")}
             </Text>
+          )}
+
+          <Stack gap={0}>
             {dataset.columns.map((column) => (
               <ColumnRow
                 key={column.name}
@@ -223,6 +202,18 @@ function DatasetEntry({
                 onInsert={onInsert}
               />
             ))}
+          </Stack>
+
+          <Box>
+            <Button
+              size="xs"
+              variant="outline"
+              color="orange.fg"
+              aria-label={`Insert example query for ${dataset.name}`}
+              onClick={() => onInsert(dataset.exampleSql)}
+            >
+              Insert example query
+            </Button>
           </Box>
         </Stack>
       )}
@@ -260,8 +251,24 @@ export function GovernedSchemaBrowser({
       align="stretch"
       gap={2}
       width="full"
+      padding={3}
       data-testid="governed-schema-browser"
     >
+      <HStack justify="space-between" align="baseline">
+        <Text
+          fontSize="11px"
+          fontWeight="600"
+          letterSpacing="0.06em"
+          textTransform="uppercase"
+          color="fg.subtle"
+        >
+          Datasets
+        </Text>
+        <Text fontSize="10.5px" color="fg.subtle">
+          filtered to your role
+        </Text>
+      </HStack>
+
       <SearchInput
         aria-label="Search the schema"
         placeholder="Search datasets and columns"
@@ -280,21 +287,23 @@ export function GovernedSchemaBrowser({
           <Text fontSize="13px">Loading the schema</Text>
         </HStack>
       ) : visible.datasets.length === 0 ? (
-        <Text fontSize="13px" color="fg.muted" padding={2}>
+        <Text fontSize="12px" color="fg.muted" padding={2}>
           {model.datasets.length === 0
             ? "No datasets are available to you yet."
-            : "Nothing matches that search."}
+            : `Nothing matches "${search}".`}
         </Text>
       ) : (
-        visible.datasets.map((dataset) => (
-          <DatasetEntry
-            key={dataset.name}
-            dataset={dataset}
-            expanded={expanded.has(dataset.name)}
-            onToggle={() => toggle(dataset.name)}
-            onInsert={onInsert}
-          />
-        ))
+        <Stack gap={0.5}>
+          {visible.datasets.map((dataset) => (
+            <DatasetEntry
+              key={dataset.name}
+              dataset={dataset}
+              expanded={expanded.has(dataset.name) || search.trim().length > 0}
+              onToggle={() => toggle(dataset.name)}
+              onInsert={onInsert}
+            />
+          ))}
+        </Stack>
       )}
     </VStack>
   );
