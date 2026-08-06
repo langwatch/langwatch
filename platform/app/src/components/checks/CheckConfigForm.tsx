@@ -35,6 +35,7 @@ import {
   type Evaluators,
   type EvaluatorTypes,
   evaluatorsSchema,
+  evaluatorTempNameMap,
   evaluatorTypesSchema,
 } from "../../server/evaluations/evaluators";
 import {
@@ -55,7 +56,7 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Tooltip } from "../ui/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
-import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
+import { EvaluatorSelection } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
 

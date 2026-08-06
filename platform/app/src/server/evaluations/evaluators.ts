@@ -61,6 +61,22 @@ export const AVAILABLE_EVALUATORS = {
   [K in EvaluatorTypes]: EvaluatorDefinition<K>;
 };
 
+/**
+ * Shorter display names for evaluators whose catalog `name` leads with its
+ * vendor. Keyed by the definition's own `name`, so a definition with no entry
+ * is shown as the catalog spells it.
+ *
+ * Temporary, pending support for grouping evaluators together.
+ */
+export const evaluatorTempNameMap: Record<string, string> = {
+  "Azure Content Safety": "Content Safety",
+  "OpenAI Moderation": "Moderation",
+  "Azure Jailbreak Detection": "Jailbreak Detection",
+  "Presidio PII Detection": "PII Detection",
+  "Lingua Language Detection": "Language Detection",
+  "Azure Prompt Shield": "Prompt Injection Detection",
+};
+
 export type {
   BatchEvaluationResult,
   EvaluationResult,

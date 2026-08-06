@@ -19,6 +19,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
+  evaluatorTempNameMap,
 } from "../../server/evaluations/evaluators";
 import { api } from "../../utils/api";
 import { isFeatureEnabled } from "../../utils/featureFlags";
@@ -28,16 +29,6 @@ import { Tooltip } from "../ui/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 
 type Category = EvaluatorDefinition<any>["category"];
-
-// Temporary name map before we have support for grouping evaluations together
-export const evaluatorTempNameMap: Record<string, string> = {
-  "Azure Content Safety": "Content Safety",
-  "OpenAI Moderation": "Moderation",
-  "Azure Jailbreak Detection": "Jailbreak Detection",
-  "Presidio PII Detection": "PII Detection",
-  "Lingua Language Detection": "Language Detection",
-  "Azure Prompt Shield": "Prompt Injection Detection",
-};
 
 const sortingOrder = [
   // rag,

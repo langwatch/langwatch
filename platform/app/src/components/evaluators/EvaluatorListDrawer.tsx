@@ -26,10 +26,10 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
+  evaluatorTempNameMap,
 } from "~/server/evaluations/evaluators";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
-import { evaluatorTempNameMap } from "../checks/EvaluatorSelection";
 import { ConfirmDialog } from "../gateway/ConfirmDialog";
 import { Menu } from "../ui/menu";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
