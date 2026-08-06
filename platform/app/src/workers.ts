@@ -8,7 +8,7 @@ import "./env-load";
 
 // OTel instrumentation MUST load before any module that creates spans —
 // without it the worker process has no registered tracer provider and every
-// BullMQOtel adapter / getLangWatchTracer span becomes a non-recording no-op.
+// getLangWatchTracer span becomes a non-recording no-op.
 // env-load stays first so instrumentation.node sees .env-provided config
 // (LANGWATCH_API_KEY, OTEL_EXPORTER_OTLP_ENDPOINT).
 import "./instrumentation.node";
