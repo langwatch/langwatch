@@ -158,6 +158,8 @@ function parsedTurn(): ParsedTurn {
     userText: "a question",
     assistantText: "the original answer",
     assistantReasoning: "",
+    userMedia: [],
+    assistantMedia: [],
     gapSecs: 0,
     showGap: false,
   };

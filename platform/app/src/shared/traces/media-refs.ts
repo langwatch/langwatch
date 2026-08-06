@@ -42,21 +42,32 @@ export interface TraceMediaRef {
 export type TraceMediaSide = "input" | "output";
 
 /**
- * Whether a ref belongs on the given summary strip.
+ * Whether media found under the given chat role belongs on the given side.
  *
  * The agent's reply is the only side we can place with certainty, so it is the
- * only one excluded from the input strip: everything the caller sent (user,
+ * only one excluded from the input side: everything the caller sent (user,
  * system, tool results, roleless) stays on INPUT, and OUTPUT takes the
- * assistant plus anything with no role recorded. A ref is therefore never
- * dropped from both strips.
+ * assistant plus anything with no role recorded. Media is therefore never
+ * dropped from both sides.
+ *
+ * The rule lives here once for every surface that splits a payload by side:
+ * the summary strips read it off compact refs, the conversation thread reads
+ * it off the parts it collected from the turn.
  */
+export function mediaRoleBelongsToSide(
+  role: MediaPartRole | undefined,
+  side: TraceMediaSide,
+): boolean {
+  if (side === "output") return role === undefined || role === "assistant";
+  return role !== "assistant";
+}
+
+/** Whether a ref belongs on the given summary strip. */
 export function mediaRefBelongsToSide(
   ref: TraceMediaRef,
   side: TraceMediaSide,
 ): boolean {
-  if (side === "output")
-    return ref.role === undefined || ref.role === "assistant";
-  return ref.role !== "assistant";
+  return mediaRoleBelongsToSide(ref.role, side);
 }
 
 export const MAX_TRACE_MEDIA_REFS = 4;

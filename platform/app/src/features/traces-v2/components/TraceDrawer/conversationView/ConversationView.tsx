@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { hasRedactionMarker } from "@langwatch/redaction";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, ChevronsDownUp, ChevronsUpDown, Copy } from "lucide-react";
 import {
@@ -20,6 +21,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { PIIRedactionAlert } from "~/components/ui/PIIRedactionNotice";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useConversationAnnotations } from "../../../hooks/useConversationAnnotations";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
@@ -53,6 +55,7 @@ import {
   buildConversationMarkdownChunks,
   type ConversationMarkdownChunk,
   joinConversationMarkdown,
+  turnMediaForSide,
 } from "./utils";
 
 type AnnotationsByTrace = Map<string, AnnotationByTrace[]>;
@@ -145,12 +148,34 @@ export const ConversationView = memo(function ConversationView({
         userText: extractReadableText(t.input, "user"),
         assistantText: extractReadableText(t.output, "assistant"),
         assistantReasoning: extractReasoningText(t.output),
+        userMedia: turnMediaForSide({
+          refs: t.inputMediaRefs,
+          value: t.input,
+          side: "input",
+        }),
+        assistantMedia: turnMediaForSide({
+          refs: t.outputMediaRefs,
+          value: t.output,
+          side: "output",
+        }),
         gapSecs,
         showGap: gapSecs > 5,
       };
     }
     return out;
   }, [turns]);
+
+  // One notice for the whole conversation rather than one per message: the
+  // policy that redacted a turn is the project's, and repeating it above every
+  // turn it touched buries the thread it is meant to explain.
+  const hasRedactedText = useMemo(
+    () =>
+      parsedTurns.some(
+        (p) =>
+          hasRedactionMarker(p.userText) || hasRedactionMarker(p.assistantText),
+      ),
+    [parsedTurns],
+  );
 
   const handleSelectTurn = useTurnSelection({
     currentTraceId,
@@ -210,6 +235,7 @@ export const ConversationView = memo(function ConversationView({
             layout={mode}
             parsedTurns={parsedTurns}
             systemPromptInput={turns[0]?.input}
+            hasRedactedText={hasRedactedText}
             currentTraceId={currentTraceId}
             onSelectTurn={handleSelectTurn}
             annotationsByTrace={annotations.byTrace}
@@ -482,6 +508,8 @@ const TurnsView: React.FC<{
   layout: TurnLayout;
   parsedTurns: ParsedTurn[];
   systemPromptInput: string | null | undefined;
+  /** Whether any turn's text carries a redaction marker. */
+  hasRedactedText: boolean;
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
   annotationsByTrace: AnnotationsByTrace;
@@ -490,6 +518,7 @@ const TurnsView: React.FC<{
   layout,
   parsedTurns,
   systemPromptInput,
+  hasRedactedText,
   currentTraceId,
   onSelectTurn,
   annotationsByTrace,
@@ -515,6 +544,7 @@ const TurnsView: React.FC<{
         layout={layout}
         parsedTurns={parsedTurns}
         systemPrompt={systemPrompt}
+        hasRedactedText={hasRedactedText}
         currentTraceId={currentTraceId}
         onSelectTurn={onSelectTurn}
         annotationsByTrace={annotationsByTrace}
@@ -539,6 +569,7 @@ const TurnsView: React.FC<{
         maxWidth={columnMaxWidth({ layout, isRailActive, railLayout })}
         marginX="auto"
       >
+        {hasRedactedText && <PIIRedactionAlert />}
         {systemPrompt && <SystemPromptBanner text={systemPrompt} />}
         {parsedTurns.map((p, i) => {
           const isCurrent = p.turn.traceId === currentTraceId;
@@ -621,6 +652,7 @@ const VirtualizedTurnsView: React.FC<{
   layout: TurnLayout;
   parsedTurns: ParsedTurn[];
   systemPrompt: string | null;
+  hasRedactedText: boolean;
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
   annotationsByTrace: AnnotationsByTrace;
@@ -629,6 +661,7 @@ const VirtualizedTurnsView: React.FC<{
   layout,
   parsedTurns,
   systemPrompt,
+  hasRedactedText,
   currentTraceId,
   onSelectTurn,
   annotationsByTrace,
@@ -666,6 +699,11 @@ const VirtualizedTurnsView: React.FC<{
         maxWidth={columnMaxWidth({ layout, isRailActive, railLayout })}
         marginX="auto"
       >
+        {hasRedactedText && (
+          <Box marginBottom={systemPrompt ? 2 : 5}>
+            <PIIRedactionAlert />
+          </Box>
+        )}
         {systemPrompt && (
           <Box marginBottom={5}>
             <SystemPromptBanner text={systemPrompt} />

@@ -10,7 +10,9 @@ import {
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Markdown } from "~/components/Markdown";
+import { TraceMediaStrip } from "~/components/traces/TraceMediaStrip";
 import { RedactedInline } from "~/components/ui/RedactedField";
+import type { MediaPartData } from "~/shared/traces/mediaParts";
 import type { RouterOutputs } from "~/utils/api";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import { useTextTranslation } from "../../../hooks/useTextTranslation";
@@ -38,12 +40,20 @@ import { formatGap } from "./utils";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 const EMPTY_ANNOTATIONS: AnnotationItem[] = [];
+const EMPTY_MEDIA: MediaPartData[] = [];
 
 interface ChatTurnRowProps {
   turn: TraceListItem;
   userText: string;
   assistantText: string;
   assistantReasoning: string;
+  /**
+   * Media recorded on the turn's input side, rendered under the user message
+   * in thread layout. The side bubbles render no media yet.
+   */
+  userMedia?: MediaPartData[];
+  /** Media recorded on the turn's output side, rendered under the reply. */
+  assistantMedia?: MediaPartData[];
   /** Wall-clock seconds between the previous turn's end and this turn's start. */
   gapSecs: number;
   /** Whether the inter-turn gap is long enough to surface as a divider. */
@@ -68,6 +78,8 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   userText: originalUserText,
   assistantText: originalAssistantText,
   assistantReasoning,
+  userMedia = EMPTY_MEDIA,
+  assistantMedia = EMPTY_MEDIA,
   gapSecs,
   showGap,
   index,
@@ -126,6 +138,21 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   // reads "Assistant" normally and "Agent" in scenario mode.
   const assistantLabel = turn.models[0] || assistantVisuals.bubbleLabel;
 
+  // A field a privacy rule hid never renders the media that was hidden with
+  // it. The server drops the references alongside the text; this is the
+  // render-side half of the same rule, so a reference that outlives its
+  // content still shows nothing.
+  const visibleUserMedia = turn.inputRedacted ? EMPTY_MEDIA : userMedia;
+  const visibleAssistantMedia = turn.outputRedacted
+    ? EMPTY_MEDIA
+    : assistantMedia;
+  // Only the thread layout has a message body to hang media off, so it is the
+  // only one where media on its own is reason enough to draw a message: a
+  // voice turn that recorded no transcript would otherwise lose its recording.
+  const hasUserMedia = layout === "thread" && visibleUserMedia.length > 0;
+  const hasAssistantMedia =
+    layout === "thread" && visibleAssistantMedia.length > 0;
+
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
       {showGap && (
@@ -155,7 +182,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         }}
       />
 
-      {userText ? (
+      {userText || hasUserMedia ? (
         <TurnMessage
           layout={layout}
           side={userSide}
@@ -163,6 +190,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           label={userVisuals.bubbleLabel}
           icon={<UserIcon />}
           text={userText}
+          media={visibleUserMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
         />
@@ -209,6 +237,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           icon={<AssistantIcon />}
           text={assistantText}
           reasoning={assistantReasoning}
+          media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
           annotation={annotationSummary}
@@ -222,11 +251,12 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           icon={<AlertTriangle />}
           text={turn.error}
           reasoning={assistantReasoning}
+          media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
           annotation={annotationSummary}
         />
-      ) : assistantReasoning ? (
+      ) : assistantReasoning || hasAssistantMedia ? (
         <TurnMessage
           layout={layout}
           side={assistantSide}
@@ -235,6 +265,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           icon={<AssistantIcon />}
           text=""
           reasoning={assistantReasoning}
+          media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
           annotation={annotationSummary}
@@ -339,6 +370,8 @@ interface TurnMessageProps {
   icon: React.ReactNode;
   text: string;
   reasoning?: string;
+  /** Media recorded on this message's side of the turn. Thread layout only. */
+  media?: MediaPartData[];
   isSelected?: boolean;
   onClick?: () => void;
   annotation?: { count: number; hasCorrection: boolean };
@@ -350,9 +383,9 @@ interface TurnMessageProps {
  * same tone / label / annotation inputs so toggling the layout never changes
  * what's shown, only how it's arranged.
  */
-function TurnMessage({ layout, side, ...rest }: TurnMessageProps) {
+function TurnMessage({ layout, side, media, ...rest }: TurnMessageProps) {
   if (layout === "thread") {
-    return <ThreadMessage {...rest} />;
+    return <ThreadMessage media={media} {...rest} />;
   }
   return <Bubble side={side} size="compact" maxChars={500} {...rest} />;
 }
@@ -373,6 +406,7 @@ function ThreadMessage({
   icon,
   text,
   reasoning,
+  media = EMPTY_MEDIA,
   onClick,
   annotation,
 }: Omit<TurnMessageProps, "layout" | "side">) {
@@ -493,6 +527,18 @@ function ThreadMessage({
             onToggle={() => setExpanded((v) => !v)}
           />
         )}
+
+        {/* Recordings, images and attachments sit under the prose they came
+            with, the way attachments sit under an email body. Clicks stay on
+            the widget so scrubbing a player doesn't navigate to the turn. */}
+        {media.length > 0 && (
+          <Box
+            paddingTop={2}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <TraceMediaStrip parts={media} />
+          </Box>
+        )}
       </Box>
     </Flex>
   );
@@ -527,6 +573,10 @@ const TurnSeparator: React.FC<{
   // header / metrics), so they're intentionally left off.
   const hasCost = (turn.totalCost ?? 0) > 0;
   const isError = turn.status === "error";
+  // How many events the turn recorded. The count only: the legacy thread view
+  // also drew the vote an event carried, and the conversation's turn data has
+  // no event metrics to draw it from.
+  const eventCount = turn.events.length;
 
   const Sep = () => (
     <Text textStyle="2xs" color="fg.subtle">
@@ -579,6 +629,14 @@ const TurnSeparator: React.FC<{
             <Sep />
             <Text textStyle="2xs" color="fg.subtle">
               {formatCost(turn.totalCost)}
+            </Text>
+          </>
+        )}
+        {eventCount > 0 && (
+          <>
+            <Sep />
+            <Text textStyle="2xs" color="fg.subtle">
+              {eventCount} {eventCount === 1 ? "event" : "events"}
             </Text>
           </>
         )}

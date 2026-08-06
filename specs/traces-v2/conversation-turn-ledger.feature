@@ -35,6 +35,30 @@ Feature: Conversation turn ledger
       Given a turn with 4500 input and 538 output tokens
       Then the separator does not show a "4.5K→538" token figure
 
+  Rule: A turn that recorded events says how many
+
+    Events hoisted from the turn's spans are worth scanning for while reading:
+    a turn that recorded three of them reads differently from one that recorded
+    none. Only the count is shown. The legacy thread view also drew the
+    thumbs-up / thumbs-down vote an event carried, and the conversation's turn
+    data holds no event metrics to draw it from, so that display is left out
+    rather than guessed at.
+
+    @integration
+    Scenario: A turn with events shows how many it recorded
+      Given a turn that recorded two events
+      Then its separator shows "2 events"
+
+    @integration
+    Scenario: A single event reads in the singular
+      Given a turn that recorded one event
+      Then its separator shows "1 event"
+
+    @integration
+    Scenario: A turn with no events shows no events segment
+      Given a turn that recorded no events
+      Then its separator says nothing about events
+
   Rule: A long inter-turn pause is surfaced as a gap divider
 
     A noticeable wall-clock gap since the previous turn finished is drawn as an

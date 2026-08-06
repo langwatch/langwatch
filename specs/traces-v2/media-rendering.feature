@@ -81,6 +81,50 @@ Feature: Media rendering across trace surfaces
     Then each message bubble renders its image inline and its audio with a player
 
   # ===========================================================================
+  # Conversation thread — media hangs off the message that carried it
+  # ===========================================================================
+  # The thread layout gives each role its own full-width row, so a turn's media
+  # belongs to a message, not to the turn as a whole: what the caller sent
+  # renders under the user message and what the agent replied under the
+  # assistant message. Which side a part belongs to follows the same rule as
+  # the trace summary strips, so a voice turn never shows the caller's
+  # recording twice.
+  #
+  # A turn's own input and output text is flattened at fold time, so the
+  # fold-derived media references are what the thread reads; a turn handed over
+  # with its raw payload (a threadless trace fetched on its own) is walked for
+  # media parts instead. The side bubbles layout is unchanged and renders no
+  # media, which is tracked as a follow-up rather than pinned here.
+
+  @integration
+  Scenario: A recording the caller sent renders under the user message
+    Given a turn whose media was recorded on the user's message
+    When I read the turn in the conversation thread
+    Then the user message renders a player for it
+    And the assistant message renders no media
+
+  @integration
+  Scenario: A recording the agent replied with renders under the assistant message
+    Given a turn whose media was recorded on the assistant's message
+    When I read the turn in the conversation thread
+    Then the assistant message renders a player for it
+    And the user message renders no media
+
+  @integration
+  Scenario: Media with no role recorded renders on the side it was recorded under
+    Given a turn whose input and output each carry media with no role, as turns
+      ingested before roles were recorded do
+    When I read the turn in the conversation thread
+    Then the user message renders the input's media
+    And the assistant message renders the output's media
+
+  @integration
+  Scenario: A message hidden by a privacy rule renders no media
+    Given a turn whose input was hidden from this viewer by a privacy rule
+    When I read the turn in the conversation thread
+    Then the user side shows the redacted marker and no media
+
+  # ===========================================================================
   # Trace summary strips — which side a recording belongs to
   # ===========================================================================
   # The trace's own input and output are flattened text, so the summary strips

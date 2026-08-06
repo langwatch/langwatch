@@ -54,7 +54,7 @@ Rule: An "Expand all" toolbar control expands every message
     Then every message returns to its truncated form
 
   Scenario: Expand-all is only offered for the message layouts
-    Given the conversation is in markdown or annotations mode
+    Given the conversation is in markdown mode
     Then no expand-all control is shown
 
 Rule: The table's compact preview is unaffected

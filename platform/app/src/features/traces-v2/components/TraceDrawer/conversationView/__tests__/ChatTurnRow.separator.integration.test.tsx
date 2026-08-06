@@ -84,7 +84,21 @@ function turn(over: Partial<TraceListItem>): TraceListItem {
   };
 }
 
-function renderRow(gap?: { gapSecs: number; showGap: boolean }) {
+function events(count: number): TraceListItem["events"] {
+  return Array.from({ length: count }, (_, i) => ({
+    spanId: `span-${i}`,
+    timestamp: 1,
+    name: "thumbs_up",
+  }));
+}
+
+function renderRow({
+  gap,
+  eventCount = 0,
+}: {
+  gap?: { gapSecs: number; showGap: boolean };
+  eventCount?: number;
+} = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <ChatTurnRow
@@ -96,6 +110,7 @@ function renderRow(gap?: { gapSecs: number; showGap: boolean }) {
           outputTokens: 538,
           models: ["openai/gpt-4o"],
           timestamp: Date.now() - ONE_HOUR_MS,
+          events: events(eventCount),
         })}
         userText="a question"
         assistantText="an answer"
@@ -143,15 +158,41 @@ describe("ChatTurnRow separator ledger", () => {
 
   describe("given a turn preceded by a long pause", () => {
     it("renders the inter-turn gap divider", () => {
-      const { container } = renderRow({ gapSecs: 12.5, showGap: true });
+      const { container } = renderRow({
+        gap: { gapSecs: 12.5, showGap: true },
+      });
       expect(container.textContent ?? "").toMatch(/12\.5s gap/);
     });
   });
 
   describe("given the first turn, with no preceding pause", () => {
     it("does not render a gap divider", () => {
-      const { container } = renderRow({ gapSecs: 0, showGap: false });
+      const { container } = renderRow({ gap: { gapSecs: 0, showGap: false } });
       expect(container.textContent ?? "").not.toMatch(/gap/i);
+    });
+  });
+
+  describe("given a turn that recorded events", () => {
+    /** @scenario "A turn with events shows how many it recorded" */
+    it("counts them in the ledger", () => {
+      renderRow({ eventCount: 2 });
+      expect(separatorText()).toContain("2 events");
+    });
+
+    /** @scenario "A single event reads in the singular" */
+    it("reads a single event in the singular", () => {
+      renderRow({ eventCount: 1 });
+      const text = separatorText();
+      expect(text).toContain("1 event");
+      expect(text).not.toContain("1 events");
+    });
+  });
+
+  describe("given a turn that recorded no events", () => {
+    /** @scenario "A turn with no events shows no events segment" */
+    it("says nothing about events", () => {
+      renderRow({ eventCount: 0 });
+      expect(separatorText()).not.toMatch(/event/i);
     });
   });
 });
