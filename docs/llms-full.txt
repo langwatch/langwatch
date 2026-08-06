@@ -36201,7 +36201,7 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 
 `GET /api/webhooks/v1/events?from=&to=&type=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
 
-`from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has — cold storage included — to serve one page. A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with `422`.
+`from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has — cold storage included — to serve one page. A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with the canonical `400` this surface answers every validation failure with, naming the offending parameter.
 
 `GET /api/webhooks/v1/events/{id}` reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
 
