@@ -33,16 +33,12 @@ export type ValidationResult =
  * Authentication strategy for API key validation.
  * - `bearer`: Uses `Authorization: Bearer {key}` header (OpenAI-compatible) - DEFAULT
  * - `anthropic`: Uses `x-api-key` header with `anthropic-version`
- * - `gemini`: Uses query parameter `?key=`
+ * - `gemini`: Uses query parameter `?key=` — or, when the credential carries
+ *   a project and location, `x-goog-api-key` on a generate-content POST
+ *   against the Agent Platform host (the second Google door)
  * - `elevenlabs`: Uses `xi-api-key` header
- * - `google_agent_platform`: `x-goog-api-key` on a generate-content POST
  */
-type AuthStrategy =
-  | "bearer"
-  | "anthropic"
-  | "gemini"
-  | "elevenlabs"
-  | "google_agent_platform";
+type AuthStrategy = "bearer" | "anthropic" | "gemini" | "elevenlabs";
 
 /**
  * Providers that use non-standard auth. All others default to bearer auth.
@@ -51,7 +47,6 @@ const PROVIDER_AUTH_OVERRIDES: Partial<Record<string, AuthStrategy>> = {
   anthropic: "anthropic",
   gemini: "gemini",
   elevenlabs: "elevenlabs",
-  google_agent_platform: "google_agent_platform",
 };
 
 /**
@@ -63,6 +58,15 @@ const PROVIDER_AUTH_OVERRIDES: Partial<Record<string, AuthStrategy>> = {
  * from a refused key.
  */
 const AGENT_PLATFORM_PROBE_MODEL = "gemini-2.5-flash";
+
+/**
+ * The host Gemini Enterprise Agent Platform answers on — Gemini's second
+ * door. Lived on the onboarding registry while Agent Platform was its own
+ * provider; now that it is a credential mode of `gemini` (whose `apiRoot`
+ * stays the Gemini API host), the second host is provider knowledge stated
+ * here.
+ */
+const AGENT_PLATFORM_API_ROOT = "https://aiplatform.googleapis.com";
 
 /**
  * The smallest generate-content request that still proves the credential.
@@ -259,11 +263,13 @@ const MAX_UPSTREAM_DETAIL_LENGTH = 300;
  * `API_KEY_INVALID` actually means the key is wrong. The rest are project or
  * key-restriction problems that generating a new key will never fix.
  *
- * This provider is Google AI Studio, at generativelanguage.googleapis.com. A
- * key minted in the Google Cloud console (Agent Platform, Vertex) reaches that
- * host without the API enabled for it, so these refusals are where a Google
- * Cloud customer lands — and they need the Vertex AI provider, which takes a
- * service account rather than a key.
+ * These refusals are where a Google Cloud customer lands when their key was
+ * minted for another Google service. The most common case is an Agent
+ * Platform key hitting generativelanguage.googleapis.com, which answers
+ * `API_KEY_SERVICE_BLOCKED` — the signal that the key is fine and belongs on
+ * Gemini's other door: the customer fills in the project and location fields
+ * and the same provider row validates and serves through
+ * aiplatform.googleapis.com instead.
  *
  * @see https://cloud.google.com/apis/design/errors
  */
@@ -477,11 +483,15 @@ async function handleHttpError({
   });
   if (fromReason) return fromReason;
 
-  // Gemini reports a rejected key as 400, every other provider as 401/403.
+  // The Gemini API reports a rejected key as 400, every other provider —
+  // including Gemini's own Agent Platform door, where 400 is a malformed
+  // request — as 401/403.
   const isAuthFailure =
     response.status === 401 ||
     response.status === 403 ||
-    (context.provider === "gemini" && response.status === 400);
+    (context.provider === "gemini" &&
+      context.googleDoor !== "agent-platform" &&
+      response.status === 400);
 
   if (isAuthFailure) {
     return refusal(
@@ -510,6 +520,13 @@ type ProbeContext = {
   apiKey: string;
   /** Whether the customer can point this provider at their own URL */
   hasConfigurableEndpoint: boolean;
+  /**
+   * Which Google door a `gemini` credential is being checked through.
+   * The doors disagree on what a 400 means: the Gemini API answers a
+   * rejected key with 400, while on Agent Platform's generate-content
+   * probe a 400 is a malformed request — never a verdict on the key.
+   */
+  googleDoor?: "gemini-api" | "agent-platform";
 };
 
 /**
@@ -575,39 +592,6 @@ function buildProbeCandidates({
   };
 
   switch (strategy) {
-    case "google_agent_platform": {
-      // No project, no location, or no host to build the path from means
-      // no path to probe. Returning nothing rather than guessing a default
-      // leaves the walk empty, which `runProbeChain` reports as
-      // unreachable — honest, since nothing was asked — instead of
-      // inventing a verdict about the key.
-      if (!agentPlatform?.project || !agentPlatform.location || !apiRoot) {
-        return [];
-      }
-
-      const { project, location } = agentPlatform;
-      const host = apiRoot.replace(/\/$/, "");
-
-      return [
-        {
-          // The key rides in a header, not `?key=`, which Agent Platform also
-          // accepts: a credential in a URL reaches access logs, proxy logs and
-          // browser history, and both shapes were verified to work.
-          //
-          // The global host with a region in the path was verified live
-          // against two regions (us-central1, europe-west4), both 200 — the
-          // same form every other verified shape uses, so this does not
-          // special-case a regional subdomain on top of it.
-          url:
-            `${host}/v1/projects/${encodeURIComponent(project)}` +
-            `/locations/${encodeURIComponent(location)}/publishers/google/models/` +
-            `${AGENT_PLATFORM_PROBE_MODEL}:generateContent`,
-          headers: { ...headers, "x-goog-api-key": apiKey },
-          method: "POST",
-          body: AGENT_PLATFORM_PROBE_BODY,
-        },
-      ];
-    }
     case "anthropic":
       return [
         {
@@ -622,6 +606,38 @@ function buildProbeCandidates({
     case "elevenlabs":
       return [{ url, headers: { ...headers, "xi-api-key": apiKey } }];
     case "gemini": {
+      // A credential carrying a project and location is an Agent Platform
+      // key: it names the door it opens, so only that door is asked. The
+      // Gemini API host is not probed at all — the key is refused there by
+      // its own restrictions, and that refusal would outrank nothing while
+      // costing a request. See
+      // specs/model-providers/google-agent-platform.feature.
+      if (agentPlatform?.project && agentPlatform.location) {
+        const { project, location } = agentPlatform;
+        const host = AGENT_PLATFORM_API_ROOT;
+
+        return [
+          {
+            // The key rides in a header, not `?key=`, which Agent Platform
+            // also accepts: a credential in a URL reaches access logs, proxy
+            // logs and browser history, and both shapes were verified to
+            // work.
+            //
+            // The global host with a region in the path was verified live
+            // against two regions (us-central1, europe-west4), both 200 —
+            // the same form every other verified shape uses, so this does
+            // not special-case a regional subdomain on top of it.
+            url:
+              `${host}/v1/projects/${encodeURIComponent(project)}` +
+              `/locations/${encodeURIComponent(location)}/publishers/google/models/` +
+              `${AGENT_PLATFORM_PROBE_MODEL}:generateContent`,
+            headers: { ...headers, "x-goog-api-key": apiKey },
+            method: "POST",
+            body: AGENT_PLATFORM_PROBE_BODY,
+          },
+        ];
+      }
+
       const key = encodeURIComponent(apiKey);
 
       // Which paths a provider serves is provider knowledge, so the root
@@ -968,6 +984,11 @@ export async function validateProviderApiKey(
     return { valid: true };
   }
 
+  const agentPlatform = {
+    project: customKeys.GEMINI_PROJECT?.trim() ?? "",
+    location: customKeys.GEMINI_LOCATION?.trim() ?? "",
+  };
+
   return runProbeChain({
     candidates: buildProbeCandidates({
       strategy: authStrategy,
@@ -975,15 +996,20 @@ export async function validateProviderApiKey(
       baseUrl,
       defaultBaseUrl,
       apiRoot: providerApiRoots[provider],
-      agentPlatform: {
-        project: customKeys.GOOGLE_AGENT_PLATFORM_PROJECT?.trim() ?? "",
-        location: customKeys.GOOGLE_AGENT_PLATFORM_LOCATION?.trim() ?? "",
-      },
+      agentPlatform,
     }),
     context: {
       provider,
       apiKey,
       hasConfigurableEndpoint: !!endpointField,
+      ...(provider === "gemini"
+        ? {
+            googleDoor:
+              agentPlatform.project && agentPlatform.location
+                ? ("agent-platform" as const)
+                : ("gemini-api" as const),
+          }
+        : {}),
     },
   });
 }

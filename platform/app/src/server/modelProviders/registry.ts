@@ -345,31 +345,39 @@ export const modelProviders = {
     type: "llm",
     apiKey: "GEMINI_API_KEY",
     endpointKey: undefined,
-    keysSchema: z.object({
-      GEMINI_API_KEY: z.string().min(1),
-    }),
+    // One provider, two Google doors. An AI Studio key answers on
+    // generativelanguage.googleapis.com; a key minted for Gemini Enterprise
+    // Agent Platform is refused there (API_KEY_SERVICE_BLOCKED) and answers
+    // on aiplatform.googleapis.com at a path naming the project and
+    // location. Same models, same wire shape, same auth header — verified
+    // live with one key of each kind. So the door is a property of the
+    // credential, not a provider of its own: project + location present
+    // means the Agent Platform door, absent means the Gemini API. See
+    // specs/model-providers/google-agent-platform.feature.
+    keysSchema: z
+      .object({
+        GEMINI_API_KEY: z.string().min(1),
+        GEMINI_PROJECT: z.string().nullable().optional(),
+        // Both `global` and a region such as `us-central1` resolve; the
+        // Agent Platform path requires one either way, so it is asked for
+        // rather than guessed.
+        GEMINI_LOCATION: z.string().nullable().optional(),
+      })
+      .superRefine((data, ctx) => {
+        // The Agent Platform path needs both or neither: a project without
+        // a location (or the reverse) cannot be probed or dispatched, and
+        // silently ignoring the lone field would validate a credential
+        // through a different door than traffic would later use.
+        if (!!data.GEMINI_PROJECT !== !!data.GEMINI_LOCATION) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              "Fill in both the project and the location, or leave both empty for an AI Studio key.",
+          });
+        }
+      }),
+    optionalKeys: ["GEMINI_PROJECT", "GEMINI_LOCATION"],
     enabledSince: new Date("2023-01-01"),
-  },
-  // Gemini models served by Gemini Enterprise Agent Platform rather than by
-  // AI Studio. Its own provider, not a mode of `gemini`, for the same reason
-  // `vertex_ai` is: different host, different auth header, and a path that
-  // names the project and location. A key minted for it is refused by
-  // generativelanguage.googleapis.com, which is what made this look like an
-  // invalid key rather than the wrong service. See
-  // specs/model-providers/google-agent-platform.feature.
-  google_agent_platform: {
-    name: "Google Agent Platform",
-    type: "llm",
-    apiKey: "GOOGLE_AGENT_PLATFORM_API_KEY",
-    endpointKey: undefined,
-    keysSchema: z.object({
-      GOOGLE_AGENT_PLATFORM_API_KEY: z.string().min(1),
-      GOOGLE_AGENT_PLATFORM_PROJECT: z.string().min(1),
-      // Both `global` and a region such as `us-central1` resolve; the path
-      // requires one either way, so it is asked for rather than guessed.
-      GOOGLE_AGENT_PLATFORM_LOCATION: z.string().min(1),
-    }),
-    enabledSince: new Date("2026-07-29"),
   },
   elevenlabs: {
     name: "ElevenLabs",

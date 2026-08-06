@@ -1,72 +1,109 @@
-Feature: Google Agent Platform as a model provider
+Feature: Gemini credentials work through either Google door
 
-  Google issues several kinds of credential, and they are not interchangeable.
-  A key minted in the Cloud console for Gemini Enterprise Agent Platform is
-  refused by generativelanguage.googleapis.com — correctly, since its API
-  restrictions exclude that service — so a customer holding one could not add
-  Gemini at all. They were told their key was invalid, which it is not.
+  Google sells Gemini through two services, and a key opens exactly one of
+  them. An AI Studio key answers on generativelanguage.googleapis.com; a key
+  minted for Gemini Enterprise Agent Platform is refused there and answers on
+  aiplatform.googleapis.com instead, at a path that names the project and
+  location. Same models, same request and response shape, same auth header —
+  verified live with one key of each kind, each blocked on the other's host
+  with reason API_KEY_SERVICE_BLOCKED.
 
-  Agent Platform is its own service: its own host, its own auth header, and a
-  path that names the project and location. That makes it a provider of its
-  own, the same way Vertex AI is, rather than a mode of the Gemini one.
+  So Agent Platform is not its own provider with its own model list: it is a
+  second door into the Gemini provider. The customer configures Gemini once,
+  with whichever key they hold; which door the key opens is detected, not
+  asked. A row whose credential carries a project and location speaks to
+  Agent Platform; a row without them speaks to the Gemini API. Model names
+  stay `gemini/…` everywhere either way — nothing downstream learns a new
+  prefix.
 
-  Established by probing a real Agent Platform key, because the two endpoints
-  on that host disagree and the documentation does not say so:
+  Established by probing real keys, because the two endpoints disagree and
+  the documentation does not say so:
 
-    POST .../publishers/google/models/{model}:generateContent  accepts an API key
-    GET  .../models                                            401, "API keys are
-                                                               not supported by
-                                                               this API"
+    POST aiplatform…/publishers/google/models/{model}:generateContent  accepts an API key
+    GET  aiplatform…/models                                            401, "API keys are
+                                                                       not supported by
+                                                                       this API"
 
-  Validating by listing models — what every other provider here does — would
-  therefore report a working credential as unusable.
+  Validating Agent Platform by listing models — what every other provider
+  here does — would therefore report a working credential as unusable.
+
+  # ── Detecting which door a key opens ────────────────────────────────────
+
+  @unit
+  Scenario: An AI Studio key validates through the Gemini API door
+    Given a Gemini credential with only an API key
+    When I check the credential
+    Then the check happens against the Gemini API host
+
+  @unit
+  Scenario: An Agent Platform key without project and location is told what is missing, not that it is invalid
+    Given a Gemini credential with only an API key
+    And the Gemini API refuses it because the key is restricted to another service
+    When I check the credential
+    Then I am told the key belongs to a different Google service
+    And the remediation names the project and location fields
+
+  @unit
+  Scenario: A credential carrying project and location is checked through the Agent Platform door
+    Given a Gemini credential for project "acme-123" in location "us-central1"
+    When I check the credential
+    Then the check happens against project "acme-123" in location "us-central1" on the Agent Platform host
+    And nothing is sent to the Gemini API host
+
+  @unit
+  Scenario: A key Agent Platform accepts is valid
+    Given Agent Platform accepts the credential
+    When I check the credential through the Agent Platform door
+    Then the credential is reported as valid
+
+  # ── Refusals stay explained and customer-safe ───────────────────────────
 
   @unit
   Scenario: The credential is not exposed where logs or browser history could retain it
-    Given a Google Agent Platform credential
+    Given a Gemini credential for a project and location
     When I check the credential
     Then the key does not appear in the address used to reach the provider
 
   @unit
-  Scenario: The project and location I entered are the ones actually checked
-    Given a Google Agent Platform credential for project "acme-123" in location "us-central1"
-    When I check the credential
-    Then the check happens against project "acme-123" in location "us-central1"
-
-  @unit
-  Scenario: A key the platform accepts is valid
-    Given Agent Platform accepts the credential
-    When I check the credential
-    Then the credential is reported as valid
-
-  @unit
   Scenario: A key the platform refuses is explained, not just rejected
     Given Agent Platform refuses the credential
-    When I check the credential
+    When I check the credential through the Agent Platform door
     Then I am told the key was refused
     And the provider's own sentence is not part of what I am told
 
   @unit
   Scenario: A model the project cannot reach is not reported as a bad key
     Given Agent Platform answers that the publisher model was not found
-    When I check the credential
+    When I check the credential through the Agent Platform door
     Then I am not told the API key is invalid
 
   @unit
   Scenario: A provider that never answers is not a verdict on the key
     Given Agent Platform cannot be reached
-    When I check the credential
+    When I check the credential through the Agent Platform door
     Then the failure says the provider could not be reached
 
-  # A credential re-check that only has the key — the shape produced when a
-  # caller rebuilds customKeys from a stored key and drops every other
-  # field — must not be treated as though nothing is wrong with the key.
-  # There is nothing to probe without a project and location, so this is
-  # the same "no verdict" outcome as the provider never answering, not a
-  # refusal.
+  # ── Dispatch follows the credential, models stay gemini/* ───────────────
+
   @unit
-  Scenario: A credential missing its project or location is not probed at all
-    Given an Agent Platform credential with no project or location
-    When I check the credential
-    Then the failure says the provider could not be reached
-    And nothing was sent to the provider
+  Scenario: A Gemini row with a project and location sends traffic through the Agent Platform door
+    Given an enabled Gemini provider whose credential carries a project and location
+    When the gateway materialises the credential
+    Then the credential carries the project and the location as the region
+    And the model names offered to the customer are unchanged Gemini catalog names
+
+  @unit
+  Scenario: A Gemini row without a project sends traffic through the Gemini API door
+    Given an enabled Gemini provider whose credential is only an API key
+    When the gateway materialises the credential
+    Then the credential carries no project and no region
+
+  # ── The old separate provider folds in ──────────────────────────────────
+
+  @unit
+  Scenario: A stored Google Agent Platform row becomes a Gemini row with the same credential
+    Given a stored model provider row for Google Agent Platform with a key, project and location
+    When the fold-in migration runs
+    Then the row's provider is Gemini
+    And its key, project and location are preserved under the Gemini field names
+    And its scope and enabled state are unchanged

@@ -397,6 +397,20 @@ export const prepareLitellmParams = async ({
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
   }
 
+  // Gemini's second door: a credential carrying a project and location is
+  // an Agent Platform key, and the two fields ride with it so nlpgo and the
+  // Go gateway route to aiplatform.googleapis.com instead of the Gemini
+  // API. Emitted together or not at all — one without the other names no
+  // door. See specs/model-providers/google-agent-platform.feature.
+  if (modelProvider.provider === "gemini") {
+    const project = getModelOrDefaultEnvKey(modelProvider, "GEMINI_PROJECT");
+    const location = getModelOrDefaultEnvKey(modelProvider, "GEMINI_LOCATION");
+    if (project && location) {
+      params.project_id = project;
+      params.region = location;
+    }
+  }
+
   if (modelProvider.provider === "bedrock") {
     delete params.api_key;
     params.aws_access_key_id =

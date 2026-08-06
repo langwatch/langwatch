@@ -535,7 +535,7 @@ const presentations = {
     title: "This key's restrictions block the request",
     describe: (error) =>
       error.meta.reason === "API_KEY_SERVICE_BLOCKED"
-        ? "Its API restrictions exclude the Generative Language API. Allow that API in the Google Cloud console, or set up a Vertex AI provider instead."
+        ? "This key belongs to a different Google service. If it is a Gemini Enterprise Agent Platform key, fill in the Google Cloud Project and Location fields and save again; otherwise allow the Generative Language API in the Google Cloud console."
         : "Its application restrictions don't allow a call from our servers. Adjust them in the Google Cloud console, then try again.",
   },
   provider_refused: {

@@ -519,7 +519,10 @@ function resolvePolicySideOfBundle(
 // from the LiteLLM integration) to the Go gateway's per-provider
 // credential shape. See services/aigateway/internal/dispatch/account.go
 // #pcToBifrostKey for the consuming side.
-function buildCredentials(mp: ModelProvider): Record<string, unknown> {
+// Exported for tests: the per-provider credential shapes (which fields ride
+// with which provider, e.g. gemini's optional Agent Platform pair) are
+// contract, and this is the single place they are built.
+export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
   const provider = mp.provider;
   const customKeys = decryptCustomKeys(mp.customKeys);
   const pick = (k: string): string =>
@@ -569,27 +572,32 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
     case "anthropic":
       return { api_key: pick("ANTHROPIC_API_KEY") };
     case "gemini":
-    case "google_gemini":
-      return { api_key: pick("GEMINI_API_KEY") || pick("GOOGLE_API_KEY") };
-    // Agent Platform serves Gemini models from a path that names the project
-    // and location, so both travel with the key rather than being derived.
-    // Routing this type to an upstream is `mapProvider`'s job in the Go
-    // gateway (services/aigateway); until that lands the credential
-    // materialises but no traffic is dispatched. Validation does not go
-    // through here — see providerValidation.ts.
-    case "google_agent_platform":
+    case "google_gemini": {
+      // One provider, two Google doors. A credential carrying a project and
+      // location is an Agent Platform key: the Go gateway routes it to
+      // aiplatform.googleapis.com at the path those two fields name, while
+      // a bare key goes to the Gemini API. See
+      // specs/model-providers/google-agent-platform.feature.
+      const project = pick("GEMINI_PROJECT");
+      const location = pick("GEMINI_LOCATION");
       return {
-        api_key: pick("GOOGLE_AGENT_PLATFORM_API_KEY"),
-        project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT"),
-        // `region`, not `location`: `buildProviderSlot` below lifts a
-        // slot-level region by looking up exactly that key
-        // (`pickString(credentials, "region")`), the convention every
-        // other regional provider's credentials already follow. Naming it
-        // `location` here — Google's own term, kept as the customer-facing
-        // env var name — would silently leave this provider without a
-        // slot-level region once something reads it.
-        region: pick("GOOGLE_AGENT_PLATFORM_LOCATION"),
+        api_key: pick("GEMINI_API_KEY") || pick("GOOGLE_API_KEY"),
+        ...(project && location
+          ? {
+              project_id: project,
+              // `region`, not `location`: `buildProviderSlot` below lifts a
+              // slot-level region by looking up exactly that key
+              // (`pickString(credentials, "region")`), the convention every
+              // other regional provider's credentials already follow. Naming
+              // it `location` here — Google's own term, kept as the
+              // customer-facing field name — would silently leave this
+              // credential without a slot-level region once something reads
+              // it.
+              region: location,
+            }
+          : {}),
       };
+    }
     case "openai":
       return { api_key: pick("OPENAI_API_KEY") };
     case "deepseek":
