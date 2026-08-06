@@ -83,6 +83,10 @@ const CLIENT_MODULE_VALUE_EXPORTS = new Set([
  * hold, so they are reported as themselves and always fail - which is the
  * right answer for this module either way: both are ways to re-export a
  * resolver that no by-name list can see.
+ *
+ * Every pattern allows leading whitespace. A top-level export is at column 1
+ * today, but a rule that reads "everything this module exports" must not be
+ * one reformatting away from missing one.
  */
 function valueExportsOf(source: string): string[] {
   return [
@@ -96,24 +100,26 @@ function valueExportsOf(source: string): string[] {
 function unnamedExportsOf(source: string): string[] {
   const stars = [
     ...source.matchAll(
-      /^export\s*\*\s*(?:as\s+[A-Za-z_$][\w$]*\s*)?from\s*["']([^"']+)["']/gm,
+      /^[ \t]*export\s*\*\s*(?:as\s+[A-Za-z_$][\w$]*\s*)?from\s*["']([^"']+)["']/gm,
     ),
   ].map((match) => `* from "${match[1]}"`);
-  return /^export\s+default\b/m.test(source) ? ["default", ...stars] : stars;
+  return /^[ \t]*export\s+default\b/m.test(source)
+    ? ["default", ...stars]
+    : stars;
 }
 
 /** `export function x`, `export const x`, `export class x`, and friends. */
 function declarationExportsOf(source: string): string[] {
   return [
     ...source.matchAll(
-      /^export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm,
+      /^[ \t]*export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm,
     ),
   ].map((match) => match[1]!);
 }
 
 /** `export { a, b as c }`, with or without a `from`. Skips `type` clauses. */
 function braceExportsOf(source: string): string[] {
-  return [...source.matchAll(/^export\s*\{([^}]*)\}/gm)]
+  return [...source.matchAll(/^[ \t]*export\s*\{([^}]*)\}/gm)]
     .flatMap((block) => block[1]!.split(","))
     .map((clause) => clause.trim())
     .filter((clause) => clause.length > 0 && !clause.startsWith("type "))
@@ -256,8 +262,42 @@ function scan(): ScanResult {
   return { files, walked };
 }
 
+/**
+ * The module the export rule above is written against, in every form it has
+ * to see. The rule is only worth having if the reader cannot slip an export
+ * past it, so the reader is exercised rather than assumed.
+ */
+const EVERY_EXPORT_FORM = [
+  "  export default resolveClient;",
+  '  export * from "./more-resolvers";',
+  '\texport * as clients from "./clients";',
+  "  export const inferredResolver = async (tenantId: string) => tenantId;",
+  "export async function getClickHouseClientForProject(id: string) {}",
+  'export { _shared as getSharedClickHouseClient } from "./client";',
+  "export type ClickHouseClientResolver = (id: string) => Promise<Client>;",
+  "export interface Unrelated { a: string }",
+].join("\n");
+
 describe("the ClickHouse client access boundary", () => {
   const { files: scanned, walked } = scan();
+
+  describe("when a module's exports are read", () => {
+    it("finds every value-export form, indented or not", () => {
+      expect(valueExportsOf(EVERY_EXPORT_FORM)).toEqual([
+        "default",
+        '* from "./more-resolvers"',
+        '* from "./clients"',
+        "inferredResolver",
+        "getClickHouseClientForProject",
+        "getSharedClickHouseClient",
+      ]);
+    });
+
+    it("does not mistake a type export for a value", () => {
+      expect(valueExportsOf("export type Resolver = () => void;")).toEqual([]);
+      expect(valueExportsOf('export { type Foo } from "./t";')).toEqual([]);
+    });
+  });
 
   describe("when the client module is read", () => {
     it("exports only the values named here, so no resolver can be added quietly", () => {
