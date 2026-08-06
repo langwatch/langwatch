@@ -14,7 +14,11 @@ Feature: haven answers an agent's tool call before it runs
   #     and a hooks[] array of {type: command, command, timeout} fires;
   #   - the payload carries session_id, transcript_path, cwd, prompt_id,
   #     permission_mode, effort.level, hook_event_name, tool_name, tool_input
-  #     and tool_use_id — and NO agent_id in a main session;
+  #     and tool_use_id — and NO agent_id in a main session, which turns out to
+  #     be the load-bearing field: a scan of 40 transcripts (14,121 requests,
+  #     ~53M cache-write tokens) shows sub-agents write ephemeral_5m 100% of the
+  #     time and main sessions write ephemeral_1h 100% of the time, with no
+  #     request writing both. So agent_id says which cache floor the caller has;
   #   - `updatedInput` is honoured with `allow` and SILENTLY IGNORED with
   #     `defer`. The same hook returning the same replacement rewrote and ran
   #     the command under allow, and left the original untouched under defer;
@@ -143,20 +147,26 @@ Feature: haven answers an agent's tool call before it runs
     Then it is deferred unchanged
 
   @unit @unimplemented
-  Scenario: A command with no slot free is rewritten to queue
+  Scenario: A main-session command with no slot free is rewritten to queue
     Given pressure is amber and no slot is free
-    And the session's cache writes went to the long-lived cache
+    And the payload carries no agent id, so the caller is a main session
     When it is gated
     Then it is rewritten to queue at full width
-    Because at that cache lifetime the wait costs nothing, and a queued run holds no memory
+    Because a main session holds the one-hour cache, so the wait costs nothing and a queued run holds no memory
 
   @unit @unimplemented
-  Scenario: A short command in a short-lived-cache session is narrowed instead
+  Scenario: A short sub-agent command is narrowed instead
     Given pressure is amber and no slot is free
-    And the session's cache writes went to the short-lived cache
-    And the command is projected to finish inside that floor
+    And the payload carries an agent id, so the caller holds the five-minute cache
+    And the command is projected to finish inside five minutes
     When it is gated
     Then it is rewritten to run under haven's heavy class with a smaller worker count
+
+  @unit @unimplemented
+  Scenario: The caller's cache floor is read from the payload, not inferred
+    When the gate decides which ceiling applies
+    Then the presence of an agent id decides it
+    And no transcript is parsed to work it out
 
   @unit @unimplemented
   Scenario: At critical pressure with no slot free the command is refused
@@ -185,8 +195,8 @@ Feature: haven answers an agent's tool call before it runs
   Scenario: A refusal never invites the caller to sleep or poll
     When the gate denies a heavy command
     Then the reason explicitly tells the caller not to sleep, poll or wait for it
-    Because sleeping buys nothing the queue would not have given, and in a session
-    on the short-lived cache it also loses the cache the refusal was protecting
+    Because sleeping buys nothing the queue would not have given, and for a
+    sub-agent it also loses the five-minute cache the refusal was protecting
 
   @unit @unimplemented
   Scenario: The same command is not refused indefinitely

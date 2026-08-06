@@ -159,12 +159,18 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
   @integration @unimplemented
   Scenario: The doctor reports both ways a run can lose its cache
     When I run the doctor
-    Then it reports agent-driven parks whose wait crossed that session's own cache floor
+    Then it reports sub-agent parks whose wait crossed their five-minute floor
     And narrowed runs whose actual duration crossed it
-    And interactive waits are counted in neither
-    # Both are expected to sit near zero, because a session on the one-hour
-    # cache has an hour of headroom and the existing failsafe stops well inside
-    # it. A number that is not near zero is the finding, not the baseline.
+    And main-session and interactive waits are counted in neither
+    # Sub-agents are the population that expires: measured across 40
+    # transcripts, they write the five-minute cache 100% of the time while main
+    # sessions write the one-hour cache 100% of the time. Counting a main
+    # session's wait here would drown the signal, since it has an hour of
+    # headroom and the failsafe stops well inside it.
+    #
+    # Both counters should sit near zero. A non-zero first means the ceiling is
+    # wrong; a non-zero second means narrowing bought nothing and burned the
+    # cache anyway, which the park counter alone would report as success.
 
   # Those two counters are the ones that say whether this mechanism is a net
   # win, and there have to be two. A park past the floor means the wait ceiling
