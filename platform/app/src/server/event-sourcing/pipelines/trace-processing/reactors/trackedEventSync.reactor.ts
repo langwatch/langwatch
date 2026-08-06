@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
+import { createLogger } from "@langwatch/observability";
 import {
   predefinedEventsSchemas,
   predefinedEventTypes,
 } from "~/server/app-layer/events/predefinedEvents.schema";
+import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
-import { createLogger } from "../../../../../utils/logger/server";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -39,6 +40,22 @@ export interface ReconstructedTrackedEvent {
   event_type: string;
   metrics: Record<string, number>;
   event_details: Record<string, string>;
+}
+
+/**
+ * An event type is recordable only when it is present, non-empty, and not the
+ * envelope's own wire name. `recordTrackedEventSpan` emits a span event named
+ * after the recorded `event_type` and always stamps an `event.type` attribute,
+ * so a tracked event typed `langwatch.event` would produce a span that matches
+ * this reactor's own predicate — a self-feeding amplification loop that dedup
+ * cannot break, because every hop mints a fresh span id.
+ */
+function isRecordableEventType(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value !== FEEDBACK_EVENT_NAME
+  );
 }
 
 export interface TrackedEventSyncReactorDeps {
@@ -81,12 +98,16 @@ function deterministicEventId({
  * Each event carries `event.type` (string), `event.metrics.<key>` (double) and
  * `event.details.<key>` (string) attributes; this rebuilds the
  * `{ event_type, metrics, event_details }` shape the track-event path expects.
- * Events without an `event.type` are skipped.
+ * Events without an `event.type`, and events reserving the envelope's own name
+ * as their type, are skipped. Spans this path emitted itself are never
+ * reconstructed at all.
  */
 export function extractTrackedEventsFromSpan(
   span: OtlpSpan,
 ): ReconstructedTrackedEvent[] {
   const events: ReconstructedTrackedEvent[] = [];
+
+  if (span.name === TRACK_EVENT_SPAN_NAME) return events;
 
   for (const event of span.events ?? []) {
     if (event.name !== FEEDBACK_EVENT_NAME) continue;
@@ -136,7 +157,7 @@ export function extractTrackedEventsFromSpan(
       }
     }
 
-    if (eventType === undefined || eventType.length === 0) continue;
+    if (!isRecordableEventType(eventType)) continue;
 
     events.push({
       event_type: eventType,
@@ -151,10 +172,17 @@ export function extractTrackedEventsFromSpan(
 /**
  * Cheap presence check — no parsing. Runs on the projection hot path with
  * attacker-supplied span payloads, so it only looks for a `langwatch.event`
- * event carrying an `event.type` string; full reconstruction and validation
- * stay in handle() off the hot path.
+ * event carrying a recordable `event.type` string; full reconstruction and
+ * validation stay in handle() off the hot path.
+ *
+ * Spans named `TRACK_EVENT_SPAN_NAME` are this reactor's own output, re-ingested
+ * through the trace-processing pipeline by `recordTrackedEventSpan`. Skipping
+ * them by name is what stops the reactor reacting to itself, whatever event type
+ * the caller supplied.
  */
 function spanHasFeedbackEvents(span: OtlpSpan): boolean {
+  if (span.name === TRACK_EVENT_SPAN_NAME) return false;
+
   return (span.events ?? []).some(
     (event) =>
       event.name === FEEDBACK_EVENT_NAME &&
@@ -163,8 +191,7 @@ function spanHasFeedbackEvents(span: OtlpSpan): boolean {
           attr.key === EVENT_TYPE_KEY &&
           attr.value !== undefined &&
           "stringValue" in attr.value &&
-          typeof attr.value.stringValue === "string" &&
-          attr.value.stringValue.length > 0,
+          isRecordableEventType(attr.value.stringValue),
       ),
   );
 }
