@@ -36,7 +36,7 @@ import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
 import { createAdapter } from "./serialized-adapter.registry";
 import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
 import { createTraceApiSpanQuery } from "./trace-api-span-query";
-import type { ChildProcessJobData } from "./types";
+import { type ChildProcessJobData, ChildProcessJobDataSchema } from "./types";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child");
 
@@ -81,7 +81,13 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
     });
     process.stdin.on("end", () => {
       try {
-        resolve(JSON.parse(data) as ChildProcessJobData);
+        // A real .parse(), not an unchecked cast: modelParams is now
+        // optional (workflow/code/http targets never resolve one) while
+        // simulatorModelParams/judgeModelParams are mandatory, so a
+        // malformed payload must fail loudly here with a named Zod error
+        // rather than as an opaque "undefined has no properties" crash
+        // three layers into model construction (issue #6634).
+        resolve(ChildProcessJobDataSchema.parse(JSON.parse(data)));
       } catch (error) {
         reject(new Error(`Failed to parse job data: ${error}`));
       }
@@ -112,10 +118,16 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     );
   }
 
+  // The platform API key rides the same telemetry channel every child
+  // process already gets (buildChildProcessEnv in scenario.processor.ts
+  // sets LANGWATCH_API_KEY from prefetchScenarioData's telemetry.apiKey) —
+  // no need to duplicate it onto the job payload. The workflow/code
+  // factories consume it as workflow.api_key; prompt and http ignore it.
   const adapter = createAdapter({
     adapterData,
     modelParams,
     nlpServiceUrl,
+    projectApiKey: langwatchApiKey,
   });
   // The user-simulator and judge resolve their own models (run-plan /
   // scenario override or the DEFAULT-role scenarios.* defaults). Older jobs

@@ -7,6 +7,7 @@ import {
 import { type FeatureDescriptor, featureByKey } from "./featureRegistry";
 import { expandLatestAlias, isLatestAlias } from "./latestAliases";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
+import { ModelRestrictedForFeatureError } from "./modelRestrictedForFeatureError";
 
 export type ResolutionSource = "feature_override" | "role_default";
 export type ResolutionScope = "project" | "team" | "organization" | null;
@@ -202,6 +203,15 @@ export async function resolveModelForFeature(
   const chain = await loadScopeChain(ctx.prisma, ctx.projectId);
   const configs = await loadConfigsForChain(ctx.prisma, chain);
 
+  // Distinct model ids skipped specifically because isModelAllowedForFeature
+  // refused them (never an unresolvable-latest-alias skip — see the
+  // `continue` sites below). Lets exhaustion tell "nothing configured" apart
+  // from "something was configured but restricted", so the resolver can
+  // throw the more specific ModelRestrictedForFeatureError instead of
+  // sending the user to set up a first default that would just be refused
+  // again.
+  const restrictedModels: string[] = [];
+
   // Walk tiers in specificity order (project most specific). At each
   // tier, sort configs attached to THIS tier by createdAt DESC and
   // pick the first one carrying a value for the feature key (override)
@@ -235,8 +245,10 @@ export async function resolveModelForFeature(
             modelId: expanded,
             featureKey: feature.key,
           })
-        )
+        ) {
+          restrictedModels.push(expanded);
           continue;
+        }
         return {
           model: expanded,
           source: "feature_override",
@@ -256,8 +268,10 @@ export async function resolveModelForFeature(
             modelId: expanded,
             featureKey: feature.key,
           })
-        )
+        ) {
+          restrictedModels.push(expanded);
           continue;
+        }
         return {
           model: expanded,
           source: "role_default",
@@ -277,8 +291,22 @@ export async function resolveModelForFeature(
     return resolveModelForFeature("prompt.create_default", ctx);
   }
 
-  // 2. Nothing in the cascade. AI features for this role are disabled
-  // until the user configures a default.
+  // 2. Nothing in the cascade — but distinguish WHY: a restricted value
+  // that had to be skipped is a different, more actionable failure than
+  // genuinely nothing being set (see ModelRestrictedForFeatureError's doc
+  // comment for why this is a sibling error, not a subclass).
+  if (restrictedModels.length > 0) {
+    throw new ModelRestrictedForFeatureError(
+      feature.key,
+      feature.role,
+      feature.displayName,
+      ctx.projectId,
+      restrictedModels,
+    );
+  }
+
+  // AI features for this role are disabled until the user configures a
+  // default.
   throw new ModelNotConfiguredError(
     feature.key,
     feature.role,

@@ -37,7 +37,15 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
   constructor(
     private readonly config: WorkflowAgentData,
     private readonly nlpServiceUrl: string,
-    private readonly apiKey: string,
+    /**
+     * The LangWatch platform API key (project.apiKey), sent as
+     * workflow.api_key. nlpgo forwards it verbatim as the X-Auth-Token
+     * header on its callbacks into the platform (agentblock/workflow_runner.go,
+     * evaluatorblock/executor.go, engine.go) — never an LLM provider
+     * credential, so it must not be sourced from litellm params (issue
+     * #6634).
+     */
+    private readonly projectApiKey: string,
   ) {
     super();
     this.name = "SerializedWorkflowAgentAdapter";
@@ -112,7 +120,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       {};
     const workflow = {
       ...this.config.workflow,
-      api_key: this.apiKey,
+      api_key: this.projectApiKey,
       secrets: { ...existingSecrets, ...this.config.secrets },
     };
 

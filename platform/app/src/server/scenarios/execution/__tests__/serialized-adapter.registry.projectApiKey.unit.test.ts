@@ -33,10 +33,14 @@ import type {
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-const defaultInput: AgentInput = {
+const defaultInput = {
   threadId: "thread_1",
   messages: [{ role: "user", content: "hello" }],
-};
+  newMessages: [],
+  requestedRole: "agent",
+  scenarioState: {},
+  scenarioConfig: {},
+} as unknown as AgentInput;
 
 // Two DISTINGUISHABLE values — a project (platform) key and an LLM
 // provider key — so an assertion that the wrong one landed in the body is

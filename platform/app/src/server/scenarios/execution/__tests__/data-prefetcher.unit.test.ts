@@ -893,30 +893,14 @@ describe("prefetchScenarioData", () => {
           }
         });
 
-        it("uses project defaultModel (code agents have no model)", async () => {
-          const mockModelParamsProvider: ModelParamsProvider = {
-            prepare: vi.fn().mockResolvedValue(defaultModelParams),
-          };
-
-          const deps = createMockDeps({
-            agentFetcher: {
-              findById: vi.fn().mockResolvedValue(codeAgent),
-            },
-            modelParamsProvider: mockModelParamsProvider,
-          });
-
-          const target: TargetConfig = {
-            type: "code",
-            referenceId: "agent_456",
-          };
-
-          await prefetchScenarioData(defaultContext, target, deps);
-
-          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
-            "proj_123",
-            "anthropic/claude-3-sonnet",
-          );
-        });
+        // "uses project defaultModel (code agents have no model)" removed
+        // (issue #6634): it asserted a code target resolves an
+        // adapter-role model at all, which was the defect this issue
+        // fixes. Superseded by the describe.each("given a workflow,
+        // code, or HTTP target") block above (AC2 / AC-N8), which pins
+        // the correct contract for code targets: the agent-under-test
+        // resolver is never called, and model params are prepared
+        // exactly twice — simulator and judge, never an adapter model.
 
         it("includes decrypted project secrets on the prefetched adapter data", async () => {
           const projectSecretsFetcher: ProjectSecretsFetcher = {

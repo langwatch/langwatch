@@ -430,6 +430,21 @@ const presentations = {
     describe: () =>
       "Nothing has a model set yet. Pick one in your project's model settings, then try again.",
   },
+  model_restricted_for_feature: {
+    // Distinct from `model_not_configured`: a model IS set, but it's
+    // licensed for Langy and the quick assists only (see
+    // codex-account-provider.feature) and this feature needs full
+    // inference.
+    title: "This model can't be used here",
+    describe: (error) => {
+      const featureDisplayName = str(
+        error,
+        "featureDisplayName",
+        "this feature",
+      );
+      return `Pick a different default model for ${featureDisplayName} in your project's model settings.`;
+    },
+  },
   model_provider_disabled: {
     title: "This model provider is turned off",
     describe: () =>

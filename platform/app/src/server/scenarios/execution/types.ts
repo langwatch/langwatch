@@ -293,18 +293,23 @@ export const ChildProcessJobDataSchema = z.object({
   /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
   scenarioRunId: z.string().optional(),
   adapterData: TargetAdapterDataSchema,
-  /** Model params for the target adapter (prompt / workflow under test). */
-  modelParams: LiteLLMParamsSchema,
+  /**
+   * Model params for the target adapter (the prompt under test). Only a
+   * prompt target ever resolves one — workflow / code / http targets send
+   * the project's platform API key instead (see
+   * serialized-adapter.registry.ts) and never consume an LLM key for the
+   * agent under test, so this is absent for them.
+   */
+  modelParams: LiteLLMParamsSchema.optional(),
   /**
    * Model params for the user-simulator agent. Resolved from the run-plan /
-   * scenario override or the scenarios.user_simulator default. Optional so a
-   * job queued by an older worker (which only carried modelParams) still
-   * parses; the child falls back to modelParams when absent.
+   * scenario override or the scenarios.user_simulator default. Every run
+   * genuinely needs one.
    */
-  simulatorModelParams: LiteLLMParamsSchema.optional(),
-  /** Model params for the judge agent — same resolution + fallback as the
-   *  simulator, from the scenarios.judge default. */
-  judgeModelParams: LiteLLMParamsSchema.optional(),
+  simulatorModelParams: LiteLLMParamsSchema,
+  /** Model params for the judge agent — same resolution as the simulator,
+   *  from the scenarios.judge default. Every run genuinely needs one. */
+  judgeModelParams: LiteLLMParamsSchema,
   nlpServiceUrl: z.string(),
   target: TargetConfigSchema,
 });
