@@ -11,13 +11,17 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const fetchMock = vi.fn();
+// `vi.hoisted` so the mock factory can close over `fetchMock` — `vi.mock` is
+// lifted above every declaration in the file, which is what forces the dynamic
+// imports this replaces. With the double declared up here, the modules under
+// test are ordinary top-level imports.
+const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: (...args: unknown[]) => fetchMock(...args),
 }));
 
-const { AnthropicAdminPuller } = await import("../anthropicAdmin.puller");
-const { buildPulledUsageRecord } = await import("../pulledUsageRecord");
+import { AnthropicAdminPuller } from "../anthropicAdmin.puller";
+import { buildPulledUsageRecord } from "../pulledUsageRecord";
 
 const SOURCE = {
   ingestionSourceId: "src_1",

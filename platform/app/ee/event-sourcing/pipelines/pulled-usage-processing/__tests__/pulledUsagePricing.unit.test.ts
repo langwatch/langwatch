@@ -56,6 +56,21 @@ describe("pricing one pulled usage item", () => {
       expect(priced.costStatus).toBe("estimate");
       expect(priced.costNanoUsd).toBe(3_500_000_000);
     });
+
+    it("refuses a figure too large to represent rather than rounding it", () => {
+      // The scaling happens in bigint so every digit of the provider's string
+      // survives; only the final integer becomes a number. Past 2^53 nano-USD
+      // (~$9,007,199 in one bucket) that last step would round, undoing the
+      // whole point of carrying the string, so it throws instead.
+      expect(() =>
+        pricePulledUsage({
+          basis: "provider_reported",
+          costUsd: "90071992.547409911",
+          costStatus: "exact",
+          quantities: QUANTITIES,
+        }),
+      ).toThrow(/refusing to round/i);
+    });
   });
 
   describe("when the provider gave only quantities", () => {

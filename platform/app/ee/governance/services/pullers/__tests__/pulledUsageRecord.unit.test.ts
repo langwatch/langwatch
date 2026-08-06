@@ -22,10 +22,13 @@ const SOURCE: PulledUsageSourceAttribution = {
 
 const OBSERVED_AT = new Date("2026-08-06T09:00:00.000Z");
 
-function usageEvent(
-  overrides: Partial<NormalizedPullEvent> = {},
-  hint: Record<string, unknown> = {},
-): NormalizedPullEvent {
+function usageEvent({
+  overrides = {},
+  hint = {},
+}: {
+  overrides?: Partial<NormalizedPullEvent>;
+  hint?: Record<string, unknown>;
+} = {}): NormalizedPullEvent {
   return {
     source_event_id: "usage_report:2026-08-01:1d:claude-sonnet-5:ws_1",
     event_timestamp: "2026-08-01T00:00:00.000Z",
@@ -100,15 +103,15 @@ describe("building one pulled usage record", () => {
 
     it("carries a provider-reported cost as exact when the adapter says so", () => {
       const record = buildPulledUsageRecord({
-        event: usageEvent(
-          {
+        event: usageEvent({
+          overrides: {
             cost_usd: 42.5,
             action: "cost_report",
             tokens_input: 0,
             tokens_output: 0,
           },
-          { costBasis: "provider_reported", costStatus: "exact" },
-        ),
+          hint: { costBasis: "provider_reported", costStatus: "exact" },
+        }),
         source: SOURCE,
         observedAt: OBSERVED_AT,
       });
@@ -121,16 +124,16 @@ describe("building one pulled usage record", () => {
 
     it("prefers the adapter's exact decimal string over the float cost_usd", () => {
       const record = buildPulledUsageRecord({
-        event: usageEvent(
+        event: usageEvent({
           // What the canonical `cost_usd: number` field could still carry
           // after a provider's string went through a JS float.
-          { cost_usd: 1.1, action: "cost_report" },
-          {
+          overrides: { cost_usd: 1.1, action: "cost_report" },
+          hint: {
             costBasis: "provider_reported",
             costStatus: "exact",
             costUsd: "1.100000001",
           },
-        ),
+        }),
         source: SOURCE,
         observedAt: OBSERVED_AT,
       });
@@ -148,9 +151,11 @@ describe("building one pulled usage record", () => {
       });
       const corrected = buildPulledUsageRecord({
         event: usageEvent({
-          cost_usd: 99,
-          tokens_input: 999_999,
-          tokens_output: 999_999,
+          overrides: {
+            cost_usd: 99,
+            tokens_input: 999_999,
+            tokens_output: 999_999,
+          },
         }),
         source: SOURCE,
         observedAt: new Date("2026-08-07T09:00:00.000Z"),
@@ -171,21 +176,22 @@ describe("building one pulled usage record", () => {
         observedAt: OBSERVED_AT,
       });
       const otherWorkspace = buildPulledUsageRecord({
-        event: usageEvent(
-          {},
-          {
+        event: usageEvent({
+          hint: {
             dimensions: {
               granularity: "1d",
               model: "anthropic/claude-sonnet-5",
               workspaceId: "ws_2",
             },
           },
-        ),
+        }),
         source: SOURCE,
         observedAt: OBSERVED_AT,
       });
       const otherPeriod = buildPulledUsageRecord({
-        event: usageEvent({ event_timestamp: "2026-08-02T00:00:00.000Z" }),
+        event: usageEvent({
+          overrides: { event_timestamp: "2026-08-02T00:00:00.000Z" },
+        }),
         source: SOURCE,
         observedAt: OBSERVED_AT,
       });
@@ -211,22 +217,20 @@ describe("building one pulled usage record", () => {
 
     it("does not depend on the order the adapter listed its dimensions", () => {
       const a = buildPulledUsageRecord({
-        event: usageEvent(
-          {},
-          {
+        event: usageEvent({
+          hint: {
             dimensions: { model: "m", workspaceId: "w", granularity: "1d" },
           },
-        ),
+        }),
         source: SOURCE,
         observedAt: OBSERVED_AT,
       });
       const b = buildPulledUsageRecord({
-        event: usageEvent(
-          {},
-          {
+        event: usageEvent({
+          hint: {
             dimensions: { granularity: "1d", workspaceId: "w", model: "m" },
           },
-        ),
+        }),
         source: SOURCE,
         observedAt: OBSERVED_AT,
       });
@@ -267,7 +271,7 @@ describe("building one pulled usage record", () => {
     it("refuses an unparseable bucket time instead of filing money under now", () => {
       expect(() =>
         buildPulledUsageRecord({
-          event: usageEvent({ event_timestamp: "not-a-date" }),
+          event: usageEvent({ overrides: { event_timestamp: "not-a-date" } }),
           source: SOURCE,
           observedAt: OBSERVED_AT,
         }),
@@ -277,7 +281,7 @@ describe("building one pulled usage record", () => {
     it("refuses a hint that names no dimensions to key on", () => {
       expect(() =>
         buildPulledUsageRecord({
-          event: usageEvent({}, { dimensions: {} }),
+          event: usageEvent({ hint: { dimensions: {} } }),
           source: SOURCE,
           observedAt: OBSERVED_AT,
         }),
@@ -287,10 +291,10 @@ describe("building one pulled usage record", () => {
     it("refuses a provider-reported cost with no status declared", () => {
       expect(() =>
         buildPulledUsageRecord({
-          event: usageEvent(
-            { cost_usd: 1 },
-            { costBasis: "provider_reported" },
-          ),
+          event: usageEvent({
+            overrides: { cost_usd: 1 },
+            hint: { costBasis: "provider_reported" },
+          }),
           source: SOURCE,
           observedAt: OBSERVED_AT,
         }),

@@ -69,12 +69,43 @@ export interface PulledUsagePrice {
   costStatus: PulledUsageCostStatus;
 }
 
+/**
+ * The provider's decimal string as the integer nano-USD the ledger stores.
+ *
+ * The scaling is done in `bigint` — that is the whole reason the exact string
+ * is carried this far — and only the final, already-rounded integer becomes a
+ * `number`. It cannot stay a bigint past this point: the event data is JSON on
+ * a durable log, the ledger row's `amountNanoUsd` is a `number`, and the
+ * computed path goes through the gateway's shared `rateSpendNanoUsd`, which
+ * returns one. Making this one path bigint would give the codebase two money
+ * types that have to be reconciled at every seam.
+ *
+ * What that narrowing can cost is bounded and checked rather than assumed.
+ * float64 holds integers exactly to 2^53, which is about $9,007,199 in a
+ * single usage bucket. Beyond that the conversion would round — so it throws
+ * instead. A figure too large to represent is a number we cannot publish, and
+ * publishing a quietly rounded one is the failure this whole path exists to
+ * prevent.
+ */
+function providerCostToNanoUsd(costUsd: string | number): number {
+  const exact = usdToNanoUsd(costUsd);
+  if (
+    exact > BigInt(Number.MAX_SAFE_INTEGER) ||
+    exact < -BigInt(Number.MAX_SAFE_INTEGER)
+  ) {
+    throw new Error(
+      `pulled usage cost ${String(costUsd)} exceeds the exactly-representable nano-USD range; refusing to round a money figure`,
+    );
+  }
+  return Number(exact);
+}
+
 export function pricePulledUsage(
   input: PulledUsagePriceInput,
 ): PulledUsagePrice {
   if (input.basis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED) {
     return {
-      costNanoUsd: Number(usdToNanoUsd(input.costUsd)),
+      costNanoUsd: providerCostToNanoUsd(input.costUsd),
       rateVersion: null,
       costBasis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
       costStatus: input.costStatus,
