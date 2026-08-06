@@ -397,11 +397,8 @@ var table = []commandSpec{
 	},
 	{
 		name:    "gate",
-		summary: "answer a Claude Code PreToolUse hook on stdin (admission + cost safety)",
-		flags: []flagSpec{
-			{long: "--install", summary: "register this as a PreToolUse hook in ~/.claude/settings.json (merges; backs up first)"},
-		},
-		run: runGate,
+		summary: "answer a Claude Code PreToolUse hook on stdin (haven up registers it for you)",
+		run:     runGate,
 	},
 	{
 		name:    "typecheck",

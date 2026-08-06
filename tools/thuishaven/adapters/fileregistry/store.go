@@ -5,6 +5,7 @@ package fileregistry
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -337,7 +338,7 @@ func (s *Store) HeavyRuns() int {
 
 // ClaimHeavyRun records this process as holding a heavy slot.
 func (s *Store) ClaimHeavyRun(pid int, command string) (func(), error) {
-	if err := os.MkdirAll(s.heavyRunsDir(), 0o755); err != nil {
+	if err := os.MkdirAll(s.heavyRunsDir(), 0o750); err != nil {
 		return func() {}, err
 	}
 	path := filepath.Join(s.heavyRunsDir(), strconv.Itoa(pid)+".json")
@@ -392,7 +393,7 @@ func (s *Store) ObserveDuration(key string, took time.Duration) {
 	}
 	all[key] = took
 	if b, err := json.Marshal(all); err == nil {
-		_ = os.MkdirAll(s.home, 0o755)
+		_ = os.MkdirAll(s.home, 0o750)
 		_ = writeFileAtomic(s.durationsPath(), b, 0o644)
 	}
 }
@@ -405,6 +406,70 @@ func (s *Store) readDurations() map[string]time.Duration {
 	}
 	_ = json.Unmarshal(b, &out)
 	return out
+}
+
+// EnsureClaudeHook registers command as a PreToolUse hook in this checkout's
+// own Claude settings.
+//
+// settings.LOCAL.json, deliberately: .gitignore carries
+// `**/.claude/settings.local.json*` while .claude/settings.json is checked in,
+// so this configures the developer's checkout without committing a hook into
+// everyone else's. repoRoot comes from `git rev-parse --show-toplevel`, which
+// in a worktree resolves to that worktree — so each one gets its own file,
+// matching the fact that each gets its own stack.
+func (s *Store) EnsureClaudeHook(repoRoot, command string) (bool, error) {
+	path := filepath.Join(repoRoot, ".claude", "settings.local.json")
+
+	settings := map[string]any{}
+	existing, readErr := os.ReadFile(path) // #nosec G304 -- repoRoot is git's own toplevel
+	if readErr == nil {
+		if err := json.Unmarshal(existing, &settings); err != nil {
+			// Someone else's file that we cannot parse is someone else's file.
+			// Refusing beats overwriting it with our own idea of its contents.
+			return false, fmt.Errorf("%s is not valid JSON; leaving it alone: %w", path, err)
+		}
+	}
+	if !mergeClaudeHook(settings, command) {
+		return false, nil
+	}
+
+	body, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return false, err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return false, err
+	}
+	if err := writeFileAtomic(path, append(body, '\n'), 0o600); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// mergeClaudeHook adds the entry unless one naming this command is already
+// there, and reports whether it changed anything — so a second `haven up` is a
+// no-op rather than a duplicate hook or a pointless rewrite.
+func mergeClaudeHook(settings map[string]any, command string) bool {
+	hooks, _ := settings["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = map[string]any{}
+	}
+	entries, _ := hooks["PreToolUse"].([]any)
+	for _, e := range entries {
+		if strings.Contains(fmt.Sprint(e), " gate") {
+			return false
+		}
+	}
+	hooks["PreToolUse"] = append(entries, map[string]any{
+		"matcher": "Bash|Agent",
+		"hooks": []any{map[string]any{
+			"type":    "command",
+			"command": command,
+			"timeout": 10,
+		}},
+	})
+	settings["hooks"] = hooks
+	return true
 }
 
 func (s *Store) pressurePath() string { return filepath.Join(s.home, "pressure.json") }
@@ -420,7 +485,7 @@ func (s *Store) WritePressure(rec domain.PressureRecord) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(s.home, 0o755); err != nil {
+	if err := os.MkdirAll(s.home, 0o750); err != nil {
 		return err
 	}
 	return writeFileAtomic(s.pressurePath(), b, 0o644)
