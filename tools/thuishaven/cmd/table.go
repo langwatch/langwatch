@@ -398,7 +398,10 @@ var table = []commandSpec{
 	{
 		name:    "gate",
 		summary: "answer a Claude Code PreToolUse hook on stdin (admission + cost safety)",
-		run:     runGate,
+		flags: []flagSpec{
+			{long: "--install", summary: "register this as a PreToolUse hook in ~/.claude/settings.json (merges; backs up first)"},
+		},
+		run: runGate,
 	},
 	{
 		name:    "typecheck",
@@ -504,6 +507,10 @@ func editDistanceAtMost(a, b string, max int) bool {
 
 // commandsHelp renders the COMMANDS section of help from the table, so a
 // command cannot exist without being documented.
+// It lists names and one-line summaries only. Flags live in `haven help
+// <command>`, because the top-level help is what you read when you have
+// forgotten a command's NAME — a wall of every flag on every command buries
+// exactly the line you came for.
 func commandsHelp() string {
 	var b strings.Builder
 	for _, spec := range table {
@@ -514,17 +521,49 @@ func commandsHelp() string {
 		if spec.args != "" {
 			left += " " + spec.args
 		}
-		b.WriteString(fmt.Sprintf("    %-14s %s\n", left, spec.summary))
-		for _, f := range spec.flags {
-			name := f.long
-			if f.short != "" {
-				name = f.short + "/" + f.long
-			}
-			if f.takesValue {
-				name += " " + f.value
-			}
-			b.WriteString(fmt.Sprintf("    %-14s   %s: %s\n", "", name, f.summary))
-		}
+		b.WriteString(fmt.Sprintf("    %-16s %s\n", left, spec.summary))
 	}
 	return b.String()
+}
+
+// commandHelp renders one command in full: what it is for, how it is called,
+// and every flag it takes.
+func commandHelp(name string) (string, bool) {
+	for _, spec := range table {
+		if spec.name != name || spec.hidden {
+			continue
+		}
+		var b strings.Builder
+		usage := "    haven " + spec.name
+		if spec.args != "" {
+			usage += " " + spec.args
+		}
+		fmt.Fprintf(&b, "%s\n\n%s\n", spec.summary, usage)
+		if len(spec.flags) > 0 {
+			b.WriteString("\nFLAGS\n")
+			for _, f := range spec.flags {
+				label := f.long
+				if f.short != "" {
+					label = f.short + "/" + f.long
+				}
+				if f.takesValue {
+					label += " " + f.value
+				}
+				fmt.Fprintf(&b, "    %-22s %s\n", label, f.summary)
+			}
+		}
+		return b.String(), true
+	}
+	return "", false
+}
+
+// commandNames lists every visible command, for the "unknown topic" pointer.
+func commandNames() []string {
+	var names []string
+	for _, spec := range table {
+		if !spec.hidden {
+			names = append(names, spec.name)
+		}
+	}
+	return names
 }
