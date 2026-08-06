@@ -64,7 +64,13 @@ function row(traceId: string): TraceListItem {
 const lastInput = () => harness.useQuery.mock.calls.at(-1)?.[0];
 const lastOpts = () => harness.useQuery.mock.calls.at(-1)?.[1];
 
-function resolveWith(data: unknown, extra: Record<string, unknown> = {}) {
+function resolveWith({
+  data,
+  extra = {},
+}: {
+  data: unknown;
+  extra?: Record<string, unknown>;
+}) {
   harness.useQuery.mockImplementation(() => ({
     data,
     isLoading: false,
@@ -74,7 +80,7 @@ function resolveWith(data: unknown, extra: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   harness.useQuery.mockReset();
-  resolveWith(undefined);
+  resolveWith({ data: undefined });
   harness.projectId.value = "proj-1";
   harness.view = { columnOrder: ["time", "trace", "events"], grouping: "flat" };
 });
@@ -101,10 +107,12 @@ describe("useTraceListEvents", () => {
       /** @scenario The list agrees with the drawer */
       it("merges each trace's events onto its own row", () => {
         resolveWith({
-          t1: {
-            names: [{ name: "thumbs_up_down", count: 1, firstTimestamp: 5 }],
-            totalCount: 1,
-            distinctCount: 1,
+          data: {
+            t1: {
+              names: [{ name: "thumbs_up_down", count: 1, firstTimestamp: 5 }],
+              totalCount: 1,
+              distinctCount: 1,
+            },
           },
         });
 
@@ -144,16 +152,16 @@ describe("useTraceListEvents", () => {
       it("keeps the new rows pending rather than reading them as empty", () => {
         // React Query hands back the old page's data with `isLoading` already
         // false, and none of it is keyed by a trace on the new page.
-        resolveWith(
-          {
+        resolveWith({
+          data: {
             "old-page-trace": {
               names: [{ name: "tool.output", count: 1, firstTimestamp: 1 }],
               totalCount: 1,
               distinctCount: 1,
             },
           },
-          { isPreviousData: true },
-        );
+          extra: { isPreviousData: true },
+        });
 
         const { result } = renderHook(() =>
           useTraceListEvents({ rows: [row("t9")] }),
