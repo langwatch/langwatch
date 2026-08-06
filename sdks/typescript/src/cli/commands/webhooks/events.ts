@@ -25,13 +25,14 @@ export const webhookEventsCommand = async (options: {
   const apiKey = checkOrgApiKey();
   // Parse flags before the spinner starts: bad input must produce a clean
   // structured error, not frames interleaved with a dying spinner.
-  // The log is a ranged read by contract; default to the last 24 hours.
-  const now = Date.now();
+  // The log is a ranged read by contract; default to the 24 hours before
+  // whatever `to` resolved to, so `--to` alone reads the day before the
+  // instant the caller named rather than a range ending before it starts.
+  const to = options.to !== undefined ? parseInstant(options.to, "--to") : Date.now();
   const from =
     options.from !== undefined
       ? parseInstant(options.from, "--from")
-      : now - 24 * 60 * 60 * 1000;
-  const to = options.to !== undefined ? parseInstant(options.to, "--to") : now;
+      : to - 24 * 60 * 60 * 1000;
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Fetching emitted events...").start();
   try {

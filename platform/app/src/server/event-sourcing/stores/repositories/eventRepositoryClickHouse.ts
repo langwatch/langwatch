@@ -83,6 +83,7 @@ interface EventLogRow {
   EventId: string;
   EventTimestamp: number;
   EventOccurredAt: number;
+  EventType: string;
   /** Object when ClickHouse parses the JSON column, string when it does not. */
   EventPayload: unknown;
   EventVersion: string;
@@ -94,11 +95,17 @@ interface EventLogRow {
  * Rows to records, normalizing the payload so numeric fields stay numeric
  * whichever way ClickHouse serialized the JSON column.
  */
-function mapEventLogRows(
-  rows: EventLogRow[],
-  context: { tenantId: string; aggregateType: string; aggregateId: string },
-): EventRecord[] {
-  const { tenantId, aggregateType, aggregateId } = context;
+function mapEventLogRows({
+  rows,
+  tenantId,
+  aggregateType,
+  aggregateId,
+}: {
+  rows: EventLogRow[];
+  tenantId: string;
+  aggregateType: string;
+  aggregateId: string;
+}): EventRecord[] {
   return rows.map((row) => ({
     TenantId: tenantId,
     AggregateType: aggregateType,
@@ -176,7 +183,7 @@ export class EventRepositoryClickHouse implements EventRepository {
 
       const rows = await result.json<EventLogRow>();
 
-      return mapEventLogRows(rows, { tenantId, aggregateType, aggregateId });
+      return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
       this.logger.error(
         {
@@ -250,7 +257,7 @@ export class EventRepositoryClickHouse implements EventRepository {
 
       const rows = await result.json<EventLogRow>();
 
-      return mapEventLogRows(rows, { tenantId, aggregateType, aggregateId });
+      return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
       this.logger.error(
         {
@@ -294,7 +301,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         format: "JSONEachRow",
       });
       const rows = await result.json<EventLogRow>();
-      return mapEventLogRows(rows, { tenantId, aggregateType, aggregateId });
+      return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
       this.logger.error(
         { ...request, aggregateId: String(aggregateId), error },

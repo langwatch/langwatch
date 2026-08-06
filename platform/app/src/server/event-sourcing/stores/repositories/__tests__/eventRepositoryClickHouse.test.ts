@@ -42,7 +42,13 @@ function selectListOf(query: string): string {
 }
 
 /** The query text the repository sent on its Nth call. */
-function queryOf(client: ClickHouseClient, call = 0): string {
+function queryOf({
+  client,
+  call = 0,
+}: {
+  client: ClickHouseClient;
+  call?: number;
+}): string {
   return (client.query as ReturnType<typeof vi.fn>).mock.calls[call]![0].query;
 }
 
@@ -153,7 +159,7 @@ describe("EventRepositoryClickHouse read projections", () => {
       });
 
       for (let call = 0; call < 3; call++) {
-        expect(queryOf(client, call)).toContain(EVENT_LOG_SELECT_COLUMNS);
+        expect(queryOf({ client, call })).toContain(EVENT_LOG_SELECT_COLUMNS);
       }
     });
   });
