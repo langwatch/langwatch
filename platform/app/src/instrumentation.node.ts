@@ -18,6 +18,18 @@ const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.replace(
 );
 const langwatchTracingEnabled = !!process.env.LANGWATCH_API_KEY;
 
+// Off by default because BullMQ drives every queue operation through Redis, so
+// tracing ioredis means tracing the queue's own bookkeeping. Measured in
+// production: the worker emitted 317 job spans/sec and ~10,116 Redis command
+// spans/sec, about 32 Redis spans per job. That was 93% of every span the
+// platform produced (966M spans/day, 370 GiB/day into Tempo) to record that a
+// queue was being a queue, which is never the answer to a question. `evalsha`
+// alone ran at 1,771/sec: BullMQ's Lua scripts.
+//
+// Turn it on per-deployment when Redis latency itself is the thing under
+// investigation, and prefer doing that somewhere without a job queue attached.
+const traceRedisCommands = isEnvTrue(process.env.OTEL_TRACE_REDIS_COMMANDS);
+
 // Load the OTel SDK + instrumentation packages ONLY when observability is
 // actually configured (an OTLP endpoint or a LangWatch API key). When neither
 // is set — the common local-dev / self-hosted case — none of these modules
@@ -50,14 +62,34 @@ if (explicitEndpoint || langwatchTracingEnabled) {
     require("langwatch/observability/node") as typeof import("langwatch/observability/node");
   const { AwsInstrumentation } =
     require("@opentelemetry/instrumentation-aws-sdk") as typeof import("@opentelemetry/instrumentation-aws-sdk");
-  const { IORedisInstrumentation } =
-    require("@opentelemetry/instrumentation-ioredis") as typeof import("@opentelemetry/instrumentation-ioredis");
   const { OpenAIInstrumentation } =
     require("@opentelemetry/instrumentation-openai") as typeof import("@opentelemetry/instrumentation-openai");
   const { PinoInstrumentation } =
     require("@opentelemetry/instrumentation-pino") as typeof import("@opentelemetry/instrumentation-pino");
   const { RuntimeNodeInstrumentation } =
     require("@opentelemetry/instrumentation-runtime-node") as typeof import("@opentelemetry/instrumentation-runtime-node");
+
+  const redisInstrumentation = () => {
+    const { IORedisInstrumentation } =
+      require("@opentelemetry/instrumentation-ioredis") as typeof import("@opentelemetry/instrumentation-ioredis");
+
+    return new IORedisInstrumentation({
+      // Redis calls are only interesting as part of some larger operation.
+      // Without this, the connection pool's `connect`/`auth`/`info` and the
+      // queue dispatcher's blocking `brpop`/`xread`, none of which have a
+      // parent, each became a root span, burying real traces in noise.
+      requireParentSpan: true,
+      // Truncate db.statement to command + first key (avoid logging content +
+      // large attributes).
+      dbStatementSerializer: (
+        cmdName: string,
+        cmdArgs: Array<string | Buffer | number | unknown[]>,
+      ) => {
+        const key = typeof cmdArgs[0] === "string" ? cmdArgs[0] : "";
+        return key ? `${cmdName} ${key}` : cmdName;
+      },
+    });
+  };
 
   const spanProcessors = [] as Array<InstanceType<typeof BatchSpanProcessor>>;
   const logRecordProcessors = [] as Array<
@@ -112,30 +144,15 @@ if (explicitEndpoint || langwatchTracingEnabled) {
     // the aggregate loads all ~41 instrumentation packages at import time even
     // though the old config disabled most and the rest target frameworks this
     // server doesn't run (express, koa, hapi, connect, grpc, nest, restify, pg).
-    // These five are the ones that actually emit telemetry here; the emitted
-    // spans/metrics are unchanged. Add a new library worth tracing by adding its
-    // instrumentation package to the Promise.all above and a `new …()` here.
+    // These are the ones that actually emit telemetry here. Add a new library
+    // worth tracing by adding its gated `require` above and a `new ...()` here.
+    // ioredis is opt-in; see traceRedisCommands for the volume it produces.
     instrumentations: [
       new AwsInstrumentation(),
       new OpenAIInstrumentation(),
       new PinoInstrumentation(),
       new RuntimeNodeInstrumentation(),
-      // Truncate ioredis db.statement to command + first key
-      // (avoid logging content + large attributes)
-      new IORedisInstrumentation({
-        // Redis calls are only interesting as part of some larger operation.
-        // Without this, the connection pool's `connect`/`auth`/`info` and the
-        // queue dispatcher's blocking `brpop`/`xread` — none of which have a
-        // parent — each became a root span, burying real traces in noise.
-        requireParentSpan: true,
-        dbStatementSerializer: (
-          cmdName: string,
-          cmdArgs: Array<string | Buffer | number | unknown[]>,
-        ) => {
-          const key = typeof cmdArgs[0] === "string" ? cmdArgs[0] : "";
-          return key ? `${cmdName} ${key}` : cmdName;
-        },
-      }),
+      ...(traceRedisCommands ? [redisInstrumentation()] : []),
     ],
   });
 } else {
