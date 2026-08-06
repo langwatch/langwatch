@@ -33,29 +33,50 @@ const reject = (): never => {
 const declaresItsOwnLength = (headers: Headers): boolean =>
   headers.has("content-length") && !headers.has("transfer-encoding");
 
-/** Reads the stream, rejecting the moment the running total passes the cap. */
+/**
+ * Reads the stream, rejecting the moment the running total passes the cap.
+ *
+ * Rejecting on the RUNNING total, and cancelling the source when it trips, is
+ * what bounds this: an oversized sender is cut off at the cap rather than
+ * after the body has fully arrived, so `maxSize` bounds the memory as well as
+ * the request. The cap is deliberately enforced here, before `next()` — a
+ * pass-through stream would defer it until the route handler had already begun
+ * consuming, and a limit the handler can outrun is not a limit.
+ */
 const readCapped = async (
   body: ReadableStream<Uint8Array>,
   maxSize: number,
   // `Uint8Array<ArrayBuffer>` rather than a bare `Uint8Array`: the latter
   // widens to `ArrayBufferLike`, which `BodyInit` does not accept.
 ): Promise<Uint8Array<ArrayBuffer>> => {
-  const chunks: Uint8Array[] = [];
+  const chunks: (Uint8Array | undefined)[] = [];
   let size = 0;
   const reader = body.getReader();
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.length;
-    if (size > maxSize) reject();
+    if (size > maxSize) {
+      // Stop the sender instead of draining a body already known to be
+      // refused, and drop what was read so the 413 path holds nothing.
+      chunks.length = 0;
+      await reader.cancel().catch(() => undefined);
+      reject();
+    }
     chunks.push(value);
   }
 
   const buffered = new Uint8Array(size);
   let offset = 0;
-  for (const chunk of chunks) {
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    if (!chunk) continue;
     buffered.set(chunk, offset);
     offset += chunk.length;
+    // Release each chunk as it is copied: without this the source chunks and
+    // the concatenated copy are both live at the end, doubling peak memory on
+    // the largest cap (the 50 MiB scenario-events route).
+    chunks[i] = undefined;
   }
   return buffered;
 };
