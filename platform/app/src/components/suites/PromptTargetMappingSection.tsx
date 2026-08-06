@@ -30,11 +30,11 @@ export interface PromptTargetMappingSectionProps {
   /** Prompts available to the project, carrying their declared inputs. */
   prompts: MappablePrompt[] | undefined;
   /** Called when a binding is set or cleared on one prompt target. */
-  onMappingChange: (
-    target: SuiteTarget,
-    identifier: string,
-    mapping: FieldMapping | undefined,
-  ) => void;
+  onMappingChange: (change: {
+    target: SuiteTarget;
+    identifier: string;
+    mapping: FieldMapping | undefined;
+  }) => void;
 }
 
 export function PromptTargetMappingSection({
@@ -72,7 +72,7 @@ export function PromptTargetMappingSection({
               (target.scenarioMappings ?? {}) as Record<string, FieldMapping>
             }
             onMappingChange={(identifier, mapping) =>
-              onMappingChange(target, identifier, mapping)
+              onMappingChange({ target, identifier, mapping })
             }
           />
         </Box>

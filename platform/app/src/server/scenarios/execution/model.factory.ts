@@ -61,6 +61,8 @@ function rejectionAsksForReasoningOff(body: string): boolean {
   } catch {
     return false;
   }
+  // JSON.parse happily returns null or a primitive for bodies like "null".
+  if (typeof parsed !== "object" || parsed === null) return false;
   if (parsed.error?.param === "reasoning_effort") return true;
   const message = parsed.error?.message;
   return (
@@ -88,6 +90,7 @@ function retryEligibleRequestBody(
   } catch {
     return undefined;
   }
+  if (typeof parsed !== "object" || parsed === null) return undefined;
   const carriesTools =
     Array.isArray(parsed.tools) && (parsed.tools as unknown[]).length > 0;
   if (!carriesTools || parsed.reasoning_effort !== undefined) return undefined;

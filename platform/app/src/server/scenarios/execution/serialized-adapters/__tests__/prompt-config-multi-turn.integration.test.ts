@@ -142,16 +142,13 @@ afterEach(async () => {
 describe("prompt agent over four turns", () => {
   describe("given a template that reads the conversation history", () => {
     describe("when the model replies with whatever it was shown", () => {
-      /**
-       * @scenario "Turn N's request does not embed turn N-1's rendered payload"
-       *
-       * The payload is the serialised conversation. A model that reproduces
-       * what it was shown cannot be stopped from putting its last reply into
-       * the next turn's history — that is the conversation. What the adapter
-       * controls, and what made the reported run compound, is whether the
-       * thing being reproduced is a JSON array that gets re-serialised and
-       * re-escaped every turn.
-       */
+      // The payload is the serialised conversation. A model that reproduces
+      // what it was shown cannot be stopped from putting its last reply into
+      // the next turn's history — that is the conversation. What the adapter
+      // controls, and what made the reported run compound, is whether the
+      // thing being reproduced is a JSON array that gets re-serialised and
+      // re-escaped every turn.
+      /** @scenario "Turn N's request does not embed turn N-1's rendered payload" */
       it("never shows the model a serialised conversation payload", async () => {
         model = await startEchoingModel();
         const config: PromptConfigData = {

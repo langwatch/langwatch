@@ -90,11 +90,15 @@ const isSameTarget = (a: SuiteTarget, b: SuiteTarget) =>
   a.type === b.type && a.referenceId === b.referenceId;
 
 /** One target with a single mapping set (or cleared, for an undefined mapping). */
-function withTargetMapping(
-  target: SuiteTarget,
-  identifier: string,
-  mapping: FieldMapping | undefined,
-): SuiteTarget {
+function withTargetMapping({
+  target,
+  identifier,
+  mapping,
+}: {
+  target: SuiteTarget;
+  identifier: string;
+  mapping: FieldMapping | undefined;
+}): SuiteTarget {
   const mappings = { ...(target.scenarioMappings ?? {}) };
   if (mapping) {
     mappings[identifier] = mapping;
@@ -290,16 +294,20 @@ export function useSuiteForm({
    * binding between a simulation and its declared inputs belongs to the run
    * plan that made the pairing.
    */
-  const setTargetMapping = (
-    target: SuiteTarget,
-    identifier: string,
-    mapping: FieldMapping | undefined,
-  ) => {
+  const setTargetMapping = ({
+    target,
+    identifier,
+    mapping,
+  }: {
+    target: SuiteTarget;
+    identifier: string;
+    mapping: FieldMapping | undefined;
+  }) => {
     const next = form
       .getValues("selectedTargets")
       .map((candidate) =>
         isSameTarget(candidate, target)
-          ? withTargetMapping(candidate, identifier, mapping)
+          ? withTargetMapping({ target: candidate, identifier, mapping })
           : candidate,
       );
     form.setValue("selectedTargets", next, { shouldDirty: true });

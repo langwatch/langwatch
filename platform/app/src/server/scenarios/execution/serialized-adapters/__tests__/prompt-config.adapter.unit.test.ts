@@ -217,7 +217,7 @@ describe("SerializedPromptConfigAdapter", () => {
       });
     });
 
-    describe("when the template mentions messages only in prose", () => {
+    describe("given a template that mentions messages only in prose", () => {
       /** @scenario "The word 'messages' in prose does not suppress the conversation" */
       it("still sends the conversation to the model", async () => {
         const config: PromptConfigData = {
@@ -250,7 +250,7 @@ describe("SerializedPromptConfigAdapter", () => {
       });
     });
 
-    describe("when the prompt declares its own inputs", () => {
+    describe("given a prompt that declares its own inputs", () => {
       /** @scenario "A declared input is bound by name to a scenario source" */
       it("binds them in the rendered system prompt", async () => {
         const config: PromptConfigData = {

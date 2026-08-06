@@ -29,7 +29,7 @@
  */
 
 import { createServer, type Server } from "node:http";
-import { generateText, tool } from "ai";
+import { APICallError, generateText, tool } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createModelFromParams } from "../model.factory";
@@ -173,6 +173,27 @@ async function startEndpoint(
   };
 }
 
+/**
+ * The structured shape of a surfaced provider rejection. Asserting on
+ * `statusCode` + `error.param` (not the message prose) keeps the tests immune
+ * to upstream rewording.
+ */
+async function surfacedRejection(
+  request: Promise<unknown>,
+): Promise<{ statusCode: number | undefined; param: unknown }> {
+  const failure = await request.then(
+    () => {
+      throw new Error("expected the request to be rejected");
+    },
+    (error: unknown) => error,
+  );
+  if (!APICallError.isInstance(failure)) throw failure;
+  const body = JSON.parse(failure.responseBody ?? "{}") as {
+    error?: { param?: unknown };
+  };
+  return { statusCode: failure.statusCode, param: body.error?.param };
+}
+
 let endpoint: StubEndpoint | undefined;
 
 afterEach(async () => {
@@ -238,7 +259,7 @@ describe("judge transport: function tools and reasoning effort", () => {
           nlpServiceUrl: endpoint.url,
         });
 
-        await expect(
+        const rejection = await surfacedRejection(
           generateText({
             model,
             messages: [{ role: "user", content: "grade this" }],
@@ -252,9 +273,11 @@ describe("judge transport: function tools and reasoning effort", () => {
               openai: { reasoningEffort: "high" },
             },
           }),
-        ).rejects.toThrow(
-          /Function tools with reasoning_effort are not supported/,
         );
+        expect(rejection).toEqual({
+          statusCode: 400,
+          param: "reasoning_effort",
+        });
 
         const bodies = endpoint.bodies();
         expect(bodies).toHaveLength(1);
@@ -326,14 +349,15 @@ describe("judge transport: function tools and reasoning effort", () => {
           nlpServiceUrl: endpoint.url,
         });
 
-        await expect(
+        const rejection = await surfacedRejection(
           generateText({
             model,
             messages: [{ role: "user", content: "grade this" }],
             tools: { finishTest },
             toolChoice: "required",
           }),
-        ).rejects.toThrow(/temperature/);
+        );
+        expect(rejection).toEqual({ statusCode: 400, param: "temperature" });
 
         expect(endpoint.bodies()).toHaveLength(1);
       });

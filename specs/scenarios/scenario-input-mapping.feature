@@ -9,8 +9,10 @@ Feature: Scenario Input Mapping
   # --- Schema ---
   #
   # Field mappings travel on the *agent config* (scenarioMappings on CodeAgentData
-  # and HttpAgentData) and on the scenario-job payload — not on the suite target
-  # schema itself, which only carries {type, referenceId}.
+  # and HttpAgentData) and on the scenario-job payload. The one exception is
+  # prompt targets: a prompt is authored in the library and pointed at, so its
+  # scenarioMappings sit on the suite target that made the pairing (see the
+  # Prompt Adapter section below). Other target types stay {type, referenceId}.
 
   @unit
   Scenario: Suite target schema accepts all valid target types
