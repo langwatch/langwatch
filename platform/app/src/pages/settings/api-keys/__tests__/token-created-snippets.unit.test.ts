@@ -106,6 +106,29 @@ describe("given the token-created-snippets feature is implemented", () => {
     });
   });
 
+  describe("when checking that one list drives the assistant tabs and config paths", () => {
+    /** @scenario One list of coding assistants drives both the tabs and the config paths */
+    it("TokenCreatedDialog no longer keeps a separate EDITOR_PATHS list", () => {
+      const dialog = readFile(
+        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
+      );
+      expect(dialog).not.toContain("EDITOR_PATHS");
+      expect(dialog).toContain("CODE_ASSISTANTS");
+    });
+
+    /** @scenario One list of coding assistants drives both the tabs and the config paths */
+    it("renders both the tabs and the config-path chips from CODE_ASSISTANTS", () => {
+      const dialog = readFile(
+        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
+      );
+      // Two map() call sites, both over the same list: the tab strip and the
+      // config-path chip row.
+      const renders =
+        dialog.match(/CODE_ASSISTANTS[\s\S]{0,40}?\.map\(/g) ?? [];
+      expect(renders.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
   describe("when checking that ShikiCommandBox is lazy-loaded via dynamic()", () => {
     /** @scenario TokenCreatedDialog lazy-loads the Shiki-backed command box on dialog open */
     it("TokenCreatedDialog imports ShikiCommandBox via dynamic() (ssr:false)", () => {
