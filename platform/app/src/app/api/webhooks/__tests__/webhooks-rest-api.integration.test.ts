@@ -44,6 +44,10 @@ describe("Feature: Webhook endpoints REST API", () => {
     "Content-Type": "application/json",
   });
 
+  /** The created range the events log requires, as query-string params. */
+  const eventsWindow = () =>
+    `from=${Date.now() - 24 * 60 * 60 * 1000}&to=${Date.now()}`;
+
   beforeAll(async () => {
     organization = await prisma.organization.create({
       data: { name: "Webhooks API Org", slug: `--test-org-${ns}` },
@@ -648,9 +652,10 @@ describe("Feature: Webhook endpoints REST API", () => {
         "gateway.budget.breached",
         "gateway.virtual_key.created",
       ]) {
-        const res = await app.request(`/api/webhooks/v1/events?type=${type}`, {
-          headers: headers(),
-        });
+        const res = await app.request(
+          `/api/webhooks/v1/events?type=${type}&${eventsWindow()}`,
+          { headers: headers() },
+        );
         expect(res.status).toBe(200);
         const body = (await res.json()) as {
           data: unknown[];
@@ -659,6 +664,32 @@ describe("Feature: Webhook endpoints REST API", () => {
         expect(body.data).toEqual([]);
         expect(body.next_cursor).toBeNull();
       }
+    });
+
+    /** @scenario The events log refuses a read with no created range */
+    it("refuses a listing that names no window", async () => {
+      planHasWebhookEndpoints = true;
+      // Unbounded, the walk sorts the whole 13-month spend table under FINAL
+      // on every page, so the range is part of the contract rather than a
+      // filter. Half a range is refused for the same reason as none.
+      const [from, to] = [Date.now() - 60_000, Date.now()];
+      for (const query of ["", `?from=${from}`, `?to=${to}`]) {
+        const res = await app.request(`/api/webhooks/v1/events${query}`, {
+          headers: headers(),
+        });
+        expect(res.status).toBe(422);
+      }
+    });
+
+    /** @scenario The events log refuses an inverted created range */
+    it("refuses a window that ends before it starts", async () => {
+      planHasWebhookEndpoints = true;
+      const now = Date.now();
+      const res = await app.request(
+        `/api/webhooks/v1/events?from=${now}&to=${now - 60_000}`,
+        { headers: headers() },
+      );
+      expect(res.status).toBe(422);
     });
   });
 });

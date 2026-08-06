@@ -208,6 +208,9 @@ describe("WebhooksApiService", () => {
     });
   });
 
+  /** The created range the events log requires on every read. */
+  const WINDOW = { from: 1_750_000_000_000, to: 1_750_086_400_000 };
+
   describe("eventsPage()", () => {
     it("takes exactly one page and hands back the cursor for the next", async () => {
       mockFetch.mockResolvedValueOnce(
@@ -234,7 +237,7 @@ describe("WebhooksApiService", () => {
         jsonResponse({ data: [emittedEvent("evt_a")] }),
       );
 
-      const page = await new WebhooksApiService().eventsPage();
+      const page = await new WebhooksApiService().eventsPage(WINDOW);
 
       expect(page.next_cursor).toBeNull();
     });
@@ -248,7 +251,7 @@ describe("WebhooksApiService", () => {
           jsonResponse(eventsPage(["evt_b", "evt_c"], null)),
         );
 
-      const events = await drain(new WebhooksApiService().iterEvents());
+      const events = await drain(new WebhooksApiService().iterEvents(WINDOW));
 
       expect(events.map((e) => e.id)).toEqual(["evt_a", "evt_b", "evt_c"]);
       expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -261,6 +264,7 @@ describe("WebhooksApiService", () => {
 
       await drain(
         new WebhooksApiService().iterEvents({
+          ...WINDOW,
           type: "gateway.request.settled",
         }),
       );
@@ -280,7 +284,7 @@ describe("WebhooksApiService", () => {
       );
 
       await expect(
-        drain(new WebhooksApiService().iterEvents()),
+        drain(new WebhooksApiService().iterEvents(WINDOW)),
       ).rejects.toBeInstanceOf(WebhooksApiError);
     });
   });

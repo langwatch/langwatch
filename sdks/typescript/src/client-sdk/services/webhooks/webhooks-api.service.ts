@@ -362,19 +362,20 @@ export class WebhooksApiService {
    * that missed a delivery reads the window back from here. Walk the whole
    * window with `iterEvents()`.
    */
-  async eventsPage(options?: {
+  async eventsPage(options: {
     type?: string;
-    from?: number;
-    to?: number;
+    /** Required: the log is a ranged read by contract. Epoch milliseconds. */
+    from: number;
+    to: number;
     cursor?: string;
     limit?: number;
   }): Promise<EmittedEventsPage> {
     const params = new URLSearchParams();
-    if (options?.type) params.set("type", options.type);
-    if (options?.from !== undefined) params.set("from", String(options.from));
-    if (options?.to !== undefined) params.set("to", String(options.to));
-    if (options?.cursor) params.set("cursor", options.cursor);
-    if (options?.limit !== undefined) params.set("limit", String(options.limit));
+    if (options.type) params.set("type", options.type);
+    params.set("from", String(options.from));
+    params.set("to", String(options.to));
+    if (options.cursor) params.set("cursor", options.cursor);
+    if (options.limit !== undefined) params.set("limit", String(options.limit));
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     const { data, next_cursor } = await this.request<{
       data: EmittedEvent[];
@@ -387,15 +388,16 @@ export class WebhooksApiService {
    * Every emitted event matching the filter, one at a time, fetching each
    * page only when the consumer reaches it.
    */
-  async *iterEvents(options?: {
+  async *iterEvents(options: {
     type?: string;
-    from?: number;
-    to?: number;
+    /** Required: the log is a ranged read by contract. Epoch milliseconds. */
+    from: number;
+    to: number;
     cursor?: string;
     limit?: number;
   }): AsyncGenerator<EmittedEvent> {
     const pages = walkCursorPages<EmittedEventsPage>({
-      startCursor: options?.cursor,
+      startCursor: options.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
         new WebhooksApiError(
@@ -406,7 +408,7 @@ export class WebhooksApiService {
         this.eventsPage({
           ...options,
           cursor,
-          limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+          limit: options.limit ?? CURSOR_WALK_PAGE_SIZE,
         }),
     });
     for await (const page of pages) {

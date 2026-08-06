@@ -120,7 +120,12 @@ def test_webhooks_facade_routes_and_envelopes():
     assert facade.deliveries_page("we_1", limit=10)["data"] == []
     assert facade.test("we_1")["delivered"] is True
     assert facade.event_types()[0]["type"] == "gateway.request.completed"
-    assert facade.events_page(type="gateway.request.completed")["data"] == []
+    assert (
+        facade.events_page(
+            type="gateway.request.completed", from_ms=1, to_ms=2
+        )["data"]
+        == []
+    )
     assert facade.get_event("evt_1")["id"] == "evt_1"
 
     # Archiving is a soft delete: nothing to hand back, only the route to hit.
@@ -172,7 +177,9 @@ def test_iter_events_walks_every_page():
     )
     facade = WebhooksFacade(FakeRestClient(handler))
 
-    rows = list(facade.iter_events(type="gateway.request.completed"))
+    rows = list(
+        facade.iter_events(type="gateway.request.completed", from_ms=1, to_ms=2)
+    )
     assert [r["id"] for r in rows] == ["evt_1", "evt_2"]
     assert seen_cursors == [None, "c1"]
 
