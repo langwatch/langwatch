@@ -1,10 +1,9 @@
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
-import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { prisma } from "../db";
-import { ClickHouseLogger } from "./clickhouseLogger";
 import { _getSharedClickHouseClient } from "./client";
-import { wrapWithDefaultSettings } from "./safeClickhouseClient";
+import { createManagedClickHouseClient } from "./managedClient";
+import { unregisterClickHouseLimiter } from "./metrics";
 
 const logger = createLogger("langwatch:clickhouse:routing");
 
@@ -202,24 +201,15 @@ function getOrCreateCustomClient(
     return cached;
   }
 
-  let parsedUrl: URL | string = url;
-  try {
-    parsedUrl = new URL(url);
-  } catch {
-    // If not a valid URL, pass raw — ClickHouse client may still accept it
-  }
-
-  const raw = createClient({
-    url: parsedUrl,
-    clickhouse_settings: {
-      date_time_input_format: "best_effort",
-    },
-    log: { LoggerClass: ClickHouseLogger },
+  // Built the same way as the shared client, which it previously was not: it
+  // set no pool size at all, so it ran the driver's default of 10, and nothing
+  // bounded the statements it would attempt. A private instance is a smaller
+  // server than the shared one, so it is the last place that should have had
+  // the weaker limits.
+  const client = createManagedClickHouseClient({
+    url,
+    instance: organizationId,
   });
-
-  const client = wrapWithDefaultSettings(
-    createResilientClickHouseClient({ client: raw }),
-  );
   customClientCache.set(organizationId, client);
   return client;
 }
@@ -230,8 +220,11 @@ function getOrCreateCustomClient(
  */
 export async function clearCustomClientCache(): Promise<void> {
   const closePromises: Promise<void>[] = [];
-  for (const client of customClientCache.values()) {
+  for (const [organizationId, client] of customClientCache) {
     closePromises.push(client.close());
+    // Each private instance registered its limiter under its own org id; drop
+    // the probe with the client so the gauges describe only live limiters.
+    unregisterClickHouseLimiter(organizationId);
   }
   await Promise.all(closePromises);
   customClientCache.clear();

@@ -128,6 +128,107 @@ export const setClickHouseActiveConnections = (count: number) =>
   clickhouseConnectionsActive.set(count);
 
 // ============================================================================
+// Statement Concurrency Metrics
+// ============================================================================
+
+// How many statements a process is running and how many are waiting for a slot
+// (see ~/server/clickhouse/statementLimit.ts). These are the numbers nobody
+// could see during the 2026-07-31 overload: the server's own counters show
+// what it admitted, never what a client was holding back. Sized from the
+// limiter itself at scrape time rather than tracked by hand, so the gauges
+// cannot drift from the limiter they describe.
+type LimiterStatsProbe = () => { inFlight: number; queued: number };
+
+const limiterProbes = new Map<string, LimiterStatsProbe>();
+
+/**
+ * Registers a limiter under an instance label. Re-registering the same label
+ * replaces the probe, which is what a client rebuild (tests, a private instance
+ * re-resolved) should do - two probes for one label would double-count.
+ */
+export const registerClickHouseLimiter = (
+  instance: string,
+  probe: LimiterStatsProbe,
+): void => {
+  limiterProbes.set(instance, probe);
+};
+
+/** Drops a limiter's probe, e.g. when its client is closed. */
+export const unregisterClickHouseLimiter = (instance: string): void => {
+  limiterProbes.delete(instance);
+};
+
+register.removeSingleMetric("clickhouse_statements_in_flight");
+const clickhouseStatementsInFlight = new Gauge({
+  name: "clickhouse_statements_in_flight",
+  help: "ClickHouse statements this process currently has in flight",
+  labelNames: ["instance"] as const,
+  collect() {
+    // Reset first. `labels().set()` only ever writes, so a client that has
+    // been closed would keep publishing its final value for the life of the
+    // process - a gauge describing a limiter that no longer fronts anything.
+    this.reset();
+    for (const [instance, probe] of limiterProbes) {
+      this.labels(instance).set(probe().inFlight);
+    }
+  },
+});
+
+register.removeSingleMetric("clickhouse_statements_queued");
+const clickhouseStatementsQueued = new Gauge({
+  name: "clickhouse_statements_queued",
+  help: "ClickHouse statements waiting for a concurrency slot in this process",
+  labelNames: ["instance"] as const,
+  collect() {
+    this.reset();
+    for (const [instance, probe] of limiterProbes) {
+      this.labels(instance).set(probe().queued);
+    }
+  },
+});
+
+// The alerting signal. Anything above zero means a process refused its own
+// work rather than pile it onto an overloaded server - useful, but not
+// something to discover from a customer.
+register.removeSingleMetric("clickhouse_statements_shed_total");
+const clickhouseStatementsShed = new Counter({
+  name: "clickhouse_statements_shed_total",
+  help: "ClickHouse statements refused because the concurrency wait queue was full",
+  labelNames: ["instance", "operation"] as const,
+});
+
+export const incrementClickHouseStatementsShed = (
+  instance: string,
+  operation: string,
+) => clickhouseStatementsShed.labels(instance, operation).inc();
+
+// Time spent waiting for a slot, which is the latency the pool used to hide.
+// Buckets start below a millisecond because the uncontended case must be
+// visibly free, and end at a minute because a wait that long is the incident.
+register.removeSingleMetric("clickhouse_statement_wait_seconds");
+const clickhouseStatementWait = new Histogram({
+  name: "clickhouse_statement_wait_seconds",
+  help: "Time a ClickHouse statement waited for a concurrency slot",
+  labelNames: ["instance", "operation"] as const,
+  buckets: [0.0005, 0.005, 0.025, 0.1, 0.5, 1, 5, 15, 60],
+});
+
+export const observeClickHouseStatementWait = (
+  instance: string,
+  operation: string,
+  waitSeconds: number,
+) => clickhouseStatementWait.labels(instance, operation).observe(waitSeconds);
+
+// Exported for the boot-time report and for tests that assert the gauges exist
+// without scraping the whole registry.
+export const clickHouseConcurrencyMetrics = {
+  inFlight: clickhouseStatementsInFlight,
+  queued: clickhouseStatementsQueued,
+  shed: clickhouseStatementsShed,
+  wait: clickhouseStatementWait,
+};
+
+// ============================================================================
 // Query Wrapper with Metrics
 // ============================================================================
 

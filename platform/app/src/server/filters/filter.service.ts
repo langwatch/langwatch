@@ -1,14 +1,9 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { FilterParam } from "~/hooks/useFilterParams";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import {
-  buildScopeConditions,
-  type ClickHouseFilterQueryParams,
-  clickHouseFilters,
-  type FilterOption,
-  type SupportedClickHouseFilterDefinition,
-} from "./clickhouse";
+import type { FilterOptionsRepository } from "~/server/app-layer/filters/repositories/filter-options.clickhouse.repository";
+import type { FilterOption } from "./clickhouse";
 import type { FilterField } from "./types";
 
 export type GetFilterOptionsInput = {
@@ -29,20 +24,12 @@ export class FilterService {
   private readonly logger = createLogger("langwatch:filters:service");
   private readonly tracer = getLangWatchTracer("langwatch.filters.service");
 
-  static create(): FilterService {
-    return new FilterService();
-  }
-
-  private getFilterDefinition(
-    field: FilterField,
-  ): SupportedClickHouseFilterDefinition | null {
-    const filterDef = clickHouseFilters[field];
-    if (!filterDef || filterDef.tableName === null) {
-      this.logger.debug({ field }, "Filter not supported in ClickHouse");
-      return null;
-    }
-    return filterDef as SupportedClickHouseFilterDefinition;
-  }
+  /**
+   * `null` on a deployment without ClickHouse, which is a real configuration
+   * rather than a fault - it fails at the call, with the same message it
+   * always did, instead of at boot.
+   */
+  constructor(private readonly repository: FilterOptionsRepository | null) {}
 
   async getFilterOptions(
     input: GetFilterOptionsInput,
@@ -66,27 +53,16 @@ export class FilterService {
           );
         }
 
-        const clickHouseClient = await getClickHouseClientForProject(
-          input.projectId,
-        );
-        if (!clickHouseClient) {
+        if (!this.repository) {
           span.setAttribute("clickhouse.available", false);
           throw new Error(
             "ClickHouse client is not available — check ClickHouse connection configuration",
           );
         }
 
-        const filterDef = this.getFilterDefinition(input.field);
-        if (!filterDef) {
-          span.setAttribute("clickhouse.filter_supported", false);
-          return [];
-        }
-
-        span.setAttribute("clickhouse.filter_supported", true);
-        span.setAttribute("clickhouse.table", filterDef.tableName);
-
         try {
-          const queryParams: ClickHouseFilterQueryParams = {
+          const filterOptions = await this.repository.findOptions({
+            field: input.field,
             tenantId: input.projectId,
             query: input.query,
             key: input.key,
@@ -94,46 +70,7 @@ export class FilterService {
             startDate: input.startDate,
             endDate: input.endDate,
             scopeFilters: input.scopeFilters,
-          };
-
-          const sqlQuery = filterDef.buildQuery(queryParams);
-
-          // Definitions that require a key/subkey return null when it is
-          // missing — there is nothing to query yet, so resolve to no options.
-          if (sqlQuery === null) {
-            span.setAttribute("clickhouse.query_skipped", true);
-            return [];
-          }
-
-          if (!sqlQuery.includes("TenantId = {tenantId:String}")) {
-            throw new Error(
-              `Security: Filter query for ${input.field} is missing TenantId isolation`,
-            );
-          }
-
-          const { params: scopeParams } = buildScopeConditions(queryParams);
-
-          // The UI encodes dots in keys/subkeys as middle dots (·) to avoid path
-          // conflicts; convert them back here before parameterising the query.
-          const actualKey = input.key?.replaceAll("·", ".") ?? "";
-          const actualSubkey = input.subkey?.replaceAll("·", ".") ?? "";
-
-          const result = await clickHouseClient.query({
-            query: sqlQuery,
-            query_params: {
-              tenantId: input.projectId,
-              query: input.query ?? "",
-              key: actualKey,
-              subkey: actualSubkey,
-              startDate: input.startDate,
-              endDate: input.endDate,
-              ...scopeParams,
-            },
-            format: "JSONEachRow",
           });
-
-          const rows = await result.json();
-          const filterOptions = filterDef.extractResults(rows as unknown[]);
 
           span.setAttribute("clickhouse.result_count", filterOptions.length);
           return filterOptions;
@@ -147,9 +84,14 @@ export class FilterService {
             "Failed to fetch filter options from ClickHouse",
           );
           span.setAttribute("clickhouse.error", true);
-          // Do not rethrow the raw ClickHouse error — its message embeds the
-          // failing SQL (table/column layout), which tRPC would forward to the
-          // browser. Details stay in the server log and span above.
+          // A handled error is already safe to surface and already carries the
+          // code the client renders guidance from - overload in particular,
+          // which is a retry-in-a-moment, not a broken filter. Flattening it
+          // here would throw away the very thing the typed error exists for.
+          if (error instanceof HandledError) throw error;
+          // Everything else is not rethrown: a raw ClickHouse message embeds
+          // the failing SQL (table and column layout), which tRPC would
+          // forward to the browser. Details stay in the server log and span.
           throw new Error("Failed to fetch filter options");
         }
       },
