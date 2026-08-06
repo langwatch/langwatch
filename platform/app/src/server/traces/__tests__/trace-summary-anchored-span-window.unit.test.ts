@@ -106,6 +106,15 @@ function mockReads({
     .mockResolvedValueOnce({ json: () => Promise.resolve([]) });
 }
 
+/**
+ * Drives the read and hands back the span query it issued.
+ *
+ * A missing span read is a broken fixture, not a failed expectation — the
+ * scenarios below are all about the SHAPE of that query, so there is nothing to
+ * assert if it never ran. Throwing keeps the assertions in the `it` blocks where
+ * `noMisplacedAssertion` expects them, and reports a setup break as a setup
+ * break rather than as a confusing `undefined` assertion failure.
+ */
 async function readTraces(traceIds: string[]) {
   const { ClickHouseTraceService } = await import(
     "../clickhouse-trace.service"
@@ -117,8 +126,12 @@ async function readTraces(traceIds: string[]) {
   const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>
     String(args.query).includes("FROM stored_spans AS t"),
   );
-  expect(spanCall).toBeDefined();
-  return spanCall![0] as {
+  if (!spanCall) {
+    throw new Error(
+      "fixture: the service issued no stored_spans read, so there is no span query to inspect",
+    );
+  }
+  return spanCall[0] as {
     query: string;
     query_params: Record<string, unknown>;
   };

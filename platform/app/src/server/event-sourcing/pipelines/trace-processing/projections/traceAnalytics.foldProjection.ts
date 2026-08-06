@@ -54,7 +54,6 @@ import { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.
 import {
   anchorStorageTime,
   firstUsableAnchor,
-  MAX_ANCHOR_FUTURE_SKEW_MS,
 } from "./services/storage-anchor";
 import {
   MAX_PROCESSED_SPANS,
@@ -548,7 +547,8 @@ export function projectAnalyticsStateToRow({
    * candidate is bounded against it, so a state whose committed anchor is
    * implausibly far ahead of `now` is re-anchored on write rather than carried
    * through. That is the one case where an already-committed row changes
-   * partition, and it is deliberate — see {@link MAX_ANCHOR_FUTURE_SKEW_MS}.
+   * partition, and it is deliberate — see `MAX_ANCHOR_FUTURE_SKEW_MS` in
+   * {@link ./services/storage-anchor.ts}.
    */
   now?: number;
 }): TraceAnalyticsRow {
