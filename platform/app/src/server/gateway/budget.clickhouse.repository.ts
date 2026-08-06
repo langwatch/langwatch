@@ -792,6 +792,16 @@ export class GatewayBudgetClickHouseRepository {
     rows: PulledUsageRow[];
   }): Promise<PulledUsageRow[]> {
     const client = await this.resolveClient(tenantId);
+    // The batch's own bucket span, which is what makes this a partition-pruned
+    // read instead of a full-history scan. `OccurredAt` is the partition key,
+    // and a probe without it touches every partition the tenant has ever
+    // written — including whatever has aged onto S3 — on every single pull.
+    // A restatement always carries its ORIGINAL bucket time (that is what
+    // makes it a restatement), so any prior version of these rows is inside
+    // this span by construction; the day of slack on each side is for a
+    // provider that nudges a bucket boundary, not for correctness.
+    const occurredAtMs = rows.map((r) => r.occurredAt.getTime());
+    const SPAN_SLACK_MS = 24 * 60 * 60 * 1000;
     const probe = await client.query({
       query: `
         SELECT GatewayRequestId,
@@ -803,11 +813,15 @@ export class GatewayBudgetClickHouseRepository {
         FROM ${EVENTS_TABLE}
         WHERE TenantId = {tenantId:String}
           AND BudgetId = {budgetId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
           AND GatewayRequestId IN {requestIds:Array(String)}
         GROUP BY GatewayRequestId`,
       query_params: {
         tenantId,
         budgetId: PULLED_USAGE_BUDGET_ID,
+        fromMs: Math.min(...occurredAtMs) - SPAN_SLACK_MS,
+        toMs: Math.max(...occurredAtMs) + SPAN_SLACK_MS,
         requestIds: rows.map((r) => pulledRequestId(r.restatementKey)),
       },
       format: "JSONEachRow",
