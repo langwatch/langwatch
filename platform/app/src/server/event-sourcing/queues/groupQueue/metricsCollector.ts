@@ -12,15 +12,8 @@ import {
   gqParkedGroups,
   gqPendingGroups,
 } from "./metrics";
+import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore";
 import type { DispatchResult, GroupStagingScripts } from "./scripts";
-
-/**
- * Ready-score written by UNBLOCK_LUA (app-layer/ops/repositories/
- * queue.redis.repository.ts) to force a just-unblocked group to dispatch
- * promptly. It is a sentinel (epoch 1ms), not a real eligibility time, so the
- * oldest-pending-age gauge excludes it — see the computation in collect().
- */
-const READY_UNBLOCK_SENTINEL_SCORE = 1;
 
 /**
  * How many of the soonest-future-scored ("nearest deferred") ready groups the
@@ -152,11 +145,23 @@ export class GroupQueueMetricsCollector {
    *      reported its entire blocked duration as backlog age (0 -> hours in
    *      one tick).
    *
-   * Exclude the unblock sentinel: UNBLOCK_LUA (app-layer/ops/repositories/
-   * queue.redis.repository.ts) re-adds a group to ready with the constant
-   * score 1 (epoch 1ms) to force prompt dispatch — not a real eligibility
-   * time, so a just-unblocked group must not read as ~56 years. The
-   * exclusive `(1` lower bound drops it; any real timestamp is far larger.
+   * Exclude every score that cannot be a timestamp, not just the sentinel.
+   * UNBLOCK_LUA (app-layer/ops/repositories/queue.redis.repository.ts) re-adds
+   * a group to ready with the constant score 1 (epoch 1ms) to force prompt
+   * dispatch, and a producer whose score function returned 0 or NaN used to
+   * stage at the epoch too (`?? 0` in queueManager, `??` in GroupQueue.send:
+   * neither catches 0). Both read as ~56 years of age. The lower bound is
+   * therefore MIN_PLAUSIBLE_EPOCH_MS rather than `(1`, which drops the sentinel
+   * and every non-timestamp alike.
+   *
+   * This is the ABSOLUTE bound only, deliberately - not the two-sided one
+   * `resolveReadyScore` applies at staging. A genuine backlog IS arbitrarily
+   * far in the past, and reporting it is this gauge's entire job, so "old" must
+   * stay reportable while "not a timestamp" is skipped. Staging now bounds what
+   * can be written, so what this catches is rows staged before that guard
+   * existed; they are not counted here, because by the time a row is read back
+   * the producer that wrote it is no longer identifiable. The counter is raised
+   * at the staging fallback instead.
    *
    * Known residual: unpark restores a group's preserved (pre-park) ready
    * score, so a long-parked group briefly over-reports on unpark until it is
@@ -186,7 +191,7 @@ export class GroupQueueMetricsCollector {
     const nowMs = Date.now();
     const oldestEligible = await this.params.redisConnection.zrangebyscore(
       readyKey,
-      `(${READY_UNBLOCK_SENTINEL_SCORE}`,
+      MIN_PLAUSIBLE_EPOCH_MS,
       nowMs,
       "WITHSCORES",
       "LIMIT",
@@ -200,7 +205,34 @@ export class GroupQueueMetricsCollector {
       eligibleDueMs === null ? 0 : Math.max(0, nowMs - eligibleDueMs),
     );
 
-    let oldestDueMs = eligibleDueMs;
+    const oldestDueMs = await this.foldDeferredHeads({
+      readyKey,
+      keyPrefix,
+      nowMs,
+      seed: eligibleDueMs,
+    });
+    gqOldestBacklogAgeMilliseconds.set(
+      { queue_name: this.params.queueName },
+      oldestDueMs === null ? 0 : Math.max(0, nowMs - oldestDueMs),
+    );
+  }
+
+  /**
+   * Samples the nearest-deferred ready groups and folds their head-job scores
+   * into the oldest due time, seeded with the eligible head so an old eligible
+   * group past the sample bound still registers.
+   */
+  private async foldDeferredHeads({
+    readyKey,
+    keyPrefix,
+    nowMs,
+    seed,
+  }: {
+    readyKey: string;
+    keyPrefix: string;
+    nowMs: number;
+    seed: number | null;
+  }): Promise<number | null> {
     const deferredGroups = await this.params.redisConnection.zrangebyscore(
       readyKey,
       `(${nowMs}`,
@@ -209,23 +241,19 @@ export class GroupQueueMetricsCollector {
       0,
       OLDEST_BACKLOG_SAMPLE_GROUPS,
     );
-    if (deferredGroups.length > 0) {
-      const headPipeline = this.params.redisConnection.pipeline();
-      for (const groupId of deferredGroups) {
-        headPipeline.zrange(
-          `${keyPrefix}group:${groupId}:jobs`,
-          0,
-          0,
-          "WITHSCORES",
-        );
-      }
-      const headResults = (await headPipeline.exec()) ?? [];
-      oldestDueMs = minDueMs(oldestDueMs, headResults, nowMs);
+    if (deferredGroups.length === 0) return seed;
+
+    const headPipeline = this.params.redisConnection.pipeline();
+    for (const groupId of deferredGroups) {
+      headPipeline.zrange(
+        `${keyPrefix}group:${groupId}:jobs`,
+        0,
+        0,
+        "WITHSCORES",
+      );
     }
-    gqOldestBacklogAgeMilliseconds.set(
-      { queue_name: this.params.queueName },
-      oldestDueMs === null ? 0 : Math.max(0, nowMs - oldestDueMs),
-    );
+    const headResults = (await headPipeline.exec()) ?? [];
+    return minDueMs(seed, headResults, nowMs);
   }
 }
 
@@ -233,18 +261,24 @@ export class GroupQueueMetricsCollector {
  * Folds the sampled head-job [member, score] replies into the running oldest
  * due time. Only DUE jobs are backlog: a head legitimately scheduled in the
  * future (delayed stage, monitor timers hours out) is not late work.
+ *
+ * A head score below the plausible-epoch floor is dropped for the same reason
+ * the eligible probe drops one: `nowMs - 0` is not an age. It is not counted
+ * here - the counter is raised at staging, where the value still exists and the
+ * producer is still identifiable.
  */
 function minDueMs(
   seed: number | null,
   headResults: Array<[unknown, unknown]>,
   nowMs: number,
 ): number | null {
-  let oldest = seed;
-  for (const [err, value] of headResults) {
-    const arr = err ? [] : (value as string[]);
-    const dueMs = arr.length >= 2 ? Number(arr[1]) : Number.NaN;
-    const isDue = Number.isFinite(dueMs) && dueMs <= nowMs;
-    if (isDue && (oldest === null || dueMs < oldest)) oldest = dueMs;
-  }
-  return oldest;
+  return headResults
+    .map(([err, value]) => (err ? [] : (value as string[])))
+    .filter((arr) => arr.length >= 2)
+    .map((arr) => Number(arr[1]))
+    .filter((dueMs) => isPlausibleReadyScore(dueMs) && dueMs <= nowMs)
+    .reduce<number | null>(
+      (acc, dueMs) => (acc === null || dueMs < acc ? dueMs : acc),
+      seed,
+    );
 }

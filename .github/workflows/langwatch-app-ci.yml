@@ -118,13 +118,15 @@ jobs:
             # across many roots, not just specs/ and platform/app/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
             # DEFAULT_GO_TEST_ROOTS, DEFAULT_PYTHON_TEST_ROOTS,
-            # DEFAULT_BATS_TEST_ROOTS in platform/app/scripts/check-feature-parity.ts),
+            # DEFAULT_BATS_TEST_ROOTS, DEFAULT_SHELL_TEST_ROOTS in
+            # platform/app/scripts/check-feature-parity.ts),
             # otherwise a binding change in an unlisted root merges without the
             # gate ever running and silently breaks parity on main (e.g. #5143
             # edited only dev/scripts/__tests__/*.bats and slipped through).
             feature-parity:
               - 'specs/**'
               - 'charts/langwatch/tests/**'
+              - 'charts/gateway/tests/**'
               - 'platform/app/**'
               - 'packages/**'
               - 'skills/**'

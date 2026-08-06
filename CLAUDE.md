@@ -176,6 +176,23 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
+**Whole-repo checks take a machine-wide slot.** A tsgo run peaks around 3 to 4
+GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds in 4
+seconds of wall clock. That is fine once and ruinous four times over, so
+`typecheck`, `typecheck:tests`, `typecheck:legacy`, `lint`, `lint:fix`,
+`lint:plugins` and `format` all go through `dev/scripts/check-queue.mjs`. It
+counts the runs live across every worktree, terminal and agent on the machine
+against **one** counter (they compete for the same cores), and a run past the
+limit waits its turn instead of piling on. With a slot free it prints nothing
+and is otherwise transparent (same stdio, same exit code). Queued, it says so on
+stderr, which is what tells you a slow run was waiting rather than hung.
+`CHECK_SLOTS=N` overrides the limit and `CHECK_SLOTS=0` turns the queue off;
+unset, the limit comes from the machine (one per 6 GiB of RAM, capped at one per
+4 cores) and CI does not queue at all. `node dev/scripts/check-queue.mjs
+--explain` shows the limit and who currently holds a slot. Don't cap the tools'
+own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
+CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
+
 When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `platform/app/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `platform/app/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure

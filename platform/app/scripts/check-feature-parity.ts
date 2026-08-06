@@ -103,7 +103,14 @@ const DEFAULT_BATS_TEST_ROOTS: string[] = [
  * hash-comment above a `test_<name>() {` function — blank lines and further
  * comments may sit between the two.
  */
-const DEFAULT_SHELL_TEST_ROOTS: string[] = ["charts/langwatch/tests"];
+const DEFAULT_SHELL_TEST_ROOTS: string[] = [
+  "charts/langwatch/tests",
+  // The gateway subchart carries its own drain-timing suite, run by the
+  // `helm` job in go-services.yaml rather than by the umbrella chart's
+  // workflow, because that job is what the gateway chart's path filter
+  // already triggers.
+  "charts/gateway/tests",
+];
 
 /**
  * Roots scanned for Go `_test.go` files. Go-side scenarios use the same
@@ -346,7 +353,6 @@ const LEGACY_INERT: string[] = [
   // test exists yet, so every scenario is parked @unimplemented.
   "specs/claude/llm-cost-safety.feature",
   "specs/claude/telemetry-turn-bounding.feature",
-  "specs/clickhouse/windowed-read-fallback.feature",
   "specs/coding-agent/personal-usage.feature",
   "specs/components/code-block-editor.feature",
   "specs/data-retention/data-size-metering.feature",
@@ -520,7 +526,6 @@ const LEGACY_INERT: string[] = [
   "specs/ops/local-observability-stack.feature",
   "specs/ops/production-bundle-integrity.feature",
   "specs/otlp/canonical-log-ingestion.feature",
-  "specs/otlp/canonical-metric-ingestion.feature",
   "specs/projects/create-project-drawer.feature",
   "specs/projects/project-list-refresh.feature",
   "specs/prompts/custom-prompt-tags.feature",

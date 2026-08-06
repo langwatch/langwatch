@@ -134,6 +134,10 @@ export function MemberDetailDialog({
         queryClient.roleBinding.listForOrg.invalidate(),
         queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
         queryClient.organization.getAll.invalidate(),
+        // An org role change moves the member between full and Lite Member
+        // seats, so the seat counts an admin is reconciling against changed
+        // with this save.
+        queryClient.limits.getUsage.invalidate(),
       ]);
       toaster.create({ title: "Member updated", type: "success" });
       onClose();

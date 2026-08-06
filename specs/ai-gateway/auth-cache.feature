@@ -148,9 +148,21 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the existing entry keeps serving its credentials
       And the config-less fresh bundle does not replace it
 
+    @unit
+    Scenario: a negative hard grace disables stale-while-error
+      # Zero means "unset" and takes the 6h default, matching every other
+      # knob here, so the opt-out is a negative value: it places the hard cap
+      # before the JWT exp, leaving nothing that could be served stale.
+      Given LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS is negative
+      And the cache holds an entry past its JWT exp
+      And the control plane is unreachable
+      When I send a request with that VK
+      Then no stale bundle is served
+      And the request is rejected with error.type "auth_upstream_unavailable"
+
     @unit @unimplemented
     Scenario: hard expiry cap stops the stale-while-error chain
-      Given the cache holds an entry stale-extended past the LW_GATEWAY_AUTH_CACHE_HARD_GRACE cap (default 6h)
+      Given the cache holds an entry stale-extended past the LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS cap (default 21600, 6h)
       And the control plane is still unreachable
       When I send a request with that VK
       Then the gateway evicts the cached entry

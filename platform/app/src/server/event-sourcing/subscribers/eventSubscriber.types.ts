@@ -1,6 +1,30 @@
 import type { FeatureFlagKey } from "../../featureFlag/registry";
-import type { Event } from "../domain/types";
+import type { AggregateType } from "../domain/aggregateType";
+import type { TenantId } from "../domain/tenantId";
+import type { Event, EventMetadataBase } from "../domain/types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
+
+/**
+ * A staged queue payload (ADR-069): a plain versioned job DTO a `stage` hook
+ * may return in the committed event's place. It mirrors the event envelope's
+ * scheduling identity so the queue orders, groups and dedups it identically,
+ * but it is NOT an event — its `type` is a plain wire string outside the
+ * event-type registry, it is never appended to the event log, and only the
+ * subscriber that staged it reads it.
+ */
+export interface StagedJobPayload {
+  id: string;
+  aggregateId: string;
+  aggregateType: AggregateType;
+  tenantId: TenantId;
+  createdAt: number;
+  occurredAt: number;
+  type: string;
+  version: string;
+  data: unknown;
+  metadata?: EventMetadataBase;
+  idempotencyKey?: string;
+}
 
 /** Metadata available to an event-only subscriber. Fold state is deliberately absent. */
 export interface EventSubscriberContext {
@@ -44,7 +68,7 @@ export interface EnqueueDispatchOptions<E extends Event = Event> {
   filter?: (event: E) => boolean;
   /**
    * Claim-check staging (ADR-069): swap the staged payload for a small
-   * reference event that mirrors the source event's scheduling identity (id,
+   * reference payload that mirrors the source event's scheduling identity (id,
    * aggregate, tenant, occurredAt) while the payload stays in its canonical
    * store. Total field-picks only — no decoding, no normalization; return the
    * source event unchanged when a reference cannot be built. The handler must
@@ -55,16 +79,16 @@ export interface EnqueueDispatchOptions<E extends Event = Event> {
    * here is reported loudly and still loses this subscriber's job for this
    * event permanently. `stage` must be total for the same reason `filter` is.
    *
-   * **Introducing a `stage` hook is a deploy-order dependency.** A reference is
-   * a different event type, and subscriber fan-out is never replayed, so during
-   * a rolling deploy a job staged by a new worker can be drained by one running
-   * the previous build — whose handler does not recognise the reference,
-   * returns, and *completes* the job, with no throw, no retry, no drop counter
-   * and no log. Ship the consumer half at least one release ahead of the
-   * producer half, and see ADR-069 for the exposure this leaves on upgrades
-   * that cross both in one step.
+   * **Introducing a `stage` hook is a deploy-order dependency.** A staged
+   * payload is a different wire type, and subscriber fan-out is never
+   * replayed, so during a rolling deploy a job staged by a new worker can be
+   * drained by one running the previous build — whose handler does not
+   * recognise the reference, returns, and *completes* the job, with no throw,
+   * no retry, no drop counter and no log. Ship the consumer half at least one
+   * release ahead of the producer half, and see ADR-069 for the exposure this
+   * leaves on upgrades that cross both in one step.
    */
-  stage?: (event: E) => Event;
+  stage?: (event: E) => Event | StagedJobPayload;
 }
 
 export interface EventSubscriberOptions<E extends Event = Event> {

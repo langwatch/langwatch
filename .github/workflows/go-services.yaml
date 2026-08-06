@@ -49,6 +49,12 @@ jobs:
             chart:
               - 'charts/gateway/**'
               - '.github/workflows/go-services.yaml'
+              # The `helm` job's ConfigMap/env-var assertions encode a
+              # contract with these two Go files — a rename here that
+              # doesn't touch charts/gateway/** would otherwise skip the
+              # job that's supposed to catch exactly that regression.
+              - 'pkg/config/server.go'
+              - 'services/aigateway/config.go'
             langyagent:
               # The langyagent image bakes in the langwatch CLI, and that CLI is
               # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
@@ -191,6 +197,28 @@ jobs:
           fi
           if grep -q "kind: NetworkPolicy" /tmp/defaults.yaml; then
             echo "NetworkPolicy should NOT render by default"; exit 1
+          fi
+
+      # The drain-timing suite: the two values reaching the container as the
+      # env vars serve.go reads, the retired duration-string keys being
+      # refused, and a drain budget wider than the pod's grace period being
+      # refused. It lives beside the chart, as a shell suite, so its cases
+      # can carry `@scenario` bindings that specs/ai-gateway feature files
+      # resolve against; inline YAML steps bind nothing.
+      - name: Assert shutdown values render as the pod needs them
+        run: ./charts/gateway/tests/shutdown-values.sh
+
+      # The chart's graceful window has to stay above the gateway's 45s
+      # non-streaming heartbeat interval (pkg/config.DefaultNonStreamingHeartbeatInterval),
+      # or a stock install boots straight into the
+      # graceful_shutdown_shorter_than_heartbeat_interval warning and every
+      # slow-but-legitimate request is one a rolling deploy cuts off.
+      - name: Assert the graceful window outlasts the heartbeat interval
+        run: |
+          graceful=$(grep -oP 'SERVER_GRACEFUL_SECONDS: "\K[0-9]+' /tmp/defaults.yaml)
+          heartbeat=$(grep -oP 'DefaultNonStreamingHeartbeatInterval = \K[0-9]+' pkg/config/server.go)
+          if [ "$graceful" -le "$heartbeat" ]; then
+            echo "shutdown.timeoutSeconds ($graceful) must exceed the ${heartbeat}s non-streaming heartbeat interval"; exit 1
           fi
 
       - name: helm dependency update (umbrella)

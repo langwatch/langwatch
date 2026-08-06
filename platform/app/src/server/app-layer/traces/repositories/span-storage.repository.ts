@@ -232,6 +232,10 @@ export interface SpanStorageRepository {
    * Claim-check resolution read (ADR-069): one canonical span by identity,
    * windowed by the reference's partition hint with no unbounded fallback —
    * a miss stays cheap because the caller retries via the queue.
+   *
+   * Derivation-shaped: the returned span carries empty `events` and `links`.
+   * Consumers of this read lift scalar span/resource attributes; a caller that
+   * needs a whole span wants `getSpanByIds`.
    */
   findNormalizedSpanById(
     params: NormalizedSpanByIdParams,

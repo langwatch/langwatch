@@ -10,7 +10,7 @@ import type {
   RoleBindingRepository,
   TeamScopedMemberBinding,
 } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { PERSONAL_TEAM_MEMBERSHIP_REFUSAL } from "~/server/app-layer/teams/team.service";
+import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 
 // When a user holds multiple bindings on one team, the most privileged is the
 // one the settings page displays (and the binding team.update edits).
@@ -623,7 +623,7 @@ export class TeamService {
         // projection below stops protecting them the moment a group binding
         // exists on the team, so the invariant is stated here directly.
         if (team.isPersonal) {
-          throw new ValidationError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
+          throw new PersonalWorkspaceNotManagedHereError(team.name);
         }
 
         // Compute the effective set of admin userIds — direct user ADMIN
