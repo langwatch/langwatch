@@ -171,6 +171,18 @@ function windowsAgentDir(home: string): string {
  */
 export function renderLaunchAgent(spec: LaunchAgentSpec): LaunchAgentDescriptor {
   const entries = Object.entries(spec.env);
+  // Descriptor formats are line-oriented (unit files, cmd, plist text): a
+  // control character in a value cannot be represented safely in all three,
+  // so refuse to render rather than emit a corrupted descriptor. Values are
+  // machine-generated (ingest token, endpoint URL, flags) — a control char
+  // here means an upstream bug, never a legitimate value.
+  for (const [k, v] of entries) {
+    if (/[\r\n\0]/.test(v)) {
+      throw new Error(
+        `copilot-app agent env "${k}" contains control characters; refusing to render the launch agent`,
+      );
+    }
+  }
   switch (spec.platform) {
     case "darwin": {
       const envXml = entries
@@ -210,12 +222,19 @@ ${envXml}
       };
     }
     case "linux": {
-      // `%` is a specifier introducer in unit files and must be doubled
-      // (same reason the Windows wrapper doubles it for cmd).
+      // Escape ORDER matters (CodeQL js/incomplete-sanitization, alert
+      // #249): backslashes FIRST — a value ending in `\` would otherwise
+      // combine with the appended closing quote into an escaped-quote
+      // sequence under systemd's unit-file quoting, unterminating the
+      // value. Then `%` (a specifier introducer, doubled — same reason the
+      // Windows wrapper doubles it for cmd), then `"`.
       const envLines = entries
         .map(
           ([k, v]) =>
-            `Environment="${k}=${v.replace(/%/g, "%%").replace(/"/g, '\\"')}"`,
+            `Environment="${k}=${v
+              .replace(/\\/g, "\\\\")
+              .replace(/%/g, "%%")
+              .replace(/"/g, '\\"')}"`,
         )
         .join("\n");
       // ExecStart is quoted: the app path may contain spaces (e.g.
@@ -258,9 +277,20 @@ WantedBy=graphical-session.target
 
       // Task Scheduler cannot set env in XML; the task runs this wrapper,
       // which sets each var then launches the app. `%` is doubled so cmd
-      // does not treat it as a variable reference.
+      // does not treat it as a variable reference. A `"` inside a value has
+      // NO reliable in-quote escape in cmd — it would terminate the quoted
+      // `set` early and hand the rest of the value to the shell (same class
+      // as the systemd backslash gap, CodeQL #249) — so refuse to render
+      // rather than emit a corrupted or injectable wrapper.
       const setLines = entries
-        .map(([k, v]) => `set "${k}=${v.replace(/%/g, "%%")}"`)
+        .map(([k, v]) => {
+          if (v.includes('"')) {
+            throw new Error(
+              `copilot-app agent env "${k}" contains a double quote; cmd cannot represent it safely — refusing to render the launch agent`,
+            );
+          }
+          return `set "${k}=${v.replace(/%/g, "%%")}"`;
+        })
         .join("\r\n");
       const wrapper = `@echo off\r\n${setLines}\r\nstart "" "${spec.execPath}"\r\n`;
 

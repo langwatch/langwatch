@@ -184,6 +184,48 @@ describe("renderLaunchAgent", () => {
         "ExecStart=/opt/GitHub Copilot/github-copilot",
       );
     });
+
+    it("escapes backslashes BEFORE quotes so a trailing backslash cannot unterminate the value (CodeQL #249)", () => {
+      const d = renderLaunchAgent({
+        platform: "linux",
+        home: "/home/dev",
+        execPath: "/usr/bin/github-copilot",
+        env: { WEIRD: 'ends-with-backslash\\', QUOTED: 'has "quote" inside' },
+      });
+
+      const unit = d.files[0]!.content;
+      // trailing backslash doubled, so the closing quote stays a closer
+      expect(unit).toContain('Environment="WEIRD=ends-with-backslash\\\\"');
+      // quotes escaped after backslashes — never a bare `\"` produced by
+      // the value's own backslash colliding with quote-escaping
+      expect(unit).toContain('Environment="QUOTED=has \\"quote\\" inside"');
+    });
+  });
+
+  describe("when an env value cannot be represented safely", () => {
+    it("refuses to render on control characters (all platforms)", () => {
+      expect(() =>
+        renderLaunchAgent({
+          platform: "linux",
+          home: "/home/dev",
+          execPath: "/usr/bin/github-copilot",
+          env: { EVIL: "line1\nExecStart=/bin/sh" },
+        }),
+      ).toThrow(/control characters/);
+    });
+
+    it("refuses to render a Windows wrapper when a value contains a double quote", () => {
+      // cmd has no reliable in-quote escape for `"` inside `set "K=V"` —
+      // it would terminate the set early and hand the rest to the shell.
+      expect(() =>
+        renderLaunchAgent({
+          platform: "win32",
+          home: "C:\\Users\\dev",
+          execPath: "C:\\apps\\copilot.exe",
+          env: { EVIL: 'x" & calc & rem "' },
+        }),
+      ).toThrow(/double quote/);
+    });
   });
 
   describe("when the platform is Windows", () => {
