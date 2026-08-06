@@ -207,6 +207,13 @@ export async function startHttpServer({
       }
       res.header("Access-Control-Allow-Origin", origin);
       res.header("Vary", "Origin");
+      // A cross-origin client cannot read a response header unless it is
+      // exposed, and the Streamable HTTP transport reads the session id off
+      // the initialize response.
+      res.header(
+        "Access-Control-Expose-Headers",
+        "Mcp-Session-Id, MCP-Protocol-Version"
+      );
     }
 
     res.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");

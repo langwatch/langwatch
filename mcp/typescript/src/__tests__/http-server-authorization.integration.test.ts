@@ -172,6 +172,16 @@ describe("Origin validation", () => {
     }
   });
 
+  it("exposes the session id header so an allowed browser origin can read it", async () => {
+    const response = await fetch(`${harness.baseUrl}/health`, {
+      headers: { Origin: "https://console.example.com" },
+    });
+
+    expect(
+      response.headers.get("access-control-expose-headers")?.toLowerCase()
+    ).toContain("mcp-session-id");
+  });
+
   it("rejects the preflight for an unlisted origin", async () => {
     const response = await fetch(`${harness.baseUrl}/mcp`, {
       method: "OPTIONS",
