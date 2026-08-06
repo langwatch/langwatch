@@ -9,7 +9,7 @@
  * session store that expires idle sessions and caps concurrency per key.
  */
 
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 // ---------------------------------------------------------------------------
 // Bind host
@@ -105,11 +105,21 @@ export function isOriginAllowed({
 // ---------------------------------------------------------------------------
 
 /**
- * Derives an opaque identifier from an API key. Raw keys must never be used as
- * map keys or counters, because those surface in heap dumps and debug output.
+ * Per-process key for deriving identifiers from API keys.
+ *
+ * Regenerated on every start. The derived values only index in-memory maps and
+ * are only compared within one process, so they never need to be reproducible
+ * across restarts. Keying the digest means that anything which exposes those
+ * maps, a heap dump or debug output, still does not let a list of candidate
+ * keys be confirmed offline the way a bare digest would.
  */
+const KEY_DERIVATION_SECRET = randomBytes(32);
+
+/** Derives an opaque identifier from an API key, for use as a map key. */
 export function hashApiKey(apiKey: string): string {
-  return createHash("sha256").update(apiKey).digest("hex");
+  return createHmac("sha256", KEY_DERIVATION_SECRET)
+    .update(apiKey)
+    .digest("hex");
 }
 
 /** Constant-time API key comparison over fixed-length digests. */
@@ -120,8 +130,12 @@ export function apiKeysMatch({
   presentedKey: string;
   expectedKey: string;
 }): boolean {
-  const presented = createHash("sha256").update(presentedKey).digest();
-  const expected = createHash("sha256").update(expectedKey).digest();
+  const presented = createHmac("sha256", KEY_DERIVATION_SECRET)
+    .update(presentedKey)
+    .digest();
+  const expected = createHmac("sha256", KEY_DERIVATION_SECRET)
+    .update(expectedKey)
+    .digest();
   return timingSafeEqual(presented, expected);
 }
 
