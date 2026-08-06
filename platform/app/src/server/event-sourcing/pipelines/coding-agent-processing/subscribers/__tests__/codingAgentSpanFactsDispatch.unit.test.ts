@@ -944,6 +944,30 @@ describe("codingAgentSpanFactsDispatch", () => {
       });
     });
 
+    describe("when the type is span_received but the body carries no span", () => {
+      /**
+       * The half the type check alone misses: the name gate answers "not mine"
+       * for a body it cannot read, so without this the job completes silently
+       * on a payload no build here produced.
+       */
+      /** @scenario a staged shape from a newer build is refused, never quietly completed */
+      it("throws instead of letting the name gate decline it", async () => {
+        const { subscriber, dispatched } = makeSubscriber();
+        const { data: _dropped, ...envelope } = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-bodyless",
+        });
+
+        await expect(
+          subscriber.handle(
+            { ...envelope, data: {} } as unknown as TraceProcessingEvent,
+            context,
+          ),
+        ).rejects.toThrow(/cannot read the staged "span_received" body/);
+        expect(dispatched).toHaveLength(0);
+      });
+    });
+
     describe("when the payload is an event kind this build knows but declines", () => {
       /**
        * The counterweight to the scenario above: refusing unknown shapes must

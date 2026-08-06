@@ -146,10 +146,25 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
         );
       }
 
+      // The type says `span_received`, so read the body before the name gate
+      // answers for it. The gate's `false` means "an event I decline", and a
+      // body with no span object would reach that answer for the wrong reason
+      // — unreadable, not declined — and complete silently. This cannot fire
+      // for a job this seam minted: `enqueue.filter` already found a listed
+      // span name on `data.span`, so an absent span means the payload came
+      // from somewhere this build does not know.
+      if (!hasReadableSpanBody(event)) {
+        throw new Error(
+          `codingAgentSpanFactsDispatch cannot read the staged "span_received" body (trace ${String(event.aggregateId)}): no span object on it. Refusing it into the queue's retry rather than completing it.`,
+        );
+      }
+
       // Full-event job: a pre-reference release staged it, or the seam could
       // not reference the span. Gate, normalize and lift inline — identical to
-      // the pre-reference handler. A span_received this subscriber declines is
-      // a legitimate quiet completion, not an unreadable shape.
+      // the pre-reference handler. A span_received carrying a readable span
+      // this subscriber declines is a legitimate quiet completion, not an
+      // unreadable shape — a build that poisons the queue with every ordinary
+      // span is worse than the loss this refusal prevents.
       if (!isCodingAgentSpan(event)) return;
       const span = normalization.normalizeSpanReceived(
         event.tenantId,
@@ -166,6 +181,22 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
       );
     },
   };
+}
+
+/**
+ * Is a `span_received` payload's body readable at all — does it carry a span
+ * object to gate, normalize and lift?
+ *
+ * Deliberately structural rather than a `spanReceivedEventSchema.parse`: a full
+ * parse would turn any drift inside a span the event log already accepted into
+ * a job that throws on every one of its 25 attempts and then parks the trace's
+ * group — the blocked-group class this whole change exists to remove. The type
+ * and the body's presence are what separate "cannot read" from "decline"; the
+ * fields within a span the seam already gated stay the normalizer's business.
+ */
+function hasReadableSpanBody(event: SpanReceivedEvent): boolean {
+  const span = (event.data as { span?: unknown } | undefined)?.span;
+  return typeof span === "object" && span !== null;
 }
 
 /**
