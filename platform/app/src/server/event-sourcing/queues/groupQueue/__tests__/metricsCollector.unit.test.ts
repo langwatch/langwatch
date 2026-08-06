@@ -7,6 +7,7 @@ import {
   gqOldestPendingAgeMilliseconds,
 } from "../metrics";
 import { GroupQueueMetricsCollector } from "../metricsCollector";
+import { MIN_PLAUSIBLE_EPOCH_MS } from "../readyScore";
 import type { GroupStagingScripts } from "../scripts";
 
 const QUEUE = "test-queue";
@@ -34,8 +35,16 @@ function zrangebyscoreModel({
 }): string[] {
   const minStr = String(min);
   const isExclusive = minStr.startsWith("(");
-  const minVal = Number(isExclusive ? minStr.slice(1) : minStr);
-  const maxVal = max === "+inf" ? Infinity : Number(max);
+  const minVal =
+    minStr === "-inf"
+      ? -Infinity
+      : Number(isExclusive ? minStr.slice(1) : minStr);
+  const maxStr = String(max);
+  const isMaxExclusive = maxStr.startsWith("(");
+  const maxVal =
+    maxStr === "+inf"
+      ? Infinity
+      : Number(isMaxExclusive ? maxStr.slice(1) : maxStr);
 
   const shouldIncludeScores = rest.includes("WITHSCORES");
   const limitIdx = rest.indexOf("LIMIT");
@@ -46,7 +55,7 @@ function zrangebyscoreModel({
     .filter(
       (e) =>
         (isExclusive ? e.score > minVal : e.score >= minVal) &&
-        e.score <= maxVal,
+        (isMaxExclusive ? e.score < maxVal : e.score <= maxVal),
     )
     .sort((a, b) => a.score - b.score)
     .slice(offset, offset + count)
@@ -142,21 +151,24 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
 
     expect(await readGauge()).toBe(5_000);
 
-    // The query must exclude the unblock sentinel (score 1) via an exclusive
-    // lower bound, cap at "now", and read only the single oldest member.
-    // This is the FIRST zrangebyscore call (the eligible probe); the second
-    // is the deferred-backlog sample.
+    // The query must start at the plausible-epoch floor (which drops the
+    // unblock sentinel and every mis-scored row alike), cap at "now", and read
+    // only the single oldest member. This is the FIRST zrangebyscore call (the
+    // eligible probe); the second is the deferred-backlog sample.
     const args = redis.zrangebyscore.mock.calls[0]!;
     expect(args[0]).toBe(`${PREFIX}ready`);
-    expect(args[1]).toBe("(1");
+    expect(args[1]).toBe(MIN_PLAUSIBLE_EPOCH_MS);
     expect(args[2]).toBe(Date.now());
     expect(args).toContain("WITHSCORES");
     expect(args.slice(-3)).toEqual(["LIMIT", 0, 1]);
   });
 
+  /**
+   * A just-unblocked group carries the sentinel score (1), which the
+   * plausible-epoch floor drops rather than surface as eligible.
+   */
+  /** @scenario "the unblock sentinel is not read as an age" */
   it("reports 0 when no group is eligible (empty / all in-flight / just unblocked)", async () => {
-    // A just-unblocked group carries the sentinel score (1), which the
-    // exclusive "(1" lower bound must drop rather than surface as eligible.
     const redis = makeRedis({
       readyZset: [{ member: "just-unblocked", score: 1 }],
     });
@@ -171,6 +183,95 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
     await runCollect(redis);
     const age = await readGauge();
     expect(age).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
+  beforeEach(() => {
+    register.resetMetrics();
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("given a group staged a few seconds after the Unix epoch", () => {
+    /**
+     * Regression for the 2026-07-31 / 2026-08-03 spurious alert fires: a score
+     * of ~2 to 57,000 made the gauge read `now - ~0`, i.e. about 56 years, and
+     * the Events Backed Up rule divides that by 1000 and fires. The floor makes
+     * the gauge structurally unable to report it.
+     */
+    /** @scenario "the oldest-pending-age gauge skips a score from just after the Unix epoch" */
+    it("does not report its age, and probes from the plausible-epoch floor", async () => {
+      const redis = makeRedis({
+        readyZset: [{ member: "mis-scored", score: 57_000 }],
+      });
+
+      await runCollect(redis);
+
+      expect(await readGauge()).toBe(0);
+      expect(await readBacklogGauge()).toBe(0);
+      expect(redis.zrangebyscore.mock.calls[0]![1]).toBe(
+        MIN_PLAUSIBLE_EPOCH_MS,
+      );
+    });
+
+    it("leaves a healthy neighbour driving the gauge", async () => {
+      const redis = makeRedis({
+        readyZset: [
+          { member: "mis-scored", score: 57_000 },
+          { member: "also-mis-scored", score: 0 },
+          { member: "just-unblocked", score: 1 },
+          { member: "healthy", score: Date.now() - 5_000 },
+        ],
+      });
+
+      await runCollect(redis);
+
+      expect(await readGauge()).toBe(5_000);
+    });
+  });
+
+  describe("given a sampled group whose head job score is not a timestamp", () => {
+    /**
+     * A genuine backlog IS arbitrarily far in the past, so the gauge applies
+     * only the absolute bound, never the staging-time skew bounds - otherwise
+     * it would hide the very backlog it exists to report.
+     */
+    /** @scenario "the backlog gauge drops a head job score that is not a timestamp" */
+    it("drops the head from the backlog age", async () => {
+      const redis = makeRedis({
+        readyZset: [
+          { member: "tenant/sub/trace:abc", score: Date.now() + 5_000 },
+        ],
+        headJobScores: {
+          [`${PREFIX}group:tenant/sub/trace:abc:jobs`]: ["job-1", "0"],
+        },
+      });
+
+      await runCollect(redis);
+
+      expect(await readBacklogGauge()).toBe(0);
+    });
+
+    it("still reports a genuinely old head job, however far past it is", async () => {
+      const veryOld = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const redis = makeRedis({
+        readyZset: [{ member: "tenant/sub/trace:old", score: Date.now() + 1 }],
+        headJobScores: {
+          [`${PREFIX}group:tenant/sub/trace:old:jobs`]: [
+            "job-1",
+            String(veryOld),
+          ],
+        },
+      });
+
+      await runCollect(redis);
+
+      expect(await readBacklogGauge()).toBe(30 * 24 * 60 * 60 * 1000);
+    });
   });
 });
 

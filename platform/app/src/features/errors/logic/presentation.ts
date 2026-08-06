@@ -162,6 +162,11 @@ const presentations = {
     title: "Search is temporarily unavailable",
     describe: () => "We're on it. Try again in a moment.",
   },
+  clickhouse_overloaded: {
+    title: "Too much running at once",
+    describe: () =>
+      "We paused this one to keep the rest responsive. Try again.",
+  },
   broadcaster_not_active: {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",
