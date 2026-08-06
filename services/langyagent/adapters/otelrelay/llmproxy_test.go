@@ -407,46 +407,49 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 		cases := []struct {
 			name string
 			body string
-			want string
+			// formerlyCaptured is the sentence this body's Meta["message"] USED
+			// to carry before the no-prose contract. Not asserted: it exists
+			// so each case still names the body it is about in failure output.
+			formerlyCaptured string
 			// The provider discriminant, or the status-derived fallback,
 			// expected as the captured cause's single typed reason.
 			wantCauseType string
 		}{
 			{
-				name:          "anthropic real credit-balance body",
-				body:          `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}`,
-				want:          "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
-				wantCauseType: "invalid_request_error",
+				name:             "anthropic real credit-balance body",
+				body:             `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}`,
+				formerlyCaptured: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+				wantCauseType:    "invalid_request_error",
 			},
 			{
-				name:          "codex backend usage limit",
-				body:          `{"error":{"type":"usage_limit_reached","message":"You've hit your usage limit."}}`,
-				want:          "You've hit your usage limit.",
-				wantCauseType: "usage_limit_reached",
+				name:             "codex backend usage limit",
+				body:             `{"error":{"type":"usage_limit_reached","message":"You've hit your usage limit."}}`,
+				formerlyCaptured: "You've hit your usage limit.",
+				wantCauseType:    "usage_limit_reached",
 			},
 			{
-				name:          "openai unmatched type and code pair",
-				body:          `{"error":{"type":"invalid_request_error","code":"invalid_api_key","message":"Incorrect API key provided."}}`,
-				want:          "Incorrect API key provided.",
-				wantCauseType: "invalid_api_key",
+				name:             "openai unmatched type and code pair",
+				body:             `{"error":{"type":"invalid_request_error","code":"invalid_api_key","message":"Incorrect API key provided."}}`,
+				formerlyCaptured: "Incorrect API key provided.",
+				wantCauseType:    "invalid_api_key",
 			},
 			{
-				name:          "codex backend detail",
-				body:          `{"detail":"The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account."}`,
-				want:          "The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account.",
-				wantCauseType: "upstream_bad_request",
+				name:             "codex backend detail",
+				body:             `{"detail":"The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account."}`,
+				formerlyCaptured: "The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account.",
+				wantCauseType:    "upstream_bad_request",
 			},
 			{
-				name:          "bare message field",
-				body:          `{"message":"model overloaded"}`,
-				want:          "model overloaded",
-				wantCauseType: "upstream_bad_request",
+				name:             "bare message field",
+				body:             `{"message":"model overloaded"}`,
+				formerlyCaptured: "model overloaded",
+				wantCauseType:    "upstream_bad_request",
 			},
 			{
-				name:          "plain text body",
-				body:          `upstream exploded`,
-				want:          "upstream exploded",
-				wantCauseType: "upstream_bad_request",
+				name:             "plain text body",
+				body:             `upstream exploded`,
+				formerlyCaptured: "upstream exploded",
+				wantCauseType:    "upstream_bad_request",
 			},
 		}
 		for _, tc := range cases {
@@ -477,11 +480,9 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 					t.Errorf("captured code = %q, want %q", e.Code, llmUpstreamErrorCode)
 				}
 				// The provider's prose never reaches the frame — see
-				// decodeLLMErrorBody. `tc.want` is retained as the sentence
-				// that USED to be captured, so each case still names the body
-				// it is about and this assertion stays legible.
+				// decodeLLMErrorBody.
 				if _, hasMessage := e.Meta["message"]; hasMessage {
-					t.Errorf("captured message = %q, want the provider's prose dropped (was %q)", e.Meta["message"], tc.want)
+					t.Errorf("captured message = %q, want the provider's prose dropped (was %q)", e.Meta["message"], tc.formerlyCaptured)
 				}
 				if e.Meta["http_status"] != http.StatusBadRequest {
 					t.Errorf("captured http_status = %v, want 400", e.Meta["http_status"])
