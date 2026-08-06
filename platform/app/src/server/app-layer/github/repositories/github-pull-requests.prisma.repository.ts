@@ -1,4 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
+import { nanoid } from "nanoid";
+import { toPgTimestampUtc } from "~/server/utils/pgTimestamp";
 
 import type {
   GithubBranchCheckRow,
@@ -280,18 +282,89 @@ export class PrismaGithubPullRequestsRepository
     });
   }
 
+  /**
+   * The atomic claim. One INSERT ... ON CONFLICT DO UPDATE ... WHERE, so the
+   * decision "may I ask GitHub about this branch" and the record of having
+   * taken it are the same write.
+   *
+   * Raw SQL for the WHERE on the conflict path, which Prisma's `upsert` cannot
+   * express: its `update` is unconditional, and the whole point here is that
+   * the update must match nothing when another caller already holds the claim.
+   * The statement names its organization, so this is not a tenancy opt-out —
+   * the guard is a Prisma middleware and simply does not see raw SQL.
+   *
+   * Both concurrent callers reach the same conflict target; Postgres serializes
+   * them on the unique index, so the second evaluates its predicate against the
+   * first's committed row and updates zero rows.
+   */
+  async claimBranchLookup({
+    organizationId,
+    repositoryHost,
+    repositoryFullName,
+    headBranch,
+    now,
+    freshMappingMs,
+    leaseMs,
+  }: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    headBranch: string;
+    now: Date;
+    freshMappingMs: number;
+    leaseMs: number;
+  }): Promise<boolean> {
+    const fullName = normalizeFullName(repositoryFullName);
+    // Naive-UTC `::timestamp` literals: a raw JS Date binds as `timestamptz`
+    // and the comparison then runs through the session timezone, which on a
+    // developer's machine makes a fifteen-minute backoff look already elapsed
+    // and lets every racer claim. See `toPgTimestampUtc`.
+    const at = toPgTimestampUtc(now);
+    const leaseUntil = toPgTimestampUtc(new Date(now.getTime() + leaseMs));
+    const freshSince = toPgTimestampUtc(
+      new Date(now.getTime() - freshMappingMs),
+    );
+    const claimed = await this.prisma.$executeRaw`
+      INSERT INTO "GithubBranchPullRequestCheck" (
+        "id", "organizationId", "repositoryHost", "repositoryFullName",
+        "headBranch", "lastCheckedAt", "prCount", "notFoundAt",
+        "recheckAfter", "attempts", "lastRequestedAt", "createdAt", "updatedAt"
+      )
+      VALUES (
+        ${nanoid()}, ${organizationId}, ${repositoryHost}, ${fullName},
+        ${headBranch}, ${at}::timestamp, 0, NULL,
+        ${leaseUntil}::timestamp, 0, ${at}::timestamp, ${at}::timestamp, ${at}::timestamp
+      )
+      ON CONFLICT ("organizationId", "repositoryHost", "repositoryFullName", "headBranch")
+      DO UPDATE SET
+        "recheckAfter" = ${leaseUntil}::timestamp,
+        "lastRequestedAt" = ${at}::timestamp,
+        "updatedAt" = ${at}::timestamp
+      WHERE
+        ("GithubBranchPullRequestCheck"."recheckAfter" IS NULL
+          OR "GithubBranchPullRequestCheck"."recheckAfter" <= ${at}::timestamp)
+        AND NOT (
+          "GithubBranchPullRequestCheck"."prCount" > 0
+          AND "GithubBranchPullRequestCheck"."lastCheckedAt" > ${freshSince}::timestamp
+        )
+    `;
+    return claimed > 0;
+  }
+
   async touchBranchCheckRequestedAt({
     organizationId,
     repositoryHost,
     repositoryFullName,
     headBranch,
     lastRequestedAt,
+    staleBefore,
   }: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;
     headBranch: string;
     lastRequestedAt: Date;
+    staleBefore: Date;
   }): Promise<void> {
     await this.prisma.githubBranchPullRequestCheck.updateMany({
       where: {
@@ -299,6 +372,7 @@ export class PrismaGithubPullRequestsRepository
         repositoryHost,
         repositoryFullName: normalizeFullName(repositoryFullName),
         headBranch,
+        lastRequestedAt: { lte: staleBefore },
       },
       data: { lastRequestedAt },
     });
@@ -330,5 +404,46 @@ export class PrismaGithubPullRequestsRepository
       take: limit,
     });
     return records.map(toBranchCheckRow);
+  }
+
+  /**
+   * The retention prune. Two statements, in this order: the branch bookkeeping
+   * past the horizon, then the pull requests whose branch no longer has a row
+   * at all. Reversing them would leave a pull request orphaned for a day.
+   *
+   * Raw SQL, with the `-- @tenancy:` opt-out every other retention sweep in the
+   * platform uses. Retention is system-owned maintenance and cannot name an
+   * organization: the alternative is enumerating every organization and issuing
+   * a delete per tenant, which is a query per tenant to do one table scan's
+   * work.
+   *
+   * Both are single unbounded DELETEs over a predicate with no index of its
+   * own, and that is the deliberate trade: this runs once a day, while an index
+   * to serve it would be paid on every write to a table that takes a row per
+   * agent branch. Measured on 200k rows: 254 ms for the branch checks, 32 ms
+   * for the anti-join (which does use the branch table's unique index).
+   */
+  async deleteStaleBefore({ before }: { before: Date }): Promise<{
+    branchChecks: number;
+    pullRequests: number;
+  }> {
+    const cutoff = toPgTimestampUtc(before);
+    const branchChecks = await this.prisma.$executeRaw`
+      DELETE FROM "GithubBranchPullRequestCheck"
+      WHERE "lastRequestedAt" < ${cutoff}::timestamp
+      -- @tenancy: GitHub branch bookkeeping retention sweep (system-owned maintenance)
+    `;
+    const pullRequests = await this.prisma.$executeRaw`
+      DELETE FROM "GithubPullRequest" pr
+      WHERE NOT EXISTS (
+        SELECT 1 FROM "GithubBranchPullRequestCheck" bc
+        WHERE bc."organizationId" = pr."organizationId"
+          AND bc."repositoryHost" = pr."repositoryHost"
+          AND bc."repositoryFullName" = pr."repositoryFullName"
+          AND bc."headBranch" = pr."headBranch"
+      )
+      -- @tenancy: GitHub pull-request retention sweep (system-owned maintenance)
+    `;
+    return { branchChecks, pullRequests };
   }
 }

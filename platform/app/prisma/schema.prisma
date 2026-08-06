@@ -1285,7 +1285,13 @@ model GithubBranchPullRequestCheck {
   updatedAt          DateTime     @default(now()) @updatedAt
 
   @@unique([organizationId, repositoryHost, repositoryFullName, headBranch])
-  @@index([organizationId, notFoundAt, recheckAfter])
+  /// The branch-recheck sweep's index, matched to the sweep's query shape:
+  /// `recheckAfter <= now` bounds the scan AND supplies the ordering,
+  /// `lastRequestedAt` cuts the activity horizon in the index, and
+  /// `notFoundAt IS NOT NULL` is checked there too rather than by fetching the
+  /// heap row. Leading with organizationId cannot serve it, because the sweep
+  /// is the one read in this feature with no organization to name.
+  @@index([recheckAfter, lastRequestedAt, notFoundAt])
 }
 
 /// Rebuildable operational state folded from Langy's canonical event stream.

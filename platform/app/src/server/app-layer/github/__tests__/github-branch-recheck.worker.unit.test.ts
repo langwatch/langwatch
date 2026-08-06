@@ -12,6 +12,7 @@ import {
   RECHECK_ACTIVE_WITHIN_MS,
   RECHECK_BATCH_LIMIT,
   runBranchRecheckPass,
+  runBranchRetentionPrune,
 } from "../github-branch-recheck.worker";
 import type {
   GithubBranchCheckRow,
@@ -53,7 +54,9 @@ function repositoryHolding(
     refreshSnapshot: vi.fn(),
     findBranchCheck: vi.fn(),
     upsertBranchCheck: vi.fn(),
+    claimBranchLookup: vi.fn(),
     touchBranchCheckRequestedAt: vi.fn(),
+    deleteStaleBefore: vi.fn(),
     findRecheckDue: vi.fn(async ({ now, activeWithinMs, limit }) =>
       rows
         .filter(
@@ -142,6 +145,36 @@ describe("runBranchRecheckPass", () => {
         repositoryName: "widgets",
         headBranch: "feat/linkage",
       });
+    });
+  });
+});
+
+describe("runBranchRetentionPrune", () => {
+  describe("given rows nobody has asked about", () => {
+    /**
+     * One horizon, not two. A branch outside the sweep's activity window has
+     * already stopped being maintained by the feature, so keeping its
+     * bookkeeping and its pull requests keeps rows that are never read and
+     * never refreshed. Bounding the prune by a knob of its own would let the
+     * two drift into disagreeing about what "abandoned" means.
+     *
+     * @scenario "Linkage rows nobody asks about stop accumulating"
+     */
+    it("prunes at the same horizon the sweep stops sweeping at", async () => {
+      const repository = repositoryHolding([]);
+      repository.deleteStaleBefore = vi
+        .fn()
+        .mockResolvedValue({ branchChecks: 7, pullRequests: 2 });
+
+      const pruned = await runBranchRetentionPrune({
+        repository,
+        now: () => NOW,
+      });
+
+      expect(repository.deleteStaleBefore).toHaveBeenCalledWith({
+        before: new Date(NOW - RECHECK_ACTIVE_WITHIN_MS),
+      });
+      expect(pruned).toEqual({ branchChecks: 7, pullRequests: 2 });
     });
   });
 });

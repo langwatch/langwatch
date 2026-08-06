@@ -37,6 +37,7 @@ import { traced } from "../../tracing";
 import {
   RECHECK_ACTIVE_WITHIN_MS,
   runBranchRecheckPass,
+  runBranchRetentionPrune,
 } from "../github-branch-recheck.worker";
 import { GithubInstallationsService } from "../github-installations.service";
 import { GithubPullRequestMappingService } from "../github-pull-request-mapping.service";
@@ -301,6 +302,55 @@ describe("branch pull-request mapping", () => {
       expect(check?.recheckAfter?.getTime()).toBeGreaterThan(Date.now());
     });
 
+    /**
+     * The workload this feature exists for: several agent worktrees on one
+     * branch, folding within milliseconds of each other. The guard used to be a
+     * read followed by a write, so both sessions read "nothing stored yet"
+     * before either wrote, and both called GitHub. One statement cannot split
+     * that way.
+     *
+     * @scenario "Concurrent sessions on one branch ask GitHub once"
+     */
+    it("asks GitHub once when two sessions map the same branch at the same time", async () => {
+      await seedInstallation();
+      // Held open until both callers have raced the claim, so the second
+      // cannot simply arrive after the first already recorded its answer —
+      // the concurrency has to be real for the test to be about the guard.
+      let releaseGitHub: () => void = () => undefined;
+      const inFlight = new Promise<void>((resolve) => {
+        releaseGitHub = resolve;
+      });
+      const listPullRequestsForHead = vi.fn().mockImplementation(async () => {
+        await inFlight;
+        return [apiPullRequest({ number: 77 })];
+      });
+      const { mapping } = servicesWith({ listPullRequestsForHead });
+      const request = {
+        tenantId: projectId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/concurrent",
+      };
+
+      const both = Promise.all([
+        mapping.requestBranchMapping(request),
+        mapping.requestBranchMapping(request),
+      ]);
+      releaseGitHub();
+      await both;
+
+      expect(listPullRequestsForHead).toHaveBeenCalledTimes(1);
+
+      const stored = await repository.findAllByBranches({
+        organizationId,
+        repositoryHost: "github.com",
+        repositoryFullName: REPO_FULL_NAME,
+        headBranches: ["feat/concurrent"],
+      });
+      expect(stored.map((row) => row.prNumber)).toEqual([77]);
+    });
+
     it("arms the backoff without claiming absence when GitHub rate limits us", async () => {
       await seedInstallation();
       const { mapping } = servicesWith({
@@ -501,6 +551,61 @@ describe("branch pull-request mapping", () => {
           where: { organizationId, headBranch: "feat/elsewhere" },
         }),
       ).toBe(0);
+    });
+  });
+
+  describe("given branches on both sides of the activity horizon", () => {
+    /** @scenario "Linkage rows nobody asks about stop accumulating" */
+    it("prunes the abandoned branch and its pull requests, and keeps the live one", async () => {
+      await seedInstallation();
+      // A distinct pull request per branch: the stored row is unique on the
+      // pull-request NUMBER, so reusing one would move it between branches
+      // instead of leaving one on each.
+      const listPullRequestsForHead = vi
+        .fn()
+        .mockImplementationOnce(async () => [apiPullRequest({ number: 51 })])
+        .mockImplementationOnce(async () => [apiPullRequest({ number: 52 })]);
+      const { mapping } = servicesWith({ listPullRequestsForHead });
+
+      for (const headBranch of ["feat/abandoned", "feat/still-read"]) {
+        await mapping.requestBranchMapping({
+          tenantId: projectId,
+          repositoryHost: "github.com",
+          repositoryOwner: `acme-${tag}`,
+          repositoryName: "widgets",
+          headBranch,
+        });
+      }
+      // Only the abandoned branch falls outside the window; the live one keeps
+      // the `lastRequestedAt` its mapping run just wrote.
+      await prisma.githubBranchPullRequestCheck.updateMany({
+        where: { organizationId, headBranch: "feat/abandoned" },
+        data: {
+          lastRequestedAt: new Date(Date.now() - RECHECK_ACTIVE_WITHIN_MS - 1),
+        },
+      });
+
+      const pruned = await runBranchRetentionPrune({ repository });
+
+      expect(pruned.branchChecks).toBe(1);
+      expect(pruned.pullRequests).toBeGreaterThanOrEqual(1);
+
+      const remainingChecks =
+        await prisma.githubBranchPullRequestCheck.findMany({
+          where: { organizationId },
+          select: { headBranch: true },
+        });
+      expect(remainingChecks.map((row) => row.headBranch)).toEqual([
+        "feat/still-read",
+      ]);
+
+      const remainingPullRequests = await prisma.githubPullRequest.findMany({
+        where: { organizationId },
+        select: { headBranch: true },
+      });
+      expect(remainingPullRequests.map((row) => row.headBranch)).toEqual([
+        "feat/still-read",
+      ]);
     });
   });
 });

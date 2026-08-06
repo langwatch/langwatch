@@ -145,13 +145,48 @@ export interface GithubPullRequestsRepository {
 
   upsertBranchCheck(input: UpsertGithubBranchCheckInput): Promise<void>;
 
-  /** Record that a reader asked about this branch, whether or not we called GitHub. */
+  /**
+   * Take the right to ask GitHub about one branch, atomically. `true` means
+   * this caller holds it; `false` means the stored bookkeeping already answers
+   * the question, or another caller is holding it right now.
+   *
+   * ONE statement, deliberately. Reading the row and then writing it is two,
+   * and two concurrent sessions on one branch — the workload agent worktrees
+   * produce — both read "not yet asked" before either writes, so both call
+   * GitHub. An upsert whose UPDATE carries the claimability predicate cannot
+   * split that way: the loser blocks on the unique index, re-evaluates against
+   * the winner's row and matches nothing.
+   *
+   * The claim arms `recheckAfter` as a short lease, which is the same column
+   * the backoff uses. That is not an overload of its meaning — both say "do not
+   * ask again before this instant" — and the answer overwrites it: a found
+   * branch clears it, an empty one replaces it with the real backoff, and only
+   * a caller that crashed mid-lookup leaves the lease to expire on its own.
+   */
+  claimBranchLookup(params: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    headBranch: string;
+    now: Date;
+    /** How long a branch that already resolved to a pull request is trusted. */
+    freshMappingMs: number;
+    /** How long the claim holds if the lookup never records an answer. */
+    leaseMs: number;
+  }): Promise<boolean>;
+
+  /**
+   * Record that a reader asked about this branch, whether or not we called
+   * GitHub — but only for a row whose `lastRequestedAt` is at or before
+   * `staleBefore`, so a page that reloads every few seconds writes once.
+   */
   touchBranchCheckRequestedAt(params: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;
     headBranch: string;
     lastRequestedAt: Date;
+    staleBefore: Date;
   }): Promise<void>;
 
   /**
@@ -174,6 +209,31 @@ export interface GithubPullRequestsRepository {
     activeWithinMs: number;
     limit: number;
   }): Promise<GithubBranchCheckRow[]>;
+
+  /**
+   * Delete the rows past the activity horizon, and the pull requests they were
+   * the only reason to keep.
+   *
+   * Bounded by the SAME horizon the sweep uses, deliberately rather than by a
+   * retention knob of its own: a branch nobody has asked about in a week has
+   * already dropped out of the sweep, so the feature has already stopped
+   * maintaining it. Keeping the row after that is keeping a row that is never
+   * read and never refreshed, at one row per agent branch per repository — the
+   * shape that turns into millions a year.
+   *
+   * Self-healing, which is what makes the horizon safe to be this short. A
+   * reader asking again re-maps the branch from GitHub and repopulates both
+   * tables; a page that is looked at keeps bumping `lastRequestedAt` and never
+   * reaches the horizon at all.
+   *
+   * Cross-tenant by nature, like the sweep it follows: system-owned
+   * maintenance, so it takes the raw-SQL opt-out the platform's other retention
+   * sweeps take.
+   */
+  deleteStaleBefore(params: { before: Date }): Promise<{
+    branchChecks: number;
+    pullRequests: number;
+  }>;
 }
 
 export class NullGithubPullRequestsRepository
@@ -194,8 +254,17 @@ export class NullGithubPullRequestsRepository
     return null;
   }
   async upsertBranchCheck(): Promise<void> {}
+  async claimBranchLookup(): Promise<boolean> {
+    return false;
+  }
   async touchBranchCheckRequestedAt(): Promise<void> {}
   async findRecheckDue(): Promise<GithubBranchCheckRow[]> {
     return [];
+  }
+  async deleteStaleBefore(): Promise<{
+    branchChecks: number;
+    pullRequests: number;
+  }> {
+    return { branchChecks: 0, pullRequests: 0 };
   }
 }

@@ -174,6 +174,10 @@ import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluati
 import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositories/monitor-performance.clickhouse.repository";
 import { NullMonitorPerformanceRepository } from "./evaluations/repositories/monitor-performance.repository";
 import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter-options.clickhouse.repository";
+import {
+  runBranchRecheckPass,
+  runBranchRetentionPrune,
+} from "./github/github-branch-recheck.worker";
 import { GithubInstallationsService } from "./github/github-installations.service";
 import { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
 import { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
@@ -997,6 +1001,16 @@ export function initializeDefaultApp(options?: {
     GithubPullRequestMappingService["requestBranchMapping"]
   >("requestBranchMapping");
 
+  // The fleet-wide linkage maintenance the scheduled process manager drives.
+  // Late-bound for the same reason: both need the mapping service and its
+  // repository, which are composed further down.
+  const recheckDueBranches = new Deferred<() => Promise<number>>(
+    "recheckDueBranches",
+  );
+  const pruneStaleBranchLinkage = new Deferred<
+    () => Promise<{ branchChecks: number; pullRequests: number }>
+  >("pruneStaleBranchLinkage");
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
@@ -1006,6 +1020,10 @@ export function initializeDefaultApp(options?: {
       pullRequestMapping: {
         requestBranchMapping: (params) => requestBranchMapping.fn(params),
       },
+    },
+    github: {
+      recheckDueBranches: () => recheckDueBranches.fn(),
+      pruneStaleBranchLinkage: () => pruneStaleBranchLinkage.fn(),
     },
     langy: {
       buffer: langyTokenBuffer,
@@ -1272,6 +1290,15 @@ export function initializeDefaultApp(options?: {
   });
   requestBranchMapping.resolve((params) =>
     githubPullRequestMapping!.requestBranchMapping(params),
+  );
+  recheckDueBranches.resolve(() =>
+    runBranchRecheckPass({
+      repository: githubPullRequestsRepository,
+      mapping: githubPullRequestMapping!,
+    }),
+  );
+  pruneStaleBranchLinkage.resolve(() =>
+    runBranchRetentionPrune({ repository: githubPullRequestsRepository }),
   );
 
   const githubPullRequestStatus = new GithubPullRequestStatusService({

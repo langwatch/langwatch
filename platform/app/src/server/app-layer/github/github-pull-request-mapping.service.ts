@@ -40,6 +40,16 @@ export const GITHUB_HOST = "github.com";
 const FRESH_MAPPING_MS = 15 * 60 * 1000;
 
 /**
+ * How long a claim on one branch's lookup holds when nothing records an answer.
+ *
+ * Every path through `mapBranch` after the claim writes the bookkeeping row
+ * again — found, empty, or rate limited — so this only ever expires for a
+ * caller that died mid-lookup. A minute is longer than the GitHub call plus its
+ * retries and short enough that a crashed worker does not park a branch.
+ */
+const LOOKUP_CLAIM_LEASE_MS = 60 * 1000;
+
+/**
  * How long a skipped read waits before it bumps `lastRequestedAt` again. The
  * column only feeds the sweep's "does anyone still care" cut, which is a week
  * wide, so writing it on every read would be a write per page load for no gain.
@@ -197,18 +207,19 @@ export class GithubPullRequestMappingService {
       return;
     }
 
-    if (await this.shouldSkip(scope)) return;
-
     const covering =
       await this.deps.installations.resolveInstallationForRepository({
         organizationId: scope.organizationId,
         repositoryFullName: scope.repositoryFullName,
       });
-    // No installation reaches this repository. Nothing is written: a
-    // bookkeeping row here would arm a backoff against a branch we never
-    // actually asked GitHub about, and the moment the customer connects the
-    // repository the backfill wants to map it immediately.
+    // No installation reaches this repository. Nothing is written, which is why
+    // this is resolved BEFORE the claim: a bookkeeping row here would arm a
+    // backoff against a branch we never actually asked GitHub about, and the
+    // moment the customer connects the repository the backfill wants to map it
+    // immediately.
     if (!covering) return;
+
+    if (!(await this.claimLookup(scope))) return;
 
     try {
       const pullRequests = await this.deps.appTokens.listPullRequestsForHead({
@@ -354,29 +365,32 @@ export class GithubPullRequestMappingService {
   }
 
   /**
-   * Whether the stored bookkeeping already answers this request. A skip still
-   * records that someone asked, throttled, because that is what keeps the
-   * branch inside the sweep's activity window.
+   * Take the right to ask GitHub about this branch, or record that a reader
+   * asked and stand down.
+   *
+   * One atomic write decides it. The read-then-write it replaces had a window
+   * between the two statements wide enough for the workload this feature is
+   * for: several agent worktrees on one branch fold within milliseconds of each
+   * other, both read "nothing stored yet", and both call GitHub. Whichever
+   * caller loses the claim still keeps the branch inside the sweep's activity
+   * window, throttled — that touch is the whole reason a skip writes at all.
    */
-  private async shouldSkip(scope: BranchScope): Promise<boolean> {
-    const existing = await this.deps.repository.findBranchCheck(scope);
-    if (!existing) return false;
+  private async claimLookup(scope: BranchScope): Promise<boolean> {
     const now = nowMs(this.deps);
+    const claimed = await this.deps.repository.claimBranchLookup({
+      ...scope,
+      now: new Date(now),
+      freshMappingMs: FRESH_MAPPING_MS,
+      leaseMs: LOOKUP_CLAIM_LEASE_MS,
+    });
+    if (claimed) return true;
 
-    const withinBackoff =
-      existing.recheckAfter !== null && now < existing.recheckAfter.getTime();
-    const freshlyMapped =
-      existing.prCount > 0 &&
-      now - existing.lastCheckedAt.getTime() < FRESH_MAPPING_MS;
-    if (!withinBackoff && !freshlyMapped) return false;
-
-    if (now - existing.lastRequestedAt.getTime() >= REQUEST_TOUCH_MS) {
-      await this.deps.repository.touchBranchCheckRequestedAt({
-        ...scope,
-        lastRequestedAt: new Date(now),
-      });
-    }
-    return true;
+    await this.deps.repository.touchBranchCheckRequestedAt({
+      ...scope,
+      lastRequestedAt: new Date(now),
+      staleBefore: new Date(now - REQUEST_TOUCH_MS),
+    });
+    return false;
   }
 
   /** Store what GitHub answered, and set the next question's due date. */
@@ -420,8 +434,12 @@ export class GithubPullRequestMappingService {
    * A read that failed. A rate limit arms the same backoff an empty answer
    * would, on `recheckAfter` alone: GitHub refused to answer, which is not the
    * same fact as "this branch has no pull request", and recording it as one
-   * would leave a mapped branch wearing a negative cache. Every other failure
-   * is logged and left entirely alone, so the next fold retries it.
+   * would leave a mapped branch wearing a negative cache.
+   *
+   * Every other failure is logged and its bookkeeping left alone, so the next
+   * fold retries it — once the claim's lease has run out. That wait is the
+   * point: a branch failing for a reason we do not model used to be re-asked on
+   * every single fold commit, which is a retry loop dressed up as enrichment.
    */
   private async recordFailure({
     scope,

@@ -132,6 +132,7 @@ import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-
 import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
+import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
@@ -361,6 +362,22 @@ export interface PipelineRegistryDeps {
      */
     pullRequestMapping: PullRequestMappingReactorDeps;
   };
+  /**
+   * The fleet-wide GitHub linkage maintenance the scheduled process manager
+   * drives. Late-bound for the same reason `codingAgent` is: the mapping
+   * service and its repository are composed after the registry, so presets
+   * passes `Deferred` callable proxies. Omitted where there is no GitHub
+   * connection, in which case the pipeline is not registered at all.
+   */
+  github?: {
+    /** One recheck pass; returns how many branches were re-asked about. */
+    recheckDueBranches: () => Promise<number>;
+    /** One retention pass over the two linkage tables. */
+    pruneStaleBranchLinkage: () => Promise<{
+      branchChecks: number;
+      pullRequests: number;
+    }>;
+  };
 }
 
 /**
@@ -452,6 +469,25 @@ export class PipelineRegistry {
         },
       }),
     );
+
+    // Pull-request linkage maintenance, on the same footing. It used to be a
+    // `setTimeout` chain on every replica with no lock, so the fleet ran the
+    // same cross-tenant scan N times every ten minutes.
+    if (this.deps.github) {
+      const github = this.deps.github;
+      this.deps.eventSourcing.register(
+        createGithubMaintenancePipeline({
+          branchRecheck: {
+            recheck: () => github.recheckDueBranches(),
+            prune: () => github.pruneStaleBranchLinkage(),
+            deleteDispatchedBefore: (params) =>
+              this.deps.repositories.processStore.deleteDispatchedBefore(
+                params,
+              ),
+          },
+        }),
+      );
+    }
 
     const automationCommands = mapCommands(automationPipeline.commands);
     const evalPipeline = this.registerEvaluationPipeline({
