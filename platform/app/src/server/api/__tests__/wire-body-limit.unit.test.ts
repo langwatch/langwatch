@@ -51,11 +51,16 @@ afterAll(() => {
   server.close();
 });
 
-/** POST with a streamed body — node's fetch sends it chunked, no Content-Length. */
-const postChunked = (payload: string) => {
+/**
+ * POST with a streamed body — node's fetch sends it chunked, no Content-Length.
+ * Takes the chunks separately so a test can control how the payload is split.
+ */
+const postChunked = (...payloads: string[]) => {
   const stream = new ReadableStream({
     start(controller) {
-      controller.enqueue(new TextEncoder().encode(payload));
+      for (const payload of payloads) {
+        controller.enqueue(new TextEncoder().encode(payload));
+      }
       controller.close();
     },
   });
@@ -79,6 +84,38 @@ describe("wireBodyLimit over a real @hono/node-server socket", () => {
     it("rejects a body over the cap with 413", async () => {
       const res = await postChunked("a".repeat(MAX_SIZE + 1));
       expect(res.status).toBe(413);
+    });
+
+    it("rejects on the running total when every single chunk fits", async () => {
+      // The cap is cumulative, not per-chunk. Four quarter-cap chunks are each
+      // individually acceptable and together one byte too many — a middleware
+      // that checked each chunk in isolation would let this through, so this
+      // is the case that pins `size += value.length` rather than the
+      // one-oversized-chunk case above.
+      const quarter = MAX_SIZE / 4;
+      const res = await postChunked(
+        "a".repeat(quarter),
+        "a".repeat(quarter),
+        "a".repeat(quarter),
+        "a".repeat(quarter + 1),
+      );
+      expect(res.status).toBe(413);
+    });
+
+    it("accepts a multi-chunk body that totals exactly the cap", async () => {
+      // The boundary from the other side: the same split, one byte smaller,
+      // must arrive whole. Guards against an off-by-one that rejects at the
+      // limit instead of past it, and proves the chunks are reassembled in
+      // order rather than merely counted.
+      const quarter = MAX_SIZE / 4;
+      const res = await postChunked(
+        "a".repeat(quarter),
+        "b".repeat(quarter),
+        "c".repeat(quarter),
+        "d".repeat(quarter),
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ received: MAX_SIZE });
     });
   });
 
