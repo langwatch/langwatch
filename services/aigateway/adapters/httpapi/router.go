@@ -952,6 +952,10 @@ func writeJSONResponse(w http.ResponseWriter, resp *domain.Response) {
 		w.Header().Set(k, v)
 	}
 	w.Header().Set("Content-Type", ct)
+	// A provider must not be able to make its body look LangWatch-authored —
+	// same rule as writeUpstreamError. This lane forwards resp.Headers
+	// wholesale, so an upstream echoing this header must not survive.
+	w.Header().Del(herr.HandledErrorHeader)
 	if resp.StatusCode > 0 {
 		w.WriteHeader(resp.StatusCode)
 	}
@@ -1223,6 +1227,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
 	herr.RegisterStatus(domain.ErrNoProviderConfigured, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrCodexSessionExpired, http.StatusUnauthorized)
 	// Retryable by contract: the control plane failed us, not the caller.
 	// A 5xx keeps client SDKs retrying instead of bubbling a config error.
 	herr.RegisterStatus(domain.ErrAuthUpstream, http.StatusServiceUnavailable)
