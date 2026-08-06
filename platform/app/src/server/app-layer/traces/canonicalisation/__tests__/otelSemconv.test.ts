@@ -236,6 +236,111 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Inference Span — values the GenAI extractor cannot interpret
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("given a gen_ai attribute the extractor cannot coerce", () => {
+    describe("when gen_ai.request.stream is not a boolean", () => {
+      it("keeps the raw value on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.request.stream": "yes",
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.request.stream"]).toBe("yes");
+      });
+    });
+
+    describe("when gen_ai.usage.cached_input_tokens is not a number", () => {
+      it("keeps the raw value on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.usage.cached_input_tokens": "lots",
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.usage.cached_input_tokens"]).toBe(
+          "lots",
+        );
+        expect(
+          result.attributes["gen_ai.usage.cache_read.input_tokens"],
+        ).toBeUndefined();
+      });
+    });
+
+    describe("when gen_ai.usage.reasoning.output_tokens is not a number", () => {
+      it("keeps the raw value on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.usage.reasoning.output_tokens": "many",
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.usage.reasoning.output_tokens"]).toBe(
+          "many",
+        );
+        expect(
+          result.attributes["gen_ai.usage.reasoning_tokens"],
+        ).toBeUndefined();
+      });
+    });
+
+    describe("when gen_ai.response.time_to_first_chunk is not a number", () => {
+      it("keeps the raw value on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": "fast",
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe(
+          "fast",
+        );
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeUndefined();
+      });
+    });
+
+    describe("when the coerced value is rejected by a guard", () => {
+      it("keeps a negative time_to_first_chunk on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": -1,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe(
+          -1,
+        );
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeUndefined();
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — Input messages (parts-based format, v1.38.0)
   // ─────────────────────────────────────────────────────────────────────────
   describe("inference span with parts-based input messages", () => {
