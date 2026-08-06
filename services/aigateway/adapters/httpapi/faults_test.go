@@ -24,10 +24,19 @@ import (
 
 func observedWriteError(t *testing.T, ctx context.Context, err error) *observer.ObservedLogs {
 	t.Helper()
+	_, logs := observedWriteErrorResponse(t, ctx, err)
+	return logs
+}
+
+// observedWriteErrorResponse is observedWriteError's sibling for callers that
+// also need to assert on the response writeError actually produced, not just
+// what it logged.
+func observedWriteErrorResponse(t *testing.T, ctx context.Context, err error) (*httptest.ResponseRecorder, *observer.ObservedLogs) {
+	t.Helper()
 	core, logs := observer.New(zapcore.DebugLevel)
 	w := httptest.NewRecorder()
 	writeError(zap.New(core), w, ctx, err)
-	return logs
+	return w, logs
 }
 
 func requireSingleFailureLog(t *testing.T, logs *observer.ObservedLogs) observer.LoggedEntry {
@@ -195,13 +204,31 @@ func TestWriteErrorDoesNotCountProviderOrPlatformFaults(t *testing.T) {
 	}
 }
 
+// @scenario "A rate-limited caller is not counted as a client reject"
+func TestWriteErrorDoesNotCountRateLimitedRejections(t *testing.T) {
+	// domain.ErrRateLimited is a customer fault by faultForCode — unlike the
+	// provider/platform cases above, this exclusion is specific to this one
+	// code: a key legitimately sustained at its RPM/RPD ceiling would pin
+	// gateway_client_rejects_total and mute the per-key alert it exists for.
+	// The rejection is already carried by gateway_rate_limit_denied_total.
+	rec := gatewaymetrics.New()
+	observedWriteError(t, meteredContext(rec, "vk_ceiling"),
+		herr.New(context.Background(), domain.ErrRateLimited, herr.M{"message": "rpm exceeded"}))
+	assert.Equal(t, 0, clientRejects(t, rec, "rate_limited", "vk_ceiling"))
+	assert.Equal(t, 0, clientRejectSeries(t, rec))
+}
+
 // @scenario "A rejection on an unmetered path is still written"
 func TestWriteErrorWithoutARecorderStillAnswers(t *testing.T) {
+	var w *httptest.ResponseRecorder
 	assert.NotPanics(t, func() {
-		logs := observedWriteError(t, context.Background(),
+		var logs *observer.ObservedLogs
+		w, logs = observedWriteErrorResponse(t, context.Background(),
 			herr.New(context.Background(), domain.ErrBadRequest, herr.M{"message": "no model"}))
 		assert.Equal(t, "customer", requireSingleFailureLog(t, logs).ContextMap()["fault"])
 	})
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), `"code":"bad_request"`)
 }
 
 // @scenario "Failure logs identify the calling project"

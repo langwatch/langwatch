@@ -8891,10 +8891,11 @@ The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the 
 | `gateway_rate_limit_denied_total` | counter | `dimension`, `vk_id` | Requests denied by the virtual-key rate limiter. `dimension` is `rpm` or `rpd` |
 | `gateway_client_rejects_total` | counter | `code`, `vk_id` | Requests **the gateway itself** rejected as the caller's fault after authentication, by gateway error code (`missing_model`, `bad_request`, `model_not_allowed`, `budget_exceeded`, `payload_too_large`, …) and by the virtual key that sent them. These are logged at `info`, so this counter is the only signal that will move when one client loops on a malformed body. Alert on a sustained per-key rate rather than on any single rejection |
 
-Two things this counter deliberately excludes, because both would make a per-key alert on it fire for keys doing nothing wrong:
+Three things this counter deliberately excludes, because all three would make a per-key alert on it fire for keys doing nothing wrong:
 
 - **Authentication failures.** A missing or unresolvable key is rejected before the request has a key to attribute it to. Watch `gateway_http_requests_total{status="401"}` instead.
 - **Provider rejections.** An upstream 4xx (an OpenAI 429, an Anthropic 402) is the caller's fault too, but it is not the gateway rejecting the client — counting it would turn a bad hour at a provider into an alert that reads as client misbehaviour. Those live on `gateway_provider_attempts_total{outcome="rate_limit"}` and the upstream status on `gateway_http_requests_total`.
+- **Gateway rate limiting.** A key legitimately sustained at its RPM/RPD ceiling would otherwise pin this counter too, muting the exact alert it exists for. Watch `gateway_rate_limit_denied_total` instead.
 
 To find a client stuck in a rejection loop, rank by key, then drill into the one that stands out:
 

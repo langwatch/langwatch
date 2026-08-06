@@ -97,15 +97,21 @@ func logRequestError(logger *zap.Logger, ctx context.Context, fault Fault, code 
 
 // recordClientReject counts a rejection the GATEWAY issued against the caller.
 //
-// Scoped to faultForCode deliberately. faultForUpstreamStatus also answers
-// FaultCustomer, for any provider 4xx, so counting every customer fault would
-// put every OpenAI 429 and Anthropic 402 on a counter named "client rejects".
-// A provider having a bad hour would then read as clients looping on malformed
-// bodies, for keys doing nothing wrong, and the per-key alert this metric
-// exists for would be muted with the real signal inside it. Provider
-// rejections are already carried by gateway_provider_attempts_total.
+// Scoped to faultForCode deliberately, with two exclusions on top of that.
+// faultForUpstreamStatus also answers FaultCustomer, for any provider 4xx, so
+// counting every customer fault would put every OpenAI 429 and Anthropic 402
+// on a counter named "client rejects". A provider having a bad hour would
+// then read as clients looping on malformed bodies, for keys doing nothing
+// wrong, and the per-key alert this metric exists for would be muted with the
+// real signal inside it. Provider rejections are already carried by
+// gateway_provider_attempts_total.
+//
+// domain.ErrRateLimited is excluded too, for the same "keys doing nothing
+// wrong" reason: a key legitimately sustained at its RPM/RPD ceiling would
+// pin this counter and mute the alert it exists for, and that rejection is
+// already carried by gateway_rate_limit_denied_total.
 func recordClientReject(ctx context.Context, code herr.Code) {
-	if faultForCode(code) != FaultCustomer {
+	if faultForCode(code) != FaultCustomer || code == domain.ErrRateLimited {
 		return
 	}
 	virtualKeyID := ""
