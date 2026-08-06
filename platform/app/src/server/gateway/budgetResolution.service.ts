@@ -31,7 +31,18 @@ import type { GatewayBudget, Prisma, PrismaClient } from "@prisma/client";
 
 export type BudgetResolutionTarget = {
   organizationId: string;
+  /**
+   * The team the request's traces land in. Callers pass only this one; the
+   * teams the key is itself scoped to are read here, from the key, so
+   * every path gets them without plumbing (see `keyTeamScopeIds`).
+   */
   teamId?: string | null;
+  /**
+   * The teams the key is scoped to, when the caller already knows them.
+   * Omit it and they are read from the key. The draft-key path passes them
+   * explicitly because the key it is previewing does not exist yet.
+   */
+  scopedTeamIds?: string[] | null;
   projectId?: string | null;
   virtualKeyId?: string | null;
   principalUserId?: string | null;
@@ -80,8 +91,23 @@ export async function resolveApplicableBudgets(
   if (target.virtualKeyId) {
     ors.push({ scopeType: "VIRTUAL_KEY", scopeId: target.virtualKeyId });
   }
-  if (target.teamId) {
-    ors.push({ scopeType: "TEAM", scopeId: target.teamId });
+  // A request belongs to the team its traces land in AND to every team its
+  // key is scoped to. Those two differ whenever the key is not scoped to
+  // exactly one project, because the trace project then falls back to the
+  // organization's governance project: a team-scoped key reported the
+  // governance team, and a budget on the team that owns the key matched
+  // nothing while both sides looked correctly configured.
+  //
+  // Reading the key's scopes here rather than making every caller pass
+  // them is what puts the fix on all four paths at once, the debit path
+  // included, and that is the one that actually accrues spend.
+  const teamIds = presentIds([
+    target.teamId,
+    ...(target.scopedTeamIds ??
+      (await keyTeamScopeIds(client, target.virtualKeyId))),
+  ]);
+  if (teamIds.length > 0) {
+    ors.push({ scopeType: "TEAM", scopeId: { in: teamIds } });
   }
   if (target.projectId) {
     ors.push({ scopeType: "PROJECT", scopeId: target.projectId });
@@ -90,9 +116,7 @@ export async function resolveApplicableBudgets(
   // ATTRIBUTED_USER templates anchor on a virtual key or a project: the
   // template applies to every request on its anchor, whoever the end user
   // turns out to be.
-  const templateAnchors = [target.virtualKeyId, target.projectId].filter(
-    (id): id is string => typeof id === "string" && id.length > 0,
-  );
+  const templateAnchors = presentIds([target.virtualKeyId, target.projectId]);
   if (templateAnchors.length > 0) {
     ors.push({
       scopeType: "ATTRIBUTED_USER",
@@ -159,6 +183,36 @@ export async function resolveApplicableBudgets(
   });
 
   return resolved.sort(byScopeThenId);
+}
+
+/** The ids actually worth querying: present, non-empty, and each asked for once. */
+function presentIds(
+  ids: (string | null | undefined)[] | null | undefined,
+): string[] {
+  if (!ids) return [];
+  return Array.from(
+    new Set(
+      ids.filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  );
+}
+
+/**
+ * The teams a key is scoped to. Empty when there is no key in context,
+ * which is the draft path before the key exists; that caller passes
+ * `scopedTeamIds` instead so the drawer previews the same set the key will
+ * resolve once it is saved.
+ */
+async function keyTeamScopeIds(
+  client: PrismaLike,
+  virtualKeyId: string | null | undefined,
+): Promise<string[]> {
+  if (!virtualKeyId) return [];
+  const scopes = await client.virtualKeyScope.findMany({
+    where: { virtualKeyId, scopeType: "TEAM" },
+    select: { scopeId: true },
+  });
+  return scopes.map((scope) => scope.scopeId);
 }
 
 /**

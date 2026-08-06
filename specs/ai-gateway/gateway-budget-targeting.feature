@@ -203,3 +203,56 @@ Feature: Gateway budget targeting
     Then that user's current-period spend reads as zero
     And the other user's spend is unchanged
     And the template's own boundary did not move
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # A budget reaches the traffic it names
+  # ────────────────────────────────────────────────────────────────────────────
+  #
+  # Which team and project a request belongs to used to be read entirely
+  # from where its traces land. That answers a different question, and for
+  # a key that is not scoped to exactly one project it lands on the
+  # organization's governance project. A team-scoped key therefore reported
+  # the governance team, and a budget on the team that owns the key matched
+  # nothing while both sides looked correctly configured.
+
+  @unit
+  Scenario: A key belongs to the teams it is scoped to
+    Given a key scoped to team "platform" with no trace project of its own
+    When the key's attribution scopes are resolved
+    Then they include team "platform"
+    And they still include the team its traces land in
+    # Attribution is a set, not a single answer, so making it correct can
+    # only add budgets that now match and can never stop one from matching.
+
+  @integration
+  Scenario: A team budget reaches a team-scoped key's traffic
+    Given team "platform" has a budget and a key scoped to that team
+    When the key completes a request
+    Then the team budget records the spend
+    # The configuration a customer would reach for first, which until now
+    # accrued nothing at all.
+
+  @integration @unimplemented
+  Scenario: A budget no active key can reach is refused when it is created
+    Given an organization whose keys all send traffic elsewhere
+    When an admin creates a budget on a project none of them reach
+    Then the budget is refused as unreachable
+    And the refusal names where the organization's traffic actually goes
+    # A budget that can never accrue is a silent failure with a bill
+    # attached. Say so at the moment it is written.
+
+  @integration @unimplemented
+  Scenario: An admin can still create a budget before any key exists
+    Given an organization with no active keys
+    When an admin creates a budget on one of its projects
+    Then the budget is created
+    # Budget first, key second is the natural setup order, so an empty
+    # organization must never be told its budget is unreachable.
+
+  @integration @unimplemented
+  Scenario: An admin can insist on a budget that nothing reaches yet
+    Given an organization whose keys all send traffic elsewhere
+    When an admin creates an unreachable budget and asks to keep it anyway
+    Then the budget is created
+    # Provisioning ahead of the keys that will use it is legitimate; the
+    # refusal is a guardrail, not a prohibition.

@@ -6,14 +6,15 @@ import {
 
 /**
  * Resolution unit over a stubbed Prisma: the queries this service runs are
- * findMany over budgets and group memberships, so a two-method stub is the
- * whole database.
+ * findMany over budgets, group memberships, and the key's own team scopes,
+ * so a small stub is the whole database.
  */
-function prismaStub(budgets: unknown[]) {
+function prismaStub(budgets: unknown[], teamScopes: unknown[] = []) {
   return {
     gatewayBudget: { findMany: vi.fn().mockResolvedValue(budgets) },
     groupMember: { findMany: vi.fn().mockResolvedValue([]) },
     group: { findMany: vi.fn().mockResolvedValue([]) },
+    virtualKeyScope: { findMany: vi.fn().mockResolvedValue(teamScopes) },
   } as never;
 }
 

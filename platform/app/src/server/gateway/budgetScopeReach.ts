@@ -25,7 +25,13 @@ import { resolveTraceProject } from "./scopeResolver";
  */
 type KeyReach = {
   organizationId: string;
-  teamId: string | null;
+  /**
+   * The team the key's traces land in, plus every team the key is scoped
+   * to. Both count, and they differ whenever the trace project falls back
+   * to governance, which is what used to make a team-scoped key look like
+   * it belonged to the governance team and nothing else.
+   */
+  teamIds: string[];
   projectId: string | null;
   virtualKeyId: string;
   principalUserId: string | null;
@@ -75,7 +81,16 @@ async function loadKeyReach(
     const traceProject = await resolveTraceProject(prisma, key);
     reach.push({
       organizationId: key.organizationId,
-      teamId: traceProject?.teamId ?? null,
+      teamIds: Array.from(
+        new Set(
+          [
+            traceProject?.teamId,
+            ...key.scopes
+              .filter((scope) => scope.scopeType === "TEAM")
+              .map((scope) => scope.scopeId),
+          ].filter((id): id is string => typeof id === "string" && id !== ""),
+        ),
+      ),
       projectId: traceProject?.id ?? null,
       virtualKeyId: key.id,
       principalUserId: key.principalUserId,
@@ -124,7 +139,7 @@ function budgetMatchesKey(budget: GatewayBudget, key: KeyReach): boolean {
     case "ORGANIZATION":
       return budget.scopeId === key.organizationId;
     case "TEAM":
-      return budget.scopeId === key.teamId;
+      return key.teamIds.includes(budget.scopeId);
     case "PROJECT":
       return budget.scopeId === key.projectId;
     case "VIRTUAL_KEY":
