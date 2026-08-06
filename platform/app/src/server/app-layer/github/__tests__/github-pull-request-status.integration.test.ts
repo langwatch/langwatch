@@ -20,6 +20,7 @@ import {
   vi,
 } from "vitest";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   startTestContainers,
   stopTestContainers,
@@ -127,9 +128,11 @@ beforeEach(async () => {
 afterAll(async () => {
   if (redis && organizationId) await redis.del(cacheKey());
   if (organizationId) {
-    await prisma.githubPullRequest.deleteMany({ where: { organizationId } });
-    await prisma.githubInstallation.deleteMany({ where: { organizationId } });
-    await prisma.organization.delete({ where: { id: organizationId } });
+    await cleanupTestRows(prisma, [
+      ["githubPullRequest", { organizationId }],
+      ["githubInstallation", { organizationId }],
+      ["organization", { id: organizationId }],
+    ]);
   }
   await stopTestContainers();
 });

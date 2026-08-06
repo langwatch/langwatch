@@ -25,6 +25,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { batchScopePermissions, type Permission } from "~/server/api/rbac";
 import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   startTestContainers,
   stopTestContainers,
@@ -278,13 +279,15 @@ afterAll(async () => {
     }
   }
   if (organizationId) {
-    await prisma.githubPullRequest.deleteMany({ where: { organizationId } });
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.customRole.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.project.deleteMany({ where: { teamId } });
-    await prisma.team.delete({ where: { id: teamId } });
-    await prisma.organization.delete({ where: { id: organizationId } });
+    await cleanupTestRows(prisma, [
+      ["githubPullRequest", { organizationId }],
+      ["roleBinding", { organizationId }],
+      ["customRole", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["project", { teamId }],
+      ["team", { id: teamId }],
+      ["organization", { id: organizationId }],
+    ]);
   }
   if (userId) await prisma.user.delete({ where: { id: userId } });
   await stopTestContainers();

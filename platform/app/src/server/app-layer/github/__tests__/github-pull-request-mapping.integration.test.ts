@@ -22,6 +22,7 @@ import {
   vi,
 } from "vitest";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   startTestContainers,
   stopTestContainers,
@@ -184,22 +185,22 @@ beforeAll(async () => {
 }, 60_000);
 
 beforeEach(async () => {
-  await prisma.githubPullRequest.deleteMany({ where: { organizationId } });
-  await prisma.githubBranchPullRequestCheck.deleteMany({
-    where: { organizationId },
-  });
+  await cleanupTestRows(prisma, [
+    ["githubPullRequest", { organizationId }],
+    ["githubBranchPullRequestCheck", { organizationId }],
+  ]);
 });
 
 afterAll(async () => {
   if (organizationId) {
-    await prisma.githubPullRequest.deleteMany({ where: { organizationId } });
-    await prisma.githubBranchPullRequestCheck.deleteMany({
-      where: { organizationId },
-    });
-    await prisma.githubInstallation.deleteMany({ where: { organizationId } });
-    await prisma.project.deleteMany({ where: { team: { organizationId } } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.organization.delete({ where: { id: organizationId } });
+    await cleanupTestRows(prisma, [
+      ["githubPullRequest", { organizationId }],
+      ["githubBranchPullRequestCheck", { organizationId }],
+      ["githubInstallation", { organizationId }],
+      ["project", { team: { organizationId } }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+    ]);
   }
   if (ch && projectId) {
     await ch.exec({

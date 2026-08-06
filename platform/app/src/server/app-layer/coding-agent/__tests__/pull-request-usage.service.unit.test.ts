@@ -8,8 +8,8 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { traced } from "../../tracing";
 import type { GithubPullRequestRow } from "../../github/repositories/github-pull-requests.repository";
+import { traced } from "../../tracing";
 import { PullRequestUsageService } from "../pull-request-usage.service";
 import type { CodingAgentBranchSessionRow } from "../repositories/coding-agent-session.repository";
 
