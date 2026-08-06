@@ -84,16 +84,10 @@ const missingModelDescriptions = {
   passthrough: "Put the model in the Gemini request URL, then try again.",
 } as const satisfies Record<MissingModelRequestType, string>;
 
-const describeMissingModel = (error: HandledErrorShape): string => {
-  const requestType = error.meta.request_type;
-  if (
-    typeof requestType === "string" &&
-    Object.hasOwn(missingModelDescriptions, requestType)
-  ) {
-    return missingModelDescriptions[requestType as MissingModelRequestType];
-  }
-  return "Set the model where this endpoint expects it, then try again.";
-};
+const describeMissingModel = (error: HandledErrorShape): string =>
+  (missingModelDescriptions as Record<string, string>)[
+    str(error, "request_type", "")
+  ] ?? "Set the model where this endpoint expects it, then try again.";
 
 /**
  * Whether any code in the error's reason chain (depth-first, nested included)
