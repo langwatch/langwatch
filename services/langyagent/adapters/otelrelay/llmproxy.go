@@ -207,6 +207,7 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 				}
 				// Gateway envelopes deliberately carry no HTTP status.
 				e.Meta["http_status"] = resp.StatusCode
+				scrubUpstreamRelayedProse(&e)
 			}
 			entry.setLLMError(e)
 			// A 429 is retryable by the worker SDK's book, which is right for a
@@ -482,6 +483,27 @@ func firstHandledReasonCode(e herr.E) herr.Code {
 		}
 	}
 	return e.Code
+}
+
+// upstreamRelayCodes carry a message classifyBifrostError built from the
+// provider's own error text — typed (gateway-authored, marker-verified)
+// but not OUR prose, so it must not reach the customer turn span.
+var upstreamRelayCodes = map[herr.Code]bool{
+	"provider_error":   true,
+	"provider_timeout": true,
+	"rate_limited":     true,
+	"chain_exhausted":  true,
+}
+
+// scrubUpstreamRelayedProse deletes the upstream-derived message (and any
+// tips) from a typed envelope whose top-level code relays provider text,
+// so the relay never trusts what the gateway itself only forwarded.
+func scrubUpstreamRelayedProse(e *herr.E) {
+	if !upstreamRelayCodes[e.Code] {
+		return
+	}
+	delete(e.Meta, "message")
+	delete(e.Meta, "tips")
 }
 
 // isGatewayEnvelope reports whether a failed response body is the gateway's

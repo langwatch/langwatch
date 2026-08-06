@@ -3,6 +3,7 @@ package otelrelay
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -196,6 +197,75 @@ func TestDecodeLLMErrorBody_TrustsOnlyMarkedHandledEnvelopes(t *testing.T) {
 	})
 }
 
+// @scenario "Upstream-relayed prose is scrubbed from marked provider_error envelopes"
+func TestLLMProxy_ScrubsUpstreamRelayedProseFromMarkedEnvelopes(t *testing.T) {
+	newGateway := func(status int, body string, handledCode string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set(herr.HandledErrorHeader, handledCode)
+			w.WriteHeader(status)
+			_, _ = io.WriteString(w, body)
+		}))
+	}
+
+	t.Run("when a marked provider_error envelope carries upstream text", func(t *testing.T) {
+		secret := "sk-proj-do-not-record"
+		body := `{"error":{"type":"provider_error","code":"provider_error","message":"upstream said: ` + secret + `"}}`
+		gateway := newGateway(http.StatusBadGateway, body, "provider_error")
+		defer gateway.Close()
+
+		relay := startRelay(t)
+		token, _ := relay.Register(WorkerInfo{ConversationID: "c", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+		relay.SetTurnContext(token, turnContext())
+
+		resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+		if err != nil {
+			t.Fatalf("proxied LLM call: %v", err)
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+
+		e, ok := relay.LastLLMError(token)
+		if !ok {
+			t.Fatal("LastLLMError must expose the captured herr")
+		}
+		if e.Code != "provider_error" {
+			t.Fatalf("captured code = %q, want provider_error", e.Code)
+		}
+		if msg, ok := e.Meta["message"]; ok {
+			t.Errorf("upstream-relayed message survived scrub: %v", msg)
+		}
+		if _, ok := e.Meta["http_status"]; !ok {
+			t.Error("http_status must survive the scrub")
+		}
+	})
+
+	t.Run("when a marked missing_model envelope keeps its message", func(t *testing.T) {
+		body := `{"error":{"type":"missing_model","code":"missing_model","message":"Choose a model."}}`
+		gateway := newGateway(http.StatusBadRequest, body, "missing_model")
+		defer gateway.Close()
+
+		relay := startRelay(t)
+		token, _ := relay.Register(WorkerInfo{ConversationID: "c", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+		relay.SetTurnContext(token, turnContext())
+
+		resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+		if err != nil {
+			t.Fatalf("proxied LLM call: %v", err)
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+
+		e, ok := relay.LastLLMError(token)
+		if !ok {
+			t.Fatal("LastLLMError must expose the captured herr")
+		}
+		if e.Meta["message"] != "Choose a model." {
+			t.Errorf("captured message = %v, want the gateway's own copy preserved", e.Meta["message"])
+		}
+	})
+}
+
 // @scenario "Untrusted provider prose never enters relay logs"
 func TestLLMProxy_LogsOnlyTheHandledClassification(t *testing.T) {
 	secret := "sk-proj-do-not-record"
@@ -225,20 +295,32 @@ func TestLLMProxy_LogsOnlyTheHandledClassification(t *testing.T) {
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
 
-	entries := logs.FilterMessage("otelrelay llm error normalized as handled upstream error").All()
-	if len(entries) != 1 {
-		t.Fatalf("normalization logged %d times, want 1", len(entries))
+	normalized := logs.FilterMessage("otelrelay llm error normalized as handled upstream error").All()
+	if len(normalized) != 1 {
+		t.Fatalf("normalization logged %d times, want 1", len(normalized))
 	}
-	fields := entries[0].ContextMap()
+	fields := normalized[0].ContextMap()
 	if fields["upstream_code"] != "invalid_api_key" || fields["body_kind"] != "json" {
 		t.Errorf("safe fields = %#v", fields)
-	}
-	if serialized := entries[0].Message + entries[0].ContextMap()["upstream_code"].(string); strings.Contains(serialized, secret) {
-		t.Fatal("provider credential entered relay logs")
 	}
 	for _, forbidden := range []string{"upstream_message", "raw_body_snippet", "html_title", "html_excerpt"} {
 		if _, ok := fields[forbidden]; ok {
 			t.Errorf("unsafe field %q was logged", forbidden)
+		}
+	}
+
+	// The two checks above only look at the fields the normalization log line
+	// is documented to carry. Scan every entry the relay logged for this call
+	// — message and every context value — so a secret introduced through a
+	// different field or a different log line still fails this test.
+	for _, entry := range logs.All() {
+		if strings.Contains(entry.Message, secret) {
+			t.Errorf("secret leaked in log message %q", entry.Message)
+		}
+		for key, value := range entry.ContextMap() {
+			if strings.Contains(fmt.Sprint(value), secret) {
+				t.Errorf("secret leaked in log field %q: %v", key, value)
+			}
 		}
 	}
 }
