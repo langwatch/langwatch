@@ -182,6 +182,13 @@ describe("Origin validation", () => {
     ).toContain("mcp-session-id");
   });
 
+  it("sets the sniffing and framing headers a browser-reachable server needs", async () => {
+    const response = await fetch(`${harness.baseUrl}/health`);
+
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+  });
+
   it("rejects the preflight for an unlisted origin", async () => {
     const response = await fetch(`${harness.baseUrl}/mcp`, {
       method: "OPTIONS",
@@ -343,6 +350,49 @@ describe("Session id is not a credential", () => {
       },
     });
     expect(authorized.status).toBe(200);
+  });
+
+  it("accepts a lowercase bearer scheme, which RFC 7235 allows", async () => {
+    const sessionId = await openSession(harness.baseUrl);
+
+    const response = await fetch(`${harness.baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        ...MCP_POST_HEADERS,
+        "mcp-session-id": sessionId,
+        Authorization: `bearer ${VALID_KEY}`,
+      },
+      body: toolsListBody(),
+    });
+
+    expect(response.status).toBe(200);
+    await response.text();
+  });
+
+  it("does not reveal whether another key's session exists", async () => {
+    const sessionId = await openSession(harness.baseUrl, VALID_KEY);
+
+    const someoneElses = await fetch(`${harness.baseUrl}/mcp`, {
+      method: "DELETE",
+      headers: {
+        "mcp-session-id": sessionId,
+        Authorization: `Bearer ${OTHER_VALID_KEY}`,
+      },
+    });
+
+    const neverExisted = await fetch(`${harness.baseUrl}/mcp`, {
+      method: "DELETE",
+      headers: {
+        "mcp-session-id": "00000000-0000-0000-0000-000000000000",
+        Authorization: `Bearer ${OTHER_VALID_KEY}`,
+      },
+    });
+
+    // Same status for "not yours" and "does not exist", so the response is not
+    // an existence oracle for session ids.
+    expect(someoneElses.status).toBe(404);
+    expect(neverExisted.status).toBe(404);
+    expect(await someoneElses.json()).toEqual(await neverExisted.json());
   });
 
   it("rejects a different valid key reusing someone else's session", async () => {

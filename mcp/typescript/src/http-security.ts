@@ -54,7 +54,9 @@ const ALWAYS_ALLOWED_ORIGIN_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
  * a usable origin, including the opaque `null` origin sent by sandboxed frames
  * and `file://` pages.
  */
-function normalizeOrigin(origin: string): string | null {
+function normalizeOrigin(
+  origin: string
+): { origin: string; hostname: string } | null {
   let parsed: URL;
   try {
     parsed = new URL(origin.trim());
@@ -62,7 +64,10 @@ function normalizeOrigin(origin: string): string | null {
     return null;
   }
   if (parsed.origin === "null") return null;
-  return parsed.origin;
+  return {
+    origin: parsed.origin,
+    hostname: stripBrackets(parsed.hostname.toLowerCase()),
+  };
 }
 
 /** Parses a comma separated origin list into normalized origins. */
@@ -70,8 +75,8 @@ export function parseAllowedOrigins(raw: string | undefined | null): string[] {
   if (!raw) return [];
   const parsed = raw
     .split(",")
-    .map((entry) => normalizeOrigin(entry))
-    .filter((entry): entry is string => entry !== null);
+    .map((entry) => normalizeOrigin(entry)?.origin)
+    .filter((entry): entry is string => entry !== undefined);
   return [...new Set(parsed)];
 }
 
@@ -80,17 +85,19 @@ export function parseAllowedOrigins(raw: string | undefined | null): string[] {
  * origins always pass; everything else has to be configured explicitly. There
  * is deliberately no wildcard: an operator who needs a remote origin lists it.
  */
-export function isOriginAllowed(
-  origin: string,
-  allowedOrigins: readonly string[]
-): boolean {
+export function isOriginAllowed({
+  origin,
+  allowedOrigins,
+}: {
+  origin: string;
+  allowedOrigins: readonly string[];
+}): boolean {
   const normalized = normalizeOrigin(origin);
   if (!normalized) return false;
 
-  const hostname = stripBrackets(new URL(normalized).hostname.toLowerCase());
-  if (ALWAYS_ALLOWED_ORIGIN_HOSTS.has(hostname)) return true;
+  if (ALWAYS_ALLOWED_ORIGIN_HOSTS.has(normalized.hostname)) return true;
 
-  return allowedOrigins.includes(normalized);
+  return allowedOrigins.includes(normalized.origin);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,14 +113,24 @@ export function hashApiKey(apiKey: string): string {
 }
 
 /** Constant-time API key comparison over fixed-length digests. */
-export function apiKeysMatch(a: string, b: string): boolean {
-  const left = createHash("sha256").update(a).digest();
-  const right = createHash("sha256").update(b).digest();
-  return timingSafeEqual(left, right);
+export function apiKeysMatch({
+  presentedKey,
+  expectedKey,
+}: {
+  presentedKey: string;
+  expectedKey: string;
+}): boolean {
+  const presented = createHash("sha256").update(presentedKey).digest();
+  const expected = createHash("sha256").update(expectedKey).digest();
+  return timingSafeEqual(presented, expected);
 }
 
 // ---------------------------------------------------------------------------
-// Rate limiter (sliding window per IP)
+// Rate limiter (fixed window per client address)
+//
+// Counts reset in whole windows rather than sliding, so a burst straddling a
+// window boundary can reach twice maxRequests. That is acceptable for the
+// failed-authentication and OAuth limits this backs.
 // ---------------------------------------------------------------------------
 
 export interface RateLimiter {
@@ -188,12 +205,14 @@ export function createApiKeyVerifier({
   positiveTtlMs = 60_000,
   negativeTtlMs = 30_000,
   maxEntries = 10_000,
+  requestTimeoutMs = 5_000,
   fetchImpl = fetch,
 }: {
   endpoint: string;
   positiveTtlMs?: number;
   negativeTtlMs?: number;
   maxEntries?: number;
+  requestTimeoutMs?: number;
   fetchImpl?: typeof fetch;
 }): ApiKeyVerifier {
   const cache = new Map<string, { valid: boolean; expiresAt: number }>();
@@ -228,6 +247,10 @@ export function createApiKeyVerifier({
       response = await fetchImpl(`${endpoint}${VERIFY_PATH}`, {
         method: "GET",
         headers: { "X-Auth-Token": apiKey },
+        // An upstream that accepts the connection and never answers would
+        // otherwise leave the in-flight promise unsettled, parking every
+        // request for this key behind it until the socket dies.
+        signal: AbortSignal.timeout(requestTimeoutMs),
       });
     } catch {
       return null;
@@ -290,7 +313,7 @@ export interface SessionRecord<TTransport> {
 
 export interface SessionStore<TTransport> {
   get(sessionId: string): SessionRecord<TTransport> | undefined;
-  add(sessionId: string, transport: TTransport, apiKey: string): void;
+  add(args: { sessionId: string; transport: TTransport; apiKey: string }): void;
   /** Marks a session as active so the reaper leaves it alone. */
   touch(sessionId: string): void;
   /** Removes a session without closing its transport. */
@@ -332,7 +355,7 @@ export function createSessionStore<TTransport>({
     get(sessionId) {
       return sessions.get(sessionId);
     },
-    add(sessionId, transport, apiKey) {
+    add({ sessionId, transport, apiKey }) {
       const existing = sessions.get(sessionId);
       if (existing) drop(sessionId, existing);
 

@@ -65,51 +65,51 @@ describe("isOriginAllowed", () => {
     "http://[::1]:3000",
     "https://localhost",
   ])("always allows the loopback origin %s", (origin) => {
-    expect(isOriginAllowed(origin, [])).toBe(true);
+    expect(isOriginAllowed({ origin, allowedOrigins: [] })).toBe(true);
   });
 
   it("rejects an unlisted remote origin", () => {
-    expect(isOriginAllowed("https://evil.test", [])).toBe(false);
+    expect(isOriginAllowed({ origin: "https://evil.test", allowedOrigins: [] })).toBe(false);
   });
 
   it("allows a configured remote origin", () => {
-    expect(isOriginAllowed("https://app.test", ["https://app.test"])).toBe(
+    expect(isOriginAllowed({ origin: "https://app.test", allowedOrigins: ["https://app.test"] })).toBe(
       true
     );
   });
 
   it("matches on scheme, host and port together", () => {
     const allowlist = ["https://app.test"];
-    expect(isOriginAllowed("http://app.test", allowlist)).toBe(false);
-    expect(isOriginAllowed("https://app.test:8443", allowlist)).toBe(false);
-    expect(isOriginAllowed("https://other.test", allowlist)).toBe(false);
+    expect(isOriginAllowed({ origin: "http://app.test", allowedOrigins: allowlist })).toBe(false);
+    expect(isOriginAllowed({ origin: "https://app.test:8443", allowedOrigins: allowlist })).toBe(false);
+    expect(isOriginAllowed({ origin: "https://other.test", allowedOrigins: allowlist })).toBe(false);
   });
 
   it("does not let a hostname that merely ends in localhost through", () => {
-    expect(isOriginAllowed("https://notlocalhost", [])).toBe(false);
-    expect(isOriginAllowed("https://evil-localhost.test", [])).toBe(false);
+    expect(isOriginAllowed({ origin: "https://notlocalhost", allowedOrigins: [] })).toBe(false);
+    expect(isOriginAllowed({ origin: "https://evil-localhost.test", allowedOrigins: [] })).toBe(false);
   });
 
   it("rejects the opaque null origin", () => {
-    expect(isOriginAllowed("null", [])).toBe(false);
+    expect(isOriginAllowed({ origin: "null", allowedOrigins: [] })).toBe(false);
   });
 
   it("treats a rebound attacker hostname as unlisted", () => {
     // DNS rebinding points an attacker hostname at loopback, but the browser
     // still sends the attacker hostname as the origin.
-    expect(isOriginAllowed("http://rebind.attacker.test", [])).toBe(false);
+    expect(isOriginAllowed({ origin: "http://rebind.attacker.test", allowedOrigins: [] })).toBe(false);
   });
 });
 
 describe("apiKeysMatch", () => {
   it("matches identical keys", () => {
-    expect(apiKeysMatch("sk-abc", "sk-abc")).toBe(true);
+    expect(apiKeysMatch({ presentedKey: "sk-abc", expectedKey: "sk-abc" })).toBe(true);
   });
 
   it("rejects different keys, including different lengths", () => {
-    expect(apiKeysMatch("sk-abc", "sk-abd")).toBe(false);
-    expect(apiKeysMatch("sk-abc", "sk-abc-longer")).toBe(false);
-    expect(apiKeysMatch("", "sk-abc")).toBe(false);
+    expect(apiKeysMatch({ presentedKey: "sk-abc", expectedKey: "sk-abd" })).toBe(false);
+    expect(apiKeysMatch({ presentedKey: "sk-abc", expectedKey: "sk-abc-longer" })).toBe(false);
+    expect(apiKeysMatch({ presentedKey: "", expectedKey: "sk-abc" })).toBe(false);
   });
 });
 
@@ -283,6 +283,23 @@ describe("createApiKeyVerifier", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it("gives up on an upstream that never answers", async () => {
+    // Without a timeout the in-flight promise never settles and every request
+    // for this key parks behind it until the socket dies.
+    const verifier = createApiKeyVerifier({
+      endpoint: "https://app.langwatch.ai",
+      requestTimeoutMs: 20,
+      fetchImpl: ((_url: string, init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new Error("aborted"))
+          );
+        })) as unknown as typeof fetch,
+    });
+
+    await expect(verifier.verify("sk-real")).resolves.toBe(false);
+  });
+
   it("fails closed when the request throws", async () => {
     const verifier = createApiKeyVerifier({
       endpoint: "https://app.langwatch.ai",
@@ -332,7 +349,7 @@ describe("createSessionStore", () => {
 
   it("stores and returns sessions bound to their key", () => {
     const { store } = makeStore();
-    store.add("s1", { id: "s1" }, "sk-a");
+    store.add({ sessionId: "s1", transport: { id: "s1" }, apiKey: "sk-a" });
 
     expect(store.get("s1")?.apiKey).toBe("sk-a");
     expect(store.size).toBe(1);
@@ -340,9 +357,9 @@ describe("createSessionStore", () => {
 
   it("counts live sessions per key without holding the raw key", () => {
     const { store } = makeStore();
-    store.add("s1", { id: "s1" }, "sk-a");
-    store.add("s2", { id: "s2" }, "sk-a");
-    store.add("s3", { id: "s3" }, "sk-b");
+    store.add({ sessionId: "s1", transport: { id: "s1" }, apiKey: "sk-a" });
+    store.add({ sessionId: "s2", transport: { id: "s2" }, apiKey: "sk-a" });
+    store.add({ sessionId: "s3", transport: { id: "s3" }, apiKey: "sk-b" });
 
     expect(store.countForKey("sk-a")).toBe(2);
     expect(store.countForKey("sk-b")).toBe(1);
@@ -351,8 +368,8 @@ describe("createSessionStore", () => {
 
   it("decrements the per-key count when a session is removed", () => {
     const { store } = makeStore();
-    store.add("s1", { id: "s1" }, "sk-a");
-    store.add("s2", { id: "s2" }, "sk-a");
+    store.add({ sessionId: "s1", transport: { id: "s1" }, apiKey: "sk-a" });
+    store.add({ sessionId: "s2", transport: { id: "s2" }, apiKey: "sk-a" });
 
     store.remove("s1");
     expect(store.countForKey("sk-a")).toBe(1);
@@ -363,7 +380,7 @@ describe("createSessionStore", () => {
 
   it("ignores removal of a session it does not hold", () => {
     const { store } = makeStore();
-    store.add("s1", { id: "s1" }, "sk-a");
+    store.add({ sessionId: "s1", transport: { id: "s1" }, apiKey: "sk-a" });
 
     store.remove("never-existed");
     store.remove("never-existed");
@@ -375,8 +392,8 @@ describe("createSessionStore", () => {
     vi.useFakeTimers();
     try {
       const { store, closed } = makeStore(1_000);
-      store.add("idle", { id: "idle" }, "sk-a");
-      store.add("busy", { id: "busy" }, "sk-a");
+      store.add({ sessionId: "idle", transport: { id: "idle" }, apiKey: "sk-a" });
+      store.add({ sessionId: "busy", transport: { id: "busy" }, apiKey: "sk-a" });
 
       vi.advanceTimersByTime(900);
       store.touch("busy");
@@ -394,8 +411,8 @@ describe("createSessionStore", () => {
 
   it("closes everything on shutdown", () => {
     const { store, closed } = makeStore();
-    store.add("s1", { id: "s1" }, "sk-a");
-    store.add("s2", { id: "s2" }, "sk-b");
+    store.add({ sessionId: "s1", transport: { id: "s1" }, apiKey: "sk-a" });
+    store.add({ sessionId: "s2", transport: { id: "s2" }, apiKey: "sk-b" });
 
     store.closeAll();
 
@@ -410,7 +427,7 @@ describe("createSessionStore", () => {
     expect(store.get("__proto__")).toBeUndefined();
     expect(store.get("constructor")).toBeUndefined();
 
-    store.add("__proto__", { id: "weird" }, "sk-a");
+    store.add({ sessionId: "__proto__", transport: { id: "weird" }, apiKey: "sk-a" });
     expect(store.get("__proto__")?.transport.id).toBe("weird");
     expect(store.size).toBe(1);
   });
