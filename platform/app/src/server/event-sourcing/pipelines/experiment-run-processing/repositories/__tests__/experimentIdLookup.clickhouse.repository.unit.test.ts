@@ -14,38 +14,42 @@ describe("ExperimentIdLookupClickHouseRepository", () => {
   });
 
   describe("given a run with a matching row", () => {
-    it("returns the row's ExperimentId", async () => {
-      mockQuery.mockResolvedValue({
-        json: async () => [{ ExperimentId: "exp-1" }],
+    describe("when the experiment id is looked up", () => {
+      it("returns the row's ExperimentId", async () => {
+        mockQuery.mockResolvedValue({
+          json: async () => [{ ExperimentId: "exp-1" }],
+        });
+        const repository = new ExperimentIdLookupClickHouseRepository(
+          resolveClient,
+        );
+
+        const result = await repository.findExperimentId("tenant-1", "run-1");
+
+        expect(result).toBe("exp-1");
+        expect(resolveClient).toHaveBeenCalledWith("tenant-1");
+        expect(mockQuery).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query_params: { tenantId: "tenant-1", runId: "run-1" },
+          }),
+        );
+        const call = mockQuery.mock.calls[0]![0] as { query: string };
+        expect(call.query).toContain("TenantId = {tenantId:String}");
       });
-      const repository = new ExperimentIdLookupClickHouseRepository(
-        resolveClient,
-      );
-
-      const result = await repository.findExperimentId("tenant-1", "run-1");
-
-      expect(result).toBe("exp-1");
-      expect(resolveClient).toHaveBeenCalledWith("tenant-1");
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query_params: { tenantId: "tenant-1", runId: "run-1" },
-        }),
-      );
-      const call = mockQuery.mock.calls[0]![0] as { query: string };
-      expect(call.query).toContain("TenantId = {tenantId:String}");
     });
   });
 
   describe("given no matching row", () => {
-    it("returns null", async () => {
-      mockQuery.mockResolvedValue({ json: async () => [] });
-      const repository = new ExperimentIdLookupClickHouseRepository(
-        resolveClient,
-      );
+    describe("when the experiment id is looked up", () => {
+      it("returns null", async () => {
+        mockQuery.mockResolvedValue({ json: async () => [] });
+        const repository = new ExperimentIdLookupClickHouseRepository(
+          resolveClient,
+        );
 
-      const result = await repository.findExperimentId("tenant-1", "run-1");
+        const result = await repository.findExperimentId("tenant-1", "run-1");
 
-      expect(result).toBeNull();
+        expect(result).toBeNull();
+      });
     });
   });
 });

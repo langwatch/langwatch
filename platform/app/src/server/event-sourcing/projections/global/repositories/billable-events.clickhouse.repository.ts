@@ -8,7 +8,10 @@ const TABLE_NAME = "billable_events" as const;
 
 export interface BillableEventsRepository {
   /** Inserts one deduplicated billable-event row. */
-  insert(record: BillableEventRecord, organizationId: string): Promise<void>;
+  insert(input: {
+    record: BillableEventRecord;
+    organizationId: string;
+  }): Promise<void>;
 }
 
 /**
@@ -30,10 +33,13 @@ export class BillableEventsMeterClickHouseRepository
     ) => Promise<ClickHouseClient | null>,
   ) {}
 
-  async insert(
-    record: BillableEventRecord,
-    organizationId: string,
-  ): Promise<void> {
+  async insert({
+    record,
+    organizationId,
+  }: {
+    record: BillableEventRecord;
+    organizationId: string;
+  }): Promise<void> {
     const client = await this.resolveClient(organizationId);
     if (!client) {
       logger.debug("ClickHouse not configured, skipping billable event insert");

@@ -319,10 +319,13 @@ async function isTripwireEnabled(projectId: string): Promise<boolean> {
  * ClickHouse client here — the instance this builds is handed out once as
  * `getApp().analytics.service`, not constructed per call site.
  */
-export function createAnalyticsService(
-  resolveClient: ClickHouseClientResolver,
-  legacyBackend: AnalyticsBackend,
-): AnalyticsService {
+export function createAnalyticsService({
+  resolveClient,
+  legacyBackend,
+}: {
+  resolveClient: ClickHouseClientResolver;
+  legacyBackend: AnalyticsBackend;
+}): AnalyticsService {
   return new AnalyticsService({
     rollupRepository: createTraceRollupReadRepo(resolveClient),
     slimRepository: createTraceSlimReadRepo(resolveClient),

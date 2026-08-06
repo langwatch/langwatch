@@ -880,10 +880,10 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
-      const service = CliBootstrapService.create(
-        ctx.prisma,
-        getApp().gateway.budgets,
-      );
+      const service = CliBootstrapService.create({
+        prisma: ctx.prisma,
+        budgetRepository: getApp().gateway.budgets,
+      });
       return await service.resolve({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,

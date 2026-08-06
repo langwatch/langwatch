@@ -40,7 +40,10 @@ describe("collectUsageStats", () => {
   describe("when instanceId is invalid", () => {
     it("throws an error", async () => {
       await expect(
-        collectUsageStats("bad", repositoryOver(null)),
+        collectUsageStats({
+          instanceId: "bad",
+          repository: repositoryOver(null),
+        }),
       ).rejects.toThrow("Invalid instance ID");
     });
   });
@@ -49,10 +52,10 @@ describe("collectUsageStats", () => {
     it("returns zero for traces and scenarios", async () => {
       vi.mocked(prisma.project.findMany).mockResolvedValue([]);
 
-      const result = await collectUsageStats(
-        "inst__org-1",
-        repositoryOver(null),
-      );
+      const result = await collectUsageStats({
+        instanceId: "inst__org-1",
+        repository: repositoryOver(null),
+      });
 
       expect(result.totalTraces).toBe(0);
       expect(result.totalScenarioEvents).toBe(0);
@@ -73,10 +76,10 @@ describe("collectUsageStats", () => {
           json: () => Promise.resolve([{ Total: "75" }]),
         });
 
-      const result = await collectUsageStats(
-        "inst__org-1",
-        repositoryOver({ query: mockClickHouseQuery }),
-      );
+      const result = await collectUsageStats({
+        instanceId: "inst__org-1",
+        repository: repositoryOver({ query: mockClickHouseQuery }),
+      });
 
       expect(result.totalTraces).toBe(200);
       expect(result.totalScenarioEvents).toBe(75);
@@ -90,10 +93,10 @@ describe("collectUsageStats", () => {
         { id: "proj-1" },
       ] as any);
 
-      const result = await collectUsageStats(
-        "inst__org-1",
-        repositoryOver(null),
-      );
+      const result = await collectUsageStats({
+        instanceId: "inst__org-1",
+        repository: repositoryOver(null),
+      });
 
       expect(result.totalTraces).toBe(0);
       expect(result.totalScenarioEvents).toBe(0);

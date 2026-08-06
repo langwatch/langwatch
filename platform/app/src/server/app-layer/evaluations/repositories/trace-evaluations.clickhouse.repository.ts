@@ -92,7 +92,17 @@ export class TraceEvaluationsClickHouseRepository
   }: FindManyByTraceIdsInput): Promise<Record<string, TraceEvaluation[]>> {
     if (traceIds.length === 0) return {};
 
-    const client = await this.resolveClient(tenantId);
+    // Resolution failure is a read failure like any other. Left outside the
+    // try it escaped as the resolver's own `ClickHouse not available for
+    // tenant ...`, so the one call that could not reach ClickHouse at all
+    // failed differently from every call that reached it and failed.
+    let client: Awaited<ReturnType<ClickHouseClientResolver>>;
+    try {
+      client = await this.resolveClient(tenantId);
+    } catch (error) {
+      this.#reportReadFailure({ tenantId, traceIds, error });
+      throw new Error("Failed to fetch evaluations for multiple traces");
+    }
 
     try {
       const rows = await this.#read({
@@ -143,7 +153,7 @@ export class TraceEvaluationsClickHouseRepository
       });
       return this.#groupByTrace(rows, traceIds);
     } catch (error) {
-      this.#reportReadFailure({ tenantId, traceIds, error, retried: true });
+      this.#reportReadFailure({ tenantId, traceIds, error, isRetry: true });
       throw new Error("Failed to fetch evaluations for multiple traces");
     }
   }
@@ -202,12 +212,12 @@ export class TraceEvaluationsClickHouseRepository
     tenantId,
     traceIds,
     error,
-    retried = false,
+    isRetry = false,
   }: {
     tenantId: string;
     traceIds: string[];
     error: unknown;
-    retried?: boolean;
+    isRetry?: boolean;
   }): void {
     logger.error(
       {
@@ -215,7 +225,7 @@ export class TraceEvaluationsClickHouseRepository
         traceIdCount: traceIds.length,
         error: error instanceof Error ? error.message : error,
       },
-      retried
+      isRetry
         ? "Failed to fetch evaluations for multiple traces from ClickHouse after light-projection retry"
         : "Failed to fetch evaluations for multiple traces from ClickHouse",
     );

@@ -21,59 +21,65 @@ describe("BillableEventsClickHouseRepository", () => {
   });
 
   describe("given a resolved ClickHouse client", () => {
-    it("inserts the row into billable_events", async () => {
-      resolveClient.mockResolvedValue({ insert: mockClickHouseInsert });
-      mockClickHouseInsert.mockResolvedValue(undefined);
-      const repository = new BillableEventsMeterClickHouseRepository(
-        resolveClient,
-      );
+    describe("when a billable event is inserted", () => {
+      it("inserts the row into billable_events", async () => {
+        resolveClient.mockResolvedValue({ insert: mockClickHouseInsert });
+        mockClickHouseInsert.mockResolvedValue(undefined);
+        const repository = new BillableEventsMeterClickHouseRepository(
+          resolveClient,
+        );
 
-      await repository.insert(record(), "org-1");
+        await repository.insert({ record: record(), organizationId: "org-1" });
 
-      expect(resolveClient).toHaveBeenCalledWith("org-1");
-      expect(mockClickHouseInsert).toHaveBeenCalledWith({
-        table: "billable_events",
-        values: [
-          expect.objectContaining({
-            OrganizationId: "org-1",
-            TenantId: "proj-1",
-            EventId: "evt-1",
-            EventType: "lw.obs.trace.span_received",
-            DeduplicationKey: "trace-abc:span-123",
-          }),
-        ],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        expect(resolveClient).toHaveBeenCalledWith("org-1");
+        expect(mockClickHouseInsert).toHaveBeenCalledWith({
+          table: "billable_events",
+          values: [
+            expect.objectContaining({
+              OrganizationId: "org-1",
+              TenantId: "proj-1",
+              EventId: "evt-1",
+              EventType: "lw.obs.trace.span_received",
+              DeduplicationKey: "trace-abc:span-123",
+            }),
+          ],
+          format: "JSONEachRow",
+          clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        });
       });
     });
   });
 
   describe("given the resolver returns no client (ClickHouse not configured)", () => {
-    it("skips the insert without throwing", async () => {
-      resolveClient.mockResolvedValue(null);
-      const repository = new BillableEventsMeterClickHouseRepository(
-        resolveClient,
-      );
+    describe("when a billable event is inserted", () => {
+      it("skips the insert without throwing", async () => {
+        resolveClient.mockResolvedValue(null);
+        const repository = new BillableEventsMeterClickHouseRepository(
+          resolveClient,
+        );
 
-      await repository.insert(record(), "org-1");
+        await repository.insert({ record: record(), organizationId: "org-1" });
 
-      expect(mockClickHouseInsert).not.toHaveBeenCalled();
+        expect(mockClickHouseInsert).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe("given the ClickHouse insert rejects", () => {
-    it("propagates the error", async () => {
-      resolveClient.mockResolvedValue({ insert: mockClickHouseInsert });
-      mockClickHouseInsert.mockRejectedValue(
-        new Error("ClickHouse connection timeout"),
-      );
-      const repository = new BillableEventsMeterClickHouseRepository(
-        resolveClient,
-      );
+    describe("when a billable event is inserted", () => {
+      it("propagates the error", async () => {
+        resolveClient.mockResolvedValue({ insert: mockClickHouseInsert });
+        mockClickHouseInsert.mockRejectedValue(
+          new Error("ClickHouse connection timeout"),
+        );
+        const repository = new BillableEventsMeterClickHouseRepository(
+          resolveClient,
+        );
 
-      await expect(repository.insert(record(), "org-1")).rejects.toThrow(
-        "ClickHouse connection timeout",
-      );
+        await expect(
+          repository.insert({ record: record(), organizationId: "org-1" }),
+        ).rejects.toThrow("ClickHouse connection timeout");
+      });
     });
   });
 });

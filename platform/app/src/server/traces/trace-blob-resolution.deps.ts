@@ -53,7 +53,7 @@ export function buildTraceBlobResolutionDeps(overrides?: {
     overrides?.resolveClickHouseClient ??
     ((tenantId) => getApp().clickhouse.resolveClient(tenantId));
   const clickhouseEnabled =
-    overrides?.clickhouseEnabled ?? isClickHouseEnabled();
+    overrides?.clickhouseEnabled ?? defaultClickHouseEnabled();
 
   return {
     blobStore: new BlobStore(
@@ -62,4 +62,24 @@ export function buildTraceBlobResolutionDeps(overrides?: {
     ),
     ioExtractionService: new TraceIOExtractionService(),
   };
+}
+
+/**
+ * Whether the resolver above can reach anything, answered by the App when
+ * there is one.
+ *
+ * `isClickHouseEnabled()` alone reads the shared client, while the App gates
+ * on `!!config.clickhouseUrl || isClickHouseEnabled()`. On a deployment
+ * configured only by `CLICKHOUSE_URL`, the two disagree until the shared
+ * client exists, and `BlobStore` built with `undefined` refuses the read
+ * before it ever calls the resolver - so an ADR-022 full read degraded to a
+ * preview on a deployment that has ClickHouse. The fallback keeps building
+ * deps free of an initialised App, which is why the App is not read directly.
+ */
+function defaultClickHouseEnabled(): boolean {
+  try {
+    return getApp().clickhouse.enabled;
+  } catch {
+    return isClickHouseEnabled();
+  }
 }

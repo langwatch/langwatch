@@ -52,6 +52,7 @@ import {
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
+import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
@@ -509,12 +510,12 @@ export function initializeDefaultApp(options?: {
   // time when ClickHouse isn't configured) and handed out as
   // `getApp().analytics.service` instead of each of its ~6 callers
   // constructing — and each resolving a ClickHouse client — its own.
-  const analyticsService = createAnalyticsService(
-    resolveClickHouseClient,
-    new ClickHouseAnalyticsService(
+  const analyticsService = createAnalyticsService({
+    resolveClient: resolveClickHouseClient,
+    legacyBackend: new ClickHouseAnalyticsService(
       new LegacyAnalyticsBackendClickHouseRepository(resolveClickHouseClient),
     ),
-  );
+  });
   const simulationReads = SimulationRunService.create(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
@@ -1458,7 +1459,7 @@ export function initializeDefaultApp(options?: {
       ),
     },
     opsExplain: {
-      repository: new OpsExplainClickHouseRepository(),
+      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
     },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
@@ -1626,9 +1627,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     analytics: {
-      service: createAnalyticsService(async () => {
-        throw new Error("ClickHouse not available in test app");
-      }, new ClickHouseAnalyticsService(null)),
+      service: createAnalyticsService({
+        resolveClient: async () => {
+          throw new Error("ClickHouse not available in test app");
+        },
+        legacyBackend: new ClickHouseAnalyticsService(null),
+      }),
     },
     experiments: ExperimentService.create(testPrisma),
     triggers: new TriggerService(new NullTriggerRepository()),
@@ -1716,7 +1720,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
     },
     opsExplain: {
-      repository: new OpsExplainClickHouseRepository(),
+      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
     },
     langy: {
       conversations: LangyConversationService.create(

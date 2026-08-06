@@ -25,8 +25,6 @@ import type {
   PersonalUsageWindow,
 } from "./personalUsage.clickhouse.repository";
 
-export type { PersonalUsageWindow } from "./personalUsage.clickhouse.repository";
-
 export interface PersonalUsageSummary {
   /** Theoretical (list-price) spend — the grand total regardless of plan. */
   spentUsd: number;
@@ -138,10 +136,13 @@ export class PersonalUsageService {
     // per-principal ledger rows and merge.
     const ingestion =
       input.userId && input.ingestionTenantId
-        ? await this.queryIngestionPrincipalSummary(repository, {
-            tenantId: input.ingestionTenantId,
-            userId: input.userId,
-            window,
+        ? await this.queryIngestionPrincipalSummary({
+            repository,
+            params: {
+              tenantId: input.ingestionTenantId,
+              userId: input.userId,
+              window,
+            },
           })
         : null;
 
@@ -222,10 +223,14 @@ export class PersonalUsageService {
     // Ingestion-source ledger union: per-day spend for the user's
     // PRINCIPAL-scope rows, merged into the same byDay map.
     if (input.userId && input.ingestionTenantId) {
-      const ledgerBuckets = await this.queryIngestionPrincipalBuckets(
+      const ledgerBuckets = await this.queryIngestionPrincipalBuckets({
         repository,
-        { tenantId: input.ingestionTenantId, userId: input.userId, window },
-      );
+        params: {
+          tenantId: input.ingestionTenantId,
+          userId: input.userId,
+          window,
+        },
+      });
       for (const r of ledgerBuckets) {
         const existing = byDay.get(r.day) ?? {
           spentUsd: 0,
@@ -242,10 +247,13 @@ export class PersonalUsageService {
     return fillEmptyBuckets(window, byDay);
   }
 
-  private async queryIngestionPrincipalBuckets(
-    repository: PersonalUsageClickHouseRepository,
-    params: { tenantId: string; userId: string; window: PersonalUsageWindow },
-  ): Promise<PersonalUsageBucket[]> {
+  private async queryIngestionPrincipalBuckets({
+    repository,
+    params,
+  }: {
+    repository: PersonalUsageClickHouseRepository;
+    params: { tenantId: string; userId: string; window: PersonalUsageWindow };
+  }): Promise<PersonalUsageBucket[]> {
     try {
       return await repository.findIngestionPrincipalBuckets(params);
     } catch {
@@ -295,10 +303,14 @@ export class PersonalUsageService {
     // Ingestion-source ledger union: per-model spend for the user's
     // PRINCIPAL-scope rows, merged into the same map.
     if (input.userId && input.ingestionTenantId) {
-      const ledgerBreakdown = await this.queryIngestionPrincipalBreakdown(
+      const ledgerBreakdown = await this.queryIngestionPrincipalBreakdown({
         repository,
-        { tenantId: input.ingestionTenantId, userId: input.userId, window },
-      );
+        params: {
+          tenantId: input.ingestionTenantId,
+          userId: input.userId,
+          window,
+        },
+      });
       for (const r of ledgerBreakdown) {
         const existing = aggregated.get(r.label) ?? {
           label: r.label,
@@ -318,10 +330,13 @@ export class PersonalUsageService {
       .slice(0, limit);
   }
 
-  private async queryIngestionPrincipalBreakdown(
-    repository: PersonalUsageClickHouseRepository,
-    params: { tenantId: string; userId: string; window: PersonalUsageWindow },
-  ): Promise<PersonalUsageBreakdown[]> {
+  private async queryIngestionPrincipalBreakdown({
+    repository,
+    params,
+  }: {
+    repository: PersonalUsageClickHouseRepository;
+    params: { tenantId: string; userId: string; window: PersonalUsageWindow };
+  }): Promise<PersonalUsageBreakdown[]> {
     try {
       return await repository.findIngestionPrincipalBreakdown(params);
     } catch {
@@ -343,10 +358,13 @@ export class PersonalUsageService {
    *     project tenant directly so the existing trace_summaries query
    *     captures them).
    */
-  private async queryIngestionPrincipalSummary(
-    repository: PersonalUsageClickHouseRepository,
-    params: { tenantId: string; userId: string; window: PersonalUsageWindow },
-  ): Promise<{
+  private async queryIngestionPrincipalSummary({
+    repository,
+    params,
+  }: {
+    repository: PersonalUsageClickHouseRepository;
+    params: { tenantId: string; userId: string; window: PersonalUsageWindow };
+  }): Promise<{
     totalCost: number;
     requestCount: number;
     promptTokens: number;

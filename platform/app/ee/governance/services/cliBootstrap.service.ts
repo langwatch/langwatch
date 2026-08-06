@@ -117,25 +117,34 @@ const SCOPE_RANK: Record<string, number> = {
 };
 
 export class CliBootstrapService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    /**
-     * The gateway budget ledger, from the App. `undefined` on a deployment
-     * without ClickHouse, in which case {@link resolveBudget} short-circuits
-     * to the empty budget rather than falling back to Postgres spend — the
-     * CLI ceremony has always reported "no budget data" when the ledger
-     * isn't reachable, not a stale PG figure.
-     */
-    private readonly budgetRepository:
-      | GatewayBudgetClickHouseRepository
-      | undefined,
-  ) {}
+  private readonly prisma: PrismaClient;
+  /**
+   * The gateway budget ledger, from the App. `undefined` on a deployment
+   * without ClickHouse, in which case {@link resolveBudget} short-circuits
+   * to the empty budget rather than falling back to Postgres spend — the
+   * CLI ceremony has always reported "no budget data" when the ledger
+   * isn't reachable, not a stale PG figure.
+   */
+  private readonly budgetRepository:
+    | GatewayBudgetClickHouseRepository
+    | undefined;
 
-  static create(
-    prisma: PrismaClient,
-    budgetRepository: GatewayBudgetClickHouseRepository | undefined,
-  ): CliBootstrapService {
-    return new CliBootstrapService(prisma, budgetRepository);
+  constructor({
+    prisma,
+    budgetRepository,
+  }: {
+    prisma: PrismaClient;
+    budgetRepository: GatewayBudgetClickHouseRepository | undefined;
+  }) {
+    this.prisma = prisma;
+    this.budgetRepository = budgetRepository;
+  }
+
+  static create(deps: {
+    prisma: PrismaClient;
+    budgetRepository: GatewayBudgetClickHouseRepository | undefined;
+  }): CliBootstrapService {
+    return new CliBootstrapService(deps);
   }
 
   async resolve(input: {

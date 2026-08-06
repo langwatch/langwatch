@@ -60,10 +60,10 @@ export const governanceRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("governance:view"))
     .query(async ({ ctx, input }) => {
-      const service = GovernanceSetupStateService.create(
-        ctx.prisma,
-        getApp().governance.traceActivity,
-      );
+      const service = GovernanceSetupStateService.create({
+        prisma: ctx.prisma,
+        traceActivity: getApp().governance.traceActivity,
+      });
       return await service.resolve(input.organizationId);
     }),
 
@@ -88,10 +88,10 @@ export const governanceRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }): Promise<PersonaResolution> => {
       const userId = ctx.session.user.id;
-      const setupService = GovernanceSetupStateService.create(
-        ctx.prisma,
-        getApp().governance.traceActivity,
-      );
+      const setupService = GovernanceSetupStateService.create({
+        prisma: ctx.prisma,
+        traceActivity: getApp().governance.traceActivity,
+      });
       const usageService = UsageStatsService.create(ctx.prisma);
 
       const [
@@ -226,10 +226,10 @@ export const governanceRouter = createTRPCRouter({
     .use(checkOrganizationPermission("complianceExport:view"))
     .use(requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT))
     .query(async ({ ctx, input }) => {
-      const service = GovernanceOcsfExportService.create(
-        ctx.prisma,
-        getApp().governance.ocsfEvents,
-      );
+      const service = GovernanceOcsfExportService.create({
+        prisma: ctx.prisma,
+        ocsfRepository: getApp().governance.ocsfEvents,
+      });
       return await service.list({
         organizationId: input.organizationId,
         sinceMs: input.sinceMs ?? 0,

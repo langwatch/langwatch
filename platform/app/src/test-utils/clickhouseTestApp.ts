@@ -28,10 +28,12 @@ import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpe
  * `createTestApp` alone is not enough - its ClickHouse slots are null, which is
  * right for a unit test and useless for one that asserts on rows.
  *
- * Every slot is wired rather than only the one a given test needs. A test
- * asserting on ingestion should not have to know which repository the route
- * reaches for, and should not start failing because a later change made the
- * route read one more.
+ * Wires the ClickHouse-backed slots a route or worker test reaches today:
+ * `clickhouse`, `gateway`, `governance` and `billableEvents`. The rest keep
+ * their `createTestApp` defaults - a throwing analytics resolver, a null
+ * filter repository, an empty cross-tenant stored-object lookup, no orphan
+ * reconciliation. A test whose route reaches one of those adds it here rather
+ * than resolving a client of its own.
  */
 export function installClickHouseTestApp({
   resolveClient,

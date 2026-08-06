@@ -20,17 +20,21 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import { _resetOpsClickHouseClientForTesting } from "~/server/ops/explain-core";
+import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
 
-// The route takes its repository from `getApp()`; standing in for the App
+// The route takes its service from `getApp()`; standing in for the App
 // keeps this suite testing the route against a real ClickHouse without
 // booting the rest of the application (redis, postgres, event sourcing).
-// The repository itself reads `getOpsClickHouseClient()` /
-// `getSharedClickHouseClient()` fresh on every call, so a single instance
-// built here behaves exactly like one built per request would.
+// The repository the service reads through resolves
+// `getOpsClickHouseClient()` / `getSharedClickHouseClient()` fresh on every
+// call, so a single instance built here behaves exactly like one built per
+// request would.
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
-    opsExplain: { repository: new OpsExplainClickHouseRepository() },
+    opsExplain: {
+      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
+    },
   }),
 }));
 

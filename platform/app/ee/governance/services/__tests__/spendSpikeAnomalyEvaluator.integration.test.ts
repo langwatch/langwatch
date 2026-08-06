@@ -180,10 +180,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         },
       });
 
-      const evaluator = SpendSpikeAnomalyEvaluator.create(
+      const evaluator = SpendSpikeAnomalyEvaluator.create({
         prisma,
         kpisRepository,
-      );
+      });
       // evaluator.evaluateAll() iterates ALL active spend_spike rules in PG,
       // so its bulk counters reflect global state (other orgs' rules from
       // dogfood fixtures may be present). Assertions stay scoped to MY rule's
@@ -214,10 +214,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
 
     describe("dedup invariant — re-running on the same window", () => {
       it("does not create a second AnomalyAlert for the same rule + window", async () => {
-        const evaluator = SpendSpikeAnomalyEvaluator.create(
+        const evaluator = SpendSpikeAnomalyEvaluator.create({
           prisma,
           kpisRepository,
-        );
+        });
         await evaluator.evaluateAll({ now: NOW });
 
         const alerts = await prisma.anomalyAlert.findMany({
@@ -250,10 +250,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         },
       });
 
-      const evaluator = SpendSpikeAnomalyEvaluator.create(
+      const evaluator = SpendSpikeAnomalyEvaluator.create({
         prisma,
         kpisRepository,
-      );
+      });
       await evaluator.evaluateAll({ now: NOW });
 
       // The source-scoped rule has zero matching governance_kpis rows
@@ -285,10 +285,10 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         },
       });
 
-      const evaluator = SpendSpikeAnomalyEvaluator.create(
+      const evaluator = SpendSpikeAnomalyEvaluator.create({
         prisma,
         kpisRepository,
-      );
+      });
       await evaluator.evaluateAll({ now: NOW });
 
       // Archived rule is filtered out by the findMany WHERE clause in

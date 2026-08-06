@@ -28,6 +28,7 @@ import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
+import type { OpsExplainService } from "../ops/opsExplain.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
 import type {
@@ -54,7 +55,6 @@ import type { ManagerExplorerService } from "./ops/manager-explorer.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
 import type { ReplayService } from "./ops/replay.service";
-import type { OpsExplainClickHouseRepository } from "./ops/repositories/ops-explain.clickhouse.repository";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PresenceService } from "./presence/presence.service";
@@ -247,10 +247,12 @@ export interface AppDependencies {
   storedObjects: {
     crossTenantOwnerLookup: StoredObjectOwnerClickHouseRepository;
   };
-  /** The operator-only `/api/ops/clickhouse/explain` endpoint's repository —
-   *  no tenant scoping, by design (see the repository's own doc comment). */
+  /** The operator-only `/api/ops/clickhouse/explain` endpoint's service —
+   *  no tenant scoping, by design (see the repository's own doc comment).
+   *  A service rather than the repository it reads, so the route calls a
+   *  service like every other route does. */
   opsExplain: {
-    repository: OpsExplainClickHouseRepository;
+    service: OpsExplainService;
   };
   /** ADR-046: Langy conversations as an event-sourced projection. */
   langy: {

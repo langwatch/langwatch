@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
-import { EvaluationService } from "../evaluation.service";
+import { serviceOver } from "./support/evaluationServiceOver";
 
 /**
  * Build a fake ClickHouse client whose `query` inspects the SQL and either
@@ -38,17 +37,6 @@ const ROW = {
   StartedAt: null,
   CompletedAt: null,
 };
-
-/** Stands in for the resolver the repository is constructed with. */
-const resolveClient = vi.fn();
-
-function serviceOver(client: unknown) {
-  resolveClient.mockResolvedValue(client);
-  return new EvaluationService(
-    undefined,
-    new TraceEvaluationsClickHouseRepository(resolveClient),
-  );
-}
 
 describe("EvaluationService memory-limit fallback", () => {
   beforeEach(() => {

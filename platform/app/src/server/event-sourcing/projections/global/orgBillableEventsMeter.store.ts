@@ -38,6 +38,6 @@ export const orgBillableEventsMeterStore: AppendStore<BillableEventRecord> = {
       return;
     }
 
-    await getApp().billing.events.insert(record, organizationId);
+    await getApp().billing.events.insert({ record, organizationId });
   },
 };

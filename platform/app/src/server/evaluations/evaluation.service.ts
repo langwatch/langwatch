@@ -42,11 +42,14 @@ export class EvaluationService {
   private readonly injectedRepository?: TraceEvaluationsRepository;
   private cachedRepository?: TraceEvaluationsRepository;
 
-  constructor(
-    resolveInputsMarkerFn: ResolveEvaluationInputsMarker = defaultResolveInputsMarker,
-    repository?: TraceEvaluationsRepository,
-  ) {
-    this.resolveInputsMarker = resolveInputsMarkerFn;
+  constructor({
+    resolveInputsMarker = defaultResolveInputsMarker,
+    repository,
+  }: {
+    resolveInputsMarker?: ResolveEvaluationInputsMarker;
+    repository?: TraceEvaluationsRepository;
+  } = {}) {
+    this.resolveInputsMarker = resolveInputsMarker;
     this.injectedRepository = repository;
   }
 

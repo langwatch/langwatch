@@ -23,8 +23,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
-import { createTestApp } from "~/server/app-layer/presets";
+import { resetApp } from "~/server/app-layer/app";
 import {
   AGGREGATE_TYPE,
   assertOverThreshold,
@@ -54,6 +53,10 @@ import type { Span, Trace } from "~/server/tracer/types";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 
 // Gate identically to the canonical event_log integration tests: skip unless a
 // real ClickHouse is reachable, run against the testcontainer otherwise.
@@ -342,22 +345,9 @@ describe.skipIf(!hasTestcontainers)(
       // getApp().clickhouse, so this test needs a real App singleton whose
       // resolver dials the same (mocked) testcontainer client above.
       await resetApp();
-      globalForApp.__langwatch_app = createTestApp({
-        clickhouse: {
-          enabled: true,
-          resolveClient: async (tenantId: string) => {
-            const resolved =
-              await clickhouseClientModule.getClickHouseClientForProject(
-                tenantId,
-              );
-            if (!resolved) {
-              throw new Error(
-                `ClickHouse not available for tenant ${tenantId}`,
-              );
-            }
-            return resolved;
-          },
-        },
+      installClickHouseTestApp({
+        resolveClient: (tenantId) =>
+          clickhouseClientModule.getClickHouseClientForProject(tenantId),
       });
     }, 60_000);
 
@@ -370,7 +360,7 @@ describe.skipIf(!hasTestcontainers)(
           });
         }
       }
-      await resetApp();
+      await clearClickHouseTestApp();
       await stopTestContainers();
     });
 

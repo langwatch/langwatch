@@ -149,10 +149,13 @@ export class SpendSpikeAnomalyEvaluator {
     private readonly dispatcher: AnomalyAlertDispatcherService = AnomalyAlertDispatcherService.create(),
   ) {}
 
-  static create(
-    prisma: PrismaClient,
-    kpisRepository: GovernanceKpisClickHouseRepository | undefined,
-  ): SpendSpikeAnomalyEvaluator {
+  static create({
+    prisma,
+    kpisRepository,
+  }: {
+    prisma: PrismaClient;
+    kpisRepository: GovernanceKpisClickHouseRepository | undefined;
+  }): SpendSpikeAnomalyEvaluator {
     return new SpendSpikeAnomalyEvaluator(prisma, kpisRepository);
   }
 

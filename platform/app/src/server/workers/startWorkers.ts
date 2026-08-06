@@ -52,8 +52,8 @@ async function bootStorageStatsCollection(
     startStorageStatsCollectionFromSharedClient,
     stopStorageStatsCollection,
   } = await import("~/server/clickhouse/metrics");
-  const started = startStorageStatsCollectionFromSharedClient();
-  if (started) {
+  const hasStarted = startStorageStatsCollectionFromSharedClient();
+  if (hasStarted) {
     shutdownHandles.push(() => stopStorageStatsCollection());
     logger.info("storage stats collection ready");
   }

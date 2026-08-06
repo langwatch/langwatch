@@ -43,7 +43,6 @@ import {
   explainBodySchema,
   redactQueryForAudit,
 } from "~/server/ops/explain-core";
-import { OpsExplainService } from "~/server/ops/opsExplain.service";
 
 function bearerTokenMatches(
   headerValue: string | undefined,
@@ -102,8 +101,7 @@ secured
       return c.json({ message: built.reason }, 400);
     }
 
-    const service = new OpsExplainService(getApp().opsExplain.repository);
-    const outcome = await service.explain({
+    const outcome = await getApp().opsExplain.service.explain({
       wrappedQuery: built.wrapped!,
       type: built.type!,
       isProduction: process.env.NODE_ENV === "production",

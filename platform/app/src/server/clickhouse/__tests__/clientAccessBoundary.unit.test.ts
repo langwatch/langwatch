@@ -51,13 +51,48 @@ const RESOLVES_CLIENT =
  * from anywhere: `clickhouseClient.ts` once exported one, and four files held
  * a client through it without ever naming a function above. The resolver TYPE
  * is exported and a resolver VALUE is not - the one value is built in
- * `presets.ts` and travels by injection - so this asserts the module declares
- * no exported binding of that type. Re-add one and this fails.
+ * `presets.ts` and travels by injection.
+ *
+ * Enforced as an exhaustive list of the module's VALUE exports rather than by
+ * matching a type annotation, because the thing being kept out does not need
+ * one: `export const resolveClient = async (tenantId: string) => ...` is
+ * structurally a resolver with nothing to match on. Anything this module
+ * exports that is not named below fails, which makes adding an export a
+ * decision somebody takes here, in front of the rule, instead of a line that
+ * slips past a pattern. Type exports are not listed - a type cannot hold a
+ * client.
  */
-const EXPORTS_A_RESOLVER_VALUE =
-  /export\s+(?:const|let|var|(?:async\s+)?function)\s+\w+[^\n;=]*:\s*ClickHouseClientResolver\b/;
-
 const CLIENT_MODULE = "src/server/clickhouse/clickhouseClient.ts";
+
+const CLIENT_MODULE_VALUE_EXPORTS = new Set([
+  "getClickHouseClientForProject",
+  "getClickHouseClientForOrganization",
+  "getAllClickHouseInstances",
+  "getSharedClickHouseClient",
+  "isClickHouseEnabled",
+  "clearCustomClientCache",
+  "getCustomClientCacheSize",
+  "clearProjectOrgCache",
+  "getPrivateClickHouseUrls",
+]);
+
+/** `export function x`, `export const x`, and `export { a as b } from "..."`. */
+function valueExportsOf(source: string): string[] {
+  const names: string[] = [];
+  for (const match of source.matchAll(
+    /^export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm,
+  )) {
+    names.push(match[1]!);
+  }
+  for (const block of source.matchAll(/^export\s*\{([^}]*)\}/gm)) {
+    for (const clause of block[1]!.split(",")) {
+      const parts = clause.trim().split(/\s+as\s+/);
+      const name = (parts[1] ?? parts[0] ?? "").trim();
+      if (name && !clause.trim().startsWith("type ")) names.push(name);
+    }
+  }
+  return names;
+}
 
 /**
  * `getApp().clickhouse.resolveClient` is the same escape hatch wearing the
@@ -195,15 +230,33 @@ describe("the ClickHouse client access boundary", () => {
   const { files: scanned, walked } = scan();
 
   describe("when the client module is read", () => {
-    it("exports the resolver type, never a resolver", () => {
+    it("exports only the values named here, so no resolver can be added quietly", () => {
       const source = readFileSync(join(PACKAGE_ROOT, CLIENT_MODULE), "utf8");
+      const unexpected = valueExportsOf(source).filter(
+        (name) => !CLIENT_MODULE_VALUE_EXPORTS.has(name),
+      );
 
       expect(
-        EXPORTS_A_RESOLVER_VALUE.test(source),
-        `${CLIENT_MODULE} exports a ClickHouseClientResolver value. Build the one ` +
-          "resolver in src/server/app-layer/presets.ts and inject it; an exported " +
-          "one is a door into ClickHouse that skips both getApp() and repositories.",
-      ).toBe(false);
+        unexpected,
+        `${CLIENT_MODULE} exports a value this rule has not seen. If it hands back ` +
+          "a client, it does not belong here at all: build the one resolver in " +
+          "src/server/app-layer/presets.ts and inject it. If it does not, add it to " +
+          "CLIENT_MODULE_VALUE_EXPORTS.",
+      ).toEqual([]);
+    });
+
+    it("keeps that list honest, so a deleted export cannot sit here forever", () => {
+      const source = readFileSync(join(PACKAGE_ROOT, CLIENT_MODULE), "utf8");
+      const actual = new Set(valueExportsOf(source));
+      const stale = [...CLIENT_MODULE_VALUE_EXPORTS].filter(
+        (name) => !actual.has(name),
+      );
+
+      expect(
+        stale,
+        "These are listed as exports of the client module but no longer exist. " +
+          "Remove them from CLIENT_MODULE_VALUE_EXPORTS.",
+      ).toEqual([]);
     });
   });
 

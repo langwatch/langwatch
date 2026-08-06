@@ -49,10 +49,10 @@ export function startSpendSpikeAnomalyWorker(): SpendSpikeAnomalyWorkerHandle {
   const tick = async () => {
     if (stopped) return;
     try {
-      const evaluator = SpendSpikeAnomalyEvaluator.create(
+      const evaluator = SpendSpikeAnomalyEvaluator.create({
         prisma,
-        getApp().governance.kpis,
-      );
+        kpisRepository: getApp().governance.kpis,
+      });
       const result = await evaluator.evaluateAll({ now: new Date() });
       logger.info(
         {

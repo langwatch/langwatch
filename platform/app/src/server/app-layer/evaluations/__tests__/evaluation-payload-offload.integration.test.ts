@@ -323,15 +323,14 @@ describe("evaluation inputs offload (integration)", () => {
       // The v1 read service resolves the marker at the read boundary. Inject
       // the same stored-objects service the write used (its client is the test
       // client via the getClickHouseClientForProject mock).
-      // The repository is injected rather than taken from the App: without
-      // one the service reads `getApp().evaluations.traceEvaluations`, which
-      // this test never boots, and its resolver would not be the test client
-      // anyway.
-      const service = new EvaluationService(
-        ({ projectId, inputs }) =>
+      // The repository is injected so the read goes through the same test
+      // client the write used. The fixture App resolves one too, but the
+      // injected dependency path is the one this asserts on.
+      const service = new EvaluationService({
+        resolveInputsMarker: ({ projectId, inputs }) =>
           resolveInputsMarker({ projectId, inputs, storedObjects }),
-        new TraceEvaluationsClickHouseRepository(async () => ch),
-      );
+        repository: new TraceEvaluationsClickHouseRepository(async () => ch),
+      });
       const readInputs = await service.getEvaluationInputs({
         projectId: tenantId,
         evaluationId,

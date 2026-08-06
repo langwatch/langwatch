@@ -41,24 +41,33 @@ export interface GovernanceSetupState {
 }
 
 export class GovernanceSetupStateService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    /**
-     * The governance trace-activity reader, from the App. `undefined` on a
-     * deployment without ClickHouse, in which case {@link probeRecentActivity}
-     * short-circuits to `false` — same as the pre-repository "no client"
-     * fallback.
-     */
-    private readonly traceActivity:
-      | GovernanceTraceActivityClickHouseRepository
-      | undefined,
-  ) {}
+  private readonly prisma: PrismaClient;
+  /**
+   * The governance trace-activity reader, from the App. `undefined` on a
+   * deployment without ClickHouse, in which case {@link probeRecentActivity}
+   * short-circuits to `false` — same as the pre-repository "no client"
+   * fallback.
+   */
+  private readonly traceActivity:
+    | GovernanceTraceActivityClickHouseRepository
+    | undefined;
 
-  static create(
-    prisma: PrismaClient,
-    traceActivity: GovernanceTraceActivityClickHouseRepository | undefined,
-  ): GovernanceSetupStateService {
-    return new GovernanceSetupStateService(prisma, traceActivity);
+  constructor({
+    prisma,
+    traceActivity,
+  }: {
+    prisma: PrismaClient;
+    traceActivity: GovernanceTraceActivityClickHouseRepository | undefined;
+  }) {
+    this.prisma = prisma;
+    this.traceActivity = traceActivity;
+  }
+
+  static create(deps: {
+    prisma: PrismaClient;
+    traceActivity: GovernanceTraceActivityClickHouseRepository | undefined;
+  }): GovernanceSetupStateService {
+    return new GovernanceSetupStateService(deps);
   }
 
   async resolve(organizationId: string): Promise<GovernanceSetupState> {

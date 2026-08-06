@@ -50,24 +50,33 @@ export interface GovernanceOcsfExportPage {
 }
 
 export class GovernanceOcsfExportService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    /**
-     * The OCSF SIEM-export sink, from the App. `undefined` on a deployment
-     * without ClickHouse, in which case {@link list} throws the same class
-     * of error the direct client lookup always did — the export has no
-     * fallback store to read from.
-     */
-    private readonly ocsfRepository:
-      | GovernanceOcsfEventsClickHouseRepository
-      | undefined,
-  ) {}
+  private readonly prisma: PrismaClient;
+  /**
+   * The OCSF SIEM-export sink, from the App. `undefined` on a deployment
+   * without ClickHouse, in which case {@link list} throws the same class
+   * of error the direct client lookup always did — the export has no
+   * fallback store to read from.
+   */
+  private readonly ocsfRepository:
+    | GovernanceOcsfEventsClickHouseRepository
+    | undefined;
 
-  static create(
-    prisma: PrismaClient,
-    ocsfRepository: GovernanceOcsfEventsClickHouseRepository | undefined,
-  ): GovernanceOcsfExportService {
-    return new GovernanceOcsfExportService(prisma, ocsfRepository);
+  constructor({
+    prisma,
+    ocsfRepository,
+  }: {
+    prisma: PrismaClient;
+    ocsfRepository: GovernanceOcsfEventsClickHouseRepository | undefined;
+  }) {
+    this.prisma = prisma;
+    this.ocsfRepository = ocsfRepository;
+  }
+
+  static create(deps: {
+    prisma: PrismaClient;
+    ocsfRepository: GovernanceOcsfEventsClickHouseRepository | undefined;
+  }): GovernanceOcsfExportService {
+    return new GovernanceOcsfExportService(deps);
   }
 
   async list(input: {

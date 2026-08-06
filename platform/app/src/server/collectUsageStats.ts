@@ -4,10 +4,13 @@ import {
 } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import { prisma } from "~/server/db";
 
-export async function collectUsageStats(
-  instanceId: string,
-  repository: InstanceUsageStatsRepository = createDefaultInstanceUsageStatsRepository(),
-) {
+export async function collectUsageStats({
+  instanceId,
+  repository = createDefaultInstanceUsageStatsRepository(),
+}: {
+  instanceId: string;
+  repository?: InstanceUsageStatsRepository;
+}) {
   const organizationId = instanceId.split("__")[1];
 
   if (!organizationId) {

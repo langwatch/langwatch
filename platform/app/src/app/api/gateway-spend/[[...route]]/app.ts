@@ -53,7 +53,7 @@ patchZodOpenapi();
  */
 function requireSpendEventsService(): GatewaySpendEventsService {
   const repository = getApp().gateway.spendEvents;
-  if (!repository) throw new Error("ClickHouse is not configured");
+  if (!repository) throw new ClickHouseUnavailableError();
   return new GatewaySpendEventsService(repository);
 }
 
@@ -583,7 +583,7 @@ secured.access(requires("gatewaySpend:manage")).post(
 
     const webhookEventsRepository = getApp().gateway.webhookEvents;
     if (!webhookEventsRepository) {
-      throw new Error("ClickHouse is not configured");
+      throw new ClickHouseUnavailableError();
     }
     const events = new WebhookEventsService({
       prisma,

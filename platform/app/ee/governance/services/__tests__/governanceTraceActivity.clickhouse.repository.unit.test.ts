@@ -20,7 +20,7 @@ function makeClient(rows: unknown[]) {
 }
 
 describe("GovernanceTraceActivityClickHouseRepository", () => {
-  describe("hasRecentActivity", () => {
+  describe("when probing for recent governance activity", () => {
     it("returns true when the probe finds a row", async () => {
       const client = makeClient([{ hit: 1 }]);
       const repo = new GovernanceTraceActivityClickHouseRepository(
@@ -44,7 +44,7 @@ describe("GovernanceTraceActivityClickHouseRepository", () => {
     });
   });
 
-  describe("findSpanCountsBySource", () => {
+  describe("when aggregating span counts by ingestion source", () => {
     it("coerces stringified spanCount values from ClickHouse", async () => {
       // ClickHouse JSONEachRow may return integers as strings depending on
       // the column type. Number() coercion happens at the repository

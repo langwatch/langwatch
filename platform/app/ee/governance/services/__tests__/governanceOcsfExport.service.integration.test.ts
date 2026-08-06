@@ -170,7 +170,10 @@ describe("OCSF schema-version forward-compat", () => {
       // constructor argument (ADR: repositories reached from the App, not
       // resolved ad hoc), so it can be pointed at the test client directly
       // instead of driving the SELECT by hand.
-      const service = GovernanceOcsfExportService.create(prisma, repo);
+      const service = GovernanceOcsfExportService.create({
+        prisma,
+        ocsfRepository: repo,
+      });
       const page = await service.list({
         organizationId,
         sinceMs: 0,

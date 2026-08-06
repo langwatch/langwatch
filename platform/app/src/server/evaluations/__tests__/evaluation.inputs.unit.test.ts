@@ -1,18 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
-import { EvaluationService } from "../evaluation.service";
-
-/** Stands in for the resolver the repository is constructed with. */
-const resolveClient = vi.fn();
-
-/** The service under test, reading through a real repository over a fake client. */
-function serviceOver(client: unknown) {
-  resolveClient.mockResolvedValue(client);
-  return new EvaluationService(
-    undefined,
-    new TraceEvaluationsClickHouseRepository(resolveClient),
-  );
-}
+import {
+  serviceOver,
+  serviceOverUnavailable,
+} from "./support/evaluationServiceOver";
 
 describe("EvaluationService.getEvaluationInputs", () => {
   beforeEach(() => {
@@ -96,12 +86,8 @@ describe("EvaluationService.getEvaluationInputs", () => {
   describe("given ClickHouse is not enabled for the project", () => {
     describe("when its inputs are requested", () => {
       it("returns null without querying", async () => {
-        resolveClient.mockRejectedValue(
+        const service = serviceOverUnavailable(
           new Error("ClickHouse not available for tenant project_test"),
-        );
-        const service = new EvaluationService(
-          undefined,
-          new TraceEvaluationsClickHouseRepository(resolveClient),
         );
 
         const result = await service.getEvaluationInputs({
