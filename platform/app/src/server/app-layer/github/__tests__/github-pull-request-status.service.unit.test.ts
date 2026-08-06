@@ -9,6 +9,7 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
+import { traced } from "../../tracing";
 import {
   deriveStatus,
   GithubPullRequestStatusService,
@@ -193,6 +194,116 @@ describe("GithubPullRequestStatusService", () => {
       await expect(
         service.getLiveStatuses({ organizationId: "org-1", refs: [REF] }),
       ).resolves.toEqual([]);
+    });
+  });
+
+  // The app layer publishes this service through `traced()`, a Proxy that hands
+  // back every function wrapped in a span. A synchronous private helper reached
+  // as `this.helper()` therefore returns a Promise, and a Promise used as a
+  // Redis key stringifies to one literal key shared by every pull request in
+  // every organization — a per-pull-request cache that answers with somebody
+  // else's status. These run through the same Proxy the app does.
+  describe("when published through the tracing proxy", () => {
+    it("caches each pull request under its own key", async () => {
+      const store = new Map<string, string>();
+      const redis = {
+        get: vi.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
+        set: vi.fn((key: string, value: string) => {
+          store.set(key, value);
+          return Promise.resolve("OK");
+        }),
+        del: vi.fn(() => Promise.resolve(1)),
+      };
+      const service = traced(
+        new GithubPullRequestStatusService({
+          repository: {
+            findByNumber: vi.fn(({ prNumber }: { prNumber: number }) =>
+              Promise.resolve(storedRow({ prNumber })),
+            ),
+            refreshSnapshot: vi.fn().mockResolvedValue(undefined),
+          } as never,
+          installations: {
+            resolveInstallationForRepository: vi.fn().mockResolvedValue({
+              installationId: "555",
+              repositoryId: "999",
+            }),
+          } as never,
+          appTokens: {
+            getPullRequest: vi
+              .fn()
+              .mockResolvedValueOnce({
+                state: "closed",
+                draft: false,
+                mergedAt: "2026-05-02T00:00:00Z",
+              })
+              .mockResolvedValueOnce({
+                state: "open",
+                draft: false,
+                mergedAt: null,
+              }),
+          } as never,
+          redis: redis as never,
+        }),
+        "GithubPullRequestStatusService",
+      );
+
+      const [merged] = await service.getLiveStatuses({
+        organizationId: "org-1",
+        refs: [{ ...REF, prNumber: 7 }],
+      });
+      const [open] = await service.getLiveStatuses({
+        organizationId: "org-1",
+        refs: [{ ...REF, prNumber: 8 }],
+      });
+
+      expect(merged?.status).toBe("merged");
+      // The second pull request must not be answered from the first one's entry.
+      expect(open?.status).toBe("open");
+      expect([...store.keys()].sort()).toEqual([
+        "gh:prstatus:org-1:github.com:acme/widgets:7",
+        "gh:prstatus:org-1:github.com:acme/widgets:8",
+      ]);
+    });
+
+    /** @scenario "Live status is cached briefly" */
+    it("answers the second read of one pull request from the cache", async () => {
+      const store = new Map<string, string>();
+      const getPullRequest = vi.fn().mockResolvedValue({
+        state: "open",
+        draft: false,
+        mergedAt: null,
+      });
+      const service = traced(
+        new GithubPullRequestStatusService({
+          repository: {
+            findByNumber: vi.fn().mockResolvedValue(storedRow()),
+            refreshSnapshot: vi.fn().mockResolvedValue(undefined),
+          } as never,
+          installations: {
+            resolveInstallationForRepository: vi.fn().mockResolvedValue({
+              installationId: "555",
+              repositoryId: "999",
+            }),
+          } as never,
+          appTokens: { getPullRequest } as never,
+          redis: {
+            get: vi.fn((key: string) =>
+              Promise.resolve(store.get(key) ?? null),
+            ),
+            set: vi.fn((key: string, value: string) => {
+              store.set(key, value);
+              return Promise.resolve("OK");
+            }),
+            del: vi.fn(() => Promise.resolve(1)),
+          } as never,
+        }),
+        "GithubPullRequestStatusService",
+      );
+
+      await service.getLiveStatuses({ organizationId: "org-1", refs: [REF] });
+      await service.getLiveStatuses({ organizationId: "org-1", refs: [REF] });
+
+      expect(getPullRequest).toHaveBeenCalledTimes(1);
     });
   });
 

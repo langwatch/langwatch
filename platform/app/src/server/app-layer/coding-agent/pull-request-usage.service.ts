@@ -45,6 +45,21 @@ export const PERSONAL_SESSION_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 /** Sessions read for the personal page. */
 const PERSONAL_SESSION_LIMIT = 1000;
 
+/**
+ * Wall clock in milliseconds, read off the injected deps.
+ *
+ * A free function, and never a method or a function-valued field on the
+ * service, because the service is published through `traced()` — a Proxy that
+ * wraps every function it hands out in `withActiveSpan`. Anything reached as
+ * `this.<something>()` therefore comes back as a Promise, and a Promise minus
+ * a number is NaN, which reaches ClickHouse as a query parameter and fails the
+ * whole read. `this.deps` is a plain object the Proxy passes through, so
+ * reading the clock from it keeps a number a number.
+ */
+function nowMs(deps: { now?: () => number }): number {
+  return deps.now?.() ?? Date.now();
+}
+
 /** The pull request itself: identity and lifetime, never its body. */
 export interface PullRequestIdentity {
   repositoryHost: string;
@@ -176,11 +191,9 @@ export interface PullRequestUsageQuery {
 
 export class PullRequestUsageService {
   private readonly deps: PullRequestUsageServiceDeps;
-  private readonly now: () => number;
 
   constructor(deps: PullRequestUsageServiceDeps) {
     this.deps = deps;
-    this.now = deps.now ?? (() => Date.now());
   }
 
   /**
@@ -231,7 +244,7 @@ export class PullRequestUsageService {
       repositoryOwner: owner,
       repositoryName: name,
       branches: [target.headBranch],
-      startedAtFromMs: this.now() - USAGE_SESSION_WINDOW_MS,
+      startedAtFromMs: nowMs(this.deps) - USAGE_SESSION_WINDOW_MS,
     });
 
     const attached = attachedToPullRequest({
@@ -257,7 +270,7 @@ export class PullRequestUsageService {
     const organizationId = await this.deps.resolveOrganizationId(projectId);
     if (!organizationId) return { rows: [], unlinked: [] };
 
-    const toMs = this.now();
+    const toMs = nowMs(this.deps);
     const sessions = await this.deps.personalSessions.listRecent({
       projectId,
       fromMs: toMs - PERSONAL_SESSION_WINDOW_MS,

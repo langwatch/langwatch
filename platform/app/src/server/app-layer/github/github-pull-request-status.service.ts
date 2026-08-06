@@ -88,6 +88,26 @@ function statusFromRow(row: GithubPullRequestRow): GithubPullRequestStatus {
   });
 }
 
+/**
+ * The cache entry one pull request's status lives under.
+ *
+ * A free function, and never a method on the service, because the service is
+ * published through `traced()` — a Proxy that hands back every function wrapped
+ * in a span, so `this.cacheKey(...)` returns a Promise rather than a string.
+ * Redis stringifies that to a single literal key shared by every pull request
+ * in every organization, which turns a per-pull-request cache into one that
+ * answers with somebody else's status.
+ */
+function statusCacheKey({
+  organizationId,
+  ref,
+}: {
+  organizationId: string;
+  ref: GithubPullRequestRef;
+}): string {
+  return `gh:prstatus:${organizationId}:${ref.repositoryHost}:${ref.repositoryFullName}:${ref.prNumber}`;
+}
+
 export class GithubPullRequestStatusService {
   private readonly deps: GithubPullRequestStatusServiceDeps;
 
@@ -234,23 +254,13 @@ export class GithubPullRequestStatusService {
       });
   }
 
-  private cacheKey({
-    organizationId,
-    ref,
-  }: {
-    organizationId: string;
-    ref: GithubPullRequestRef;
-  }): string {
-    return `gh:prstatus:${organizationId}:${ref.repositoryHost}:${ref.repositoryFullName}:${ref.prNumber}`;
-  }
-
   private async readCache(params: {
     organizationId: string;
     ref: GithubPullRequestRef;
   }): Promise<GithubPullRequestStatus | null> {
     if (!this.deps.redis) return null;
     try {
-      const value = await this.deps.redis.get(this.cacheKey(params));
+      const value = await this.deps.redis.get(statusCacheKey(params));
       return isStatus(value) ? value : null;
     } catch {
       return null;
@@ -269,7 +279,7 @@ export class GithubPullRequestStatusService {
     if (!this.deps.redis) return;
     try {
       await this.deps.redis.set(
-        this.cacheKey({ organizationId, ref }),
+        statusCacheKey({ organizationId, ref }),
         status,
         "EX",
         STATUS_CACHE_TTL_SEC,

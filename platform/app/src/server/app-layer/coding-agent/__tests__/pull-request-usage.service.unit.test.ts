@@ -8,6 +8,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it, vi } from "vitest";
+import { traced } from "../../tracing";
 import type { GithubPullRequestRow } from "../../github/repositories/github-pull-requests.repository";
 import { PullRequestUsageService } from "../pull-request-usage.service";
 import type { CodingAgentBranchSessionRow } from "../repositories/coding-agent-session.repository";
@@ -256,6 +257,65 @@ describe("PullRequestUsageService", () => {
         startedAtFromMs: number;
       };
       expect(call.startedAtFromMs).toBeLessThan(NOW);
+    });
+  });
+
+  // The app layer publishes this service through `traced()`, a Proxy that
+  // returns every function it is asked for wrapped in a span, so anything the
+  // service reaches for as `this.<something>()` comes back as a Promise. A
+  // clock read that way yields NaN once it meets arithmetic, and NaN reaches
+  // ClickHouse as a query parameter, which fails the read outright. These run
+  // through the same Proxy the app does rather than the bare instance.
+  describe("when published through the tracing proxy", () => {
+    it("still bounds the personal read on a real timestamp", async () => {
+      const listRecent = vi.fn().mockResolvedValue([]);
+      const service = traced(
+        new PullRequestUsageService({
+          pullRequests: {
+            findByNumber: vi.fn(),
+            findAllByBranches: vi.fn().mockResolvedValue([]),
+          } as never,
+          sessions: { listByRepositoryBranch: vi.fn() } as never,
+          personalSessions: { listRecent },
+          installations: { coversRepository: vi.fn().mockResolvedValue(true) },
+          resolveOrganizationId: async () => "org-1",
+        }),
+        "PullRequestUsageService",
+      );
+
+      await service.getForPersonalProject({ projectId: "project-1" });
+
+      const call = listRecent.mock.calls[0]![0] as {
+        fromMs: number;
+        toMs: number;
+      };
+      expect(Number.isFinite(call.fromMs)).toBe(true);
+      expect(Number.isFinite(call.toMs)).toBe(true);
+      expect(call.fromMs).toBeLessThan(call.toMs);
+    });
+
+    it("still bounds the pull request read on a real timestamp", async () => {
+      const listByRepositoryBranch = vi.fn().mockResolvedValue([]);
+      const service = traced(
+        new PullRequestUsageService({
+          pullRequests: {
+            findByNumber: vi.fn().mockResolvedValue(pullRequestRow()),
+            findAllByBranches: vi.fn().mockResolvedValue([pullRequestRow()]),
+          } as never,
+          sessions: { listByRepositoryBranch } as never,
+          personalSessions: { listRecent: vi.fn().mockResolvedValue([]) },
+          installations: { coversRepository: vi.fn().mockResolvedValue(true) },
+          resolveOrganizationId: async () => "org-1",
+        }),
+        "PullRequestUsageService",
+      );
+
+      await service.getPullRequestUsage(QUERY);
+
+      const call = listByRepositoryBranch.mock.calls[0]![0] as {
+        startedAtFromMs: number;
+      };
+      expect(Number.isFinite(call.startedAtFromMs)).toBe(true);
     });
   });
 });

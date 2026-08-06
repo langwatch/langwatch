@@ -127,6 +127,20 @@ export function normalizeHost(repositoryHost: string): string {
   return repositoryHost === "" ? GITHUB_HOST : repositoryHost;
 }
 
+/**
+ * Wall clock in milliseconds, read off the injected deps.
+ *
+ * A free function, and never a method or a function-valued field on the
+ * service, because the service is published through `traced()` — a Proxy that
+ * hands back every function wrapped in a span. Reached as `this.now()` the
+ * clock returns a Promise, which turns every window bound into NaN and every
+ * `new Date(...)` into an Invalid Date, so the backoff never engages, the
+ * backfill reads nothing and the bookkeeping write fails.
+ */
+function nowMs(deps: { now?: () => number }): number {
+  return deps.now?.() ?? Date.now();
+}
+
 function backoffMsFor(attempts: number): number {
   const index = Math.min(
     Math.max(attempts - 1, 0),
@@ -137,11 +151,9 @@ function backoffMsFor(attempts: number): number {
 
 export class GithubPullRequestMappingService {
   private readonly deps: GithubPullRequestMappingServiceDeps;
-  private readonly now: () => number;
 
   constructor(deps: GithubPullRequestMappingServiceDeps) {
     this.deps = deps;
-    this.now = deps.now ?? (() => Date.now());
   }
 
   /**
@@ -223,7 +235,7 @@ export class GithubPullRequestMappingService {
   }: {
     organizationId: string;
   }): Promise<void> {
-    const toMs = this.now();
+    const toMs = nowMs(this.deps);
     const fromMs = toMs - BACKFILL_WINDOW_MS;
     const projectIds = await this.deps.findProjectIds(organizationId);
     const targets = new Map<string, BranchMappingTarget>();
@@ -349,7 +361,7 @@ export class GithubPullRequestMappingService {
   private async shouldSkip(scope: BranchScope): Promise<boolean> {
     const existing = await this.deps.repository.findBranchCheck(scope);
     if (!existing) return false;
-    const now = this.now();
+    const now = nowMs(this.deps);
 
     const withinBackoff =
       existing.recheckAfter !== null && now < existing.recheckAfter.getTime();
@@ -377,7 +389,7 @@ export class GithubPullRequestMappingService {
       ReturnType<GithubAppTokenService["listPullRequestsForHead"]>
     >;
   }): Promise<void> {
-    const now = new Date(this.now());
+    const now = new Date(nowMs(this.deps));
     if (pullRequests.length > 0) {
       await this.deps.repository.upsertPullRequests({
         pullRequests: pullRequests.map((pull) =>
@@ -422,7 +434,7 @@ export class GithubPullRequestMappingService {
       logger.warn({ error, ...scope }, "branch pull-request mapping failed");
       return;
     }
-    const now = new Date(this.now());
+    const now = new Date(nowMs(this.deps));
     const existing = await this.deps.repository.findBranchCheck(scope);
     const attempts = (existing?.attempts ?? 0) + 1;
     await this.deps.repository.upsertBranchCheck({
