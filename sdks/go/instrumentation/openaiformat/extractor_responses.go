@@ -233,10 +233,20 @@ func recordResponsesResult(span *langwatch.Span, resp responsesResponse, capture
 
 // toGenAIUsage maps the Responses usage onto the LangWatch helper, leaving
 // fields nil (unrecorded) when the wire value is absent / zero.
+//
+// InputTokens carries the NON-CACHED input only. The Responses API reports
+// input_tokens_details.cached_tokens as a subset of input_tokens, whereas
+// LangWatch costs the buckets additively (input at the input rate plus
+// cache-read at the cache-read rate), so the cached portion is subtracted out
+// here. That yields the same exclusive split Anthropic and Bedrock report
+// natively. Reporting input_tokens as-is would bill the cached tokens twice.
+// TotalTokens is left as the provider's reported total.
 func (u responsesUsagePayload) toGenAIUsage() langwatch.GenAIUsage {
 	usage := langwatch.GenAIUsage{}
-	if u.InputTokens > 0 {
-		usage.InputTokens = langwatch.Int(u.InputTokens)
+	// Clamped at zero: a provider reporting cached > input is bad data, and the
+	// field stays nil rather than going negative.
+	if nonCached := u.InputTokens - u.InputTokensDetails.CachedTokens; nonCached > 0 {
+		usage.InputTokens = langwatch.Int(nonCached)
 	}
 	if u.OutputTokens > 0 {
 		usage.OutputTokens = langwatch.Int(u.OutputTokens)

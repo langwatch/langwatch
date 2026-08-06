@@ -52,7 +52,9 @@ func TestMiddleware_ChatCompletion_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.StringValue("cmpl-xyz"), attrs[semconv.GenAIResponseIDKey])
 	assert.Equal(t, attribute.StringValue("gpt-test-resp"), attrs[semconv.GenAIResponseModelKey])
 	assert.Equal(t, attribute.StringValue("fp_test_value"), attrs[semconv.OpenAIResponseSystemFingerprintKey])
-	assert.Equal(t, attribute.IntValue(2), attrs[semconv.GenAIUsageInputTokensKey])
+	// prompt_tokens=2 includes the 1 cached token, so the exclusive split is
+	// input=1 / cached=1.
+	assert.Equal(t, attribute.IntValue(1), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(1), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(1), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
 	assert.Equal(t, attribute.StringSliceValue([]string{"stop"}), attrs[semconv.GenAIResponseFinishReasonsKey])
@@ -151,7 +153,9 @@ func TestMiddleware_Responses_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.StringValue("resp_123"), attrs[semconv.GenAIResponseIDKey])
 	assert.Equal(t, attribute.StringValue("gpt-4o"), attrs[semconv.GenAIResponseModelKey])
 	assert.Equal(t, attribute.StringValue("completed"), attrs[attribute.Key("gen_ai.response.status")])
-	assert.Equal(t, attribute.IntValue(11), attrs[semconv.GenAIUsageInputTokensKey])
+	// input_tokens=11 includes the 4 cached tokens, so the exclusive split is
+	// input=7 / cached=4.
+	assert.Equal(t, attribute.IntValue(7), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(7), attrs[semconv.GenAIUsageOutputTokensKey])
 	// Cached + reasoning tokens are extracted from the usage details.
 	assert.Equal(t, attribute.IntValue(4), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])

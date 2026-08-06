@@ -48,7 +48,9 @@ func TestChatExtractor_Response(t *testing.T) {
 	assert.Equal(t, attribute.StringValue("fp_test_value"), attrs[semconv.OpenAIResponseSystemFingerprintKey])
 	assert.Equal(t, attribute.StringSliceValue([]string{"stop"}), attrs[semconv.GenAIResponseFinishReasonsKey])
 
-	assert.Equal(t, attribute.IntValue(2), attrs[semconv.GenAIUsageInputTokensKey])
+	// prompt_tokens=2 includes the 1 cached token, so the exclusive split is
+	// input=1 / cached=1. total_tokens stays the provider's reported 3.
+	assert.Equal(t, attribute.IntValue(1), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(1), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(3), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 	assert.Equal(t, attribute.IntValue(1), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
@@ -123,7 +125,9 @@ func TestChatStreamAccumulator(t *testing.T) {
 	assert.Equal(t, attribute.StringValue("gpt-stream-resp"), attrs[semconv.GenAIResponseModelKey])
 	assert.Equal(t, attribute.StringValue("fp_stream_test"), attrs[semconv.OpenAIResponseSystemFingerprintKey])
 	assert.Equal(t, attribute.StringSliceValue([]string{"stop"}), attrs[semconv.GenAIResponseFinishReasonsKey])
-	assert.Equal(t, attribute.IntValue(4), attrs[semconv.GenAIUsageInputTokensKey])
+	// prompt_tokens=4 includes the 3 cached tokens, so the exclusive split is
+	// input=1 / cached=3. total_tokens stays the provider's reported 6.
+	assert.Equal(t, attribute.IntValue(1), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(2), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(6), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 	assert.Equal(t, attribute.IntValue(3), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
