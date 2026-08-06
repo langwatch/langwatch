@@ -43,6 +43,11 @@ COPY services/langevals/ ./services/langevals/
 EXPOSE 3000
 
 WORKDIR /app/mcp/typescript
+
+# The HTTP server is network reachable, so it does not run as root. The node
+# image ships this unprivileged user; everything under /app is read-only at
+# runtime and tsx compiles into the system temp directory.
+USER node
 # The HTTP server binds loopback by default. A container has to bind every
 # interface to be reachable from outside itself, so that is opted into here.
 # Publish the port only to a network you trust, and pass --allowedOrigin for

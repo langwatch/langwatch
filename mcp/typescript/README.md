@@ -16,7 +16,7 @@ For Claude Code (manual) or other MCP clients (Cursor, Copilot, etc.), add an en
 - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
 - `env.LANGWATCH_API_KEY`: your LangWatch API key
 
-The API key is required for observability and prompt tools. Documentation tools work without it.
+In stdio mode the API key is required for observability and prompt tools, and documentation tools work without it. In HTTP mode every request needs a valid key, including documentation-tool requests, because the server authenticates the request before it reaches any tool.
 
 > The config is described in prose rather than as a JSON snippet because some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104). The bash form above is safe — the package name is followed by a whitespace terminator.
 
@@ -35,9 +35,13 @@ The API key is required for observability and prompt tools. Documentation tools 
 ### HTTP mode
 
 In HTTP mode each client brings its own API key in an `Authorization: Bearer <key>`
-header. The key is checked against the LangWatch API before a session is created
-and re-checked on every request, so a session id by itself grants no access. The
-API key is never read from a query parameter.
+header, on every request rather than only at session start. The key is checked
+against the LangWatch API before a session is created and re-checked on each
+request, so a session id by itself grants no access and revoking a key ends its
+sessions. The API key is never read from a query parameter.
+
+Because authentication happens before routing, this applies to the documentation
+tools too: unlike stdio mode, they are not reachable without a valid key.
 
 The server listens on `127.0.0.1` by default, per the MCP transport guidance for
 local servers. Pass `--host 0.0.0.0` to accept connections from other machines,

@@ -60,7 +60,13 @@ if (argv.http) {
     allowedOrigins,
   });
 
-  console.log(`LangWatch MCP server listening on http://${host}:${port}/mcp`);
+  // An IPv6 literal has to be bracketed inside a URL, and must not be
+  // double-bracketed when the operator already wrote it that way.
+  const displayHost =
+    host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+  console.log(
+    `LangWatch MCP server listening on http://${displayHost}:${port}/mcp`
+  );
   console.log(
     "Clients must provide their API key via Authorization: Bearer <key> header"
   );
