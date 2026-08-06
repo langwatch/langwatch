@@ -371,6 +371,47 @@ describe("Session id is not a credential", () => {
     expect(text).toContain("fetch_langwatch_docs");
   });
 
+  it("stops serving a session once its key stops verifying", async () => {
+    const live = new Set([VALID_KEY]);
+    const verifier: ApiKeyVerifier = {
+      verify: async (apiKey: string) => live.has(apiKey),
+      sweep: () => undefined,
+      clear: () => undefined,
+    };
+    const revocable = await startHarness({ port: 0, apiKeyVerifier: verifier });
+
+    try {
+      const sessionId = await openSession(revocable.baseUrl);
+
+      const before = await fetch(`${revocable.baseUrl}/mcp`, {
+        method: "POST",
+        headers: {
+          ...MCP_POST_HEADERS,
+          "mcp-session-id": sessionId,
+          Authorization: `Bearer ${VALID_KEY}`,
+        },
+        body: toolsListBody(),
+      });
+      expect(before.status).toBe(200);
+      await before.text();
+
+      live.delete(VALID_KEY);
+
+      const after = await fetch(`${revocable.baseUrl}/mcp`, {
+        method: "POST",
+        headers: {
+          ...MCP_POST_HEADERS,
+          "mcp-session-id": sessionId,
+          Authorization: `Bearer ${VALID_KEY}`,
+        },
+        body: toolsListBody(),
+      });
+      expect(after.status).toBe(401);
+    } finally {
+      await revocable.close();
+    }
+  });
+
   it("answers 401 rather than 400 for a session id it does not know", async () => {
     const response = await fetch(`${harness.baseUrl}/mcp`, {
       method: "POST",

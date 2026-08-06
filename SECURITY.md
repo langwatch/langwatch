@@ -2,7 +2,15 @@
 
 ## Reporting a vulnerability
 
-Email **security@langwatch.ai**.
+Use either channel, whichever you prefer:
+
+- **GitHub private vulnerability reporting**, from the
+  [Security tab](https://github.com/langwatch/langwatch/security/advisories/new).
+  This is the fastest route: it opens a private thread attached to the
+  repository, so the report reaches the engineers who own the code with no
+  inbox routing in between.
+- **Email security@langwatch.ai**, if you would rather not use GitHub or want
+  to report something outside this repository.
 
 Please do not open a public GitHub issue, pull request, or Discord message for a
 security problem. A public report puts every LangWatch user at risk during the

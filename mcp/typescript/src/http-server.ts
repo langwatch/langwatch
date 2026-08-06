@@ -31,12 +31,11 @@ const MAX_SESSIONS_PER_KEY = 20;
 /** OAuth access token lifetime. */
 const OAUTH_TOKEN_TTL_SECONDS = 3600;
 
-/**
- * In-memory store for OAuth access tokens.
- * Maps token to API key so Bearer tokens resolve from either direct API keys
- * or OAuth-issued access tokens.
- */
-const oauthTokens = new Map<string, { apiKey: string; expiresAt: number }>();
+/** An OAuth access token and the API key it was minted from. */
+interface OAuthTokenEntry {
+  apiKey: string;
+  expiresAt: number;
+}
 
 /**
  * Reads the raw Bearer token from the Authorization header.
@@ -46,22 +45,6 @@ function readBearerToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) return null;
   return authHeader.slice(7) || null;
-}
-
-/**
- * Resolves a Bearer token to the API key it stands for. OAuth-issued access
- * tokens map back to the key they were minted from; anything else is treated
- * as a direct API key. This only translates the token, it does not decide
- * whether the key is valid.
- */
-function resolveApiKey(token: string): string | null {
-  const oauthEntry = oauthTokens.get(token);
-  if (!oauthEntry) return token;
-
-  if (Date.now() < oauthEntry.expiresAt) return oauthEntry.apiKey;
-
-  oauthTokens.delete(token);
-  return null;
 }
 
 /**
@@ -133,11 +116,36 @@ export async function startHttpServer({
     parseAllowedOrigins(process.env.LANGWATCH_MCP_ALLOWED_ORIGINS);
 
   const app = express();
-  app.set("trust proxy", true);
+  // Behind a reverse proxy the forwarded headers are what carry the client
+  // address and the external scheme, so the per-IP rate limiter and the OAuth
+  // metadata document both depend on this. It is only as trustworthy as the
+  // proxy in front of it: with the port exposed directly, a client can put any
+  // address in X-Forwarded-For. Set LANGWATCH_MCP_TRUST_PROXY=false when
+  // nothing trusted terminates in front of the server.
+  app.set("trust proxy", process.env.LANGWATCH_MCP_TRUST_PROXY !== "false");
   app.use(express.json());
 
   const verifier =
     apiKeyVerifier ?? createApiKeyVerifier({ endpoint: getConfig().endpoint });
+
+  /** OAuth access tokens minted by this server, keyed by token. */
+  const oauthTokens = new Map<string, OAuthTokenEntry>();
+
+  /**
+   * Resolves a Bearer token to the API key it stands for. OAuth-issued access
+   * tokens map back to the key they were minted from; anything else is treated
+   * as a direct API key. This only translates the token, it does not decide
+   * whether the key is valid.
+   */
+  function resolveApiKey(token: string): string | null {
+    const oauthEntry = oauthTokens.get(token);
+    if (!oauthEntry) return token;
+
+    if (Date.now() < oauthEntry.expiresAt) return oauthEntry.apiKey;
+
+    oauthTokens.delete(token);
+    return null;
+  }
 
   // Failed authentication is rate limited per IP so an attacker cannot spray
   // candidate keys or turn one flood into unbounded verification traffic.
@@ -266,13 +274,15 @@ export async function startHttpServer({
   /**
    * Re-checks the Bearer token on a request that names an existing session.
    * The token has to resolve to the same key the session was created with, so
-   * possession of a session id grants nothing on its own.
+   * possession of a session id grants nothing on its own, and the key has to
+   * still be live, so revoking a key ends its sessions within the verifier's
+   * cache window rather than at the session TTL.
    */
-  function authenticateForSession(
+  async function authenticateForSession(
     req: Request,
     res: Response,
     sessionApiKey: string
-  ): boolean {
+  ): Promise<boolean> {
     const token = readBearerToken(req);
     if (!token) {
       sendUnauthorized(
@@ -286,6 +296,12 @@ export async function startHttpServer({
     if (!apiKey || !apiKeysMatch(apiKey, sessionApiKey)) {
       authFailRateLimiter.track(clientIp(req));
       sendUnauthorized(res, "Bearer token does not match session");
+      return false;
+    }
+
+    if (!(await verifier.verify(apiKey))) {
+      authFailRateLimiter.track(clientIp(req));
+      sendUnauthorized(res, "Invalid API key");
       return false;
     }
 
@@ -387,7 +403,7 @@ export async function startHttpServer({
     const session = sessionId ? sessions.get(sessionId) : undefined;
 
     if (sessionId && session) {
-      if (!authenticateForSession(req, res, session.apiKey)) return;
+      if (!(await authenticateForSession(req, res, session.apiKey))) return;
 
       sessions.touch(sessionId);
       await handleWithSessionConfig(session.apiKey, () =>
@@ -445,7 +461,7 @@ export async function startHttpServer({
     const session = sessionId ? sessions.get(sessionId) : undefined;
 
     if (sessionId && session) {
-      if (!authenticateForSession(req, res, session.apiKey)) return;
+      if (!(await authenticateForSession(req, res, session.apiKey))) return;
 
       sessions.touch(sessionId);
       await handleWithSessionConfig(session.apiKey, () =>
@@ -471,7 +487,7 @@ export async function startHttpServer({
       return;
     }
 
-    if (!authenticateForSession(req, res, session.apiKey)) return;
+    if (!(await authenticateForSession(req, res, session.apiKey))) return;
 
     sessions.remove(sessionId);
     await session.transport.close();
@@ -521,7 +537,7 @@ export async function startHttpServer({
       return;
     }
 
-    if (!authenticateForSession(req, res, session.apiKey)) return;
+    if (!(await authenticateForSession(req, res, session.apiKey))) return;
 
     sseSessions.touch(sessionId);
     await handleWithSessionConfig(session.apiKey, () =>
