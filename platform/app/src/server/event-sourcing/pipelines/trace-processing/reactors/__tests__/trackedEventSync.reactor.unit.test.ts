@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type {
   SpanReceivedEvent,
@@ -47,6 +48,41 @@ function makeOtlpSpan(feedbackEvents: FeedbackEvent[]): OtlpSpan {
     })),
     links: [],
     status: { code: null, message: null },
+    flags: null,
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+  } as unknown as OtlpSpan;
+}
+
+/**
+ * Mirrors the span `recordTrackedEventSpan` ingests back into the same
+ * trace-processing pipeline: named `TRACK_EVENT_SPAN_NAME`, carrying one span
+ * event named after the recorded event type, whose attributes always include
+ * `event.type`. With `eventType` set to `langwatch.event` this span is byte-for
+ * -byte the shape this reactor reacts to, which is the amplification loop.
+ */
+function makeRecordedTrackEventSpan(eventType: string): OtlpSpan {
+  const attributes = [
+    { key: "event.type", value: { stringValue: eventType } },
+    { key: "event.id", value: { stringValue: "event_sha_deadbeef" } },
+    { key: "event.metrics.vote", value: { doubleValue: 1 } },
+  ];
+
+  return {
+    traceId: "aaaa0000000000000000000000000001",
+    spanId: "cccc000000000002",
+    parentSpanId: null,
+    name: TRACK_EVENT_SPAN_NAME,
+    kind: 1,
+    startTimeUnixNano: "1700000000500000000",
+    endTimeUnixNano: "1700000000500000000",
+    attributes,
+    events: [
+      { name: eventType, timeUnixNano: "1700000000500000000", attributes },
+    ],
+    links: [],
+    status: { code: 1, message: null },
     flags: null,
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
@@ -162,6 +198,24 @@ describe("extractTrackedEventsFromSpan", () => {
         metrics: {},
         event_details: {},
       });
+    });
+  });
+
+  describe("given a span this ingestion path emitted itself", () => {
+    it("reconstructs nothing from it", () => {
+      const span = makeRecordedTrackEventSpan("langwatch.event");
+
+      expect(extractTrackedEventsFromSpan(span)).toHaveLength(0);
+    });
+  });
+
+  describe("given a feedback event typed as the envelope name", () => {
+    it("skips the reserved event type", () => {
+      const span = makeOtlpSpan([
+        { type: "langwatch.event", metrics: { vote: 1 } },
+      ]);
+
+      expect(extractTrackedEventsFromSpan(span)).toHaveLength(0);
     });
   });
 });
@@ -296,6 +350,82 @@ describe("trackedEventSync reactor", () => {
       await reactor.handle(oldEvent, createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a span this ingestion path emitted itself", () => {
+    describe("when the recorded event type is the envelope name", () => {
+      it("records no tracked event", async () => {
+        const reactor = createTrackedEventSyncReactor(deps);
+        const span = makeRecordedTrackEventSpan("langwatch.event");
+
+        await reactor.handle(
+          createSpanReceivedEvent(span),
+          createContext(createFoldState()),
+        );
+
+        expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
+      });
+
+      it("declines to react", () => {
+        const reactor = createTrackedEventSyncReactor(deps);
+        const span = makeRecordedTrackEventSpan("langwatch.event");
+
+        expect(
+          reactor.shouldReact!(
+            createSpanReceivedEvent(span),
+            createContext(createFoldState()),
+          ),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the recorded event type is an ordinary feedback type", () => {
+      it("records no tracked event", async () => {
+        const reactor = createTrackedEventSyncReactor(deps);
+        const span = makeRecordedTrackEventSpan("thumbs_up_down");
+
+        await reactor.handle(
+          createSpanReceivedEvent(span),
+          createContext(createFoldState()),
+        );
+
+        expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a span claiming the envelope name as its event type", () => {
+    it("records no tracked event", async () => {
+      const reactor = createTrackedEventSyncReactor(deps);
+      const span = makeOtlpSpan([
+        { type: "langwatch.event", metrics: { vote: 1 } },
+      ]);
+
+      await reactor.handle(
+        createSpanReceivedEvent(span),
+        createContext(createFoldState()),
+      );
+
+      expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an ordinary SDK feedback span", () => {
+    it("still records exactly one tracked event", async () => {
+      const reactor = createTrackedEventSyncReactor(deps);
+      const span = makeOtlpSpan([
+        { type: "thumbs_up_down", metrics: { vote: 1 } },
+      ]);
+      const event = createSpanReceivedEvent(span);
+
+      expect(
+        reactor.shouldReact!(event, createContext(createFoldState())),
+      ).toBe(true);
+
+      await reactor.handle(event, createContext(createFoldState()));
+
+      expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(1);
     });
   });
 
