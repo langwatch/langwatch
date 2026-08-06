@@ -174,7 +174,28 @@ The scenario title in the feature file should match the `it()` description in th
 | `@integration` | Component/boundary test | Testing rendering, API calls, DB queries |
 | `@regression` | Prevents a previously-fixed bug from recurring | Bug fix scenarios — must fail without the fix |
 | `@e2e` | Stable core flow (deprioritized) | Only for the 5-10 stable happy-path tests |
-| `@manual` | Verified by hand against real infrastructure, cannot run in CI | Needs a real cloud account/subscription. Still **requires a binding** to a test that self-skips without credentials, so the verification keeps an anchor in the codebase. Record the date and result in a comment above the scenario |
+| `@manual` | Verified by hand against real infrastructure that CI cannot reach | Last resort only — see the rules below the table |
+
+`@manual` is deliberately hard to qualify for, because it is also the easiest
+tag to abuse: anything marked manual is a test nobody runs automatically, and
+an agent (or a rushed human) reaching for it to dodge writing a real test
+defeats the whole pyramid. All of these must hold, or the scenario belongs in
+an automated tier:
+
+- The scenario **cannot** run in CI for a structural reason — it needs a real
+  cloud account/subscription or credentials CI cannot hold. "Hard to write",
+  "slow", or "needs Docker" never qualify.
+- Everything automatable about the behavior is already covered by `@unit` /
+  `@integration` scenarios (e.g. against an emulator); `@manual` covers only
+  the residue that specifically proves the real-infrastructure behavior.
+- It still **requires a binding** to a test that self-skips without
+  credentials, so the verification keeps an anchor in the codebase — the
+  parity checker enforces this like any automated tier.
+- The date and result of the last hand-run are recorded in a comment above the
+  scenario.
+
+Expect a reviewer to challenge every new `@manual`; the burden of proof is on
+the tag, not on the reviewer.
 
 Bug-fix feature specs should use `@regression` (alongside `@unit` or `@integration` for pyramid level):
 
