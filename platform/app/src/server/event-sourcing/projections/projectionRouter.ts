@@ -9,6 +9,7 @@ import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   incrementEsFoldPostStoreFailure,
   incrementEsFoldProjectionTotal,
+  incrementEsMapProjectionEnqueueTotal,
   incrementEsMapProjectionTotal,
   incrementEsProjectionTotal,
   incrementEsReactorCollapsedTotal,
@@ -1092,6 +1093,7 @@ export class ProjectionRouter<
 
         // Filter events for this handler
         const filteredEvents = [];
+        let declined = 0;
         for (const event of events) {
           const disabled = await isComponentDisabled({
             featureFlagService: this.featureFlagService,
@@ -1111,8 +1113,26 @@ export class ProjectionRouter<
           ) {
             continue;
           }
+
+          if (!this.mapEnqueueAccepts({ mapProj, name, event })) {
+            declined++;
+            continue;
+          }
           filteredEvents.push(event);
         }
+
+        incrementEsMapProjectionEnqueueTotal({
+          pipelineName: this.pipelineName,
+          projectionName: name,
+          outcome: "filtered",
+          count: declined,
+        });
+        incrementEsMapProjectionEnqueueTotal({
+          pipelineName: this.pipelineName,
+          projectionName: name,
+          outcome: "queued",
+          count: filteredEvents.length,
+        });
 
         if (filteredEvents.length === 0) continue;
 
@@ -1156,6 +1176,25 @@ export class ProjectionRouter<
           ) {
             continue;
           }
+
+          // The same gate the queued branch applies, so the inline path (tests,
+          // queue-less runtimes) reaches the same set of mapped records. There
+          // is no job to avoid minting here — the win is only the skipped
+          // execute — but a seam that answered differently in the two modes
+          // would make every inline test a lie about production.
+          if (!this.mapEnqueueAccepts({ mapProj, name, event })) {
+            incrementEsMapProjectionEnqueueTotal({
+              pipelineName: this.pipelineName,
+              projectionName: name,
+              outcome: "filtered",
+            });
+            continue;
+          }
+          incrementEsMapProjectionEnqueueTotal({
+            pipelineName: this.pipelineName,
+            projectionName: name,
+            outcome: "queued",
+          });
 
           try {
             // Defer or skip if projection-replay is active for this aggregate.
@@ -1224,6 +1263,48 @@ export class ProjectionRouter<
         errors,
         `${errors.length} map projection(s) failed during dispatch`,
       );
+    }
+  }
+
+  /**
+   * The map projection's enqueue-time gate (ADR-069 invariant 4): `false`
+   * means no job is ever minted for this event.
+   *
+   * Fail-OPEN on a throw, and deliberately the opposite of the subscriber
+   * seam's rule. There, a thrown filter is reported as a dispatch failure
+   * because a subscriber's job is the only carrier of its side effect and
+   * silently reading the throw as "not relevant" would hide a permanent loss.
+   * Here the filter is a pure restatement of what `map()` already decides, so
+   * admitting the event on a throw costs one job that maps to nothing —
+   * exactly the pre-filter behavior — while declining it would drop a row the
+   * projection was going to write. Between "cost of a job" and "silent hole in
+   * a fact table", the gate opens. It is still a bug: it is logged.
+   */
+  private mapEnqueueAccepts({
+    mapProj,
+    name,
+    event,
+  }: {
+    mapProj: MapProjectionDefinition<any, EventType>;
+    name: string;
+    event: EventType;
+  }): boolean {
+    const filter = mapProj.options?.enqueue?.filter;
+    if (!filter) return true;
+    try {
+      return filter(event);
+    } catch (error) {
+      this.logger.warn(
+        {
+          projectionName: name,
+          eventId: event.id,
+          eventType: event.type,
+          tenantId: String(event.tenantId),
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Map projection enqueue filter threw; admitting the event so no record is lost",
+      );
+      return true;
     }
   }
 

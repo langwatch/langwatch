@@ -1,3 +1,4 @@
+import type { Event } from "../../../domain/types";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
@@ -82,8 +83,12 @@ export interface CodingAgentSessionEventRecord {
  *
  * Wire names arrive bare (`api_request`) from Claude Code and namespaced
  * (`claude_code.api_refusal`) from agents that prefix; both spellings map.
+ *
+ * The single declaration behind BOTH the row and the enqueue-time gate: adding
+ * a name here makes the projection map it and makes the gate admit it, in one
+ * edit. See {@link mapsToCodingAgentSessionEvent}.
  */
-const EVENT_KIND_BY_RAW_NAME: Record<string, string> = {
+export const EVENT_KIND_BY_RAW_NAME: Record<string, string> = {
   api_request: "model_call",
   compaction: "compaction",
   chat_compression: "compaction",
@@ -98,6 +103,30 @@ const EVENT_KIND_BY_RAW_NAME: Record<string, string> = {
   user_prompt: "user_prompt",
   subagent_completed: "subagent_completed",
 };
+
+/**
+ * The enqueue-time gate (ADR-069 invariant 4): does this contribution become a
+ * row at all?
+ *
+ * Every coding-agent log record is contributed to its session, and most of
+ * them are not rows here — hooks, plugin loads, MCP connections and the two
+ * body events are 71% of a measured session's records. Without this gate each
+ * of them minted a queue job that deserialized a payload, ran `map()`, got
+ * `null` and wrote nothing.
+ *
+ * It cannot disagree with `map()` because it is not a second opinion: both
+ * evaluate `resolveEventKind(rawEventName(event))`, and `map()` returns `null`
+ * on exactly the answer this returns `false` on. Any future reason for `map()`
+ * to decline an event must be added BELOW that check, never inside
+ * `resolveEventKind`, or the gate silently narrows with it.
+ *
+ * Total by construction: a body that carries no readable `event.name` reads as
+ * `""`, which resolves to `null` — declined the same way an unlisted name is,
+ * because `map()` would also have written nothing for it.
+ */
+export function mapsToCodingAgentSessionEvent(event: Event): boolean {
+  return resolveEventKind(rawEventName(event)) !== null;
+}
 
 const events = [logFactsContributedEventSchema] as const;
 
@@ -114,6 +143,7 @@ export class CodingAgentSessionEventsMapProjection
     this.store = deps.store;
     this.options = {
       coalesceMaxBatch: CODING_AGENT_MAP_COALESCE_MAX_BATCH,
+      enqueue: { filter: mapsToCodingAgentSessionEvent },
     };
   }
 
@@ -121,7 +151,7 @@ export class CodingAgentSessionEventsMapProjection
     event: LogFactsContributedEvent,
   ): CodingAgentSessionEventRecord | null {
     const facts = event.data.facts;
-    const eventKind = resolveEventKind(str(facts["event.name"]));
+    const eventKind = resolveEventKind(rawEventName(event));
     if (eventKind === null) return null;
 
     const querySource = str(facts.query_source);
@@ -180,6 +210,22 @@ export class CodingAgentSessionEventsMapProjection
 function resolveEventKind(rawName: string): string | null {
   if (rawName === "") return null;
   return EVENT_KIND_BY_RAW_NAME[bare(rawName)] ?? null;
+}
+
+/**
+ * The raw wire event name off a contribution, read totally.
+ *
+ * Shared by `map()` and the enqueue filter so the two read the same field the
+ * same way. Structural rather than schema-parsed on purpose: the filter runs on
+ * the dispatch hot path with no retry behind it, and a body shape it cannot
+ * read is an event with no name, which is already the "no row" answer.
+ */
+function rawEventName(event: { data?: unknown }): string {
+  const data = event.data;
+  if (typeof data !== "object" || data === null) return "";
+  const facts = (data as { facts?: unknown }).facts;
+  if (typeof facts !== "object" || facts === null) return "";
+  return str((facts as ContributionFacts)["event.name"]);
 }
 
 /** `claude_code.api_refusal` and `api_refusal` are the same wire word. */

@@ -48,6 +48,28 @@ Feature: Per-call session events for context economics
     When the session events projection maps it
     Then no row is produced
 
+  # Most of a session's log records are not rows here: hooks, plugin loads,
+  # MCP connections and the two body events were 71% of a measured corpus.
+  # Deciding that at the fan-out seam rather than inside a queue job is what
+  # keeps a 4,000-record session from minting 4,000 jobs to write 1,300 rows.
+  @unit
+  Scenario: A contribution the fact table declines mints no queue job
+    Given a batch of contributions the session events projection would map to nothing
+    When the pipeline dispatches them
+    Then no job is queued for those contributions
+    And the contributions it does map are queued as before
+
+  # The gate is a restatement of what the projection already decides, never a
+  # second opinion. Admitting more than the projection maps costs a job that
+  # writes nothing; admitting less silently loses a row, because a map
+  # projection's fan-out is not replayed.
+  @unit
+  Scenario: The events fact table declines a contribution it would map to nothing
+    Given every wire event name the session events projection knows
+    When the enqueue gate is asked about each of them
+    Then it admits every name that becomes a row
+    And it declines nothing that would have become a row
+
   @integration
   Scenario: re-delivery does not duplicate a row
     Given the same session event row written twice

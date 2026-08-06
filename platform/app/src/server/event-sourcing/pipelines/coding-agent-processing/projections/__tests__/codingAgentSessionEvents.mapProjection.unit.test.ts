@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import type { Event } from "../../../../domain/types";
 import type { AppendStore } from "../../../../projections/mapProjection.types";
 import { LOG_FACTS_CONTRIBUTED_EVENT_TYPE } from "../../schemas/constants";
 import type { LogFactsContributedEvent } from "../../schemas/events";
 import {
   type CodingAgentSessionEventRecord,
   CodingAgentSessionEventsMapProjection,
+  EVENT_KIND_BY_RAW_NAME,
+  mapsToCodingAgentSessionEvent,
 } from "../codingAgentSessionEvents.mapProjection";
 
 const SESSION_ID = "28a0697b-9057-47c4-a927-b53a9e80f139";
@@ -236,6 +239,106 @@ describe("CodingAgentSessionEventsMapProjection", () => {
 
       expect(row?.traceId).toBe("");
       expect(row?.eventKind).toBe("model_call");
+    });
+  });
+
+  describe("its enqueue-time gate", () => {
+    /**
+     * The wire vocabulary as it actually arrives, taken from a measured
+     * dogfooding corpus (34 sessions, 5641 coding-agent log records): every
+     * name the projection maps, in both the bare and namespaced spellings, plus
+     * every name it does not.
+     */
+    const DECLINED_WIRE_NAMES = [
+      "hook_execution_start",
+      "hook_execution_complete",
+      "hook_registered",
+      "api_request_body",
+      "api_response_body",
+      "assistant_response",
+      "mcp_server_connection",
+      "plugin_loaded",
+      "at_mention",
+      "feedback_survey",
+      "langwatch.session_context",
+      "gen_ai.client.inference.operation.details",
+      "gemini_cli.model_routing",
+      "gemini_cli.startup_stats",
+      "event otel/src/events/session_telemetry.rs:236",
+      "",
+    ];
+
+    const admittedNames = Object.keys(EVENT_KIND_BY_RAW_NAME);
+
+    it("declares the gate on the projection so the router can read it", () => {
+      expect(makeProjection().options?.enqueue?.filter).toBe(
+        mapsToCodingAgentSessionEvent,
+      );
+    });
+
+    /** @scenario "The events fact table declines a contribution it would map to nothing" */
+    it("admits every wire name the projection maps, in both spellings", () => {
+      const projection = makeProjection();
+
+      for (const name of admittedNames) {
+        for (const spelling of [name, `claude_code.${name}`]) {
+          const event = logFactsEvent({ "event.name": spelling });
+          expect(mapsToCodingAgentSessionEvent(event as Event)).toBe(true);
+          expect(
+            projection.mapCodingAgentSessionLogFactsContributed(event),
+          ).not.toBeNull();
+        }
+      }
+    });
+
+    /**
+     * The invariant that makes the gate safe to add at all. A gate admitting a
+     * superset of what `map()` maps costs a job that writes nothing — the
+     * behavior before it existed. A gate rejecting something `map()` would have
+     * mapped is a silent hole in the fact table, because map fan-out is never
+     * replayed on the live path. So: rejected implies unmapped, always.
+     *
+     * @scenario "The events fact table declines a contribution it would map to nothing"
+     */
+    it("never rejects a contribution the projection would have mapped", () => {
+      const projection = makeProjection();
+
+      for (const name of [...admittedNames, ...DECLINED_WIRE_NAMES]) {
+        for (const spelling of [name, `claude_code.${name}`]) {
+          const event = logFactsEvent({ "event.name": spelling });
+          if (mapsToCodingAgentSessionEvent(event as Event)) continue;
+          expect(
+            projection.mapCodingAgentSessionLogFactsContributed(event),
+          ).toBeNull();
+        }
+      }
+    });
+
+    it("declines the records that dominate a real session", () => {
+      for (const name of DECLINED_WIRE_NAMES) {
+        expect(
+          mapsToCodingAgentSessionEvent(
+            logFactsEvent({ "event.name": name }) as Event,
+          ),
+        ).toBe(false);
+      }
+    });
+
+    /**
+     * The gate runs on the dispatch hot path, where a throw is a dispatch
+     * failure rather than a retry. A payload it cannot read at all must
+     * therefore answer, not raise — and it answers the same "no row" `map()`
+     * would.
+     */
+    it("answers for a payload with no readable facts instead of throwing", () => {
+      for (const data of [undefined, null, {}, { facts: null }, "nonsense"]) {
+        expect(
+          mapsToCodingAgentSessionEvent({
+            type: LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+            data,
+          } as unknown as Event),
+        ).toBe(false);
+      }
     });
   });
 });

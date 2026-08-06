@@ -89,6 +89,13 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.coding_agent_session_events
     TotalTokens UInt64 CODEC(ZSTD(1)),
 
     UpdatedAt DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
+    -- 308 is the GRANDFATHER value, not this table's retention. It is what a
+    -- row would read if it carried no stamped value, matching migrations 00032
+    -- and 00051; no row written through the map projection ever reaches it,
+    -- because the append store stamps the tenant's resolved trace retention, or
+    -- PLATFORM_DEFAULT_RETENTION_DAYS (49) when the resolver has no answer.
+    -- ADR-022 has the 49/308 split. Read this default as "what rows predating
+    -- the column get", never as "how long these rows live".
     `_retention_days` UInt16 DEFAULT 308 CODEC(Delta(2), ZSTD(1)),
 
     INDEX idx_case_event_kind EventKind TYPE set(16) GRANULARITY 4,
