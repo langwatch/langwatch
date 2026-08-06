@@ -101,6 +101,12 @@ export type CredentialClass =
  * Derived rather than declared per route, because the app already decides it
  * for every route but one kind: a handler-managed route can opt out of its
  * app's family, and that is the only thing this has to read from the policy.
+ *
+ * Throws on the one pair that has no answer: a handler on a service app that
+ * says it accepts an API key. A service app resolves neither a project nor an
+ * organization, so there is no key family to name and any guess would be
+ * published to integrators as fact. No route is written that way today, and
+ * this is what keeps it that way.
  */
 export function credentialClassFor({
   scope,
@@ -114,6 +120,16 @@ export function credentialClassFor({
   if (policy.kind === "handlerManaged") {
     if (policy.credential === "internal") return "internal";
     if (policy.credential === "session") return "session";
+    // apiKey / both: the handler accepts a key, so the app's own family is
+    // the answer, and the two scopes that have no family are refused below.
+    if (scope === "service" || scope === "session") {
+      throw new Error(
+        `handlerManagedAuth({ credential: "${policy.credential}" }) on a ${scope} app has no API-key family: ` +
+          "a service or session app resolves neither a project nor an organization, so nothing decides which " +
+          "key reaches the route. Mount it on a project or organization app, or declare the credential the " +
+          "handler really takes.",
+      );
+    }
   }
   switch (scope) {
     case "project":

@@ -13,14 +13,14 @@ export type SecurityRequirement = Record<string, never[]>;
  * route and false of a session-only or internal one, so those two have no
  * entry and are refused instead of published as unauthenticated.
  */
-const SECURITY_BY_CREDENTIAL_CLASS: Record<
-  Exclude<CredentialClass, "session" | "internal">,
-  SecurityRequirement[]
-> = {
+const SECURITY_BY_CREDENTIAL_CLASS = {
   project_api_key: [{ project_api_key: [] }],
   organization_api_key: [{ admin_api_key: [] }],
   none: [],
-};
+} as const satisfies Record<
+  Exclude<CredentialClass, "session" | "internal">,
+  readonly SecurityRequirement[]
+>;
 
 /**
  * The security requirement a documented operation publishes, given the
@@ -44,7 +44,7 @@ export function securityForCredentialClass({
 }: {
   operationKey: string;
   credentialClass: CredentialClass;
-}): SecurityRequirement[] {
+}): readonly SecurityRequirement[] {
   if (credentialClass === "session" || credentialClass === "internal") {
     throw new Error(
       `${operationKey} is documented in the public API description but reaches by "${credentialClass}", ` +

@@ -104,7 +104,7 @@ export async function resolveApplicableBudgets(
   const teamIds = presentIds([
     target.teamId,
     ...(target.scopedTeamIds ??
-      (await keyTeamScopeIds(client, target.virtualKeyId))),
+      (await keyTeamScopeIds({ client, virtualKeyId: target.virtualKeyId }))),
   ]);
   if (teamIds.length > 0) {
     ors.push({ scopeType: "TEAM", scopeId: { in: teamIds } });
@@ -203,10 +203,13 @@ function presentIds(
  * `scopedTeamIds` instead so the drawer previews the same set the key will
  * resolve once it is saved.
  */
-async function keyTeamScopeIds(
-  client: PrismaLike,
-  virtualKeyId: string | null | undefined,
-): Promise<string[]> {
+async function keyTeamScopeIds({
+  client,
+  virtualKeyId,
+}: {
+  client: PrismaLike;
+  virtualKeyId: string | null | undefined;
+}): Promise<string[]> {
   if (!virtualKeyId) return [];
   const scopes = await client.virtualKeyScope.findMany({
     where: { virtualKeyId, scopeType: "TEAM" },

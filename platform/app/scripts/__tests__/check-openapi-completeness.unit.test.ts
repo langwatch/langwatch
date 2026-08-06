@@ -51,7 +51,7 @@ const jsonBody = {
  * Every operation declares its own security, because the fixtures below are
  * each about one other rule. The security rule has its own block.
  */
-const secured = { security: [{ project_api_key: [] }] };
+const secured = { security: [{ project_api_key: [] }] } as const;
 
 function rules(violations: Violation[]): string[] {
   return violations.map((v) => `${v.operation} [${v.rule}]`);

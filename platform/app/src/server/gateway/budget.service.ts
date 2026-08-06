@@ -595,7 +595,11 @@ export class GatewayBudgetService {
     const [{ budgets, spendAvailable, readAt }, scopeReach] = await Promise.all(
       [
         this.applyClickHouseSpendWithHealth(rows, organizationId),
-        resolveBudgetScopeReach(this.prisma, organizationId, rows),
+        resolveBudgetScopeReach({
+          prisma: this.prisma,
+          organizationId,
+          budgets: rows,
+        }),
       ],
     );
     return { budgets, spendAvailable, readAt, scopeReach };
@@ -881,6 +885,17 @@ export class GatewayBudgetService {
   }
 
   /**
+   * The wire spelling of each reach-checked scope, so the refusal's
+   * `meta.scope_type` can only ever be one of the three the documentation
+   * lists.
+   */
+  private static readonly REACH_CHECKED_SCOPE_NAMES = {
+    TEAM: "team",
+    PROJECT: "project",
+    GROUP: "group",
+  } as const;
+
+  /**
    * Refuse a budget that no active key could ever spend against.
    *
    * Only TEAM, PROJECT and GROUP are checked, because only those three are
@@ -899,9 +914,13 @@ export class GatewayBudgetService {
     const kind = input.scope.kind;
     if (kind !== "TEAM" && kind !== "PROJECT" && kind !== "GROUP") return;
 
-    const reach = await resolveScopeReach(this.prisma, input.organizationId, {
-      scopeType: scopeKindToEnum(kind),
-      scopeId: scopeIdForScope(input.scope),
+    const reach = await resolveScopeReach({
+      prisma: this.prisma,
+      organizationId: input.organizationId,
+      scope: {
+        scopeType: scopeKindToEnum(kind),
+        scopeId: scopeIdForScope(input.scope),
+      },
     });
     // An organization with no keys yet is being set up, and budget first, key
     // second is the natural order there. Refusing would leave a fresh
@@ -909,7 +928,7 @@ export class GatewayBudgetService {
     if (reach.activeKeyCount === 0 || reach.reachable) return;
 
     throw new GatewayBudgetScopeUnreachableError({
-      scopeType: kind.toLowerCase(),
+      scopeType: GatewayBudgetService.REACH_CHECKED_SCOPE_NAMES[kind],
       reachableProjectIds: reach.reachableProjectIds,
     });
   }

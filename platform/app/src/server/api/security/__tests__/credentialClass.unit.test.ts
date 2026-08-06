@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import type { HandlerCredential } from "../access-policy";
 import {
   anyAuthenticated,
   apiKeyPermission,
@@ -52,6 +53,12 @@ const PUBLIC_SURFACES = [
 /** The first surface whose prefix the path starts with; order is longest-first. */
 const surfaceFor = (path: string) =>
   PUBLIC_SURFACES.find((surface) => path.startsWith(surface.prefix));
+
+type ApiDocument = {
+  paths: Record<string, Record<string, { security?: unknown }>>;
+};
+
+const document = JSON.parse(readFileSync(SPEC_PATH, "utf8")) as ApiDocument;
 
 describe("credentialClassFor", () => {
   describe("given routes mounted on each kind of app", () => {
@@ -105,6 +112,60 @@ describe("credentialClassFor", () => {
           ),
         }),
       ).toBe("internal");
+    });
+  });
+
+  describe("given a handler-managed route on each app, for each credential", () => {
+    const handlerManaged = (credential: HandlerCredential) =>
+      handlerManagedAuth({
+        reason: "the handler resolves the caller itself",
+        permissions: [],
+        credential,
+      });
+
+    // Every combination, because the derivation reads the credential for two
+    // of the four values and the app scope for the other two, and a pair that
+    // falls between them is exactly how a route ends up publishing a class
+    // nothing enforces.
+    it.each([
+      { scope: "project", credential: "apiKey", expected: "project_api_key" },
+      { scope: "project", credential: "both", expected: "project_api_key" },
+      { scope: "project", credential: "session", expected: "session" },
+      { scope: "project", credential: "internal", expected: "internal" },
+      {
+        scope: "organization",
+        credential: "apiKey",
+        expected: "organization_api_key",
+      },
+      {
+        scope: "organization",
+        credential: "both",
+        expected: "organization_api_key",
+      },
+      { scope: "organization", credential: "session", expected: "session" },
+      { scope: "organization", credential: "internal", expected: "internal" },
+      { scope: "service", credential: "session", expected: "session" },
+      { scope: "service", credential: "internal", expected: "internal" },
+    ] as const)("a $scope app taking $credential publishes $expected", ({
+      scope,
+      credential,
+      expected,
+    }) => {
+      expect(
+        credentialClassFor({ scope, policy: handlerManaged(credential) }),
+      ).toBe(expected);
+    });
+
+    it.each([
+      "apiKey",
+      "both",
+    ] as const)("refuses a service app whose handler takes %s, which names no key family", (credential) => {
+      expect(() =>
+        credentialClassFor({
+          scope: "service",
+          policy: handlerManaged(credential),
+        }),
+      ).toThrow(/no API-key family/);
     });
   });
 });
@@ -164,10 +225,6 @@ describe("the published API description", () => {
   describe("given an operation on a public REST surface", () => {
     /** @scenario "Every published operation states its own credential requirement" */
     it("names the credential class rather than inheriting the document default", () => {
-      const document = JSON.parse(readFileSync(SPEC_PATH, "utf8")) as {
-        paths: Record<string, Record<string, { security?: unknown }>>;
-      };
-
       // Every operation is checked against the family its mount puts it in,
       // rather than counted. A count passes while an organization endpoint
       // publishes the project key, as long as some other operation still
@@ -210,11 +267,7 @@ describe("the published API description", () => {
     });
 
     it("gives the spend and webhook routes the organization key", () => {
-      const document = JSON.parse(readFileSync(SPEC_PATH, "utf8")) as {
-        paths: Record<string, Record<string, { security?: unknown }>>;
-      };
-
-      // The four routes the last dogfood ran a project key at, plus the
+      // The two spend routes the last dogfood ran a project key at, plus the
       // webhook collection it registers against.
       for (const path of [
         "/api/gateway/v1/spend-summaries",

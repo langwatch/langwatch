@@ -353,7 +353,13 @@ export class GatewayBudgetScopeUnreachableError extends HandledError {
     scopeType,
     reachableProjectIds,
   }: {
-    scopeType: string;
+    /**
+     * The three scopes whose reach depends on a key. The other four are
+     * either reachable by construction or matched directly, so they never
+     * arrive here, and a wider type would let one onto the published
+     * `meta.scope_type` that the documented values do not include.
+     */
+    scopeType: "team" | "project" | "group";
     reachableProjectIds: string[];
   }) {
     super(

@@ -139,7 +139,13 @@ async function loadGroupIdsByPrincipal(
 type ScopeRef = Pick<GatewayBudget, "scopeType" | "scopeId">;
 
 /** The same predicate applicableForRequest uses, evaluated in memory. */
-function budgetMatchesKey(budget: ScopeRef, key: KeyReach): boolean {
+function budgetMatchesKey({
+  budget,
+  key,
+}: {
+  budget: ScopeRef;
+  key: KeyReach;
+}): boolean {
   switch (budget.scopeType) {
     case "ORGANIZATION":
       return budget.scopeId === key.organizationId;
@@ -172,11 +178,15 @@ function budgetMatchesKey(budget: ScopeRef, key: KeyReach): boolean {
   }
 }
 
-export async function resolveBudgetScopeReach(
-  prisma: PrismaClient,
-  organizationId: string,
-  budgets: GatewayBudget[],
-): Promise<Map<string, BudgetScopeReach>> {
+export async function resolveBudgetScopeReach({
+  prisma,
+  organizationId,
+  budgets,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  budgets: GatewayBudget[];
+}): Promise<Map<string, BudgetScopeReach>> {
   const out = new Map<string, BudgetScopeReach>();
   if (budgets.length === 0) return out;
 
@@ -186,7 +196,7 @@ export async function resolveBudgetScopeReach(
   for (const budget of budgets) {
     out.set(budget.id, {
       budgetId: budget.id,
-      reachable: keys.some((key) => budgetMatchesKey(budget, key)),
+      reachable: keys.some((key) => budgetMatchesKey({ budget, key })),
       reachableProjectIds,
     });
   }
@@ -211,14 +221,18 @@ export type ScopeReach = {
   activeKeyCount: number;
 };
 
-export async function resolveScopeReach(
-  prisma: PrismaClient,
-  organizationId: string,
-  scope: ScopeRef,
-): Promise<ScopeReach> {
+export async function resolveScopeReach({
+  prisma,
+  organizationId,
+  scope,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  scope: ScopeRef;
+}): Promise<ScopeReach> {
   const keys = await loadKeyReach(prisma, organizationId);
   return {
-    reachable: keys.some((key) => budgetMatchesKey(scope, key)),
+    reachable: keys.some((key) => budgetMatchesKey({ budget: scope, key })),
     reachableProjectIds: tracedProjectIds(keys),
     activeKeyCount: keys.length,
   };

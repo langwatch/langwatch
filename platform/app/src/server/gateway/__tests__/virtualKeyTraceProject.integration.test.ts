@@ -286,14 +286,12 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
     /** @scenario "A destination that is named has to be one that exists" */
     it("refuses a project belonging to another organization, and writes nothing", async () => {
       const service = VirtualKeyService.create(prisma);
-      const before = await prisma.virtualKey.count({
-        where: { organizationId: ORG_CHOICE_ID },
-      });
+      const name = `foreign-destination-${suffix}`;
 
       const refusal = await service
         .create({
           organizationId: ORG_CHOICE_ID,
-          name: `foreign-destination-${suffix}`,
+          name,
           actorUserId: USER_ID,
           // A real project, of a different organization. Resolution would
           // otherwise fall through to this key's single project scope and
@@ -305,11 +303,14 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
         .catch((error: unknown) => error);
 
       expect(refusal).toMatchObject({ code: "gateway_trace_project_unknown" });
+      // Scoped to this key's own name rather than to the organization's
+      // count: every other test in the file writes keys into the same
+      // organization, so a count would only hold while this one ran first.
       expect(
         await prisma.virtualKey.count({
-          where: { organizationId: ORG_CHOICE_ID },
+          where: { organizationId: ORG_CHOICE_ID, name },
         }),
-      ).toBe(before);
+      ).toBe(0);
     });
 
     it("refuses a project that does not exist at all", async () => {
