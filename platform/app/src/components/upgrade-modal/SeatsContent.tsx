@@ -29,6 +29,29 @@ type ProrationQueryResult =
     }
   | undefined;
 
+/**
+ * The billing period, spelled out next to an amount the customer is about to
+ * confirm.
+ *
+ * Every period the payment provider can report gets its own words. Collapsing
+ * the unknown ones to "per month" would put a wrong period beside a real
+ * charge, so an unrecognised one says nothing rather than something false.
+ */
+function formatBillingPeriod(interval: string): string {
+  switch (interval) {
+    case "year":
+      return " per year";
+    case "month":
+      return " per month";
+    case "week":
+      return " per week";
+    case "day":
+      return " per day";
+    default:
+      return "";
+  }
+}
+
 function SeatsProrationPreview({
   hasSubscriptionApi,
   prorationQuery,
@@ -111,7 +134,7 @@ function SeatsProrationPreview({
             </Text>
             <Text fontWeight="normal" fontSize="md" color="gray.500">
               {data.formattedRecurringTotal}
-              {data.billingInterval === "year" ? " per year" : " per month"}
+              {formatBillingPeriod(data.billingInterval)}
             </Text>
           </HStack>
         </VStack>

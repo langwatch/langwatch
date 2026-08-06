@@ -15,7 +15,7 @@ export const MAX_QUERY_RETRIES = 4;
  * the handled error's code, because that is where the distinction actually
  * lives.
  */
-const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404, 422, 431];
+const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404, 422, 431] as const;
 
 export function shouldRetryQuery(
   failureCount: number,
@@ -31,7 +31,7 @@ export function shouldRetryQuery(
 
   if (
     error instanceof TRPCClientError &&
-    HTTP_STATUS_TO_NOT_RETRY.includes(
+    (HTTP_STATUS_TO_NOT_RETRY as readonly number[]).includes(
       (error.data as { httpStatus?: number } | undefined)?.httpStatus ?? 0,
     )
   ) {
