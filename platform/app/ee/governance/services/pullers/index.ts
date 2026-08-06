@@ -8,6 +8,7 @@
  * Add new adapters by registering them here AND exporting them from
  * this module so admin-UI source-type discovery picks them up.
  */
+import { AnthropicAdminPuller } from "./anthropicAdmin.puller";
 import { ClaudeComplianceReferencePuller } from "./claudeCompliance.puller";
 import { CopilotStudioReferencePuller } from "./copilotStudio.puller";
 import { HttpPollingPullerAdapter } from "./httpPollingPullerAdapter";
@@ -24,9 +25,15 @@ export function registerBuiltInPullers(): void {
   pullerAdapterRegistry.register(new CopilotStudioReferencePuller());
   pullerAdapterRegistry.register(new OpenAiComplianceReferencePuller());
   pullerAdapterRegistry.register(new ClaudeComplianceReferencePuller());
+  pullerAdapterRegistry.register(new AnthropicAdminPuller());
   registered = true;
 }
 
+export {
+  ANTHROPIC_ADMIN_ADAPTER_ID,
+  type AnthropicAdminPullConfig,
+  anthropicAdminPullConfigSchema,
+} from "./anthropicAdmin.puller";
 export { CLAUDE_COMPLIANCE_PULL_CONFIG } from "./claudeCompliance.puller";
 export { COPILOT_STUDIO_PULL_CONFIG } from "./copilotStudio.puller";
 export type { HttpPollingConfig } from "./httpPollingPullerAdapter";
@@ -39,6 +46,7 @@ export type {
 } from "./pullerAdapter";
 export type { S3PollingConfig } from "./s3PollingPullerAdapter";
 export {
+  AnthropicAdminPuller,
   ClaudeComplianceReferencePuller,
   CopilotStudioReferencePuller,
   HttpPollingPullerAdapter,
