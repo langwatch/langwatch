@@ -11,11 +11,11 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";
-import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { submitBugReport } from "~/server/app-layer/bug-reports/bug-report.service";
+import { safeBodyLimit } from "../middleware/safeBodyLimit";
 
 const secured = createServiceApp({ basePath: "/api/bug-reports" });
 
@@ -65,7 +65,7 @@ secured
       "Agent issue-report intake; reporters may have no working credentials, an API key only enriches the report with a project link",
     ),
   )
-  .post("/", bodyLimit({ maxSize: MAX_BODY_BYTES }), async (c) => {
+  .post("/", safeBodyLimit({ maxSize: MAX_BODY_BYTES }), async (c) => {
     let json: unknown;
     try {
       json = await c.req.json();
