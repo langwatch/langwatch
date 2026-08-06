@@ -13,8 +13,9 @@
  * Corresponds to specs/setup/check-slots.feature.
  */
 
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import {
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -119,7 +120,11 @@ function startRun(tag: string, options: RunOptions = {}): Run {
     stdout: string;
     stderr: string;
   }>((resolve) => {
-    child.on("exit", (code) => {
+    // `close`, not `exit`: exit fires when the process ends, while the stdout
+    // and stderr pipes may still hold buffered data. The assertions below
+    // compare that output exactly, so an early resolve would flake as a queue
+    // bug rather than a harness one.
+    child.on("close", (code) => {
       running.delete(child);
       resolve({ code, stdout, stderr });
     });
@@ -153,7 +158,7 @@ const startOrder = (events: Event[]) =>
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Blocks until the queue directory reports a run in the `running` state. */
+/** Blocks until the event log shows that some run entered the command. */
 async function waitForHolder(): Promise<void> {
   for (let attempt = 0; attempt < 200; attempt++) {
     if (startOrder(readEvents()).length > 0) return;
@@ -344,6 +349,65 @@ describe("check queue", () => {
 
       holder.child.kill("SIGKILL");
       await holder.done;
+    });
+  });
+
+  describe("given the shared directory is unusable", () => {
+    /** @scenario "A malformed entry from another branch cannot crash the queue" */
+    it("drops entries whose shape it does not understand", () => {
+      mkdirSync(queueDir, { recursive: true });
+      // Two entries sharing an arrival millisecond are what force the tie-break
+      // comparison, and neither carries the token that comparison reads. This
+      // is the shape a worktree on a branch with a different entry format
+      // leaves behind, since the directory is machine-wide by design.
+      const arrivedAt = Date.now();
+      for (const tag of ["one", "two"]) {
+        writeFileSync(
+          path.join(queueDir, `${arrivedAt}-${tag}.json`),
+          JSON.stringify({ pid: process.pid, arrivedAt, state: "waiting" }),
+          "utf8",
+        );
+      }
+
+      const result = spawnSync(
+        process.execPath,
+        [QUEUE_SCRIPT, "node", fakeCommand, logFile, "after-malformed", "0"],
+        {
+          env: { ...process.env, CHECK_QUEUE_DIR: queueDir, CHECK_SLOTS: "2" },
+          encoding: "utf8",
+        },
+      );
+
+      expect(result.status).toBe(0);
+      expect(startOrder(readEvents())).toEqual(["after-malformed"]);
+      expect(queueEntries()).toHaveLength(0);
+    });
+
+    /** @scenario "A queue that cannot be created degrades to an unqueued run" */
+    it("runs the command anyway when the queue directory cannot be written", () => {
+      // root ignores the mode bits, so the directory would be writable and
+      // there would be nothing to degrade from.
+      if (process.getuid?.() === 0) return;
+      const readOnly = path.join(scratch, "read-only");
+      mkdirSync(readOnly, { mode: 0o500 });
+
+      const result = spawnSync(
+        process.execPath,
+        [QUEUE_SCRIPT, "node", fakeCommand, logFile, "degraded", "0"],
+        {
+          env: {
+            ...process.env,
+            CHECK_QUEUE_DIR: path.join(readOnly, "queue"),
+            CHECK_SLOTS: "1",
+          },
+          encoding: "utf8",
+        },
+      );
+
+      expect(result.stderr).toContain("queue unavailable");
+      expect(result.stderr).toContain("running without a slot");
+      expect(result.status).toBe(0);
+      expect(startOrder(readEvents())).toEqual(["degraded"]);
     });
   });
 

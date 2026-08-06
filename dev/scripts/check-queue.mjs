@@ -159,7 +159,10 @@ function statMtimeMs(target) {
  * miscounted slot is a far better outcome than a check that never starts.
  */
 async function withQueueLock(dir, body) {
-  fs.mkdirSync(dir, { recursive: true });
+  // 0o700 because the uid in the directory name makes the path unique, not
+  // private: on a shared /tmp anyone could otherwise read the labels, which
+  // name worktrees and branches.
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const lock = path.join(dir, ".lock");
   const giveUpAt = Date.now() + LOCK_GIVE_UP_MS;
   for (;;) {
@@ -215,8 +218,16 @@ function readEntries(dir) {
       fs.rmSync(file, { force: true });
       continue;
     }
-    const expired = now - (entry.arrivedAt ?? 0) > ENTRY_MAX_AGE_MS;
-    if (expired || !pidAlive(entry.pid)) {
+    // The whole point of this directory is that worktrees on different
+    // branches share it, so an entry written in a shape this branch does not
+    // understand is a normal event, not a corrupt-state emergency. Drop it
+    // rather than letting it reach code that assumes the fields exist.
+    const usable =
+      typeof entry?.token === "string" &&
+      Number.isFinite(entry?.arrivedAt) &&
+      typeof entry?.state === "string";
+    const expired = now - (entry?.arrivedAt ?? 0) > ENTRY_MAX_AGE_MS;
+    if (!usable || expired || !pidAlive(entry.pid)) {
       fs.rmSync(file, { force: true });
       continue;
     }
@@ -375,7 +386,13 @@ async function explain(env) {
     stderr("queue=off\n");
     return 0;
   }
-  const entries = await withQueueLock(dir, () => readEntries(dir));
+  let entries;
+  try {
+    entries = await withQueueLock(dir, () => readEntries(dir));
+  } catch (err) {
+    stderr(`queue unavailable (${err.message})\n`);
+    return 0;
+  }
   const running = entries.filter((e) => e.state === "running");
   const waiting = entries.filter((e) => e.state === "waiting").sort(byArrival);
   stderr(`running=${running.length} waiting=${waiting.length}\n`);
@@ -421,10 +438,19 @@ async function main(argv, env) {
   const release = () => {
     if (released) return;
     released = true;
-    fs.rmSync(ticket.file, { force: true });
+    try {
+      fs.rmSync(ticket.file, { force: true });
+    } catch {
+      // The next run prunes the entry by pid. Losing a slot for a while beats
+      // throwing from an exit handler.
+    }
   };
   process.on("exit", release);
 
+  // The queue is a courtesy, never a gate. A /tmp that is read-only, full or
+  // owned by someone else must not be the reason a check refuses to run, so
+  // only the queueing is inside this boundary: the command itself runs exactly
+  // once either way, and a failure inside it is the command's own.
   try {
     const { waited, announced, forced } = await waitForTurn({
       dir,
@@ -439,6 +465,13 @@ async function main(argv, env) {
         `${PREFIX} slot free after ${formatDuration(waited)} in the queue, starting now.\n`,
       );
     }
+  } catch (err) {
+    stderr(
+      `${PREFIX} queue unavailable (${err.message}), running without a slot\n`,
+    );
+  }
+
+  try {
     return await runCommand(commandArgv);
   } finally {
     release();

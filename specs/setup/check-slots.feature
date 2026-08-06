@@ -98,6 +98,20 @@ Feature: Machine-wide slots for whole-repo checks
     And the waiting run starts
 
   @unit
+  Scenario: A malformed entry from another branch cannot crash the queue
+    Given the shared directory holds an entry written in a shape this branch does not understand
+    When a check reads the queue
+    Then the entry is dropped rather than reaching code that assumes its fields
+    And the check runs
+
+  @unit
+  Scenario: A queue that cannot be created degrades to an unqueued run
+    Given the shared directory cannot be created or written
+    When a check starts
+    Then it warns that the queue is unavailable
+    And it runs the command without a slot, because the queue is a courtesy and never a gate
+
+  @unit
   Scenario: A run that waits too long runs anyway
     Given the maximum wait has elapsed and no slot has freed up
     When the waiting run re-checks
