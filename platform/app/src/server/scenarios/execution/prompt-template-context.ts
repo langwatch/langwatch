@@ -142,11 +142,16 @@ export function buildPromptTemplateContext({
     // The shared resolver serialises the conversation as JSON, which is right
     // for an HTTP body and wrong for prompt text. Same substitution as the base
     // `messages` binding, so a declared input mapped to the conversation reads
-    // the same way.
+    // the same way. `threadId` likewise reads the base binding: the resolver
+    // answers "" when the runner supplies no thread id, which would render
+    // blank while `{{threadId}}` renders the sentinel.
+    const sourceField = sourceFieldOf(effectiveMappings[identifier]!);
     context[identifier] =
-      sourceFieldOf(effectiveMappings[identifier]!) === "messages"
+      sourceField === "messages"
         ? transcript
-        : value;
+        : sourceField === "threadId"
+          ? context.threadId!
+          : value;
   }
 
   const unboundInputs = inputs

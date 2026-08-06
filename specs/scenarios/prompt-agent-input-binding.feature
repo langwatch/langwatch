@@ -45,6 +45,14 @@ Feature: Prompt agent input binding under simulation
     Then "question" holds "Use the knowledge base"
 
   @unit
+  Scenario: A thread-mapped input matches the base threadId when the runner supplies none
+    Given the prompt declares an input "thread_id"
+    And the runner supplies no thread id for the turn
+    When the template context is built for a turn
+    Then "thread_id" holds the same fallback thread id as "threadId"
+    And "thread_id" is not blank and not reported unbound
+
+  @unit
   Scenario: Explicit mappings do not unbind the inputs they leave out
     Given the prompt declares inputs "question" and "thread_id"
     And only "question" is explicitly mapped

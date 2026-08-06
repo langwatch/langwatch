@@ -61,6 +61,23 @@ describe("buildPromptTemplateContext", () => {
     });
   });
 
+  describe("given the runner supplies no thread id for the turn", () => {
+    /** @scenario "A thread-mapped input matches the base threadId when the runner supplies none" */
+    it("binds a thread-mapped input to the same fallback as threadId", () => {
+      const input = turn();
+      (input as { threadId?: string }).threadId = undefined;
+
+      const { context, unboundInputs } = buildPromptTemplateContext({
+        input,
+        inputs: [{ identifier: "thread_id", type: "str" }],
+      });
+
+      expect(context.thread_id).toBe(context.threadId);
+      expect(context.thread_id).not.toBe("");
+      expect(unboundInputs).toEqual([]);
+    });
+  });
+
   describe("given an explicit mapping", () => {
     /** @scenario "An explicit mapping wins over the name match" */
     it("uses the explicit mapping rather than the name match", () => {
