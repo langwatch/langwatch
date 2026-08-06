@@ -38,10 +38,12 @@ const APP_DERIVED_PREFIXES = [
   "/api/dashboards",
   "/api/evaluators",
   "/api/events",
-  // Covers `/api/experiment/init` and every `/api/experiments/...` route in
-  // one prefix. Both used to be hand-maintained entries in the JSON; they are
-  // generated now, so the hand-written copies are pruned here.
+  // Singular and plural are two surfaces, not one: `/api/experiment/init` lives
+  // in `misc.ts`, the rest under `/api/experiments`. Both used to be
+  // hand-maintained entries in the JSON; they are generated now, so the
+  // hand-written copies are pruned here.
   "/api/experiment",
+  "/api/experiments",
   "/api/webhooks",
   "/api/gateway/v1",
   "/api/governance",
@@ -61,14 +63,28 @@ const APP_DERIVED_PREFIXES = [
   "/api/workflows",
 ];
 
+/**
+ * Whether a path is owned by one of the apps above — the prefix itself, or
+ * anything below it.
+ *
+ * The boundary is a whole path segment, which rules out both directions of
+ * accident: a bare `startsWith` would let `/api/experiment` claim a future
+ * `/api/experimental-runs`, and a substring test would match the prefix
+ * anywhere in the key, including keys that are not paths at all. `customMerge`
+ * runs at every level of the merge, so it is asked about `paths`, `components`
+ * and every operation field too.
+ */
+const isAppDerivedPath = (key: string): boolean =>
+  APP_DERIVED_PREFIXES.some(
+    (prefix) => key === prefix || key.startsWith(`${prefix}/`),
+  );
+
 const currentSpec = {
   ...rawCurrentSpec,
   paths: Object.fromEntries(
     Object.entries(
       (rawCurrentSpec as { paths?: Record<string, unknown> }).paths ?? {},
-    ).filter(
-      ([route]) => !APP_DERIVED_PREFIXES.some((p) => route.startsWith(p)),
-    ),
+    ).filter(([route]) => !isAppDerivedPath(route)),
   ),
 };
 
@@ -202,7 +218,7 @@ export default async function execute() {
       customMerge(key) {
         // Since we get these routes from the app directly,
         // we don't want to merge, we just want to replace.
-        if (APP_DERIVED_PREFIXES.some((p) => key.includes(p))) {
+        if (isAppDerivedPath(key)) {
           // Replace with new
           return (_target, source) => {
             return source;

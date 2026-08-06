@@ -5984,7 +5984,24 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Rows to evaluate inline, instead of the experiment's saved dataset. Mutually exclusive with dataset_id. */
+                    data?: {
+                        [key: string]: unknown;
+                    }[];
+                    /** @description A saved dataset to evaluate, instead of the one the experiment is configured with. Mutually exclusive with data. */
+                    dataset_id?: string;
+                    /** @description Constant inputs applied to every row, overriding fields of the same name */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description Run only these rows of the dataset, by zero-based index */
+                    row_indices?: number[];
+                };
+            };
+        };
         responses: {
             /** @description Run started */
             200: {
@@ -6491,13 +6508,17 @@ export interface operations {
                     };
                 };
             };
-            /** @description Neither experiment_slug nor experiment_id was supplied */
+            /** @description The body was not valid JSON, or neither experiment_slug nor experiment_id was supplied */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        /** @description Set when the body was not valid JSON */
+                        message: string;
+                    } | {
+                        /** @description The validation failure as a sentence, not a code: neither identifier was supplied, or a field had the wrong type */
                         error: string;
                     };
                 };
@@ -6513,18 +6534,28 @@ export interface operations {
                     };
                 };
             };
-            /** @description The plan's experiment limit is already reached */
+            /** @description The API key lacks experiments:manage, or the plan's experiment limit is already reached */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        /** @description Stable failure code; branch on this */
                         error: string;
-                        message: string;
-                        limitType: string;
-                        current: number;
-                        max: number;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                        /** @description Which plan limit was reached, on resource_limit_exceeded */
+                        limitType?: string;
+                        /** @description Experiments already in use */
+                        current?: number;
+                        /** @description What the plan allows */
+                        max?: number;
+                    } & {
+                        [key: string]: unknown;
                     };
                 };
             };

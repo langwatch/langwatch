@@ -206,7 +206,7 @@ export function collectQueryReadingOperations(roots: string[]): Set<string> {
     for (const registration of collectRouteRegistrations(source)) {
       if (!registration.readsQuery) continue;
       const path = honoPathToTemplate(
-        joinRoutePath(basePath, registration.path),
+        joinRoutePath({ basePath, routePath: registration.path }),
       );
       found.add(`${registration.method.toUpperCase()} ${path}`);
     }

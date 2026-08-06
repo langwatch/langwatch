@@ -63,7 +63,7 @@ export const HANDLER_ROOTS = [
   join(LANGWATCH_ROOT, "src/app/api"),
   join(LANGWATCH_ROOT, "src/server/routes"),
   join(LANGWATCH_ROOT, "ee"),
-];
+] as const;
 
 /**
  * Why a route is absent from the published document. The category is not
@@ -97,7 +97,7 @@ export interface Exclusion {
  * without this route. For `gap` entries that claim is temporary, and the fix is
  * always the same three steps from the module docstring.
  */
-export const UNPUBLISHED: Exclusion[] = [
+export const UNPUBLISHED = [
   // ── Internal: the app talking to itself ────────────────────────────────
   {
     match: "/api/trpc",
@@ -363,7 +363,7 @@ export const UNPUBLISHED: Exclusion[] = [
     category: "gap",
     why: "documented at /api/annotations/trace/{id} while the handler names the segment :trace; the endpoint is published, the placeholder names disagree",
   },
-];
+] as const satisfies readonly Exclusion[];
 
 interface OpenApiDocument {
   paths?: Record<string, Record<string, unknown>>;
@@ -386,7 +386,9 @@ export interface RegisteredRoute {
  * mounts a rewriting alias app beside the real one, so both spellings really
  * are served, and both have to be accounted for.
  */
-export function collectRegisteredRoutes(roots: string[]): RegisteredRoute[] {
+export function collectRegisteredRoutes(
+  roots: readonly string[],
+): RegisteredRoute[] {
   const routes: RegisteredRoute[] = [];
 
   for (const file of discoverTypeScriptFiles(roots)) {
@@ -401,7 +403,7 @@ export function collectRegisteredRoutes(roots: string[]): RegisteredRoute[] {
     for (const registration of collectRouteRegistrations(source)) {
       for (const basePath of basePaths) {
         const path = honoPathToTemplate(
-          joinRoutePath(basePath, registration.path),
+          joinRoutePath({ basePath, routePath: registration.path }),
         );
         routes.push({
           key: `${registration.method.toUpperCase()} ${path}`,
@@ -429,7 +431,13 @@ export function documentedOperations(document: OpenApiDocument): Set<string> {
 }
 
 /** Does this exclusion cover that operation key? */
-export function excludes(exclusion: Exclusion, key: string): boolean {
+export function excludes({
+  exclusion,
+  key,
+}: {
+  exclusion: Exclusion;
+  key: string;
+}): boolean {
   if (!exclusion.match.startsWith("/")) return exclusion.match === key;
   const path = key.slice(key.indexOf(" ") + 1);
   return path === exclusion.match || path.startsWith(`${exclusion.match}/`);
@@ -451,7 +459,7 @@ export function auditCoverage({
 }: {
   routes: RegisteredRoute[];
   documented: Set<string>;
-  exclusions: Exclusion[];
+  exclusions: readonly Exclusion[];
 }): CoverageResult {
   const byKey = new Map<string, RegisteredRoute>();
   for (const route of routes) {
@@ -465,7 +473,7 @@ export function auditCoverage({
   const used = new Set<Exclusion>();
   const unexplained = missing.filter((route) => {
     const excusing = exclusions.filter((exclusion) =>
-      excludes(exclusion, route.key),
+      excludes({ exclusion, key: route.key }),
     );
     for (const exclusion of excusing) used.add(exclusion);
     return excusing.length === 0;

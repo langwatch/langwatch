@@ -90,7 +90,11 @@ import { encrypt } from "~/utils/encryption";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
-import { experimentInitResponseSchema } from "./experiments-v3.schemas";
+import {
+  experimentInitBadRequestSchema,
+  experimentInitForbiddenSchema,
+  experimentInitResponseSchema,
+} from "./experiments-v3.schemas";
 
 const logger = createLogger("langwatch:misc");
 // Shared auth middlewares for every API-key-aware handler in this file.
@@ -508,10 +512,11 @@ secured.access(experimentsManageAuth).post(
         },
       },
       400: {
-        description: "Neither experiment_slug nor experiment_id was supplied",
+        description:
+          "The body was not valid JSON, or neither experiment_slug nor experiment_id was supplied",
         content: {
           "application/json": {
-            schema: resolver(z.object({ error: z.string() })),
+            schema: resolver(experimentInitBadRequestSchema),
           },
         },
       },
@@ -524,18 +529,11 @@ secured.access(experimentsManageAuth).post(
         },
       },
       403: {
-        description: "The plan's experiment limit is already reached",
+        description:
+          "The API key lacks experiments:manage, or the plan's experiment limit is already reached",
         content: {
           "application/json": {
-            schema: resolver(
-              z.object({
-                error: z.string(),
-                message: z.string(),
-                limitType: z.string(),
-                current: z.number(),
-                max: z.number(),
-              }),
-            ),
+            schema: resolver(experimentInitForbiddenSchema),
           },
         },
       },

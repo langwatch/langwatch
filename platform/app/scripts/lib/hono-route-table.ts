@@ -32,7 +32,13 @@ export function honoPathToTemplate(path: string): string {
   return path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
 }
 
-export function joinRoutePath(basePath: string, routePath: string): string {
+export function joinRoutePath({
+  basePath,
+  routePath,
+}: {
+  basePath: string;
+  routePath: string;
+}): string {
   const joined = `${basePath.replace(/\/$/, "")}/${routePath.replace(/^\//, "")}`;
   return joined.replace(/\/$/, "") || "/";
 }
@@ -141,7 +147,7 @@ function partitionDirectory(dir: string): {
   return { directories, files };
 }
 
-export function discoverTypeScriptFiles(roots: string[]): string[] {
+export function discoverTypeScriptFiles(roots: readonly string[]): string[] {
   const found: string[] = [];
   const pending = [...roots];
 

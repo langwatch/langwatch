@@ -36,13 +36,15 @@ describe("honoPathToTemplate", () => {
 
 describe("joinRoutePath", () => {
   it("joins a basePath to a route path without doubling the separator", () => {
-    expect(joinRoutePath("/api/experiments", "/runs")).toBe(
-      "/api/experiments/runs",
-    );
+    expect(
+      joinRoutePath({ basePath: "/api/experiments", routePath: "/runs" }),
+    ).toBe("/api/experiments/runs");
   });
 
   it("keeps the basePath alone when the route is the collection root", () => {
-    expect(joinRoutePath("/api/experiments", "/")).toBe("/api/experiments");
+    expect(
+      joinRoutePath({ basePath: "/api/experiments", routePath: "/" }),
+    ).toBe("/api/experiments");
   });
 });
 

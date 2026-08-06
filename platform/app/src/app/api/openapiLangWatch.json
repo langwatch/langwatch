@@ -7695,7 +7695,62 @@
           }
         ],
         "summary": "Run an experiment",
-        "description": "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes."
+        "description": "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "description": "Rows to evaluate inline, instead of the experiment's saved dataset. Mutually exclusive with dataset_id."
+                  },
+                  "dataset_id": {
+                    "type": "string",
+                    "description": "A saved dataset to evaluate, instead of the one the experiment is configured with. Mutually exclusive with data."
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "description": "Constant inputs applied to every row, overriding fields of the same name"
+                  },
+                  "row_indices": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "description": "Run only these rows of the dataset, by zero-based index"
+                  }
+                },
+                "not": {
+                  "required": [
+                    "data",
+                    "dataset_id"
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/experiments/runs": {
@@ -8826,18 +8881,35 @@
             }
           },
           "400": {
-            "description": "Neither experiment_slug nor experiment_id was supplied",
+            "description": "The body was not valid JSON, or neither experiment_slug nor experiment_id was supplied",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "description": "Set when the body was not valid JSON"
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "The validation failure as a sentence, not a code: neither identifier was supplied, or a field had the wrong type"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ]
                     }
-                  },
-                  "required": [
-                    "error"
                   ]
                 }
               }
@@ -8862,35 +8934,49 @@
             }
           },
           "403": {
-            "description": "The plan's experiment limit is already reached",
+            "description": "The API key lacks experiments:manage, or the plan's experiment limit is already reached",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
                     },
                     "message": {
                       "type": "string"
                     },
-                    "limitType": {
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
                       "type": "string"
                     },
+                    "limitType": {
+                      "type": "string",
+                      "description": "Which plan limit was reached, on resource_limit_exceeded"
+                    },
                     "current": {
-                      "type": "number"
+                      "type": "number",
+                      "description": "Experiments already in use"
                     },
                     "max": {
-                      "type": "number"
+                      "type": "number",
+                      "description": "What the plan allows"
                     }
                   },
                   "required": [
-                    "error",
-                    "message",
-                    "limitType",
-                    "current",
-                    "max"
-                  ]
+                    "error"
+                  ],
+                  "additionalProperties": true
                 }
               }
             }

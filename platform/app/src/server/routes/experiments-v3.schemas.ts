@@ -1,10 +1,11 @@
 /**
  * OpenAPI schemas for the API-key half of the experiments REST surface.
  *
- * Only the routes an integrator calls with a project API key live here — the
- * run trigger and the three read endpoints. `execute` and `abort` authenticate
- * with a browser session and belong to the workbench UI, so they are not
- * described and do not reach the published document.
+ * Only the routes an integrator calls with a project API key live here: the
+ * create call (`POST /api/experiment/init`, registered over in `misc.ts`), the
+ * run trigger, and the three read endpoints. `execute` and `abort`
+ * authenticate with a browser session and belong to the workbench UI, so they
+ * are not described and do not reach the published document.
  *
  * These describe responses the handlers already send. They do not validate
  * anything at runtime; the handlers keep their own parsing.
@@ -315,4 +316,43 @@ export const runResultsResponseSchema = z.object({
 export const experimentInitResponseSchema = z.object({
   slug: z.string().describe("Slug of the experiment, created or existing"),
   path: z.string().describe("Path to the experiment in the LangWatch app"),
+});
+
+/**
+ * The two 400s the create call answers with.
+ *
+ * They are hand-rolled in the handler rather than raised as handled errors,
+ * and they share no field: a body that is not JSON at all answers `message`, a
+ * body that parses but fails the schema answers `error` carrying the
+ * validation sentence. Documented as sent, so a caller reads the right field.
+ */
+export const experimentInitBadRequestSchema = z.union([
+  z.object({
+    message: z.string().describe("Set when the body was not valid JSON"),
+  }),
+  z.object({
+    error: z
+      .string()
+      .describe(
+        "The validation failure as a sentence, not a code: neither identifier was supplied, or a field had the wrong type",
+      ),
+  }),
+]);
+
+/**
+ * What a refused create call sends.
+ *
+ * Two different refusals share the 403: the API key ceiling denying
+ * `experiments:manage`, and the plan's experiment limit. Both arrive in the
+ * flat handled-error envelope, so `error` is the code to branch on —
+ * `api_key_permission_denied` for the first, `resource_limit_exceeded` for the
+ * second, which also carries the counts below.
+ */
+export const experimentInitForbiddenSchema = handledErrorEnvelopeSchema.extend({
+  limitType: z
+    .string()
+    .optional()
+    .describe("Which plan limit was reached, on resource_limit_exceeded"),
+  current: z.number().optional().describe("Experiments already in use"),
+  max: z.number().optional().describe("What the plan allows"),
 });

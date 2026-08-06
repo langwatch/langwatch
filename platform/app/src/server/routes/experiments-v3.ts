@@ -435,6 +435,53 @@ secured.access(apiKeyAuthRun).post(
     description:
       "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.",
     tags: ["Experiments"],
+    // Declared by hand rather than through zValidator: the handler reads the
+    // raw body so it can accept an empty one, and parses with
+    // `runInputsBodySchema` itself, so there is no validator schema for the
+    // generator to read. Every field is optional — sending no body at all runs
+    // the experiment's saved dataset as configured.
+    requestBody: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              data: {
+                type: "array",
+                items: { type: "object", additionalProperties: true },
+                description:
+                  "Rows to evaluate inline, instead of the experiment's saved dataset. Mutually exclusive with dataset_id.",
+              },
+              dataset_id: {
+                type: "string",
+                description:
+                  "A saved dataset to evaluate, instead of the one the experiment is configured with. Mutually exclusive with data.",
+              },
+              parameters: {
+                type: "object",
+                additionalProperties: {
+                  oneOf: [
+                    { type: "string" },
+                    { type: "number" },
+                    { type: "boolean" },
+                  ],
+                },
+                description:
+                  "Constant inputs applied to every row, overriding fields of the same name",
+              },
+              row_indices: {
+                type: "array",
+                items: { type: "integer", minimum: 0 },
+                description:
+                  "Run only these rows of the dataset, by zero-based index",
+              },
+            },
+            not: { required: ["data", "dataset_id"] },
+          },
+        },
+      },
+    },
     responses: {
       ...experimentErrorResponses,
       400: {

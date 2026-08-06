@@ -81,8 +81,12 @@ describe("excludes", () => {
         why: "session authenticated",
       };
 
-      expect(excludes(entry, "POST /api/experiments/execute")).toBe(true);
-      expect(excludes(entry, "GET /api/experiments/execute")).toBe(false);
+      expect(
+        excludes({ exclusion: entry, key: "POST /api/experiments/execute" }),
+      ).toBe(true);
+      expect(
+        excludes({ exclusion: entry, key: "GET /api/experiments/execute" }),
+      ).toBe(false);
     });
   });
 
@@ -94,8 +98,10 @@ describe("excludes", () => {
         why: "the app's own transport",
       };
 
-      expect(excludes(entry, "GET /api/trpc")).toBe(true);
-      expect(excludes(entry, "POST /api/trpc/experiment.create")).toBe(true);
+      expect(excludes({ exclusion: entry, key: "GET /api/trpc" })).toBe(true);
+      expect(
+        excludes({ exclusion: entry, key: "POST /api/trpc/experiment.create" }),
+      ).toBe(true);
     });
 
     it("does not match a sibling path that merely shares a word start", () => {
@@ -105,7 +111,9 @@ describe("excludes", () => {
         why: "example",
       };
 
-      expect(excludes(entry, "GET /api/experiments")).toBe(false);
+      expect(excludes({ exclusion: entry, key: "GET /api/experiments" })).toBe(
+        false,
+      );
     });
   });
 });
@@ -244,10 +252,14 @@ describe("the UNPUBLISHED list", () => {
         "POST /api/admin/{resource}",
       );
       expect(
-        excludes(
-          { match: "/api/admin", category: "internal", why: "staff only" },
-          probe("POST /api/admin/{resource}"),
-        ),
+        excludes({
+          exclusion: {
+            match: "/api/admin",
+            category: "internal",
+            why: "staff only",
+          },
+          key: probe("POST /api/admin/{resource}"),
+        }),
       ).toBe(true);
     });
 
@@ -258,7 +270,7 @@ describe("the UNPUBLISHED list", () => {
             other !== entry &&
             other.match.startsWith("/") &&
             entry.match !== other.match &&
-            excludes(other, probe(entry.match)),
+            excludes({ exclusion: other, key: probe(entry.match) }),
         ),
       );
 
