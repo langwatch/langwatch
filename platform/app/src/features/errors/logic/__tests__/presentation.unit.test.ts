@@ -98,6 +98,7 @@ describe("explainHandledError", () => {
       expect(description).toBe("");
     });
 
+    /** @scenario "A missing-model rejection is explained per the surface that raised it" */
     it.each([
       ["chat", "POST /v1/chat/completions"],
       ["messages", "POST /v1/messages"],
@@ -114,6 +115,7 @@ describe("explainHandledError", () => {
       expect(description).toContain(expected);
     });
 
+    /** @scenario "A missing-model rejection is explained per the surface that raised it" */
     it("uses surface-neutral missing-model copy for an unknown request type", () => {
       const { description } = explainHandledError(
         shape({

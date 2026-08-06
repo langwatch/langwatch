@@ -78,6 +78,19 @@ Feature: Handled errors — what the customer actually reads
   # What a customer may see
   # ==========================================================================
 
+  @unit @bdd @handled-errors @presentation
+  Scenario: A missing-model rejection is explained per the surface that raised it
+    Given a handled error carries the code "missing_model"
+    And its meta names the request surface (chat, messages, responses,
+      embeddings, speech, transcription, or the Gemini passthrough)
+    When the client surfaces it
+    Then the description says where THAT surface expects its model
+      # each surface disagrees about where a model comes from — a JSON field,
+      # a form part, or the request URL — so one generic sentence would send
+      # some callers looking for something that does not exist on their surface
+    But when the surface named in meta is not one the client recognises
+    Then the description falls back to a surface-neutral sentence
+
   @unit @integration @bdd @handled-errors @presentation
   Scenario: Remediation reaches the customer when we have nothing better
     Given a handled error carries tips and a docs URL
