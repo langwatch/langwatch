@@ -34,16 +34,24 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
 
   private readonly logger: Logger;
 
-  constructor(
-    private readonly config: PromptConfigData,
-    private readonly litellmParams: LiteLLMParams,
-    private readonly nlpServiceUrl: string,
-    logger?: Logger,
-  ) {
+  private readonly config: PromptConfigData;
+  private readonly litellmParams: LiteLLMParams;
+  private readonly nlpServiceUrl: string;
+
+  constructor(options: {
+    config: PromptConfigData;
+    litellmParams: LiteLLMParams;
+    nlpServiceUrl: string;
+    logger?: Logger;
+  }) {
     super();
     this.name = "SerializedPromptConfigAdapter";
+    this.config = options.config;
+    this.litellmParams = options.litellmParams;
+    this.nlpServiceUrl = options.nlpServiceUrl;
     this.logger =
-      logger ?? createChildProcessLogger("langwatch:scenarios:prompt-adapter");
+      options.logger ??
+      createChildProcessLogger("langwatch:scenarios:prompt-adapter");
   }
 
   async call(input: AgentInput): Promise<string> {

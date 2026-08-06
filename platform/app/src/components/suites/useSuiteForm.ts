@@ -86,6 +86,27 @@ interface UseSuiteFormParams {
   prompts: Prompt[] | undefined;
 }
 
+const isSameTarget = (a: SuiteTarget, b: SuiteTarget) =>
+  a.type === b.type && a.referenceId === b.referenceId;
+
+/** One target with a single mapping set (or cleared, for an undefined mapping). */
+function withTargetMapping(
+  target: SuiteTarget,
+  identifier: string,
+  mapping: FieldMapping | undefined,
+): SuiteTarget {
+  const mappings = { ...(target.scenarioMappings ?? {}) };
+  if (mapping) {
+    mappings[identifier] = mapping;
+  } else {
+    delete mappings[identifier];
+  }
+  return {
+    ...target,
+    scenarioMappings: Object.keys(mappings).length > 0 ? mappings : undefined,
+  };
+}
+
 const defaultValues: SuiteFormData = {
   name: "",
   description: "",
@@ -274,25 +295,13 @@ export function useSuiteForm({
     identifier: string,
     mapping: FieldMapping | undefined,
   ) => {
-    const next = form.getValues("selectedTargets").map((candidate) => {
-      if (
-        candidate.type !== target.type ||
-        candidate.referenceId !== target.referenceId
-      ) {
-        return candidate;
-      }
-      const mappings = { ...(candidate.scenarioMappings ?? {}) };
-      if (mapping) {
-        mappings[identifier] = mapping;
-      } else {
-        delete mappings[identifier];
-      }
-      return {
-        ...candidate,
-        scenarioMappings:
-          Object.keys(mappings).length > 0 ? mappings : undefined,
-      };
-    });
+    const next = form
+      .getValues("selectedTargets")
+      .map((candidate) =>
+        isSameTarget(candidate, target)
+          ? withTargetMapping(candidate, identifier, mapping)
+          : candidate,
+      );
     form.setValue("selectedTargets", next, { shouldDirty: true });
   };
 

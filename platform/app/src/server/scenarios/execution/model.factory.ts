@@ -33,12 +33,15 @@ const JUDGE_MODELS_REQUIRING_DISABLED_REASONING = new Set<string>([
  * such a model no run could reach a verdict — #6369, and the same signature in
  * the Python SDK judge, langwatch/scenario#864.
  *
- * Reasoning is disabled by RETRY, never preemptively: whether a model accepts
- * reasoning off is not knowable up front (Gemini 2.5 Pro rejects it with
- * "Budget 0 is invalid. This model only works in thinking mode."), so the
+ * Reasoning is disabled by RETRY as the general mechanism: whether a model
+ * accepts reasoning off is not knowable up front (Gemini 2.5 Pro rejects it
+ * with "Budget 0 is invalid. This model only works in thinking mode."), so the
  * request is sent untouched and re-sent with reasoning off only when the
  * provider's rejection asks for exactly that. Models that work today are never
- * sent anything new.
+ * sent anything new. `createJudgeModelFromParams` additionally defaults
+ * reasoning off preemptively for the exact models already observed to require
+ * it (#6620), which skips the wasted rejected round-trip on every judge turn;
+ * the retry stays as the net for models nobody has listed yet.
  */
 const REASONING_OFF = "none";
 
@@ -68,29 +71,42 @@ function rejectionAsksForReasoningOff(body: string): boolean {
 }
 
 /**
+ * The parsed request body, when the request is one the retry may rewrite: a
+ * tool-carrying JSON body with no reasoning effort of its own. A caller that
+ * asked for a specific effort keeps it and gets the endpoint's own error,
+ * rather than having its intent silently rewritten.
+ */
+function retryEligibleRequestBody(
+  init: RequestInit | undefined,
+): Record<string, unknown> | undefined {
+  const body = init?.body;
+  if (typeof body !== "string") return undefined;
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(body) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+  const carriesTools =
+    Array.isArray(parsed.tools) && (parsed.tools as unknown[]).length > 0;
+  if (!carriesTools || parsed.reasoning_effort !== undefined) return undefined;
+  return parsed;
+}
+
+/**
  * Wrap `fetch` to retry a tool-carrying request with reasoning declared off
  * when — and only when — the provider rejected it for exactly that reason.
- * A caller that asked for a specific effort keeps it and gets the endpoint's
- * own error, rather than having its intent silently rewritten.
  */
 function withReasoningOffRetry(
   baseFetch: typeof globalThis.fetch,
 ): typeof globalThis.fetch {
   return async (input, init) => {
     const response = await baseFetch(input, init);
+    if (response.status !== 400) return response;
 
-    const body = init?.body;
-    if (response.status !== 400 || typeof body !== "string") return response;
-
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(body) as Record<string, unknown>;
-    } catch {
-      return response;
-    }
-    const carriesTools =
-      Array.isArray(parsed.tools) && (parsed.tools as unknown[]).length > 0;
-    if (!carriesTools || parsed.reasoning_effort !== undefined) return response;
+    const parsed = retryEligibleRequestBody(init);
+    if (!parsed) return response;
 
     // Read the rejection from a clone so the original stays consumable if it
     // turns out to be some other 400.

@@ -11,11 +11,13 @@
  * The judge forces a finish_test / continue_test function-tool call on every
  * criteria-graded run, so on such a model no run could reach a verdict.
  *
- * Reasoning is disabled by RETRY, never preemptively: whether a model accepts
- * reasoning off is not knowable up front (Gemini 2.5 Pro answers "Budget 0 is
- * invalid. This model only works in thinking mode."), so the request goes out
- * untouched and is re-sent with reasoning off only when the provider's
- * rejection asks for exactly that.
+ * Reasoning is disabled by RETRY as the general mechanism: whether a model
+ * accepts reasoning off is not knowable up front (Gemini 2.5 Pro answers
+ * "Budget 0 is invalid. This model only works in thinking mode."), so the
+ * request goes out untouched and is re-sent with reasoning off only when the
+ * provider's rejection asks for exactly that. (`createJudgeModelFromParams`
+ * additionally defaults reasoning off preemptively for the exact models
+ * already observed to require it — #6620, covered by model.factory.unit.test.)
  *
  * Drives the real model built by `createModelFromParams` against a local server
  * standing in for the chat-completions endpoint. Only the network is local —
@@ -58,13 +60,89 @@ interface StubEndpoint {
   close: () => Promise<void>;
 }
 
+const UNRELATED_REJECTION = {
+  error: {
+    type: "invalid_request_error",
+    message: "Unsupported value for parameter 'temperature'.",
+    param: "temperature",
+  },
+};
+
+/** The upstream 400 verbatim, including the structured `param` the retry keys on. */
+function reasoningRejectionFor(model: unknown) {
+  return {
+    error: {
+      type: "invalid_request_error",
+      message: `Function tools with reasoning_effort are not supported for ${String(
+        model,
+      )} in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.`,
+      param: "reasoning_effort",
+    },
+  };
+}
+
+function completionFor(body: Record<string, unknown>, carriesTools: boolean) {
+  return {
+    id: "chatcmpl-stub",
+    object: "chat.completion",
+    created: 0,
+    model: body.model,
+    choices: [
+      {
+        index: 0,
+        message: carriesTools
+          ? {
+              role: "assistant",
+              content: null,
+              tool_calls: [
+                {
+                  id: "call_1",
+                  type: "function",
+                  function: {
+                    name: "finishTest",
+                    arguments: JSON.stringify({
+                      verdict: "success",
+                      reasoning: "criteria met",
+                    }),
+                  },
+                },
+              ],
+            }
+          : { role: "assistant", content: "plain answer" },
+        finish_reason: carriesTools ? "tool_calls" : "stop",
+      },
+    ],
+    usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+  };
+}
+
+/** What the endpoint answers for one request under the given rule. */
+function responseFor(
+  rule: EndpointRule,
+  body: Record<string, unknown>,
+): { status: number; payload: unknown } {
+  const carriesTools =
+    Array.isArray(body.tools) && (body.tools as unknown[]).length > 0;
+
+  if (rule === "reject-unrelated") {
+    return { status: 400, payload: UNRELATED_REJECTION };
+  }
+  if (
+    rule === "reject-tools-without-reasoning-off" &&
+    carriesTools &&
+    body.reasoning_effort !== "none"
+  ) {
+    return { status: 400, payload: reasoningRejectionFor(body.model) };
+  }
+  return { status: 200, payload: completionFor(body, carriesTools) };
+}
+
 /**
  * Stands in for the chat-completions endpoint behind the gateway proxy.
  *
- * "reject-tools-without-reasoning-off" reproduces the upstream 400 verbatim,
- * including the structured `param` field the retry keys on. "reject-unrelated"
- * answers a 400 that has nothing to do with reasoning. "accept" takes anything
- * and exists only to record the wire body.
+ * "reject-tools-without-reasoning-off" enforces the upstream rule.
+ * "reject-unrelated" answers a 400 that has nothing to do with reasoning.
+ * "accept" takes anything and exists only to record the wire body.
  */
 async function startEndpoint(
   rule: EndpointRule = "accept",
@@ -77,79 +155,9 @@ async function startEndpoint(
     req.on("end", () => {
       const body = JSON.parse(raw) as Record<string, unknown>;
       bodies.push(body);
-
-      const carriesTools =
-        Array.isArray(body.tools) && (body.tools as unknown[]).length > 0;
-
-      if (rule === "reject-unrelated") {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(
-          JSON.stringify({
-            error: {
-              type: "invalid_request_error",
-              message: "Unsupported value for parameter 'temperature'.",
-              param: "temperature",
-            },
-          }),
-        );
-        return;
-      }
-
-      if (
-        rule === "reject-tools-without-reasoning-off" &&
-        carriesTools &&
-        body.reasoning_effort !== "none"
-      ) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(
-          JSON.stringify({
-            error: {
-              type: "invalid_request_error",
-              message: `Function tools with reasoning_effort are not supported for ${String(
-                body.model,
-              )} in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.`,
-              param: "reasoning_effort",
-            },
-          }),
-        );
-        return;
-      }
-
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          id: "chatcmpl-stub",
-          object: "chat.completion",
-          created: 0,
-          model: body.model,
-          choices: [
-            {
-              index: 0,
-              message: carriesTools
-                ? {
-                    role: "assistant",
-                    content: null,
-                    tool_calls: [
-                      {
-                        id: "call_1",
-                        type: "function",
-                        function: {
-                          name: "finishTest",
-                          arguments: JSON.stringify({
-                            verdict: "success",
-                            reasoning: "criteria met",
-                          }),
-                        },
-                      },
-                    ],
-                  }
-                : { role: "assistant", content: "plain answer" },
-              finish_reason: carriesTools ? "tool_calls" : "stop",
-            },
-          ],
-          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-        }),
-      );
+      const { status, payload } = responseFor(rule, body);
+      res.writeHead(status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(payload));
     });
   });
 
@@ -178,7 +186,10 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A rejected tool-carrying request is retried with reasoning off" */
       it("retries with reasoning declared off and succeeds", async () => {
         endpoint = await startEndpoint("reject-tools-without-reasoning-off");
-        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url);
+        const model = createModelFromParams({
+          litellmParams: JUDGE_PARAMS,
+          nlpServiceUrl: endpoint.url,
+        });
 
         const result = await generateText({
           model,
@@ -199,7 +210,10 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "The judge reaches a verdict against an endpoint that enforces the rule" */
       it("reaches a verdict instead of an infrastructure error", async () => {
         endpoint = await startEndpoint("reject-tools-without-reasoning-off");
-        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url);
+        const model = createModelFromParams({
+          litellmParams: JUDGE_PARAMS,
+          nlpServiceUrl: endpoint.url,
+        });
 
         const result = await generateText({
           model,
@@ -219,7 +233,10 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "An explicitly requested reasoning effort is preserved" */
       it("surfaces the rejection rather than rewriting the caller's intent", async () => {
         endpoint = await startEndpoint("reject-tools-without-reasoning-off");
-        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url);
+        const model = createModelFromParams({
+          litellmParams: JUDGE_PARAMS,
+          nlpServiceUrl: endpoint.url,
+        });
 
         await expect(
           generateText({
@@ -251,7 +268,10 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A model that accepts the request is never sent anything new" */
       it("sends exactly one request with no reasoning_effort", async () => {
         endpoint = await startEndpoint("accept");
-        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url);
+        const model = createModelFromParams({
+          litellmParams: JUDGE_PARAMS,
+          nlpServiceUrl: endpoint.url,
+        });
 
         await generateText({
           model,
@@ -274,10 +294,13 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "A model whose reasoning cannot be disabled is never asked to disable it" */
       it("never asks a thinking-only model to disable reasoning", async () => {
         endpoint = await startEndpoint("accept");
-        const model = createModelFromParams(
-          { api_key: "test-key", model: "gemini/gemini-2.5-pro" },
-          endpoint.url,
-        );
+        const model = createModelFromParams({
+          litellmParams: {
+            api_key: "test-key",
+            model: "gemini/gemini-2.5-pro",
+          },
+          nlpServiceUrl: endpoint.url,
+        });
 
         await generateText({
           model,
@@ -298,7 +321,10 @@ describe("judge transport: function tools and reasoning effort", () => {
       /** @scenario "An unrelated rejection is surfaced, not retried" */
       it("surfaces the rejection without retrying", async () => {
         endpoint = await startEndpoint("reject-unrelated");
-        const model = createModelFromParams(JUDGE_PARAMS, endpoint.url);
+        const model = createModelFromParams({
+          litellmParams: JUDGE_PARAMS,
+          nlpServiceUrl: endpoint.url,
+        });
 
         await expect(
           generateText({

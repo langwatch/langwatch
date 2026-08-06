@@ -171,7 +171,11 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter(config, LITELLM_PARAMS, model.url),
+          new SerializedPromptConfigAdapter({
+            config: config,
+            litellmParams: LITELLM_PARAMS,
+            nlpServiceUrl: model.url,
+          }),
           4,
         );
 
@@ -210,7 +214,11 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter(config, LITELLM_PARAMS, model.url),
+          new SerializedPromptConfigAdapter({
+            config: config,
+            litellmParams: LITELLM_PARAMS,
+            nlpServiceUrl: model.url,
+          }),
           4,
         );
 
@@ -232,7 +240,11 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter(config, LITELLM_PARAMS, model.url),
+          new SerializedPromptConfigAdapter({
+            config: config,
+            litellmParams: LITELLM_PARAMS,
+            nlpServiceUrl: model.url,
+          }),
           4,
         );
 
@@ -257,7 +269,11 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter(config, LITELLM_PARAMS, model.url),
+          new SerializedPromptConfigAdapter({
+            config: config,
+            litellmParams: LITELLM_PARAMS,
+            nlpServiceUrl: model.url,
+          }),
           4,
         );
 
@@ -289,9 +305,14 @@ describe("prompt agent over four turns", () => {
         };
 
         await runTurns(
-          new SerializedPromptConfigAdapter(config, LITELLM_PARAMS, model.url, {
-            warn,
-          } as unknown as Logger),
+          new SerializedPromptConfigAdapter({
+            config: config,
+            litellmParams: LITELLM_PARAMS,
+            nlpServiceUrl: model.url,
+            logger: {
+              warn,
+            } as unknown as Logger,
+          }),
           1,
         );
 

@@ -56,29 +56,29 @@ describe("SerializedPromptConfigAdapter", () => {
   });
 
   it("has AGENT role", () => {
-    const adapter = new SerializedPromptConfigAdapter(
-      defaultConfig,
-      defaultLitellmParams,
-      "http://localhost:8080",
-    );
+    const adapter = new SerializedPromptConfigAdapter({
+      config: defaultConfig,
+      litellmParams: defaultLitellmParams,
+      nlpServiceUrl: "http://localhost:8080",
+    });
     expect(adapter.role).toBe(AgentRole.AGENT);
   });
 
   it("has correct name", () => {
-    const adapter = new SerializedPromptConfigAdapter(
-      defaultConfig,
-      defaultLitellmParams,
-      "http://localhost:8080",
-    );
+    const adapter = new SerializedPromptConfigAdapter({
+      config: defaultConfig,
+      litellmParams: defaultLitellmParams,
+      nlpServiceUrl: "http://localhost:8080",
+    });
     expect(adapter.name).toBe("SerializedPromptConfigAdapter");
   });
 
   it("builds messages with system prompt first", async () => {
-    const adapter = new SerializedPromptConfigAdapter(
-      defaultConfig,
-      defaultLitellmParams,
-      "http://localhost:8080",
-    );
+    const adapter = new SerializedPromptConfigAdapter({
+      config: defaultConfig,
+      litellmParams: defaultLitellmParams,
+      nlpServiceUrl: "http://localhost:8080",
+    });
 
     await adapter.call(defaultInput);
 
@@ -92,11 +92,11 @@ describe("SerializedPromptConfigAdapter", () => {
   });
 
   it("includes prompt messages before conversation history", async () => {
-    const adapter = new SerializedPromptConfigAdapter(
-      defaultConfig,
-      defaultLitellmParams,
-      "http://localhost:8080",
-    );
+    const adapter = new SerializedPromptConfigAdapter({
+      config: defaultConfig,
+      litellmParams: defaultLitellmParams,
+      nlpServiceUrl: "http://localhost:8080",
+    });
 
     await adapter.call(defaultInput);
 
@@ -115,11 +115,11 @@ describe("SerializedPromptConfigAdapter", () => {
   });
 
   it("passes temperature to generateText", async () => {
-    const adapter = new SerializedPromptConfigAdapter(
-      { ...defaultConfig, temperature: 0.5 },
-      defaultLitellmParams,
-      "http://localhost:8080",
-    );
+    const adapter = new SerializedPromptConfigAdapter({
+      config: { ...defaultConfig, temperature: 0.5 },
+      litellmParams: defaultLitellmParams,
+      nlpServiceUrl: "http://localhost:8080",
+    });
 
     await adapter.call(defaultInput);
 
@@ -131,11 +131,11 @@ describe("SerializedPromptConfigAdapter", () => {
   });
 
   it("passes maxTokens to generateText", async () => {
-    const adapter = new SerializedPromptConfigAdapter(
-      { ...defaultConfig, maxTokens: 500 },
-      defaultLitellmParams,
-      "http://localhost:8080",
-    );
+    const adapter = new SerializedPromptConfigAdapter({
+      config: { ...defaultConfig, maxTokens: 500 },
+      litellmParams: defaultLitellmParams,
+      nlpServiceUrl: "http://localhost:8080",
+    });
 
     await adapter.call(defaultInput);
 
@@ -151,11 +151,11 @@ describe("SerializedPromptConfigAdapter", () => {
       text: "Generated response",
     } as Awaited<ReturnType<typeof generateText>>);
 
-    const adapter = new SerializedPromptConfigAdapter(
-      defaultConfig,
-      defaultLitellmParams,
-      "http://localhost:8080",
-    );
+    const adapter = new SerializedPromptConfigAdapter({
+      config: defaultConfig,
+      litellmParams: defaultLitellmParams,
+      nlpServiceUrl: "http://localhost:8080",
+    });
 
     const result = await adapter.call(defaultInput);
 
@@ -169,11 +169,11 @@ describe("SerializedPromptConfigAdapter", () => {
         systemPrompt: "You are helping with: {{input}}",
         messages: [],
       };
-      const adapter = new SerializedPromptConfigAdapter(
-        config,
-        defaultLitellmParams,
-        "http://localhost:8080",
-      );
+      const adapter = new SerializedPromptConfigAdapter({
+        config: config,
+        litellmParams: defaultLitellmParams,
+        nlpServiceUrl: "http://localhost:8080",
+      });
 
       await adapter.call(defaultInput);
 
@@ -197,11 +197,11 @@ describe("SerializedPromptConfigAdapter", () => {
         systemPrompt: "You are a helpful assistant.",
         messages: [{ role: "user", content: "User asked: {{input}}" }],
       };
-      const adapter = new SerializedPromptConfigAdapter(
-        config,
-        defaultLitellmParams,
-        "http://localhost:8080",
-      );
+      const adapter = new SerializedPromptConfigAdapter({
+        config: config,
+        litellmParams: defaultLitellmParams,
+        nlpServiceUrl: "http://localhost:8080",
+      });
 
       await adapter.call(defaultInput);
 
@@ -225,11 +225,11 @@ describe("SerializedPromptConfigAdapter", () => {
           systemPrompt: "Summarise the customer's messages politely.",
           messages: [],
         };
-        const adapter = new SerializedPromptConfigAdapter(
-          config,
-          defaultLitellmParams,
-          "http://localhost:8080",
-        );
+        const adapter = new SerializedPromptConfigAdapter({
+          config: config,
+          litellmParams: defaultLitellmParams,
+          nlpServiceUrl: "http://localhost:8080",
+        });
 
         await adapter.call(defaultInput);
 
@@ -262,11 +262,11 @@ describe("SerializedPromptConfigAdapter", () => {
             { identifier: "thread_id", type: "str" },
           ],
         };
-        const adapter = new SerializedPromptConfigAdapter(
-          config,
-          defaultLitellmParams,
-          "http://localhost:8080",
-        );
+        const adapter = new SerializedPromptConfigAdapter({
+          config: config,
+          litellmParams: defaultLitellmParams,
+          nlpServiceUrl: "http://localhost:8080",
+        });
 
         await adapter.call({ ...defaultInput, threadId: "thread_abc" });
 
@@ -295,12 +295,12 @@ describe("SerializedPromptConfigAdapter", () => {
             { identifier: "customer_tier", type: "str" },
           ],
         };
-        const adapter = new SerializedPromptConfigAdapter(
-          config,
-          defaultLitellmParams,
-          "http://localhost:8080",
-          { warn: vi.fn() } as unknown as Logger,
-        );
+        const adapter = new SerializedPromptConfigAdapter({
+          config: config,
+          litellmParams: defaultLitellmParams,
+          nlpServiceUrl: "http://localhost:8080",
+          logger: { warn: vi.fn() } as unknown as Logger,
+        });
 
         await adapter.call(defaultInput);
 
@@ -322,11 +322,11 @@ describe("SerializedPromptConfigAdapter", () => {
         systemPrompt: "Conversation so far: {{messages}}",
         messages: [],
       };
-      const adapter = new SerializedPromptConfigAdapter(
-        config,
-        defaultLitellmParams,
-        "http://localhost:8080",
-      );
+      const adapter = new SerializedPromptConfigAdapter({
+        config: config,
+        litellmParams: defaultLitellmParams,
+        nlpServiceUrl: "http://localhost:8080",
+      });
 
       await adapter.call(defaultInput);
 
@@ -348,11 +348,11 @@ describe("SerializedPromptConfigAdapter", () => {
         systemPrompt: "You are helpful.",
         messages: [{ role: "user", content: "History: {{messages}}" }],
       };
-      const adapter = new SerializedPromptConfigAdapter(
-        config,
-        defaultLitellmParams,
-        "http://localhost:8080",
-      );
+      const adapter = new SerializedPromptConfigAdapter({
+        config: config,
+        litellmParams: defaultLitellmParams,
+        nlpServiceUrl: "http://localhost:8080",
+      });
 
       await adapter.call(defaultInput);
 
@@ -369,11 +369,11 @@ describe("SerializedPromptConfigAdapter", () => {
     });
 
     it("appends input.messages when no {{messages}} in template", async () => {
-      const adapter = new SerializedPromptConfigAdapter(
-        defaultConfig,
-        defaultLitellmParams,
-        "http://localhost:8080",
-      );
+      const adapter = new SerializedPromptConfigAdapter({
+        config: defaultConfig,
+        litellmParams: defaultLitellmParams,
+        nlpServiceUrl: "http://localhost:8080",
+      });
 
       await adapter.call(defaultInput);
 
@@ -396,11 +396,11 @@ describe("SerializedPromptConfigAdapter", () => {
             "{% if input contains 'refund' %}You handle refunds.{% else %}You are a general assistant.{% endif %}",
           messages: [],
         };
-        const adapter = new SerializedPromptConfigAdapter(
-          config,
-          defaultLitellmParams,
-          "http://localhost:8080",
-        );
+        const adapter = new SerializedPromptConfigAdapter({
+          config: config,
+          litellmParams: defaultLitellmParams,
+          nlpServiceUrl: "http://localhost:8080",
+        });
 
         const input: AgentInput = {
           ...defaultInput,
@@ -439,11 +439,11 @@ describe("SerializedPromptConfigAdapter", () => {
             },
           ],
         };
-        const adapter = new SerializedPromptConfigAdapter(
-          config,
-          defaultLitellmParams,
-          "http://localhost:8080",
-        );
+        const adapter = new SerializedPromptConfigAdapter({
+          config: config,
+          litellmParams: defaultLitellmParams,
+          nlpServiceUrl: "http://localhost:8080",
+        });
 
         await adapter.call(defaultInput);
 
