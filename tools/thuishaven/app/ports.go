@@ -157,7 +157,7 @@ type System interface {
 	GroupRSS(pid int) uint64
 	// MemStat samples the machine's memory-pressure signals: compressor
 	// occupancy and swap, which unlike summed RSS do not double-count shared
-	// pages. An unreadable signal stays zero and classifies green (ADR-087).
+	// pages. An unreadable signal stays zero and classifies green (ADR-090).
 	MemStat() domain.MemStat
 	// DemoteGroup moves a process group into the throttled background band, and
 	// RestoreGroup moves it back. The group, not the launcher: the policy is

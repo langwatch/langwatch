@@ -6,7 +6,7 @@ Feature: haven answers an agent's tool call before it runs
 
   # `haven gate` is a Claude Code hook. The direction of control is the point:
   # the agent calls haven, haven answers, haven never invokes the agent. It
-  # fires inside sub-agents too. See ADR-088.
+  # fires inside sub-agents too. See ADR-091.
   #
   # Properties of the hook contract, MEASURED against a headless session with a
   # scratch settings file rather than read from docs:
@@ -46,7 +46,7 @@ Feature: haven answers an agent's tool call before it runs
 
   # --- The fast path is almost everything ---
 
-  @unit @unimplemented
+  @unit
   Scenario: A command that is not heavy is waved through
     Given a tool call that is not a heavy command
     When the gate is asked about it
@@ -56,7 +56,7 @@ Feature: haven answers an agent's tool call before it runs
     # specs/claude/llm-cost-safety.feature must record something per call, so
     # "no work" cannot hold for the gate as a whole.
 
-  @unit @unimplemented
+  @unit
   Scenario: Only a named set of commands is treated as heavy
     When the gate classifies a command
     Then vitest, tsgo, biome, next build, go build and docker build are heavy
@@ -70,28 +70,28 @@ Feature: haven answers an agent's tool call before it runs
 
   # --- The rewrap ---
 
-  @unit @unimplemented
+  @unit
   Scenario: A heavy command is passed to haven as one escaped argument
     Given a heavy command under pressure
     When the gate rewrites it
     Then the original command is passed as a single escaped argument for a shell to run
     And it is not spliced after a separator, because the command is a shell string and not argv
 
-  @unit @unimplemented
+  @unit
   Scenario: A command containing shell operators is gated as a whole
     Given a heavy command joined to another command by a shell operator
     When it is rewritten
     Then the whole line runs under the slot
     And no part of it escapes the slot by being parsed at the outer level
 
-  @unit @unimplemented
+  @unit
   Scenario: A command already under haven's heavy class is not rewrapped again
     Given a command that is already wrapped
     When the gate is asked about it
     Then it is left alone
     Because a nested wrap makes the outer hold the slot the inner waits for
 
-  @unit @unimplemented
+  @unit
   Scenario: The rewrap names haven by absolute path
     Given haven is not on the caller's PATH
     When a command is rewritten
@@ -174,7 +174,7 @@ Feature: haven answers an agent's tool call before it runs
   # notification with the exit code when the run finishes. That is the closest
   # thing to a push channel there is — hooks are request/response, and a blocked
   # agent makes no API calls, so there is nothing to push to.
-  @unit @unimplemented
+  @unit
   Scenario: A wait too long to serve is backgrounded rather than refused
     Given no slot is free
     And the queue is deeper than this caller's wait ceiling
@@ -183,7 +183,7 @@ Feature: haven answers an agent's tool call before it runs
     And the agent keeps working rather than waiting or retrying
     Because it was not going to get its result this turn either way
 
-  @unit @unimplemented
+  @unit
   Scenario: A backgrounded run explains itself in the same breath
     Given a command the gate has backgrounded
     When the replacement is handed back
@@ -196,7 +196,7 @@ Feature: haven answers an agent's tool call before it runs
     When the agent polls the background task
     Then it sees the current queue position rather than silence
 
-  @unit @unimplemented
+  @unit
   Scenario: A wait that fits the ceiling still blocks
     Given no slot is free
     And the queue is shallower than this caller's wait ceiling
@@ -221,13 +221,13 @@ Feature: haven answers an agent's tool call before it runs
 
   # --- The refusal has to be actionable ---
 
-  @unit @unimplemented
+  @unit
   Scenario: A refusal explains the state in terms the caller can act on
     When the gate denies a heavy command
     Then the reason names the current pressure and how many runs are queued
     And it names work that is safe to do instead
 
-  @unit @unimplemented
+  @unit
   Scenario: A refusal says where the caller is in the queue and when to come back
     Given a refused command whose queue depth can be estimated
     When the reason is written
@@ -269,7 +269,7 @@ Feature: haven answers an agent's tool call before it runs
     Then it names that command as starving
     And one or two refusals are reported as ordinary contention, not starvation
 
-  @unit @unimplemented
+  @unit
   Scenario: A refusal never invites the caller to sleep or poll
     When the gate denies a heavy command
     Then the reason explicitly tells the caller not to sleep, poll or wait for it

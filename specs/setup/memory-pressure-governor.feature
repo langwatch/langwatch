@@ -9,7 +9,7 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
   # databases; it does not sample memory at all. The primitives exist elsewhere
   # and are already used: GroupRSS is read by app/report.go for the doctor's
   # footprint lines, and TotalMemory by app/typecheck.go to size slots. What is
-  # new here is a pressure reading on the tick, and publishing it. See ADR-087.
+  # new here is a pressure reading on the tick, and publishing it. See ADR-090.
   #
   # SUMMED RSS IS NOT THE SIGNAL. GroupRSS sums `ps` output, which double-counts
   # shared pages and overstates by several GB. The honest signals on macOS are
@@ -38,26 +38,26 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
 
   # --- Reading the machine ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Pressure is classified from the compressor and swap, not from summed RSS
     When the daemon samples the machine
     Then the reading comes from compressor occupancy and swap usage
     And summed process RSS is not an input to the level
 
-  @unit @unimplemented
+  @unit
   Scenario: Compressor occupancy is read in bytes, not pages
     When compressor occupancy is computed
     Then the page count is multiplied by the machine's own page size
     And the occupied count is used rather than the stored count
 
-  @unit @unimplemented
+  @unit
   Scenario: Either signal alone can raise the level
     Given a machine with swap disabled, so its swap term is permanently zero
     When compressor occupancy alone crosses the threshold
     Then the level rises
     Because a machine with no swap file still thrashes its compressor
 
-  @unit @unimplemented
+  @unit
   Scenario: An undetectable machine reads as unloaded
     Given the machine's memory cannot be read
     When pressure is classified
@@ -70,17 +70,17 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
     Then green admits heavy runs at full width and demotes nothing
     And amber demotes the unfocused stacks and stops admitting at full width
     And red additionally refuses a heavy run that finds no free slot
-    # These are rows of the precedence table in ADR-087. Amber does not refuse
+    # These are rows of the precedence table in ADR-090. Amber does not refuse
     # work; it stops work being admitted at full width.
 
   # --- Publishing ---
 
-  @integration @unimplemented
+  @integration
   Scenario: The reading is published for other processes to read
     When the daemon completes a tick
     Then the current level is written to its state directory with a version and a timestamp
 
-  @unit @unimplemented
+  @unit
   Scenario: A reading that cannot be trusted reads as green
     Given a pressure file that is absent, unparseable, or older than the staleness threshold
     When a reader consults it
@@ -89,7 +89,7 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
 
   # --- Slowing rather than killing ---
 
-  @integration @unimplemented
+  @integration
   Scenario: Under pressure the unfocused stacks are demoted
     Given several stacks are running and one worktree is focused
     When pressure reaches amber
@@ -103,21 +103,21 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
     Then every process in its group is demoted, not just the launcher
     Because the policy is inherited by processes forked afterwards, not applied retroactively
 
-  @integration @unimplemented
+  @integration
   Scenario: Focus that cannot be determined demotes nothing
     Given the focused worktree cannot be identified
     When pressure reaches amber
     Then no stack is demoted
     Because demoting all of them includes the one being worked in
 
-  @integration @unimplemented
+  @integration
   Scenario: At critical pressure the daemon names the worst offender but does not act on it
     Given pressure is red
     When the daemon completes a tick
     Then it names the largest stack and the command that would stop it
     But it does not stop it, because it did not start that work
 
-  @integration @unimplemented
+  @integration
   Scenario: Demotion is lifted when pressure clears
     Given stacks were demoted under pressure
     When pressure returns to green
@@ -130,7 +130,7 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
   # dev-runtime processes whose parent is PID 1 in known directories, at every
   # `haven up`. This extends that same rule to test workers and runs it on the
   # daemon's tick. On macOS PID 1 is launchd.
-  @integration @unimplemented
+  @integration
   Scenario: Orphaned test workers are swept
     Given a vitest worker process whose parent is PID 1
     When the daemon completes a tick

@@ -170,7 +170,7 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 // behind and nobody is coming back for it.
 const vitestWorkerMarker = "vitest/dist/workers"
 
-// governPressure is the daemon's whole response to a loaded machine (ADR-087).
+// governPressure is the daemon's whole response to a loaded machine (ADR-090).
 //
 // It samples, publishes, and then slows things down — it never kills. macOS can
 // bound a process's memory (`taskpolicy -m` sets a jetsam limit at spawn), but
@@ -178,11 +178,28 @@ const vitestWorkerMarker = "vitest/dist/workers"
 // Demotion is reversible and costs nothing but time.
 func (o *Orchestrator) governPressure() {
 	level := domain.ClassifyPressure(o.sys.MemStat())
+	o.publishPressure(level)
+	o.sweepOrphanedWorkers()
 
-	// Publish first, so readers see the current level even if the demotion below
-	// does nothing. A failure to publish is not worth a tick: readers treat a
-	// missing record as green, which disables narrowing and refusal and leaves
-	// slot counting exactly as it was.
+	stacks := o.store.Stacks()
+	if len(stacks) == 0 {
+		return
+	}
+	if level == domain.Green {
+		o.restoreDemoted(stacks)
+		return
+	}
+	o.demoteUnfocused(stacks)
+	if level == domain.Red {
+		o.warnCritical()
+	}
+}
+
+// publishPressure runs before any demotion, so readers see the current level
+// even if the demotion does nothing. A failure to publish is not worth a tick:
+// readers treat a missing record as green, which disables narrowing and refusal
+// and leaves slot counting exactly as it was.
+func (o *Orchestrator) publishPressure(level domain.Pressure) {
 	if err := o.store.WritePressure(domain.PressureRecord{
 		Version:   domain.PressureRecordVersion,
 		Level:     level.String(),
@@ -190,44 +207,42 @@ func (o *Orchestrator) governPressure() {
 	}); err != nil {
 		o.log.Warn("could not publish memory pressure", zap.Error(err))
 	}
+}
 
-	o.sweepOrphanedWorkers()
-
-	stacks := o.store.Stacks()
-	if len(stacks) == 0 {
-		return
-	}
-	// Stacks() is ordered most-recently-updated first, so the head is the
-	// worktree being worked in. Demoting that one would slow down exactly the
-	// thing the developer is watching.
-	focused := stacks[0].Slug
-
-	if level == domain.Green {
-		for _, s := range stacks {
-			if o.sys.ProcessAlive(s.LauncherPID) {
-				o.sys.RestoreGroup(s.LauncherPID)
-			}
+func (o *Orchestrator) restoreDemoted(stacks []domain.Stack) {
+	for _, s := range stacks {
+		if o.sys.ProcessAlive(s.LauncherPID) {
+			o.sys.RestoreGroup(s.LauncherPID)
 		}
-		return
 	}
+}
 
+// demoteUnfocused slows every live stack except the head of Stacks(), which is
+// ordered most-recently-updated first — the head is the worktree being worked
+// in, and demoting that one would slow down exactly the thing the developer is
+// watching.
+func (o *Orchestrator) demoteUnfocused(stacks []domain.Stack) {
+	focused := stacks[0].Slug
 	for _, s := range stacks {
 		if s.Slug == focused || !o.sys.ProcessAlive(s.LauncherPID) {
 			continue
 		}
 		o.sys.DemoteGroup(s.LauncherPID)
 	}
+}
 
-	if level == domain.Red {
-		if slug, rss := o.fattestStack(); slug != "" {
-			// Named, not stopped. The daemon did not start this work and has no
-			// standing to end it; the operator decides.
-			o.log.Warn("memory pressure critical",
-				zap.String("largest_stack", slug),
-				zap.String("rss", domain.HumanBytes(int64(rss))),
-				zap.String("hint", "haven down "+slug))
-		}
+// warnCritical names the largest stack, and does no more than name it. The
+// daemon did not start this work and has no standing to end it; the operator
+// decides.
+func (o *Orchestrator) warnCritical() {
+	slug, rss := o.fattestStack()
+	if slug == "" {
+		return
 	}
+	o.log.Warn("memory pressure critical",
+		zap.String("largest_stack", slug),
+		zap.String("rss", domain.HumanBytes(int64(rss))),
+		zap.String("hint", "haven down "+slug))
 }
 
 // sweepOrphanedWorkers reclaims test workers an interrupted run left parented to

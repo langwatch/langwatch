@@ -11,7 +11,7 @@ import (
 )
 
 // `haven gate` answers a Claude Code PreToolUse hook. The agent calls haven,
-// haven answers; haven never invokes the agent. See ADR-088.
+// haven answers; haven never invokes the agent. See ADR-091.
 //
 // EVERY path here defers rather than blocking. A hook that exits 2 BLOCKS the
 // tool call, and an unrecovered Go panic exits with exactly 2 — so the
@@ -190,7 +190,7 @@ func (o *Orchestrator) readPressureRecord() (domain.PressureRecord, bool, time.T
 //
 // The limit comes from what is actually free rather than total RAM: on a
 // machine with a container VM holding several GiB, os.totalmem() overstates
-// what this process can have (ADR-087).
+// what this process can have (ADR-090).
 func (o *Orchestrator) queueState() (queueDepth int, slotFree bool) {
 	live := o.store.HeavyRuns()
 	limit := domain.HeavySlots(o.sys.MemStat(), runtime.NumCPU())

@@ -527,31 +527,38 @@ func commandsHelp() string {
 // and every flag it takes.
 func commandHelp(name string) (string, bool) {
 	for _, spec := range table {
-		if spec.name != name || spec.hidden {
-			continue
+		if spec.name == name && !spec.hidden {
+			return renderCommandHelp(spec), true
 		}
-		var b strings.Builder
-		usage := "    haven " + spec.name
-		if spec.args != "" {
-			usage += " " + spec.args
-		}
-		fmt.Fprintf(&b, "%s\n\n%s\n", spec.summary, usage)
-		if len(spec.flags) > 0 {
-			b.WriteString("\nFLAGS\n")
-			for _, f := range spec.flags {
-				label := f.long
-				if f.short != "" {
-					label = f.short + "/" + f.long
-				}
-				if f.takesValue {
-					label += " " + f.value
-				}
-				fmt.Fprintf(&b, "    %-22s %s\n", label, f.summary)
-			}
-		}
-		return b.String(), true
 	}
 	return "", false
+}
+
+func renderCommandHelp(spec commandSpec) string {
+	var b strings.Builder
+	usage := "    haven " + spec.name
+	if spec.args != "" {
+		usage += " " + spec.args
+	}
+	fmt.Fprintf(&b, "%s\n\n%s\n", spec.summary, usage)
+	if len(spec.flags) > 0 {
+		b.WriteString("\nFLAGS\n")
+		for _, f := range spec.flags {
+			fmt.Fprintf(&b, "    %-22s %s\n", helpFlagLabel(f), f.summary)
+		}
+	}
+	return b.String()
+}
+
+func helpFlagLabel(f flagSpec) string {
+	label := f.long
+	if f.short != "" {
+		label = f.short + "/" + f.long
+	}
+	if f.takesValue {
+		label += " " + f.value
+	}
+	return label
 }
 
 // commandNames lists every visible command, for the "unknown topic" pointer.

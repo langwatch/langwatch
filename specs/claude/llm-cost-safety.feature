@@ -5,7 +5,7 @@ Feature: The gate prices an action before it silently invalidates a prompt cache
   stuck agent does not burn turns unattended
 
   # Second duty of `haven gate` (specs/claude/agent-admission-gate.feature).
-  # Separate concern, same seam. See ADR-088.
+  # Separate concern, same seam. See ADR-091.
   #
   # THE BUST CONSTANT. Prompt caching is a prefix match: any byte change in the
   # prefix invalidates everything after it. A cache read costs 0.1x base input;

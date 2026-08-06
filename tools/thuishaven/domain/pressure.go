@@ -4,7 +4,7 @@ import "time"
 
 // Pressure is how much trouble the machine is in. It is deliberately coarse:
 // three levels, each with one response, so a reader can tell what haven will do
-// without knowing the thresholds. See ADR-087.
+// without knowing the thresholds. See ADR-090.
 type Pressure int
 
 const (
@@ -39,7 +39,7 @@ func (p Pressure) String() string {
 type MemStat struct {
 	TotalBytes uint64
 	// CompressedBytes is the memory the compressor OCCUPIES, not the (much
-	// larger) amount it has stored. On the machine that motivated ADR-087 those
+	// larger) amount it has stored. On the machine that motivated ADR-090 those
 	// two read 2 GiB and 10 GiB; quoting the wrong one overstates by five times.
 	CompressedBytes uint64
 	SwapUsedBytes   uint64
@@ -48,7 +48,7 @@ type MemStat struct {
 
 // Pressure thresholds, as fractions. Picked from what was observed on a
 // laptop running several worktrees, not from anything the OS enforces — so
-// they are a heuristic, and ADR-087 says so rather than implying it measured
+// they are a heuristic, and ADR-090 says so rather than implying it measured
 // a limit the system actually applies.
 const (
 	amberSwapFraction = 0.40

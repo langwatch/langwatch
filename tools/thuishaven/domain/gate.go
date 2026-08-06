@@ -7,7 +7,7 @@ import (
 
 // The gate's pure half: deciding what a command is, and what to say about it.
 // Reading the hook payload and writing the reply live in app; everything that
-// can be got wrong lives here, where a test can reach it. See ADR-088.
+// can be got wrong lives here, where a test can reach it. See ADR-091.
 
 // heavyCommands are the only commands worth gating. Everything else defers in
 // a few milliseconds, because a gate that thinks about `ls` is its own outage.
