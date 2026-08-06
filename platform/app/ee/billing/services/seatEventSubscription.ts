@@ -410,8 +410,20 @@ export const createSeatEventSubscriptionFns = ({
       // "nothing happens".)
       const prorationCents = preview.total;
 
-      // Recurring total: new seat count × per-seat price
-      const unitAmountCents = seatItem.price.unit_amount ?? 0;
+      // Recurring total: new seat count × per-seat price.
+      //
+      // No `?? 0` fallback. Stripe reports `unit_amount: null` for tiered and
+      // metered prices, and a seat line without a per-seat figure has no
+      // recurring total to quote — defaulting to zero would print "€0 per year"
+      // beside a button that charges the card, which is the same class of lie
+      // this whole change exists to remove. Today the seat line is always one
+      // of four flat licensed prices, so this is unreachable; it becomes
+      // reachable the moment someone adds a tiered seat price to the catalog,
+      // and it should fail loudly then rather than misprice the purchase.
+      const unitAmountCents = seatItem.price.unit_amount;
+      if (unitAmountCents === null) {
+        throw new SubscriptionItemNotFoundError("seat_unit_amount");
+      }
       const recurringTotalCents = newTotalSeats * unitAmountCents;
 
       const format = (cents: number) => {

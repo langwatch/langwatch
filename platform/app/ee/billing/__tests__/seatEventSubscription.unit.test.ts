@@ -111,7 +111,7 @@ describe("seatEventSubscription", () => {
   }: {
     canceledAt?: number | null;
     interval?: string;
-    unitAmount?: number;
+    unitAmount?: number | null;
     priceId?: string;
   } = {}) => ({
     status: "active",
@@ -318,6 +318,29 @@ describe("seatEventSubscription", () => {
             proration_behavior: "always_invoice",
           },
         });
+      });
+    });
+
+    describe("when the seat price carries no per-seat amount", () => {
+      it("refuses to quote rather than printing a zero recurring total", async () => {
+        // Stripe reports `unit_amount: null` for tiered and metered prices.
+        // Falling back to zero rendered "$0" as the new billing amount beside a
+        // button that charges the card.
+        db.subscription.findMany.mockResolvedValue([linkedActive]);
+        stripe.subscriptions.retrieve.mockResolvedValue(
+          seatSubscription({ unitAmount: null }),
+        );
+        stripe.invoices.createPreview.mockResolvedValue({
+          currency: "usd",
+          total: 1500,
+        });
+
+        await expect(
+          service.previewProration({
+            organizationId: "org_1",
+            newTotalSeats: 4,
+          }),
+        ).rejects.toMatchObject({ code: "subscription_sync_failed" });
       });
     });
 
