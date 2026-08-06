@@ -18,7 +18,15 @@
  * @see specs/analytics/governed-sql-workbench.feature
  */
 
-import { Badge, Box, Button, HStack, Stack, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Stack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 
 import { starterVegaLiteSpecText } from "../visualization/starterVegaLiteSpec";
@@ -62,6 +70,14 @@ const starterFor = (result: GovernedSqlChartResult): string =>
     columns: result.columns,
     datasetName: GOVERNED_QUERY_RESULT_DATASET,
   });
+
+/**
+ * What the starter follows: the shape of the result, not its rows. A Reload
+ * with the same columns changes nothing here; a new query with different
+ * columns is a new shape.
+ */
+const shapeOf = (result: GovernedSqlChartResult): string =>
+  result.columns.map((column) => `${column.name} ${column.type}`).join("\n");
 
 /**
  * What a member can rely on the policy accepting, said next to where they type.
@@ -143,7 +159,12 @@ function SpecPolicyPanel({
                 >
                   {error.path}
                 </Text>
-                <Text fontSize="12px" lineHeight="1.6" paddingX={3} paddingY={2}>
+                <Text
+                  fontSize="12px"
+                  lineHeight="1.6"
+                  paddingX={3}
+                  paddingY={2}
+                >
                   {error.message}
                 </Text>
               </Box>
@@ -230,10 +251,28 @@ export function GovernedSqlChartMode({
   view = "chart",
   onOpenSpecification,
 }: GovernedSqlChartModeProps) {
-  // Seeded once. An edited specification is the member's work and is never
-  // replaced behind their back when new rows arrive; the reset button is how
-  // they ask for the starting point again.
-  const [specText, setSpecText] = useState(() => starterFor(result));
+  // The starter follows each new result shape until the member edits it. An
+  // edited specification is their work and is never replaced behind their
+  // back; the reset button hands the current result's starter back and
+  // resumes following.
+  const [specState, setSpecState] = useState(() => ({
+    shape: shapeOf(result),
+    text: starterFor(result),
+    edited: false,
+  }));
+
+  const shape = shapeOf(result);
+  if (!specState.edited && specState.shape !== shape) {
+    // Adjusting state during render is React's sanctioned shape for state
+    // that derives from a changed prop: it re-renders before painting.
+    setSpecState({ shape, text: starterFor(result), edited: false });
+  }
+
+  const specText = specState.text;
+  const setSpecText = (text: string) =>
+    setSpecState((current) => ({ ...current, text, edited: true }));
+  const resetSpecText = () =>
+    setSpecState({ shape, text: starterFor(result), edited: false });
 
   const datasets = useMemo(
     () => ({ [GOVERNED_QUERY_RESULT_DATASET]: result.rows }),
@@ -288,14 +327,14 @@ export function GovernedSqlChartMode({
               Chart specification
             </Text>
             <Text fontSize="10.5px" color="fg.subtle">
-              Vega-Lite v6 · describes the chart over the returned rows — new
-              rows never overwrite your edits
+              Vega-Lite v6 · the example follows each new result until you edit
+              — your edits are never overwritten
             </Text>
             <Box flex="1" />
             <Button
               size="xs"
               variant="outline"
-              onClick={() => setSpecText(starterFor(result))}
+              onClick={resetSpecText}
               data-testid="vega-spec-reset"
             >
               Reset to the example
@@ -319,7 +358,12 @@ export function GovernedSqlChartMode({
   }
 
   return (
-    <VStack align="stretch" gap={3} height="full" data-testid="governed-sql-chart-mode">
+    <VStack
+      align="stretch"
+      gap={3}
+      height="full"
+      data-testid="governed-sql-chart-mode"
+    >
       {onOpenSpecification && (
         <HStack justify="flex-end">
           <Button

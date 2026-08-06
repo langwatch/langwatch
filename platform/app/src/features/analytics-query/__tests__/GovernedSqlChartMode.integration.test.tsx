@@ -144,7 +144,9 @@ describe("chart mode", () => {
   describe("given a successful governed SQL result", () => {
     describe("when chart mode opens", () => {
       it("starts from a specification that draws the result it is given", async () => {
-        const { rerender } = withChakra(<GovernedSqlChartMode result={RESULT} />);
+        const { rerender } = withChakra(
+          <GovernedSqlChartMode result={RESULT} />,
+        );
 
         await waitFor(() => expect(vega.state.embeds).toBe(1));
         expect(screen.queryByTestId("governed-chart-failure")).toBeNull();
@@ -171,7 +173,9 @@ describe("chart mode", () => {
     describe("when the member edits the specification", () => {
       /** @scenario "Editing the chart specification never reruns SQL" */
       it("revalidates and redraws without issuing a single request", async () => {
-        const { rerender } = withChakra(<GovernedSqlChartMode result={RESULT} />);
+        const { rerender } = withChakra(
+          <GovernedSqlChartMode result={RESULT} />,
+        );
         await waitFor(() => expect(vega.state.embeds).toBe(1));
 
         switchView(rerender, "specification");
@@ -232,9 +236,7 @@ describe("chart mode", () => {
         );
 
         await waitFor(() =>
-          expect(
-            screen.queryByTestId("vega-spec-editor-problems"),
-          ).toBeNull(),
+          expect(screen.queryByTestId("vega-spec-editor-problems")).toBeNull(),
         );
 
         // The chart view agrees: nothing refused, the chart draws.
@@ -302,6 +304,64 @@ describe("chart mode", () => {
             screen.getByTestId("vega-spec-policy-panel").textContent,
           ).toContain("Refused"),
         );
+      });
+    });
+
+    describe("when a new query returns a result with different columns", () => {
+      /** @scenario "A new result reshapes the starter specification until it is edited" */
+      it("redraws from a starter specification over the new columns", async () => {
+        const { rerender } = withChakra(
+          <GovernedSqlChartMode result={RESULT} />,
+        );
+        await waitFor(() => expect(vega.state.embeds).toBe(1));
+
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <GovernedSqlChartMode
+              result={{
+                columns: [
+                  { name: "status", type: "String" },
+                  { name: "latency_ms", type: "Float64" },
+                ],
+                rows: [{ status: "ok", latency_ms: 12.5 }],
+              }}
+              view="specification"
+            />
+          </ChakraProvider>,
+        );
+
+        const editor = await findEditor();
+        const starter = JSON.parse((editor as HTMLTextAreaElement).value);
+        expect(starter.encoding.x.field).toBe("status");
+        expect(starter.encoding.y.field).toBe("latency_ms");
+      });
+
+      /** @scenario "A new result reshapes the starter specification until it is edited" */
+      it("never replaces a specification the member has edited", async () => {
+        const { rerender } = withChakra(
+          <GovernedSqlChartMode result={RESULT} view="specification" />,
+        );
+        const editor = await findEditor();
+        const edited = JSON.stringify({
+          data: { name: "query_result" },
+          mark: "point",
+          encoding: { x: { field: "model", type: "nominal" } },
+        });
+        await replaceSpec(editor, edited);
+
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <GovernedSqlChartMode
+              result={{
+                columns: [{ name: "status", type: "String" }],
+                rows: [{ status: "ok" }],
+              }}
+              view="specification"
+            />
+          </ChakraProvider>,
+        );
+
+        expect((editor as HTMLTextAreaElement).value).toBe(edited);
       });
     });
 

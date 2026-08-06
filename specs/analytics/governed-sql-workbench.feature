@@ -516,6 +516,13 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     And no prior view or its resources leak
 
   @integration
+  Scenario: A new result reshapes the starter specification until it is edited
+    Given a chart drawn from the starter specification, untouched
+    When a run returns a result with different columns
+    Then the chart redraws from a starter specification over the new columns
+    But a specification the member has edited is never replaced by a new result
+
+  @integration
   Scenario: Spec, size, and color-mode changes update the chart and unmount finalizes it
     Given a rendered chart
     When the spec changes, the container resizes, or the color mode flips
