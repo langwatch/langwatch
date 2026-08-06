@@ -217,3 +217,50 @@ Feature: Member Role Team Restrictions
     And the team role fields should be read-only
     And I should not see Save or Cancel buttons
     And I should see a Back button
+
+  # ============================================================================
+  # A seat decision and a team's last admin
+  # ============================================================================
+
+  # The correction to Viewer can take away the only team-scoped admin a shared
+  # team has, and the last-admin guard used to refuse that, which took the whole
+  # seat change down with it: the organization role never changed either, and no
+  # amount of editing the member's access in the dialog helped, because the seat
+  # change is applied before it and always saw the roles as they still were.
+  #
+  # The guard protects a team from having nobody who can administer it. An
+  # ORGANIZATION-scoped ADMIN binding grants team permissions in every shared
+  # team, so an organization admin still administers a team whose last
+  # team-scoped admin is gone, and the state the guard exists to prevent is not
+  # the state this produces. So a seat decision, which is the organization's to
+  # make, goes through, and the teams it changed are named back to the admin who
+  # made it. Editing a single team's own members is a team-local decision and
+  # keeps the guard.
+
+  @integration
+  Scenario: Moving the only admin of a shared team to a Lite Member seat goes through
+    Given a member is the only admin of a shared team
+    When an organization admin moves them to a Lite Member seat
+    Then the seat change is saved
+    And their role on that team becomes Viewer
+
+  @integration
+  Scenario: The teams left without a team admin are named back to the admin
+    Given a member is the only admin of two shared teams
+    When an organization admin moves them to a Lite Member seat
+    Then the save reports both teams as left without a team admin
+    And it does not report a team that still has another admin
+
+  @integration
+  Scenario: A seat change that names team roles outright still keeps the guard
+    Given a member is the only admin of a shared team
+    When a caller asks for that team role to be Viewer as part of the seat change
+    Then the change is refused
+    And the refusal names the team
+
+  @integration
+  Scenario: Editing one team's members still refuses to remove its last admin
+    Given a member is the only admin of a shared team
+    When an organization admin changes that team role from the team's own members
+    Then the change is refused
+    And the refusal names the team

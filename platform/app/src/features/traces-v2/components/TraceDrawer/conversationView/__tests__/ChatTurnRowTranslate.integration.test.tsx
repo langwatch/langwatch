@@ -82,6 +82,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import type { TraceListItem } from "../../../../types/trace";
+import { NO_TRACE_EVENTS } from "../../../../types/trace";
 import { ChatTurnRow } from "../ChatTurnRow";
 
 function turn(over: Partial<TraceListItem>): TraceListItem {
@@ -103,7 +104,7 @@ function turn(over: Partial<TraceListItem>): TraceListItem {
     output: null,
     origin: "application",
     evaluations: [],
-    events: [],
+    events: NO_TRACE_EVENTS,
     ...over,
   };
 }

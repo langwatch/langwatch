@@ -124,7 +124,7 @@ export function groupTracesByConversation(
     for (const t of sorted) {
       totalSpans += t.spanCount;
       if (t.status === "error") errorCount++;
-      totalEvents += t.events.length;
+      totalEvents += t.events.totalCount;
     }
 
     const lastOutput =

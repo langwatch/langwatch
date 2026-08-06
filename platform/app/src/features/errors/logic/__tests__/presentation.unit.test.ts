@@ -143,6 +143,80 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("when a team would be left without an admin", () => {
+    /** @scenario Refusing to leave a team without an admin names the team */
+    it("names the team and the one step that clears it", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "team_last_admin_required",
+          httpStatus: 409,
+          meta: { teamName: "developers" },
+        }),
+      );
+
+      expect(description).toContain('"developers"');
+      expect(description).toContain("Admin role");
+    });
+
+    /** @scenario Refusing to leave a team without an admin names the team */
+    it("still says something useful when the team has no name to give", () => {
+      const { description } = explainHandledError(
+        shape({ code: "team_last_admin_required", httpStatus: 409, meta: {} }),
+      );
+
+      expect(description).toContain("This team");
+      expect(description).not.toContain("undefined");
+    });
+
+    /** @scenario Being the last admin oneself is a different sentence */
+    it("tells the last admin of a team to promote somebody before leaving it", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "cannot_remove_self_as_last_admin",
+          httpStatus: 409,
+          meta: { teamName: "developers" },
+        }),
+      );
+
+      expect(description).toContain('"developers"');
+      expect(description).toContain("first");
+      // Nobody can do this for them, so copy that points at somebody else is
+      // pointing at the reader.
+      expect(description).not.toMatch(/ask|contact|support/i);
+    });
+
+    /** @scenario A Lite Member seat that only allows Viewer says so as itself */
+    it("explains that the seat is what limits the team role", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lite_member_viewer_only",
+          httpStatus: 409,
+          meta: { teamName: "developers" },
+        }),
+      );
+
+      expect(description).toContain("Viewer");
+      expect(description).toContain("full member seat");
+    });
+
+    /** @scenario None of these refusals reach the customer as check-your-input */
+    it.each([
+      "team_last_admin_required",
+      "cannot_remove_self_as_last_admin",
+      "lite_member_viewer_only",
+    ])("does not present %s as a bad input", (code) => {
+      const { title, description } = explainHandledError(
+        shape({ code, httpStatus: 409, meta: {} }),
+      );
+
+      // What each of these used to read as, before they carried a code of their
+      // own: the sentence the server wrote was dropped on the wire and the
+      // registry had only `validation_error` left to go on.
+      expect(title).not.toBe("Check your input");
+      expect(description).not.toContain("Some of the values aren't valid");
+    });
+  });
+
   describe("given a code the registry has never seen", () => {
     /**
      * The fallback used to be `FAULT_TITLES[fault]`, which is a guess dressed

@@ -103,7 +103,14 @@ const DEFAULT_BATS_TEST_ROOTS: string[] = [
  * hash-comment above a `test_<name>() {` function — blank lines and further
  * comments may sit between the two.
  */
-const DEFAULT_SHELL_TEST_ROOTS: string[] = ["charts/langwatch/tests"];
+const DEFAULT_SHELL_TEST_ROOTS: string[] = [
+  "charts/langwatch/tests",
+  // The gateway subchart carries its own drain-timing suite, run by the
+  // `helm` job in go-services.yaml rather than by the umbrella chart's
+  // workflow, because that job is what the gateway chart's path filter
+  // already triggers.
+  "charts/gateway/tests",
+];
 
 /**
  * Roots scanned for Go `_test.go` files. Go-side scenarios use the same
@@ -466,7 +473,6 @@ const LEGACY_INERT: string[] = [
   "specs/mcp-server/project-tools.feature",
   "specs/mcp-server/prompt-tools.feature",
   "specs/mcp-server/scenario-tool-formatters.feature",
-  "specs/members/member-role-team-restrictions.feature",
   "specs/migration/vite-migration.feature",
   "specs/model-config/anthropic-empty-content.feature",
   "specs/model-config/litellm-reasoning-params.feature",
@@ -515,7 +521,6 @@ const LEGACY_INERT: string[] = [
   "specs/ops/local-observability-stack.feature",
   "specs/ops/production-bundle-integrity.feature",
   "specs/otlp/canonical-log-ingestion.feature",
-  "specs/otlp/canonical-metric-ingestion.feature",
   "specs/projects/create-project-drawer.feature",
   "specs/projects/project-list-refresh.feature",
   "specs/prompts/custom-prompt-tags.feature",
@@ -588,7 +593,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/conversation-turn-ledger.feature",
   "specs/traces-v2/data-layer.feature",
   "specs/traces-v2/editable-trace-name-alignment.feature",
-  "specs/traces-v2/evaluations.feature",
   "specs/traces-v2/facet-perspectives.feature",
   "specs/traces-v2/flame-graph.feature",
   "specs/traces-v2/grouping-engine.feature",

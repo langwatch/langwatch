@@ -18,6 +18,12 @@ export interface TraceListQueryResult {
   isFetched: boolean;
   isError: boolean;
   error: unknown;
+  /**
+   * Whether the rows are onboarding fixtures rather than the project's own
+   * traces. Their ids exist nowhere but the fixture file, so anything that
+   * would enrich a row from the backend has to sit the preview out.
+   */
+  isSamplePreview: boolean;
 }
 
 /**
@@ -141,6 +147,7 @@ export function useTraceListQuery(): TraceListQueryResult {
       isFetched: true,
       isError: false,
       error: null,
+      isSamplePreview: true,
     };
   }
 
@@ -154,5 +161,6 @@ export function useTraceListQuery(): TraceListQueryResult {
     isFetched: query.isFetched,
     isError: query.isError,
     error: query.error,
+    isSamplePreview: false,
   };
 }

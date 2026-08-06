@@ -341,11 +341,11 @@ const TurnPreviewCell: React.FC<{
         value={trace.spanCount}
       />
     )}
-    {trace.events.length > 0 && (
+    {trace.events.totalCount > 0 && (
       <CountChip
         icon={<Zap />}
         iconColor="orange.fg"
-        value={trace.events.length}
+        value={trace.events.totalCount}
       />
     )}
     {trace.evaluations.length > 0 && (

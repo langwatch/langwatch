@@ -5,11 +5,8 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { RouterOutputs } from "~/utils/api";
-import type {
-  TraceEvalResult,
-  TraceListEvent,
-  TraceListItem,
-} from "../../types/trace";
+import type { TraceEvalResult, TraceListItem } from "../../types/trace";
+import { NO_TRACE_EVENTS } from "../../types/trace";
 
 /**
  * Conversation turn exactly as the `tracesV2.conversationContext` procedure
@@ -66,7 +63,6 @@ export function isPreviewTraceId(traceId: string): boolean {
 const NOW = () => Date.now();
 const minutesAgo = (n: number) => NOW() - n * 60_000;
 
-const noEvents: TraceListEvent[] = [];
 const noEvals: TraceEvalResult[] = [];
 
 interface MakeTraceArgs {
@@ -124,7 +120,7 @@ function makeTrace(args: MakeTraceArgs): TraceListItem {
     traceName: args.name,
     rootSpanType: args.rootSpanType,
     evaluations: args.evaluations ?? noEvals,
-    events: noEvents,
+    events: NO_TRACE_EVENTS,
   };
 }
 
