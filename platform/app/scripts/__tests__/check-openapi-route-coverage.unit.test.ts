@@ -27,7 +27,13 @@ import {
   UNPUBLISHED,
 } from "../check-openapi-route-coverage";
 
-const route = (key: string, described = false): RegisteredRoute => ({
+const route = ({
+  key,
+  described = false,
+}: {
+  key: string;
+  described?: boolean;
+}): RegisteredRoute => ({
   key,
   file: "src/server/routes/example.ts",
   described,
@@ -122,7 +128,9 @@ describe("auditCoverage", () => {
   describe("when a registered route is absent from the document", () => {
     /** @scenario "A public route missing from the document fails the check" */
     it("reports it as unexplained", () => {
-      const result = audit({ routes: [route("POST /api/experiment/init")] });
+      const result = audit({
+        routes: [route({ key: "POST /api/experiment/init" })],
+      });
 
       expect(result.unexplained.map((r) => r.key)).toEqual([
         "POST /api/experiment/init",
@@ -132,7 +140,7 @@ describe("auditCoverage", () => {
     /** @scenario "An internal route is excluded by a written reason" */
     it("stays silent once an exclusion explains it", () => {
       const result = audit({
-        routes: [route("POST /api/experiments/execute")],
+        routes: [route({ key: "POST /api/experiments/execute" })],
         exclusions: [
           {
             match: "POST /api/experiments/execute",
@@ -150,7 +158,7 @@ describe("auditCoverage", () => {
   describe("when a route is in the document", () => {
     it("neither reports it nor counts it as unexplained", () => {
       const result = audit({
-        routes: [route("GET /api/experiments")],
+        routes: [route({ key: "GET /api/experiments" })],
         documented: ["GET /api/experiments"],
       });
 
@@ -170,7 +178,7 @@ describe("auditCoverage", () => {
       };
 
       const result = audit({
-        routes: [route("GET /api/experiments")],
+        routes: [route({ key: "GET /api/experiments" })],
         documented: ["GET /api/experiments"],
         exclusions: [stale],
       });
@@ -186,7 +194,7 @@ describe("auditCoverage", () => {
       };
 
       const result = audit({
-        routes: [route("GET /api/experiments")],
+        routes: [route({ key: "GET /api/experiments" })],
         documented: ["GET /api/experiments"],
         exclusions: [entry],
       });
@@ -198,7 +206,10 @@ describe("auditCoverage", () => {
   describe("when the same route is registered from two basePaths", () => {
     it("counts each spelling once", () => {
       const result = audit({
-        routes: [route("GET /api/experiments"), route("GET /api/experiments")],
+        routes: [
+          route({ key: "GET /api/experiments" }),
+          route({ key: "GET /api/experiments" }),
+        ],
         documented: ["GET /api/experiments"],
       });
 
@@ -209,7 +220,9 @@ describe("auditCoverage", () => {
   /** @scenario "A route annotated but whose app is unwired is still caught" */
   it("catches an annotated route whose app the generator never imports", () => {
     const result = audit({
-      routes: [route("GET /api/projects/{id}/api-key", true)],
+      routes: [
+        route({ key: "GET /api/projects/{id}/api-key", described: true }),
+      ],
     });
 
     expect(result.unexplained.map((r) => r.key)).toEqual([

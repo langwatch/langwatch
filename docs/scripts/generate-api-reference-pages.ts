@@ -515,14 +515,20 @@ function main() {
     // A declared order wins; everything it does not name keeps the CRUD sort
     // and follows behind, so adding a route never silently reshuffles the rest.
     const declaredOrder = group.endpointOrder ?? [];
-    const declaredIndex = (method: string, apiPath: string): number => {
+    const declaredIndex = ({
+      method,
+      apiPath,
+    }: {
+      method: string;
+      apiPath: string;
+    }): number => {
       const at = declaredOrder.indexOf(`${method.toUpperCase()} ${apiPath}`);
       return at === -1 ? Number.MAX_SAFE_INTEGER : at;
     };
 
     endpoints.sort((a, b) => {
-      const aDeclared = declaredIndex(a.method, a.path);
-      const bDeclared = declaredIndex(b.method, b.path);
+      const aDeclared = declaredIndex({ method: a.method, apiPath: a.path });
+      const bDeclared = declaredIndex({ method: b.method, apiPath: b.path });
       if (aDeclared !== bDeclared) return aDeclared - bDeclared;
       const aScore = sortScore(a.method, a.path);
       const bScore = sortScore(b.method, b.path);
