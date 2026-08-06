@@ -422,6 +422,55 @@ describe("Session id is not a credential", () => {
     }
   });
 
+  it("stops serving an SSE session once its key stops verifying", async () => {
+    const live = new Set([VALID_KEY]);
+    const verifier: ApiKeyVerifier = {
+      verify: async (apiKey: string) => live.has(apiKey),
+      sweep: () => undefined,
+      clear: () => undefined,
+    };
+    const revocable = await startHarness({ port: 0, apiKeyVerifier: verifier });
+    const controller = new AbortController();
+
+    try {
+      const sse = await fetch(`${revocable.baseUrl}/sse`, {
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${VALID_KEY}` },
+      });
+      expect(sse.status).toBe(200);
+
+      const reader = sse.body!.getReader();
+      const { value } = await reader.read();
+      const sessionId = /sessionId=([\w-]+)/.exec(
+        new TextDecoder().decode(value)
+      )?.[1];
+      expect(sessionId).toBeTruthy();
+
+      const post = () =>
+        fetch(`${revocable.baseUrl}/messages?sessionId=${sessionId}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${VALID_KEY}`,
+          },
+          body: toolsListBody(),
+        });
+
+      const before = await post();
+      expect(before.status).toBeLessThan(400);
+      await before.text();
+
+      live.delete(VALID_KEY);
+
+      const after = await post();
+      expect(after.status).toBe(401);
+      await after.text();
+    } finally {
+      controller.abort();
+      await revocable.close();
+    }
+  });
+
   it("answers 401 rather than 400 for a session id it does not know", async () => {
     const response = await fetch(`${harness.baseUrl}/mcp`, {
       method: "POST",
@@ -525,6 +574,42 @@ describe("Key verification before allocation", () => {
       expect(sawRateLimit).toBe(true);
     } finally {
       await harness.close();
+    }
+  });
+
+  it("ignores forwarded client addresses when the proxy is not trusted", async () => {
+    const previous = process.env.LANGWATCH_MCP_TRUST_PROXY;
+    process.env.LANGWATCH_MCP_TRUST_PROXY = "false";
+
+    const { verifier } = countingVerifier([VALID_KEY]);
+    const harness = await startHarness({ port: 0, apiKeyVerifier: verifier });
+
+    try {
+      // Every attempt claims a different client address. With the proxy
+      // untrusted these are ignored, so they all count against one limit.
+      let sawRateLimit = false;
+      for (let i = 0; i < 30; i++) {
+        const response = await fetch(`${harness.baseUrl}/mcp`, {
+          method: "POST",
+          headers: {
+            ...MCP_POST_HEADERS,
+            Authorization: `Bearer wrong-key-${i}`,
+            "X-Forwarded-For": `203.0.113.${i}`,
+          },
+          body: initializeBody(),
+        });
+        await response.text();
+        if (response.status === 429) {
+          sawRateLimit = true;
+          break;
+        }
+      }
+
+      expect(sawRateLimit).toBe(true);
+    } finally {
+      await harness.close();
+      if (previous === undefined) delete process.env.LANGWATCH_MCP_TRUST_PROXY;
+      else process.env.LANGWATCH_MCP_TRUST_PROXY = previous;
     }
   });
 

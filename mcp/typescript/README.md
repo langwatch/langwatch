@@ -30,6 +30,7 @@ The API key is required for observability and prompt tools. Documentation tools 
 | | `--port` | HTTP port (default: `3000`) |
 | `LANGWATCH_MCP_HTTP_HOST` | `--host` | HTTP listen address (default: `127.0.0.1`) |
 | `LANGWATCH_MCP_ALLOWED_ORIGINS` | `--allowedOrigin` | Browser origins allowed to call the HTTP server |
+| `LANGWATCH_MCP_TRUST_PROXY` | | Trust forwarded proxy headers (default: `true`) |
 
 ### HTTP mode
 
@@ -49,6 +50,23 @@ Loopback origins are always allowed; anything else has to be listed:
 npx @langwatch/mcp-server --http --port 3000 \
   --allowedOrigin https://your-app.example.com
 ```
+
+#### Running behind a proxy
+
+Forwarded proxy headers are trusted by default, which is what lets the server
+report the external scheme in its OAuth metadata and see the real client
+address behind a load balancer.
+
+Failed authentication is rate limited per client address, and that address
+comes from those same headers. If the port is reachable without a trusted proxy
+in front of it, a client can put any address in `X-Forwarded-For` and the limit
+stops counting. Set `LANGWATCH_MCP_TRUST_PROXY=false` in that case, which makes
+the server use the socket address instead.
+
+This is defense in depth, not the security boundary. API keys are verified
+against the LangWatch API before a session is created and re-checked on every
+request; the rate limit exists to make guessing expensive, not to decide who
+gets in. A spoofable rate limit does not let anyone authenticate.
 
 ## Tools
 
