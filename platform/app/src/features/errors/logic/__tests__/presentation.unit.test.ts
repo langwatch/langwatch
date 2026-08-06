@@ -199,6 +199,58 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("given a mediated LLM call the gateway forwarded from a provider", () => {
+    const reason = (code: string) => ({ code, kind: code });
+
+    /** @scenario "A provider-refused credential gets its own remediation copy" */
+    it.each([
+      "upstream_unauthorized",
+      "upstream_forbidden",
+    ])("explains a %s reason as a rejected credential", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toContain("key or its permissions");
+    });
+
+    /** @scenario "A provider rate limit gets its own remediation copy" */
+    it("explains an upstream_rate_limited reason as a wait-and-retry", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "llm_upstream_error",
+          reasons: [reason("upstream_rate_limited")],
+        }),
+      );
+
+      expect(description).toContain("rate-limiting");
+    });
+
+    /** @scenario "A provider outage gets its own remediation copy" */
+    it.each([
+      "upstream_unavailable",
+      "upstream_timeout",
+    ])("explains a %s reason as a provider outage", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toContain("temporarily unavailable");
+    });
+
+    /** @scenario "An unrecognised upstream reason falls back to the generic retry line" */
+    it("falls back to the generic line for a reason it does not classify", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "llm_upstream_error",
+          reasons: [reason("some_new_provider_code")],
+        }),
+      );
+
+      expect(description).toBe("Try again, or pick a different model.");
+    });
+  });
+
   describe("given a validation error naming fields", () => {
     it("never names a field the customer can't see", () => {
       // zod flattens to the INPUT SCHEMA's keys, so every procedure's
