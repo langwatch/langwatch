@@ -11,9 +11,9 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";
-import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import { z } from "zod";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { submitBugReport } from "~/server/app-layer/bug-reports/bug-report.service";
 

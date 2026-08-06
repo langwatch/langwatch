@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   captureException,

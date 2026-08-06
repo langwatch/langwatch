@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import { getApp } from "~/server/app-layer/app";
 import {
   SCENARIO_TAB_NAVIGATE_EVENT,
