@@ -56,6 +56,14 @@ const pulledUsageHintSchema = z
     dimensions: z.record(z.string()).refine((d) => Object.keys(d).length > 0, {
       message: "a pulled usage hint must name at least one dimension to key on",
     }),
+    /**
+     * The provider's cost as the exact decimal STRING it published, when the
+     * adapter has one. `NormalizedPullEvent.cost_usd` is a `number`, and an
+     * invoice figure that has passed through a JS float has already lost
+     * digits by the time anything downstream can care; a provider that hands
+     * us a string should have every one of them survive to the ledger.
+     */
+    costUsd: z.string().optional(),
     /** Falls back to the event's `target`, which is where models already sit. */
     model: z.string().optional(),
     tokensCacheRead: z.number().int().nonnegative().default(0),
@@ -160,7 +168,9 @@ export function buildPulledUsageRecord({
     hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED
       ? pricePulledUsage({
           basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
-          costUsd: event.cost_usd,
+          // The string when the adapter kept one, so no digit is lost to the
+          // float `cost_usd` had to be to fit the canonical event shape.
+          costUsd: hint.costUsd ?? event.cost_usd,
           // Present by the schema's own refinement on this branch.
           costStatus: hint.costStatus!,
           quantities,

@@ -118,6 +118,25 @@ describe("building one pulled usage record", () => {
       expect(record?.costNanoUsd).toBe(42_500_000_000);
       expect(record?.rateVersion).toBeNull();
     });
+
+    it("prefers the adapter's exact decimal string over the float cost_usd", () => {
+      const record = buildPulledUsageRecord({
+        event: usageEvent(
+          // What the canonical `cost_usd: number` field could still carry
+          // after a provider's string went through a JS float.
+          { cost_usd: 1.1, action: "cost_report" },
+          {
+            costBasis: "provider_reported",
+            costStatus: "exact",
+            costUsd: "1.100000001",
+          },
+        ),
+        source: SOURCE,
+        observedAt: OBSERVED_AT,
+      });
+
+      expect(record?.costNanoUsd).toBe(1_100_000_001);
+    });
   });
 
   describe("when the same period is pulled again", () => {
