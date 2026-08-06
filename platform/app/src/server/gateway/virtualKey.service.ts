@@ -26,7 +26,11 @@ import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { nextResetAt } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
-import { translateExternalIdConflict } from "./errors";
+import {
+  GatewayTraceProjectAmbiguousError,
+  GatewayTraceProjectRequiredError,
+  translateExternalIdConflict,
+} from "./errors";
 import {
   identityPatchData,
   metadataPatch,
@@ -897,16 +901,25 @@ export class VirtualKeyService {
   }
 
   /**
-   * Every key must resolve a project for its traces to land in. Debits no
-   * longer depend on it (they ride the gateway's spend commands), but a
-   * key whose traces land nowhere is invisible in every usage view, and
-   * per-key spend is read from the trace path rather than the ledger.
-   * Project-owned and personal keys resolve a project structurally, and
-   * org/team-owned keys resolve the organization's governance project when
-   * one exists. What is
-   * refused is the remaining shape: ownership above a project in an org
-   * with no governance project, which is exactly the shape that used to
-   * drop traces on the floor.
+   * Every key must SAY where its traces land, rather than have it guessed.
+   *
+   * Per-key spend is read off the trace path, so the project a key traces
+   * into is the project its spend is attributed to. A key resolves that
+   * from an explicit destination or from its single project scope; a key
+   * with neither falls back to the organization's governance project. The
+   * fallback keeps existing keys working, but writing one is a trap: every
+   * project budget the creator had in mind matches nothing, because the
+   * traffic is attributed to a project they never named.
+   *
+   * So two shapes are refused. No destination at all, in an organization
+   * with no governance project either, is `trace_project_required`. A
+   * destination only the fallback could supply, while the organization has
+   * real projects to choose from, is `gateway_trace_project_ambiguous`. An
+   * organization whose only project IS the governance one is left alone,
+   * since there would be nothing else to pick.
+   *
+   * The app has always required the destination for organization and team
+   * ownership; this is the API agreeing with it.
    *
    * Runs on create and on every update (not only scope changes), so a key
    * that predates the rule cannot keep being edited around the hole: the
@@ -922,12 +935,22 @@ export class VirtualKeyService {
   ): Promise<void> {
     const traceProject = await resolveTraceProject(this.prisma, vk, tx);
     if (!traceProject) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "trace_project_required: an organization- or team-owned key needs a project for its traces and costs to land in; without one its spend could not be capped by any budget. Scope the key to a project, or set up the organization's governance project first.",
-      });
+      throw new GatewayTraceProjectRequiredError();
     }
+    if (traceProject.source !== "governance_fallback") return;
+
+    const alternatives = await tx.project.count({
+      where: {
+        team: { organizationId: vk.organizationId },
+        kind: { not: "internal_governance" },
+      },
+    });
+    if (alternatives === 0) return;
+
+    throw new GatewayTraceProjectAmbiguousError({
+      projectScopeCount: vk.scopes.filter((s) => s.scopeType === "PROJECT")
+        .length,
+    });
   }
 
   /**

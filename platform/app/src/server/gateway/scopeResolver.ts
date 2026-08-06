@@ -185,7 +185,45 @@ export async function resolveTraceProject(
   return resolved ?? null;
 }
 
-export type TraceProject = { id: string; teamId: string; apiKey: string };
+export type TraceProject = {
+  id: string;
+  teamId: string;
+  apiKey: string;
+  /**
+   * Which rule answered. Callers that only need the destination ignore it;
+   * write-path validation reads it, because `governance_fallback` is the
+   * one answer the key itself never asked for, and telling that apart from
+   * a destination the creator actually chose is the whole question.
+   */
+  source: TraceProjectSource;
+};
+
+export type TraceProjectSource =
+  | "explicit"
+  | "project_scope"
+  | "governance_fallback";
+
+/**
+ * The rule that will answer for this key, read off the key alone.
+ *
+ * The paired async resolver returns the rule that DID answer, which needs
+ * the database. The two agree except when the destination a key names has
+ * since been deleted: this reports `explicit`, because that is what the key
+ * says, while resolution falls through to governance. Reporting the key's
+ * own claim is the useful answer for a caller auditing configuration, and
+ * the deleted project is visible to them as a `trace_project_id` they
+ * cannot fetch.
+ *
+ * Pure on purpose: a key listing renders hundreds of rows and must not
+ * resolve a destination per row to describe one.
+ */
+export function traceProjectSourceFor(
+  vk: TraceProjectInput,
+): TraceProjectSource {
+  if (vk.traceProjectId) return "explicit";
+  const projectScopes = vk.scopes.filter((s) => s.scopeType === "PROJECT");
+  return projectScopes.length === 1 ? "project_scope" : "governance_fallback";
+}
 
 /**
  * `resolveTraceProject` for many keys at once, answering in a fixed number
@@ -214,13 +252,13 @@ export async function resolveTraceProjects(
   let pending = vks.map((_, index) => index);
 
   const settle = (
-    indices: number[],
-    pick: (index: number) => TraceProject | undefined,
+    source: TraceProjectSource,
+    pick: (index: number) => ProjectRow | undefined,
   ) => {
-    pending = indices.filter((index) => {
+    pending = pending.filter((index) => {
       const hit = pick(index);
       if (!hit) return true;
-      resolved[index] = hit;
+      resolved[index] = { ...hit, source };
       return false;
     });
   };
@@ -230,7 +268,7 @@ export async function resolveTraceProjects(
     indices: pending,
     organizationIds,
   });
-  settle(pending, (index) => {
+  settle("explicit", (index) => {
     const vk = vks[index]!;
     if (!vk.traceProjectId) return undefined;
     return byOrgAndId.get(orgScopedKey(vk.organizationId, vk.traceProjectId));
@@ -238,7 +276,7 @@ export async function resolveTraceProjects(
 
   const uniqueScopeIds = uniqueProjectScopeIds(vks, pending);
   const byId = await scopedDestinations(client, uniqueScopeIds);
-  settle(pending, (index) => {
+  settle("project_scope", (index) => {
     const scopeId = uniqueScopeIds.get(index);
     return scopeId ? byId.get(scopeId) : undefined;
   });
@@ -249,13 +287,16 @@ export async function resolveTraceProjects(
   // and the materialiser then skips span export rather than failing.
   if (pending.length > 0) {
     const governance = await governanceProjectByOrg(client, organizationIds);
-    for (const index of pending) {
-      resolved[index] = governance.get(vks[index]!.organizationId) ?? null;
-    }
+    settle("governance_fallback", (index) =>
+      governance.get(vks[index]!.organizationId),
+    );
   }
 
   return resolved;
 }
+
+/** A project row as the lookups return it, before a rule claims it. */
+type ProjectRow = { id: string; teamId: string; apiKey: string };
 
 /**
  * The explicit trace destinations, keyed by organization and id. Org-pinned
@@ -270,7 +311,7 @@ async function explicitDestinations(
     indices: number[];
     organizationIds: string[];
   },
-): Promise<Map<string, TraceProject>> {
+): Promise<Map<string, ProjectRow>> {
   const ids = args.indices
     .map((index) => args.vks[index]!.traceProjectId)
     .filter((id): id is string => typeof id === "string" && id.length > 0);
@@ -306,7 +347,7 @@ function uniqueProjectScopeIds(
 async function scopedDestinations(
   client: ProjectClient,
   scopeIdByIndex: Map<number, string>,
-): Promise<Map<string, TraceProject>> {
+): Promise<Map<string, ProjectRow>> {
   if (scopeIdByIndex.size === 0) return new Map();
   const rows = await client.project.findMany({
     where: { id: { in: [...new Set(scopeIdByIndex.values())] } },
@@ -320,8 +361,8 @@ type ProjectClient = PrismaClient | Prisma.TransactionClient;
 async function projectsByOrgAndId(
   client: ProjectClient,
   args: { ids: string[]; organizationIds: string[] },
-): Promise<Map<string, TraceProject>> {
-  const rows: Array<TraceProject & { team: Pick<Team, "organizationId"> }> =
+): Promise<Map<string, ProjectRow>> {
+  const rows: Array<ProjectRow & { team: Pick<Team, "organizationId"> }> =
     await client.project.findMany({
       where: {
         id: { in: [...new Set(args.ids)] },
@@ -346,8 +387,8 @@ async function projectsByOrgAndId(
 async function governanceProjectByOrg(
   client: ProjectClient,
   organizationIds: string[],
-): Promise<Map<string, TraceProject>> {
-  const rows: Array<TraceProject & { team: Pick<Team, "organizationId"> }> =
+): Promise<Map<string, ProjectRow>> {
+  const rows: Array<ProjectRow & { team: Pick<Team, "organizationId"> }> =
     await client.project.findMany({
       where: {
         kind: "internal_governance",
@@ -361,7 +402,7 @@ async function governanceProjectByOrg(
       },
       orderBy: { createdAt: "asc" },
     });
-  const byOrg = new Map<string, TraceProject>();
+  const byOrg = new Map<string, ProjectRow>();
   for (const row of rows) {
     if (byOrg.has(row.team.organizationId)) continue;
     byOrg.set(row.team.organizationId, {

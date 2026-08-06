@@ -61,6 +61,20 @@ const str = (
 };
 
 /**
+ * Reads a number out of `meta` without trusting it. `meta` crosses a wire,
+ * so a value that arrives as a string or NaN has to read as absent rather
+ * than reach a sentence as "NaN projects".
+ */
+const num = (
+  error: HandledErrorShape,
+  key: string,
+  fallback: number,
+): number => {
+  const value = error.meta[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+};
+
+/**
  * The two plan allowances an admin meets while reconciling seats, in words that
  * read inside a sentence. Not taken from the license-enforcement labels, which
  * are column headings ("Team Members") and land badly mid-sentence.
@@ -1341,6 +1355,25 @@ const presentations = {
       return window
         ? `A ${window.toLowerCase()} budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.`
         : "This budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.";
+    },
+  },
+  trace_project_required: {
+    // Names the one field that fixes it, since the alternative fix (an
+    // administrator setting the organization's governance project up) is
+    // not something the person looking at this form can do.
+    title: "This key needs somewhere for its traces to land",
+    describe: () =>
+      "Pick the project where its traces and costs land, under Ownership. Without one its spend is invisible and no budget can cap it.",
+  },
+  gateway_trace_project_ambiguous: {
+    // The refusal is about what the key did NOT say, so the copy has to
+    // say it back: the caller believes they already picked the project.
+    title: "This key doesn't say where its traces land",
+    describe: (error) => {
+      const scopes = num(error, "project_scope_count", 0);
+      return scopes > 1
+        ? `It can reach ${scopes} projects, so its traces and costs would go to none of them. Pick the one they should land in.`
+        : "Pick the project where its traces and costs land. Without one they go to a hidden governance project, and every budget on the project you had in mind counts nothing.";
     },
   },
   gateway_budget_scope_unreachable: {

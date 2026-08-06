@@ -656,6 +656,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         {
           name: `org-scoped-${suffix}`,
           scopes: [{ scope_type: "organization", scope_id: ORG_ID }],
+          // An organization with projects to choose from must say which
+          // one its shared key traces into, rather than leave it to the
+          // governance fallback. RBAC stays the only thing under test.
+          trace_project_id: PROJECT_ID,
         },
         apiKeyAuth(adminToken),
       );
@@ -1293,6 +1297,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
           name: `group-budget-${suffix}`,
           window: "month",
           limit_usd: "40",
+          // None of these members hold a key, so the budget is unreachable
+          // and would be refused. What is under test is the per-member
+          // labelling, and reach has its own tests.
+          allow_unreachable: true,
         },
         legacyAuth(),
       );

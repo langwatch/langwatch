@@ -42,6 +42,7 @@ import {
   type BudgetScope,
   GatewayBudgetService,
 } from "~/server/gateway/budget.service";
+import { resolveScopeReach } from "~/server/gateway/budgetScopeReach";
 import type { CacheRuleCursor } from "~/server/gateway/cacheRule.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import {
@@ -157,6 +158,11 @@ const virtualKeyDtoSchema = z.object({
   // Where an org- or team-owned key's traces and costs land. Not a
   // scope: it grants no access to the key.
   trace_project_id: z.string().nullable(),
+  trace_project_source: z
+    .enum(["explicit", "project_scope", "governance_fallback"])
+    .describe(
+      "Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.",
+    ),
   /** The caller's own id for this key, unique within the organization. */
   external_id: z.string().nullable(),
   /** Customer-owned bookkeeping, echoed back verbatim. Never interpreted. */
@@ -240,7 +246,7 @@ const budgetDtoSchema = z.object({
     .enum(["reachable", "unreachable"])
     .optional()
     .describe(
-      "Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. Absent on create, where the same check has just run and would have refused unless `allow_unreachable` was sent.",
+      "Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.",
     ),
 });
 
@@ -906,7 +912,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
   describeRoute({
     summary: "Create virtual key",
     description:
-      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
     tags: ["Virtual Keys"],
     parameters: [idempotencyKeyParameter],
     responses: {
@@ -1725,13 +1731,21 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
             allowUnreachable: body.data.allow_unreachable,
             actorUserId,
           });
-          const memberCounts = await groupMemberCounts([row]);
+          const [memberCounts, reach] = await Promise.all([
+            groupMemberCounts([row]),
+            // Resolved again rather than carried out of the guard, which
+            // only runs for the three scopes it can refuse. A create
+            // response that omitted the field would not equal the row the
+            // very next read returns, and callers do compare those.
+            resolveScopeReach(prisma, organizationId, row),
+          ]);
           return {
             status: 201,
             body: {
               budget: toBudgetDto({
                 budget: row,
                 memberCount: memberCounts.get(row.scopeId),
+                reachable: reach.reachable,
               }),
             },
           };

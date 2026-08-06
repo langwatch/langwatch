@@ -75,6 +75,7 @@ export const APP_ERROR_CODES = [
   "gateway_provider_bindings_gone",
   "gateway_scope_org_mismatch",
   "gateway_spend_unavailable",
+  "gateway_trace_project_ambiguous",
   "guardrail_attach_forbidden",
   "idempotency_error",
   "ingestion_source_cap_reached",
@@ -196,6 +197,7 @@ export const APP_ERROR_CODES = [
   "time_range_too_wide",
   "trace_not_evaluatable",
   "trace_not_found",
+  "trace_project_required",
   "trace_sharing_disabled",
   // Also a Go code, with copy already written under the shared/transport
   // heading — an app-level subclass raises it too (`ee/admin/routes/admin.ts`),

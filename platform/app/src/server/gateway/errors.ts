@@ -237,6 +237,60 @@ export class GatewayGroupBudgetUnsupportedError extends HandledError {
 }
 
 /**
+ * A key was written with nowhere for its traces to land.
+ *
+ * Per-key spend is read off the trace path, so a key whose traces land
+ * nowhere is invisible in every usage view and its spend can be capped by
+ * no budget. Reached only when the organization has no governance project
+ * either, which is the older self-hosted shape.
+ */
+export class GatewayTraceProjectRequiredError extends HandledError {
+  declare readonly code: "trace_project_required";
+
+  constructor() {
+    super(
+      "trace_project_required",
+      "An organization- or team-owned key needs a project for its traces and costs to land in",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "GatewayTraceProjectRequiredError";
+  }
+}
+
+/**
+ * A key was written whose traces would land somewhere it never named.
+ *
+ * A key resolves its trace destination from an explicit one it carries, or
+ * from its single project scope. A key that has neither, an organization-
+ * or team-owned key with no destination set, or one scoped to several
+ * projects at once, falls back to the organization's governance project.
+ * That is a fine read-path tolerance for keys that already exist, and a bad
+ * shape to write: every project budget the creator had in mind matches
+ * nothing, because the traffic is attributed to a project they never
+ * mentioned.
+ *
+ * The app has always required the destination for these ownerships; this is
+ * the API agreeing with it. An organization whose only project IS the
+ * governance one is not refused, since there would be nothing else to pick.
+ */
+export class GatewayTraceProjectAmbiguousError extends HandledError {
+  declare readonly code: "gateway_trace_project_ambiguous";
+
+  constructor({ projectScopeCount }: { projectScopeCount: number }) {
+    super(
+      "gateway_trace_project_ambiguous",
+      "This key does not say which project its traces and costs land in",
+      {
+        meta: { project_scope_count: projectScopeCount },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "GatewayTraceProjectAmbiguousError";
+  }
+}
+
+/**
  * How many of the organization's projects the refusal names before it stops
  * counting. An organization running a project per customer has hundreds, and
  * an error payload is not a listing endpoint; `reachable_project_count` says
