@@ -1,12 +1,17 @@
-import { TRPCError } from "@trpc/server";
 import { getApp } from "~/server/app-layer/app";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { LimitExceededError } from "./errors";
 import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
 import type { RoleChangeType } from "./member-classification";
 
 /**
  * Error messages for license limit violations.
  * Consistent wording using "Lite Member" (not "External").
+ *
+ * Server copy and log lines only. What a customer reads comes from the
+ * `resource_limit_exceeded` entry in the client presentation registry, keyed off
+ * the code {@link LimitExceededError} carries, with the allowance itself read
+ * from its `meta`.
  */
 export const LICENSE_LIMIT_ERRORS = {
   FULL_MEMBER_LIMIT: "Cannot complete action: full member limit reached",
@@ -24,10 +29,15 @@ export interface MemberTypeLimits {
 
 /**
  * Asserts that a role change doesn't exceed license limits.
- * Throws TRPCError with FORBIDDEN code if limits would be exceeded.
  * Sends a fire-and-forget Slack notification to ops before throwing.
  *
- * @throws TRPCError with code FORBIDDEN if limit exceeded
+ * The refusal is a {@link LimitExceededError}, so the allowance that ran out
+ * travels as `meta` under a stable code and the client can name it. It used to
+ * be a bare `TRPCError` whose whole answer was the sentence "Cannot complete
+ * action", which is the least useful thing to tell an admin working down a
+ * member list one seat at a time.
+ *
+ * @throws LimitExceededError if the limit would be exceeded
  */
 export async function assertMemberTypeLimitNotExceeded(
   changeType: RoleChangeType,
@@ -52,15 +62,7 @@ export async function assertMemberTypeLimitNotExceeded(
         })
         .catch(captureException);
 
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
-        cause: {
-          limitType: "members",
-          current: memberCount,
-          max: limits.maxMembers,
-        },
-      });
+      throw new LimitExceededError("members", memberCount, limits.maxMembers);
     }
   }
 
@@ -76,15 +78,11 @@ export async function assertMemberTypeLimitNotExceeded(
         })
         .catch(captureException);
 
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
-        cause: {
-          limitType: "membersLite",
-          current: liteCount,
-          max: limits.maxMembersLite,
-        },
-      });
+      throw new LimitExceededError(
+        "membersLite",
+        liteCount,
+        limits.maxMembersLite,
+      );
     }
   }
 }

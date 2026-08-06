@@ -36,17 +36,25 @@ Feature: Structured Logging for ClickHouse Queries
   # ---------------------------------------------------------------------------
   # Retry behavior
   #
-  # Both reads and inserts retry transient ClickHouse failures (overload,
-  # connection, cluster-recovery). Read-side retry behavior lives in
-  # clickhouse-concurrency-resilience.feature; the insert scenarios stay here
-  # next to the logging they emit.
+  # Reads retry transient ClickHouse failures (overload, connection,
+  # cluster-recovery); that behaviour lives in
+  # clickhouse-concurrency-resilience.feature. Inserts do not retry here, and
+  # the scenarios for that stay in this file next to the logging they emit.
+  #
+  # Inserts are only ever issued from a queued job, which retries the whole job
+  # on its own backoff, so retrying again at the client multiplies attempts
+  # rather than adding resilience. It is also the unsafe half: these are async
+  # inserts with deduplication left at ClickHouse's default of off, so a failure
+  # raised after the server has buffered the batch can still flush, and a retry
+  # writes the rows twice.
   # ---------------------------------------------------------------------------
 
   @unit @regression
-  Scenario: Transient insert errors are retried with exponential backoff
+  Scenario: Insert failures are not retried by the client
+    Given every insert is issued from a job the queue will retry
     When an insert fails with a transient error
-    Then the insert is retried up to the configured maximum
-    And each retry uses jittered exponential backoff
+    Then the insert is attempted exactly once
+    And the failure is raised to the caller for the queue to retry
 
   @unit @regression
   Scenario: Non-transient insert errors fail immediately

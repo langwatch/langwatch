@@ -30,6 +30,7 @@ import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
+import { FilterService } from "~/server/filters/filter.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
@@ -165,6 +166,7 @@ import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/ev
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositories/monitor-performance.clickhouse.repository";
 import { NullMonitorPerformanceRepository } from "./evaluations/repositories/monitor-performance.repository";
+import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter-options.clickhouse.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import {
@@ -1310,6 +1312,13 @@ export function initializeDefaultApp(options?: {
       ),
       topics,
     },
+    filters: {
+      options: new FilterService(
+        clickhouseEnabled
+          ? new FilterOptionsClickHouseRepository(resolveClickHouseClient)
+          : null,
+      ),
+    },
     codingAgents: {
       sessions: traced(
         new CodingAgentSessionService(
@@ -1526,6 +1535,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
       topics: new TopicService(new PrismaTopicRepository(testPrisma)),
     },
+    filters: { options: new FilterService(null) },
     codingAgents: {
       sessions: new CodingAgentSessionService(
         new NullCodingAgentSessionRepository(),

@@ -62,6 +62,13 @@ describe("GroupQueue metrics", () => {
       expect(metric).toBeDefined();
     });
 
+    it("registers gq_oldest_backlog_age_milliseconds gauge", () => {
+      const metric = register.getSingleMetric(
+        "gq_oldest_backlog_age_milliseconds",
+      );
+      expect(metric).toBeDefined();
+    });
+
     it("registers gq_blocked_groups gauge", () => {
       const metric = register.getSingleMetric("gq_blocked_groups");
       expect(metric).toBeDefined();

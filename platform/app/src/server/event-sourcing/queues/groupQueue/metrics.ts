@@ -22,6 +22,8 @@ const metricNames = [
   "gq_retry_backoff_milliseconds",
   "gq_job_duration_milliseconds",
   "gq_oldest_pending_age_milliseconds",
+  "gq_oldest_backlog_age_milliseconds",
+  "gq_ready_score_implausible_total",
   // ADR-030 hardening + review 2026-06-24
   "gq_blob_reclaim_s3_failures_total",
   "gq_blob_decode_cap_exceeded_total",
@@ -187,6 +189,41 @@ export const gqJobDurationMilliseconds = new Histogram({
 export const gqOldestPendingAgeMilliseconds = new Gauge({
   name: "gq_oldest_pending_age_milliseconds",
   help: "Age of the oldest pending job in the ready sorted set (milliseconds)",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * Backlog age the eligible-waiting gauge is structurally blind to. A group
+ * pinned in retry backoff has its ready score REWRITTEN to now+backoff on every
+ * failed attempt, so `gq_oldest_pending_age_milliseconds` (which clocks off the
+ * ready score) reads seconds even while the group's head job has been due for a
+ * day. This gauge clocks off the per-group jobs zset instead, whose scores are
+ * preserved across retries/blocks/parks, sampling the most-deferred ready
+ * groups — exactly where retry-pinned and in-flight groups live.
+ */
+export const gqOldestBacklogAgeMilliseconds = new Gauge({
+  name: "gq_oldest_backlog_age_milliseconds",
+  help: "Age of the oldest due job across sampled groups regardless of dispatch eligibility (catches groups pinned in retry backoff)",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * Jobs whose producer supplied a ready score the queue refused.
+ *
+ * Raised at the staging fallback, once per job, the moment the value is
+ * rejected - not by scanning the ready set afterwards. That ordering is the
+ * whole point: the guard replaces the bad score before it is written, so a scan
+ * would find nothing and report zero for ever while the broken producer carried
+ * on. This is a true monotonic count of events, so `rate()` and `increase()`
+ * mean what they usually mean.
+ *
+ * Only a value the producer actually supplied counts. A payload with no
+ * occurrence time at all (`deferredOriginResolution` and friends) is scored at
+ * staging time by design, and is not a defect to report.
+ */
+export const gqReadyScoreImplausibleTotal = new Counter({
+  name: "gq_ready_score_implausible_total",
+  help: "Jobs staged with a producer score the queue rejected (not a timestamp, or outside the allowed skew around now) and replaced with the staging time",
   labelNames: ["queue_name"] as const,
 });
 

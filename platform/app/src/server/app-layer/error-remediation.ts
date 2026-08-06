@@ -81,6 +81,12 @@ const registry = {
       "If it persists, check the LangWatch status page or contact support",
     ],
   },
+  clickhouse_overloaded: {
+    tips: [
+      "Too many queries were running at once — retry in a few seconds",
+      "Narrow the time range or add filters so the query costs less to run",
+    ],
+  },
 
   // ---- api keys ----
   api_key_not_found: {

@@ -27,6 +27,35 @@ import { ConfigurationError, ValidationError } from "../errorHandling";
 const logger = createLogger("langwatch:event-sourcing:queue-manager");
 
 /**
+ * Ready score for a payload whose own occurrence time orders its dispatch.
+ *
+ * A missing `occurredAt` means "we never recorded when this happened", not
+ * "this happened in January 1970". The previous `?? 0` fallback meant the
+ * latter: it staged the job with a ready score of epoch-plus-delay, which both
+ * ranks it ahead of every real job and makes
+ * `gq_oldest_pending_age_milliseconds` report about 56 years of backlog for the
+ * whole queue (production, 2026-07-31 and 2026-08-03).
+ *
+ * Scoring an absent value at `Date.now()` matches every other producer in this
+ * file - the `serializeByAggregate` branch scores `Date.now()` outright, and
+ * `GroupQueue.send` does the same when no score function is registered.
+ *
+ * A value that IS present is handed over untouched, however odd it looks. It is
+ * `GroupQueue`'s guard that judges it against the staging clock, and only there
+ * is the queue name in scope to raise `gq_ready_score_implausible_total`.
+ * Repairing it here would silently hide the producer that needs fixing - which
+ * matters most for the highest-volume paths, where `occurredAt` is a
+ * customer-supplied OTLP timestamp (`recordDataPoint`, `contributeMetricFacts`,
+ * `contributeLogFacts`).
+ */
+function occurredAtScore(payload: { occurredAt?: unknown }): number {
+  const occurredAt = payload.occurredAt;
+  return occurredAt === undefined || occurredAt === null
+    ? Date.now()
+    : (occurredAt as number);
+}
+
+/**
  * Metadata stored per job type in the global job registry.
  * Used by the global queue's process/groupKey/score callbacks to dispatch to the right handler.
  */
@@ -654,7 +683,7 @@ export class QueueManager<EventType extends Event = Event> {
         groupKeyFn: commandGroupKeyFn,
         scoreFn: cmdEntry.options.serializeByAggregate
           ? () => Date.now()
-          : (payload: any) => payload.occurredAt as number,
+          : (payload: any) => occurredAtScore(payload),
         process: async (payload: any) => {
           await processCommand({ ...commandProcessParams, payload });
         },
@@ -939,7 +968,7 @@ export class QueueManager<EventType extends Event = Event> {
         : (payload: any) => `${String(payload.tenantId)}/job/${name}`,
       scoreFn: scoreFn
         ? (scoreFn as any)
-        : (payload: any) => (payload.occurredAt as number) ?? 0,
+        : (payload: any) => occurredAtScore(payload),
       process: process as any,
       delay,
       deduplication: deduplication
