@@ -347,6 +347,36 @@ func TestLLMProxy_ScrubsUpstreamRelayedProseFromMarkedEnvelopes(t *testing.T) {
 	})
 }
 
+// @scenario "The gateway's provider header rides into an untyped capture"
+func TestLLMProxy_CapturesProviderIdentityOnUntypedFailures(t *testing.T) {
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-LangWatch-Provider", "anthropic")
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = io.WriteString(w, `{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}`)
+	}))
+	defer gateway.Close()
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "c", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+	relay.SetTurnContext(token, turnContext())
+
+	resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatalf("proxied LLM call: %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	e, ok := relay.LastLLMError(token)
+	if !ok {
+		t.Fatal("LastLLMError must expose the captured herr")
+	}
+	if e.Meta["provider"] != "anthropic" {
+		t.Errorf("captured provider = %v, want anthropic", e.Meta["provider"])
+	}
+}
+
 // @scenario "Untrusted provider prose never enters relay logs"
 func TestLLMProxy_LogsOnlyTheHandledClassification(t *testing.T) {
 	secret := "sk-proj-do-not-record"

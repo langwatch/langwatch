@@ -159,85 +159,7 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		// status, and body kind), never provider prose. The body is restored
 		// untouched for the worker's SDK.
 		ModifyResponse: func(resp *http.Response) error {
-			if resp.StatusCode < 400 {
-				if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
-					// A 200 stream can still fail: providers signal hard
-					// limits (OpenAI's insufficient_quota) as an in-stream
-					// error event after the stream opens. Watch the frames as
-					// they pass through untouched; a clean end clears the
-					// capture, an error event captures and latches (see
-					// llmStreamSniffer).
-					resp.Body = newLLMStreamSniffer(resp.Body, entry, clog.Get(r.baseCtx))
-					return nil
-				}
-				// A later successful call clears the capture: a transient failure
-				// the SDK retried past must not be blamed for an unrelated error
-				// the agent reports afterwards.
-				entry.clearLLMError()
-				return nil
-			}
-			peeked, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
-			// Chain any unread remainder back on so a >cap body still reaches the
-			// worker's SDK intact (truncating against a larger Content-Length
-			// would corrupt the response); Close closes the original body.
-			rest := resp.Body
-			resp.Body = struct {
-				io.Reader
-				io.Closer
-			}{io.MultiReader(bytes.NewReader(peeked), rest), rest}
-			if err != nil {
-				return nil // capture is best-effort; the proxied response stands.
-			}
-			contentType := resp.Header.Get("Content-Type")
-			e, typed := decodeLLMErrorBody(peeked, upstreamResponse{
-				handledCode: resp.Header.Get(herr.HandledErrorHeader),
-				status:      resp.StatusCode,
-				contentType: contentType,
-			})
-			if !typed {
-				// Provider responses are untrusted. Record only the bounded
-				// classification carried by the handled error; authentication
-				// failures can echo the API key in their prose.
-				clog.Get(r.baseCtx).Info("otelrelay llm error normalized as handled upstream error",
-					zap.String("conversation", entry.info.ConversationID),
-					zap.Int("status", resp.StatusCode),
-					zap.Int("body_bytes", len(peeked)),
-					zap.String("body_kind", e.Meta["body_kind"].(string)),
-					zap.String("upstream_code", string(firstHandledReasonCode(e))))
-			}
-			if typed {
-				if e.Meta == nil {
-					e.Meta = herr.M{}
-				}
-				// Gateway envelopes deliberately carry no HTTP status.
-				e.Meta["http_status"] = resp.StatusCode
-				scrubUpstreamRelayedProse(&e)
-			}
-			entry.setLLMError(e)
-			// A 429 is retryable by the worker SDK's book, which is right for a
-			// burst and an endless silent spinner for a hard plan limit. Cut the
-			// loop here (see cutRateLimitRetry): the SDK sees a final failure,
-			// the turn fails, and the captured error above still carries the
-			// provider's own cause for the panel's plan-limit card.
-			//
-			// The count is of UNINTERRUPTED 429s: any other answer, a 500
-			// included, resets it (without touching the capture above). A mixed
-			// flap is not a deterministic limit, and only a limit that answers
-			// every backoff identically should be cut.
-			if resp.StatusCode != http.StatusTooManyRequests {
-				entry.resetRateLimitStrikes()
-				return nil
-			}
-			hard := hasHardLimitReason(e)
-			strikes := entry.strikeRateLimit()
-			if hard || strikes >= rateLimitCutAfter {
-				cutRateLimitRetry(resp)
-				clog.Get(r.baseCtx).Info("otelrelay llm rate-limit retry loop cut",
-					zap.String("conversation", entry.info.ConversationID),
-					zap.Bool("hard_limit", hard),
-					zap.Int("consecutive", strikes))
-			}
-			return nil
+			return r.captureLLMFailure(entry, resp)
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 			clog.Get(r.baseCtx).Warn("otelrelay llm proxy error",
@@ -248,6 +170,121 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		},
 	}
 	proxy.ServeHTTP(w, req)
+}
+
+// captureLLMFailure is handleLLM's ModifyResponse body, pulled out to a named
+// method so its branching is not charged against handleLLM's own cognitive
+// complexity. See the ModifyResponse call site for what it is responsible
+// for.
+func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error {
+	if resp.StatusCode < 400 {
+		if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+			// A 200 stream can still fail: providers signal hard limits
+			// (OpenAI's insufficient_quota) as an in-stream error event
+			// after the stream opens. Watch the frames as they pass through
+			// untouched; a clean end clears the capture, an error event
+			// captures and latches (see llmStreamSniffer).
+			resp.Body = newLLMStreamSniffer(resp.Body, entry, clog.Get(r.baseCtx))
+			return nil
+		}
+		// A later successful call clears the capture: a transient failure
+		// the SDK retried past must not be blamed for an unrelated error
+		// the agent reports afterwards.
+		entry.clearLLMError()
+		return nil
+	}
+	peeked, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
+	// Chain any unread remainder back on so a >cap body still reaches the
+	// worker's SDK intact (truncating against a larger Content-Length would
+	// corrupt the response); Close closes the original body.
+	rest := resp.Body
+	resp.Body = struct {
+		io.Reader
+		io.Closer
+	}{io.MultiReader(bytes.NewReader(peeked), rest), rest}
+	if err != nil {
+		return nil // capture is best-effort; the proxied response stands.
+	}
+	e, typed := decodeLLMErrorBody(peeked, upstreamResponse{
+		handledCode: resp.Header.Get(herr.HandledErrorHeader),
+		status:      resp.StatusCode,
+		contentType: resp.Header.Get("Content-Type"),
+	})
+	if !typed {
+		r.logUntypedLLMFailure(entry, failureBody{resp: resp, peeked: peeked}, &e)
+	}
+	if typed {
+		if e.Meta == nil {
+			e.Meta = herr.M{}
+		}
+		// Gateway envelopes deliberately carry no HTTP status.
+		e.Meta["http_status"] = resp.StatusCode
+		scrubUpstreamRelayedProse(&e)
+	}
+	entry.setLLMError(e)
+	r.cutRetryLoopOnHardLimit(entry, resp, e)
+	return nil
+}
+
+// failureBody is the raw response plus the bytes captureLLMFailure already
+// peeked off it, bundled so logUntypedLLMFailure stays under the repo's
+// 3-argument limit (revive argument-limit).
+type failureBody struct {
+	resp   *http.Response
+	peeked []byte
+}
+
+// logUntypedLLMFailure records the bounded, safe-to-log classification of a
+// provider-native failure body: never the provider's own prose, which can
+// echo credentials (an invalid-key response quoting the key back).
+func (r *Relay) logUntypedLLMFailure(entry *workerEntry, body failureBody, e *herr.E) {
+	bodyKind, _ := e.Meta["body_kind"].(string)
+	if bodyKind == "" {
+		bodyKind = "unknown"
+	}
+	// The gateway sets this header itself on the errors it authors
+	// (writeUpstreamError); it names which provider the failure came from,
+	// not anything the provider wrote, so it is safe to carry into the
+	// capture even though the body around it is not.
+	provider := body.resp.Header.Get("X-LangWatch-Provider")
+	if provider != "" {
+		if e.Meta == nil {
+			e.Meta = herr.M{}
+		}
+		e.Meta["provider"] = provider
+	}
+	clog.Get(r.baseCtx).Info("otelrelay llm error normalized as handled upstream error",
+		zap.String("conversation", entry.info.ConversationID),
+		zap.Int("status", body.resp.StatusCode),
+		zap.Int("body_bytes", len(body.peeked)),
+		zap.String("body_kind", bodyKind),
+		zap.String("upstream_code", string(firstHandledReasonCode(*e))),
+		zap.String("provider", provider))
+}
+
+// cutRetryLoopOnHardLimit answers a rate-limited retry terminally once the
+// conversation has hit rateLimitCutAfter consecutive 429s, or immediately on
+// a hard plan-limit discriminant — see cutRateLimitRetry and
+// hasHardLimitReason for why a 429 alone is not enough to cut on.
+//
+// The count is of UNINTERRUPTED 429s: any other answer, a 500 included,
+// resets it (without touching the capture already set on entry). A mixed
+// flap is not a deterministic limit, and only a limit that answers every
+// backoff identically should be cut.
+func (r *Relay) cutRetryLoopOnHardLimit(entry *workerEntry, resp *http.Response, e herr.E) {
+	if resp.StatusCode != http.StatusTooManyRequests {
+		entry.resetRateLimitStrikes()
+		return
+	}
+	hard := hasHardLimitReason(e)
+	strikes := entry.strikeRateLimit()
+	if hard || strikes >= rateLimitCutAfter {
+		cutRateLimitRetry(resp)
+		clog.Get(r.baseCtx).Info("otelrelay llm rate-limit retry loop cut",
+			zap.String("conversation", entry.info.ConversationID),
+			zap.Bool("hard_limit", hard),
+			zap.Int("consecutive", strikes))
+	}
 }
 
 // llmTargetURL joins the request path BEYOND /w/{token}/llm onto the
