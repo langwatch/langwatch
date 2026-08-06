@@ -467,7 +467,6 @@ const LEGACY_INERT: string[] = [
   "specs/mcp-server/project-tools.feature",
   "specs/mcp-server/prompt-tools.feature",
   "specs/mcp-server/scenario-tool-formatters.feature",
-  "specs/members/member-role-team-restrictions.feature",
   "specs/migration/vite-migration.feature",
   "specs/model-config/anthropic-empty-content.feature",
   "specs/model-config/litellm-reasoning-params.feature",
