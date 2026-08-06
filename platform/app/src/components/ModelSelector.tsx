@@ -91,6 +91,28 @@ export const filterRestrictedModels = ({
       : isModelAllowedForFeature({ modelId: model, featureKey }),
   );
 
+/**
+ * True when Gemini embeddings cannot be served: every enabled Gemini row's
+ * credential names the Agent Platform door (project + location present),
+ * which has no embeddings endpoint. A single AI Studio row — including an
+ * env-fed system row, whose customKeys are null — makes them available
+ * again. Exported for tests.
+ */
+export const geminiEmbeddingsUnavailable = (
+  rows: Array<{
+    provider: string;
+    enabled: boolean;
+    customKeys?: unknown;
+  }>,
+): boolean => {
+  const geminiRows = rows.filter((r) => r.provider === "gemini" && r.enabled);
+  if (geminiRows.length === 0) return false;
+  return geminiRows.every((row) => {
+    const keys = row.customKeys as Record<string, string> | null | undefined;
+    return !!keys?.GEMINI_PROJECT && !!keys?.GEMINI_LOCATION;
+  });
+};
+
 export const useModelSelectionOptions = (
   options: string[],
   model: string,
@@ -136,11 +158,6 @@ export const useModelSelectionOptions = (
     };
   }
 
-  const allModels = filterRestrictedModels({
-    models: getCustomModels(providersByKey, options, mode),
-    featureKey: opts?.featureKey,
-  });
-
   // Build a set of custom model IDs for quick lookup
   const customModelIdSet = new Set<string>();
   for (const [providerKey, config] of Object.entries(providersByKey)) {
@@ -152,6 +169,23 @@ export const useModelSelectionOptions = (
       }
     }
   }
+
+  const allModels = filterRestrictedModels({
+    models: getCustomModels(providersByKey, options, mode),
+    featureKey: opts?.featureKey,
+  }).filter(
+    (model) =>
+      // Gemini's Agent Platform door serves chat but not the embeddings
+      // endpoint (verified live: :batchEmbedContents answers 404 on
+      // aiplatform.googleapis.com). When every enabled Gemini row goes
+      // through that door, offering the registry embedding models would
+      // recreate the selectable-but-always-fails class this fold removed.
+      // Explicit custom models stay — they are the customer's own claim.
+      mode !== "embedding" ||
+      !model.startsWith("gemini/") ||
+      customModelIdSet.has(model) ||
+      !geminiEmbeddingsUnavailable(modelProviders.data?.providers ?? []),
+  );
 
   const displayNames = buildCustomModelDisplayNames(
     modelProviders.data?.providers ?? [],

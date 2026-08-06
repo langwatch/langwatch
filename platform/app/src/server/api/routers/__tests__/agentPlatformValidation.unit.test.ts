@@ -276,4 +276,48 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
       ).rejects.toMatchObject({ code: "provider_unreachable" });
     });
   });
+
+  describe("given a legacy google_agent_platform row from the fold window", () => {
+    /**
+     * The retired provider has no onboarding tile any more, so it resolves
+     * no default base URL — and the no-endpoint skip must not read that as
+     * "nothing to probe". The Agent Platform door builds its own URL; a
+     * green check without a request would pass a revoked key.
+     */
+    /** @scenario A legacy row still validates through the Agent Platform door during the fold window */
+    it("probes the Agent Platform door instead of skipping validation", async () => {
+      mockFetch.mockResolvedValue(generated());
+
+      const result = await validateProviderApiKey("google_agent_platform", {
+        GOOGLE_AGENT_PLATFORM_API_KEY: "AQ.LegacyKey",
+        GOOGLE_AGENT_PLATFORM_PROJECT: "acme-123",
+        GOOGLE_AGENT_PLATFORM_LOCATION: "global",
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(sentRequest().url).toContain("aiplatform.googleapis.com");
+      expect(sentRequest().url).toContain(
+        "/projects/acme-123/locations/global/",
+      );
+      expect(result).toEqual({ valid: true });
+    });
+
+    /** @scenario A legacy row still validates through the Agent Platform door during the fold window */
+    it("still reports a refused legacy key as refused", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: async () => JSON.stringify({ error: { message: "nope" } }),
+      });
+
+      const result = await validateProviderApiKey("google_agent_platform", {
+        GOOGLE_AGENT_PLATFORM_API_KEY: "AQ.RevokedKey",
+        GOOGLE_AGENT_PLATFORM_PROJECT: "acme-123",
+        GOOGLE_AGENT_PLATFORM_LOCATION: "global",
+      });
+
+      expect(mockFetch).toHaveBeenCalled();
+      expect(codeOf(result)).toBe("provider_key_invalid");
+    });
+  });
 });

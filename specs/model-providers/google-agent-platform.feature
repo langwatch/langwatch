@@ -98,6 +98,17 @@ Feature: Gemini credentials work through either Google door
     When the gateway materialises the credential
     Then the credential carries no project and no region
 
+  # The Agent Platform door serves chat but not embeddings (verified live:
+  # the embeddings endpoint answers 404 on that host). Offering a model
+  # that cannot run recreates the picks-it-always-fails defect this whole
+  # feature exists to remove.
+  @unit
+  Scenario: Embedding models are not offered through a door that cannot serve them
+    Given the only enabled Gemini credential carries a project and location
+    When the customer opens an embedding model picker
+    Then the Gemini embedding models are not offered
+    And a Gemini credential without the pair makes them available again
+
   # ── The old separate provider folds in ──────────────────────────────────
 
   @unit
@@ -107,3 +118,13 @@ Feature: Gemini credentials work through either Google door
     Then the row's provider is Gemini
     And its key, project and location are preserved under the Gemini field names
     And its scope and enabled state are unchanged
+
+  # A green check on a key that was never probed is worse than no check:
+  # the fold-window row keeps its retired provider name, and nothing about
+  # that name may quietly disable the walk to the Agent Platform door.
+  @unit
+  Scenario: A legacy row still validates through the Agent Platform door during the fold window
+    Given a stored Google Agent Platform row with a key, project and location
+    When I check the credential
+    Then the check happens against the Agent Platform host
+    And the credential is not reported as valid without a request being made

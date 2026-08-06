@@ -176,14 +176,28 @@ export class ProviderServiceDisabledError extends HandledError {
  * it is safe to carry and to branch copy on.
  */
 export class ProviderKeyRestrictedError extends HandledError {
-  constructor({ provider, reason }: { provider: string; reason: string }) {
+  constructor({
+    provider,
+    reason,
+    googleDoor,
+  }: {
+    provider: string;
+    reason: string;
+    /**
+     * Which Google door refused — the same `API_KEY_SERVICE_BLOCKED`
+     * reason means opposite remediations on the two doors (fill in the
+     * project/location pair vs clear it), so the presentation registry
+     * branches on this.
+     */
+    googleDoor?: "gemini-api" | "agent-platform";
+  }) {
     super(
       "provider_key_restricted",
       `${provider} refused the API key (${reason})`,
       {
         fault: "customer",
         httpStatus: 403,
-        meta: { provider, reason },
+        meta: { provider, reason, ...(googleDoor ? { googleDoor } : {}) },
         tips: ["Adjust the key's restrictions in the Google Cloud console."],
       },
     );
@@ -279,10 +293,14 @@ const MAX_UPSTREAM_DETAIL_LENGTH = 300;
  */
 const GEMINI_REASON_ERRORS: Record<
   string,
-  (args: { provider: string }) => HandledError
+  (args: {
+    provider: string;
+    googleDoor?: "gemini-api" | "agent-platform";
+  }) => HandledError
 > = {
-  API_KEY_INVALID: (args) => new ProviderKeyInvalidError(args),
-  SERVICE_DISABLED: (args) => new ProviderServiceDisabledError(args),
+  API_KEY_INVALID: ({ provider }) => new ProviderKeyInvalidError({ provider }),
+  SERVICE_DISABLED: ({ provider }) =>
+    new ProviderServiceDisabledError({ provider }),
   API_KEY_SERVICE_BLOCKED: (args) =>
     new ProviderKeyRestrictedError({
       ...args,
@@ -419,16 +437,24 @@ async function readUpstreamRefusal(
 function geminiReasonRefusal({
   provider,
   reason,
+  googleDoor,
 }: {
   provider: string;
   reason: string | undefined;
+  googleDoor?: "gemini-api" | "agent-platform";
 }): RankedFailure | undefined {
-  if (provider !== "gemini" || !reason) return undefined;
+  // Both Google providers speak the same ErrorInfo shape — the legacy
+  // fold-window provider probes the Agent Platform door and its refusals
+  // carry the same enumerated reasons.
+  if (provider !== "gemini" && provider !== "google_agent_platform") {
+    return undefined;
+  }
+  if (!reason) return undefined;
 
   const build = GEMINI_REASON_ERRORS[reason];
   if (!build) return undefined;
 
-  const error = build({ provider });
+  const error = build({ provider, googleDoor });
 
   return refusal(
     error,
@@ -484,6 +510,7 @@ async function handleHttpError({
   const fromReason = geminiReasonRefusal({
     provider: context.provider,
     reason,
+    googleDoor: context.googleDoor,
   });
   if (fromReason) return fromReason;
 
@@ -980,14 +1007,6 @@ export async function validateProviderApiKey(
     VALIDATION_ONLY_BASE_URLS[provider] ??
     "";
 
-  // No endpoint to probe (e.g. voyage, which has no models listing): skip
-  // rather than fetch a relative URL, which would always throw and surface
-  // as a misleading "check your network connection" error. The key is
-  // exercised on the first real call instead.
-  if (!baseUrl && !defaultBaseUrl) {
-    return { valid: true };
-  }
-
   // Legacy rows from the fold window read their pair from the retired
   // field names; new gemini rows carry the GEMINI_* pair. Both validate
   // through the same Agent Platform door. The legacy branch goes with the
@@ -1002,6 +1021,23 @@ export async function validateProviderApiKey(
           project: customKeys.GEMINI_PROJECT?.trim() ?? "",
           location: customKeys.GEMINI_LOCATION?.trim() ?? "",
         };
+
+  // No endpoint to probe (e.g. voyage, which has no models listing): skip
+  // rather than fetch a relative URL, which would always throw and surface
+  // as a misleading "check your network connection" error. The key is
+  // exercised on the first real call instead.
+  //
+  // A credential naming the Agent Platform door is exempt: that probe
+  // builds its URL from AGENT_PLATFORM_API_ROOT and never needs a base
+  // URL. Without the exemption, a legacy `google_agent_platform` row —
+  // whose onboarding tile (the source of providerDefaultBaseUrls) is gone
+  // — returned `valid: true` after ZERO requests: a green check on a key
+  // that was never probed.
+  const hasAgentPlatformDoor =
+    !!agentPlatform.project && !!agentPlatform.location;
+  if (!baseUrl && !defaultBaseUrl && !hasAgentPlatformDoor) {
+    return { valid: true };
+  }
 
   return runProbeChain({
     candidates: buildProbeCandidates({

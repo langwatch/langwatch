@@ -533,10 +533,20 @@ const presentations = {
     // what "invalid" would send them off to do. The reason is a discriminant
     // from a set Google enumerates, so branching copy on it is safe.
     title: "This key's restrictions block the request",
-    describe: (error) =>
-      error.meta.reason === "API_KEY_SERVICE_BLOCKED"
-        ? "This key belongs to a different Google service. If it is a Gemini Enterprise Agent Platform key, fill in the Google Cloud Project and Location fields and save again; otherwise allow the Generative Language API in the Google Cloud console."
-        : "Its application restrictions don't allow a call from our servers. Adjust them in the Google Cloud console, then try again.",
+    // The same refusal reason means opposite remediations on Google's two
+    // doors, so the sentence follows `meta.googleDoor` (set by the
+    // validation walk): a key blocked on the Gemini API likely belongs on
+    // the Agent Platform door and needs the pair filled in, while a key
+    // blocked on Agent Platform likely belongs on the Gemini API and
+    // needs the pair cleared.
+    describe: (error) => {
+      if (error.meta.reason !== "API_KEY_SERVICE_BLOCKED") {
+        return "Its application restrictions don't allow a call from our servers. Adjust them in the Google Cloud console, then try again.";
+      }
+      return error.meta.googleDoor === "agent-platform"
+        ? "This key can't call the Agent Platform service. If it is an AI Studio key, clear the Google Cloud Project and Location fields and save again; otherwise allow the Agent Platform API in the Google Cloud console."
+        : "This key belongs to a different Google service. If it is a Gemini Enterprise Agent Platform key, fill in the Google Cloud Project and Location fields and save again; otherwise allow the Generative Language API in the Google Cloud console.";
+    },
   },
   provider_refused: {
     // fault: provider. It answered and said no, but not in terms we can map —

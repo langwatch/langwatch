@@ -378,10 +378,17 @@ export const modelProviders = {
         // The Agent Platform path needs both or neither: a project without
         // a location (or the reverse) cannot be probed or dispatched, and
         // silently ignoring the lone field would validate a credential
-        // through a different door than traffic would later use.
+        // through a different door than traffic would later use. The issue
+        // lands on the EMPTY side of the pair so the form renders it under
+        // the field the customer has to fill — a pathless issue gets
+        // re-anchored under the first field (the API key), which reads as
+        // the wrong field complaining.
         if (!!data.GEMINI_PROJECT !== !!data.GEMINI_LOCATION) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
+            path: data.GEMINI_PROJECT
+              ? ["GEMINI_LOCATION"]
+              : ["GEMINI_PROJECT"],
             message:
               "Fill in both the project and the location, or leave both empty for an AI Studio key.",
           });
