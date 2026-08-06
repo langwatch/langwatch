@@ -46,7 +46,28 @@ function parseFileUri(uri: string): string {
     );
   }
   const parsed = new URL(uri);
-  return decodeURIComponent(parsed.pathname);
+  const decoded = decodeURIComponent(parsed.pathname);
+
+  // Containment check, deliberately AFTER the decode.
+  //
+  // `new URL()` leaves `%2F` encoded, so a URI can look confined and stop being
+  // confined one line later: `…/spool/proj/..%2F..%2Fetc/span` has a single
+  // path segment as far as the URL parser is concerned, and becomes
+  // `…/spool/proj/../../etc/span` the moment it is decoded — which is what
+  // `mkdir`/`writeFile` would then act on. A caller that percent-encodes its
+  // segments is therefore NOT protected by having done so.
+  //
+  // Callers should still keep each segment a single component; this is the
+  // backstop that makes a mistake there fail loudly instead of writing outside
+  // the object root.
+  const resolved = path.resolve(decoded);
+  if (resolved !== decoded) {
+    throw new Error(
+      `LocalFilesystemDriver refuses a file: URI whose decoded path is not already canonical — ` +
+        `it resolves outside the location it names. Keep every path segment a single component.`,
+    );
+  }
+  return resolved;
 }
 
 /**

@@ -368,6 +368,17 @@ export function createEnvConfig() {
       AZURE_BLOB_ACCOUNT_KEY: z.string().optional(),
       AZURE_BLOB_ENDPOINT: z.string().optional(),
       AZURE_BLOB_CONTAINER: z.string().optional(),
+      // The ADR-022 trace spool is bounded by a lifecycle rule the operator
+      // provisions on the container, NOT by anything the application does: it
+      // deletes eagerly after the event_log INSERT, and a crash between those
+      // two steps is what the rule reaps. That rule lives on Azure's
+      // MANAGEMENT plane (Microsoft.Storage/.../managementPolicies), and this
+      // deployment holds only a data-plane key, so the app cannot read it back
+      // to check. This flag is the operator asserting it exists. Default false
+      // means an Azure install that enables the spool without thinking about
+      // retention degrades to inline payloads rather than accumulating
+      // customer data nothing will ever reap.
+      AZURE_BLOB_SPOOL_RETENTION_CONFIRMED: z.boolean().optional(),
       DATASET_STORAGE_LOCAL: z.boolean().optional(),
       CREDENTIALS_SECRET: z.string().optional(),
       AZURE_AD_CLIENT_ID: z.string().optional(),
@@ -564,6 +575,10 @@ export function createEnvConfig() {
       AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,
       AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
       AZURE_BLOB_CONTAINER: process.env.AZURE_BLOB_CONTAINER,
+      AZURE_BLOB_SPOOL_RETENTION_CONFIRMED:
+        process.env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED === "1" ||
+        process.env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED?.toLowerCase() ===
+          "true",
       DATASET_STORAGE_LOCAL:
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",

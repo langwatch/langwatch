@@ -160,4 +160,103 @@ LEAN BOUNDARIES  (what stays small at each hop)
 - Any user-visible enumeration of `stored_spans.SpanAttributes` keys MUST exclude `langwatch.reserved.*`. (Survived from ADR-021.)
 - `event_log` retention drives the durability ceiling for "show full" reads. There is no longer a separate S3 retention to coordinate.
 
-<!-- ci-trigger: force workflows to fire on this head -->
+## Amendment: the spool is backend-agnostic (langwatch/langwatch-saas#800)
+
+This ADR was written when S3 was the only object store LangWatch could write to,
+so it says "S3 spool" throughout. That is no longer accurate, and taking it
+literally is what kept the spool hardcoded to the AWS SDK long after every other
+byte-writing surface had moved behind the shared `stored-objects` layer. Read
+every "S3" above as "the deployment's object store".
+
+**What changed.** `BlobStore` no longer builds an S3 client for the spool. It
+resolves the project's storage destination through
+`resolveProjectStorageDestination` and writes through the `stored-objects`
+`StorageRegistry`, exactly as the GroupQueue durable blob tier does (ADR-030).
+The spool therefore lands in Azure Blob, S3, or the local filesystem according
+to how the deployment is configured. `mintUriForDestination`
+(`stored-objects/uri.ts`) is now the single destination → URI mapping; the three
+copies of that switch that used to exist are gone.
+
+**The object path is unchanged**: `trace-blobs/spool/{projectId}/{traceId}/{spanId}`,
+with the prefix deliberately kept ABOVE the tenant segment. An S3 lifecycle
+prefix filter cannot wildcard a leading tenant segment, so moving the prefix
+below it would make orphan spools unexpirable. Existing lifecycle rules keep
+working untouched.
+
+**The reference no longer carries a location.** A spooled command used to carry
+the raw object key, and the read path parsed the tenant id back out of that
+string to choose a bucket — so a tampered queue message could steer a read at
+another tenant's object. Commands now carry the opaque marker `spool:v2` and the
+worker re-derives the location from the command's own authenticated `tenantId`
+and span ids. This is the same discipline `BlobRef` follows in ADR-030 §5.
+
+For one release the worker still accepts a v1 raw key, so commands queued across
+the deploy resolve; a v1 key whose tenant segment does not match the command's
+authenticated tenant is refused rather than dereferenced. **Removal is tracked in
+langwatch/langwatch-saas#837**, and the `TODO` markers in `blob-store.service.ts`
+name that issue. It is safe to remove one release after this ships: a v1
+reference can only live inside a command queued before the deploy, and the object
+it names is reaped by the lifecycle rule within 3 days.
+
+**Each derived path segment is a single component.** Percent-encoding is not
+enough on its own: `LocalFilesystemDriver` round-trips the URI through
+`decodeURIComponent`, which turns `..%2F..%2F` back into `../../` before
+`mkdir`/`writeFile` see it. Since `idSchema` accepts arbitrary strings, a span id
+of `../../…` would otherwise have escaped the object root. Ids outside
+`[A-Za-z0-9_-]` are replaced by a hash of the id — deterministic, so the read and
+delete paths re-derive the same location, and incapable of carrying a separator
+whatever decodes it downstream. `LocalFilesystemDriver` additionally refuses any
+`file:` URI whose decoded path is not already canonical, so a future caller that
+gets this wrong fails loudly rather than writing outside the root.
+
+**The spool has no local-filesystem destination.** It is the one stored-objects
+consumer whose boundedness depends on something outside the object store: it
+deletes eagerly after the `event_log` INSERT and leans on a lifecycle rule to
+reap what a crash between those two steps leaves behind. A filesystem cannot
+express such a rule, so an orphan there is permanent and the volume is what
+fills. `mintSpoolUri` therefore refuses a `file` destination and ingestion
+continues with the payload inline. This is not a regression: before the spool
+moved onto the shared storage layer it built an S3 client, which on a local
+install resolved to the hardcoded `langwatch` bucket, so the write failed and the
+same fail-open path ran every time. It is now explicit instead of incidental.
+
+**The orphan-cleanup window is 3 days, not 24h — and enabling the flag does not
+create it.** This ADR says 24h in two places (the flow sketch and the rules
+list); the implementation has said 3 days since it was written, with the
+rationale that a weekend incident needs catch-up time before orphans are reaped.
+Three days is the intended value and the only one now stated in code.
+
+Provisioning that rule is the **operator's** job and a prerequisite for turning
+the flag on, not a consequence of it. On S3 it is a lifecycle rule on the
+`trace-blobs/spool/` prefix; on Azure Blob it is a lifecycle management policy
+with the same prefix filter. Since `release_trace_blob_offload` has never been
+enabled in a shipped deployment, no such rule exists anywhere yet — an operator
+turning the flag on creates it fresh, so there is no deployed rule for the 24h
+correction to contradict.
+
+**On Azure the spool fails closed until the operator says the rule exists.**
+Documenting the prerequisite is not enough on its own: an operator who enables
+the flag without creating the policy gets exactly the unbounded-orphan case the
+local-filesystem refusal above exists to prevent, and trace payloads then
+outlive the retention this ADR promises. `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`
+(chart: `app.dataplane.providers.azureBlob.spoolRetentionConfirmed`) defaults to
+false, and `mintSpoolUri` refuses an azure destination without it, so ingestion
+degrades to inline payloads rather than accumulating objects nothing reaps.
+
+It is an assertion, not a verification, and deliberately so. An Azure lifecycle
+policy is a management-plane resource
+(`Microsoft.Storage/storageAccounts/managementPolicies`); this deployment holds
+only a data-plane key, so reading the policy back would mean requiring ARM
+credentials, a subscription id and a resource-group name that the feature
+otherwise has no use for — a much larger blast radius than the problem. The
+affirmation lives in the same config that turns the spool on, and the default is
+the safe one. S3 is deliberately not gated the same way: its lifecycle
+requirement predates this change and is the long-standing ADR-022 rule, so
+extending the gate there would silently disable the spool for every existing
+install.
+
+**Superseded above:** "'No S3 equivalent' means no object storage at all";
+"deployments with no object storage should leave `release_trace_blob_offload`
+off"; and both "24h lifecycle policy" statements. Azure Blob is now a
+first-class spool destination alongside S3. The fail-open-on-write and
+read-must-not-degrade rules are unchanged.

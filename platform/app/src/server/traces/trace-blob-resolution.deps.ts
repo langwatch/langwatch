@@ -1,4 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/observability";
+import { env } from "~/env.mjs";
+import type { SpoolStorage } from "~/server/app-layer/traces/blob-store.service";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
@@ -7,7 +10,25 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { createS3Client } from "~/server/storage";
+import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import type { BlobResolutionDeps } from "./trace.service";
+
+/**
+ * Production spool storage: the same `stored-objects` registry and destination
+ * resolver every other byte-writing surface uses, so the trace spool honours a
+ * deployment's Azure / S3 / local-filesystem choice instead of assuming S3
+ * (langwatch/langwatch-saas#800).
+ */
+const defaultSpoolStorage: SpoolStorage = {
+  objectStoreFor: (projectId: string) => createStorageRegistry({ projectId }),
+  resolveDestination: resolveProjectStorageDestination,
+  // The env read lives here, at the composition root, so `BlobStore` stays
+  // env-free and testable. Default false: the spool stays off on Azure until an
+  // operator states the lifecycle rule exists, because nothing else bounds an
+  // orphan left by a crash between the write and its delete.
+  azureRetentionConfirmed: env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED ?? false,
+};
 
 /**
  * Default ClickHouse client resolver: given a tenantId (projectId), returns the
@@ -34,7 +55,7 @@ const defaultResolveClickHouseClient: ClickHouseClientResolver = async (
  * inside `initializeWebApp` (worker-only import). So the customer detail
  * procedures can't reach the app-layer deps. This factory is the single
  * source of truth for constructing those deps; `presets.ts` consumes it too
- * (passing its own composition-root values) so the `new BlobStore(...)` +
+ * (passing its own composition-root values) so the `new BlobStore({ … })` +
  * `new TraceIOExtractionService()` shape is defined in exactly one place.
  *
  * Construction does NO network I/O: `BlobStore` only stores the resolver
@@ -63,10 +84,14 @@ export function buildTraceBlobResolutionDeps(overrides?: {
     overrides?.resolveClickHouseClient ?? defaultResolveClickHouseClient;
 
   return {
-    blobStore: new BlobStore(
-      createS3Client,
-      clickhouseEnabled ? resolveClickHouseClient : undefined,
-    ),
+    blobStore: new BlobStore({
+      resolveS3Client: createS3Client,
+      resolveClickHouseClient: clickhouseEnabled
+        ? resolveClickHouseClient
+        : undefined,
+      spoolStorage: defaultSpoolStorage,
+      logger: createLogger("langwatch:traces:blob-store"),
+    }),
     ioExtractionService: new TraceIOExtractionService(),
   };
 }

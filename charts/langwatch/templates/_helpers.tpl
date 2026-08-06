@@ -812,6 +812,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_NAME" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountName) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_KEY" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountKey) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_CONTAINER" "fieldValues" .Values.app.dataplane.providers.azureBlob.container) }}
+{{- if .Values.app.dataplane.providers.azureBlob.spoolRetentionConfirmed }}
+# The ADR-022 trace spool stays off on Azure until the operator states that the
+# container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3
+# days. That policy is management-plane; the app holds a data-plane key and
+# cannot read it back, so this is an assertion, not a check. Left unset, an
+# oversized span keeps its payload inline instead of leaving an object behind
+# that nothing reaps.
+- name: AZURE_BLOB_SPOOL_RETENTION_CONFIRMED
+  value: "true"
+{{- end }}
 {{- if or .Values.app.dataplane.providers.azureBlob.endpoint.value .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.azureBlob.endpoint) }}
 {{- end }}
