@@ -45,6 +45,13 @@
 --
 -- Re-running the whole file converges: the view is dropped if present and
 -- recreated with the same definition.
+--
+-- The view body below is 00070's CURRENT definition with exactly one line
+-- added (`AND Scope != 'pulled'`). Copy the latest migration that touched this
+-- view, never the one whose comment reads best: an earlier draft of this file
+-- was based on 00069, which predates the nano-USD column, and dropping
+-- `sumState(AmountNanoUSD)` would have turned every calendar-window budget
+-- into a silent no-op in production.
 -- ============================================================================
 
 -- +goose StatementBegin
@@ -63,7 +70,7 @@ SELECT
     -- All branches must return DateTime64(3) to match the target column,
     -- and every function names 'UTC' so the boundary truncated to is the
     -- one the reader computes, on any server. toStartOfWeek mode 1 is
-    -- Monday, matching the reader's ISO week. Unchanged from 00069.
+    -- Monday, matching the reader's ISO week. Verbatim from 00070.
     multiIf(
         Window = 'MINUTE', toDateTime64(toStartOfMinute(OccurredAt, 'UTC'), 3, 'UTC'),
         Window = 'HOUR',   toDateTime64(toStartOfHour(OccurredAt, 'UTC'), 3, 'UTC'),
@@ -73,7 +80,18 @@ SELECT
         -- TOTAL and anything unrecognised: one lifetime bucket.
                            toDateTime64(0, 3, 'UTC')
     ) AS PeriodStart,
+    -- Grouping by the budget keeps the aggregate at the ledger's own grain;
+    -- without it two budgets on one bucket fold into a single aggregate
+    -- holding both their rows. See 00069.
     BudgetId,
+    -- THE money column. `getSpendForBudgets*` reads `sumMerge(SpendNanoUSD)`
+    -- and nothing else, so a view that omits this writes an empty aggregate
+    -- and every calendar-window budget silently reads zero and stops
+    -- enforcing. Added by 00070; an earlier draft of this migration was
+    -- based on 00069's pre-nano view and dropped it. `SpendUSD` below is the
+    -- Decimal audit column and is never what enforcement sums, so a test
+    -- asserting on it cannot see this class of break.
+    sumState(AmountNanoUSD) AS SpendNanoUSD,
     sumState(AmountUSD) AS SpendUSD,
     sumState(toUInt64(TokensInput)) AS TokensInput,
     sumState(toUInt64(TokensOutput)) AS TokensOutput,
