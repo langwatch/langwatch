@@ -14,6 +14,6 @@ export {
 export {
   type PulledUsageObservedEvent,
   type PulledUsageObservedEventData,
-  pulledUsageObservedEventDataSchema,
   type PulledUsageProcessingEvent,
+  pulledUsageObservedEventDataSchema,
 } from "./schemas/events";
