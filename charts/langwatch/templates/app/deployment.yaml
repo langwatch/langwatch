@@ -148,6 +148,14 @@ spec:
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.app.http.langwatchEndpoint | default (printf "http://localhost:%v" (.Values.app.service.port | default 5560)) | quote }}
 
+            # Content-hashed asset base (ADR-086). Empty by default → assets are
+            # served same-origin from the pod. Set to a commit-prefixed CDN base
+            # so a rolling deploy never strands a browser on a stale-chunk 404.
+            {{- if .Values.app.assetBase }}
+            - name: LANGWATCH_ASSET_BASE
+              value: {{ .Values.app.assetBase | quote }}
+            {{- end }}
+
             # Cron API key
             {{- if .Values.app.cronApiKey.secretKeyRef.name }}
             - name: CRON_API_KEY

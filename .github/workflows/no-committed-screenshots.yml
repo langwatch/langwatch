@@ -34,6 +34,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
+          # The check reads the diff, never a file's contents: the only thing
+          # it needs materialised is the script below, which lives under
+          # .github/. History still comes down in full (fetch-depth: 0) so the
+          # base-branch diff resolves — sparse-checkout narrows the working
+          # tree, not the object graph.
+          sparse-checkout: .github
 
       - name: Fetch base branch
         env:

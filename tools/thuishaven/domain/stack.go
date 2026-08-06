@@ -59,6 +59,14 @@ type Stack struct {
 	// LocalAPIKey is the stable, deterministic local dev API key haven seeds and
 	// injects, so every worktree (and every agent) authenticates with the same key.
 	LocalAPIKey string `json:"localApiKey"`
+	// DisableGoogleDLP injects LANGWATCH_DISABLE_GOOGLE_DLP=true, turning the Google
+	// DLP PII check off. True by default for haven stacks: local dev never wants to
+	// ship trace text to Google, and switching the check off also keeps the
+	// @google-cloud/dlp SDK (grpc + generated protos, one of the heaviest
+	// dependencies we have) out of the process entirely. False is how you opt back
+	// in to running DLP: nothing is emitted, so .env governs the check — for the
+	// rare case of exercising DLP locally against real credentials.
+	DisableGoogleDLP bool `json:"disableGoogleDlp,omitempty"`
 	// IsBaseline marks this stack as the shared default other worktrees fall back to
 	// for services they do not run themselves (see Service.IsFallback).
 	IsBaseline bool `json:"baseline,omitempty"`

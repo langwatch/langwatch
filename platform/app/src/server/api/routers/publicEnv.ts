@@ -1,6 +1,6 @@
 import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
-import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum";
+import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
 import { env } from "../../../env.mjs";
 import { hasEmailProvider } from "../../mailer/providers";

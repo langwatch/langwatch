@@ -6,8 +6,8 @@
  */
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { modelDisplayLabel } from "~/server/modelProviders/customModelDisplayNames";
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import {
   isLatestAlias,
   resolveLatestAlias,

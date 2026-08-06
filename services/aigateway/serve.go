@@ -20,6 +20,12 @@ import (
 // until shutdown signal.
 func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) error {
 	deps.Logger.Info("aigateway_starting", zap.String("addr", cfg.Server.Addr))
+	if !cfg.ControlPlane.BaseURLExplicit {
+		deps.Logger.Warn("aigateway_control_plane_base_url_not_explicit",
+			zap.String("control_plane_base_url", cfg.ControlPlane.BaseURL),
+			zap.String("fix", "set LW_GATEWAY_BASE_URL explicitly, see platform/app/.env.example"),
+		)
+	}
 
 	ottlSrv, err := ottlserver.New(deps.Logger)
 	if err != nil {
@@ -47,6 +53,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		MaxRequestBodyBytes:   cfg.Server.MaxRequestBodyBytes,
 		HeartbeatInterval:     time.Duration(cfg.NonStreamingHeartbeatIntervalSeconds) * time.Second,
 		Status:                statusMon,
+		ControlPlaneBaseURL:   cfg.ControlPlane.BaseURL,
 	})
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}
