@@ -40,7 +40,6 @@ vi.mock("../clickhouse", () => ({
   },
 }));
 
-/** Stands in for the resolver the repository is constructed with. */
 const resolveClient = vi.fn();
 
 /** The service under test, reading through a real repository over a fake client. */
