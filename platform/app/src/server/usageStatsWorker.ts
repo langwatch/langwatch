@@ -1,13 +1,11 @@
 /**
  * Daily self-hosted usage telemetry sender.
  *
- * Replaces the deleted BullMQ usageStatsQueue/usageStatsWorker pair (a
- * per-organization repeatable job at noon daily) with an in-process
- * interval loop, following the same pattern as
- * `src/server/observability/anomalyWorker.ts`. Guarded by the same flags
- * the old worker used: sends nothing when DISABLE_USAGE_STATS or IS_SAAS
- * is set. The `/api/track_usage` receiver on app.langwatch.ai is
- * unchanged.
+ * Runs as an in-process interval loop, one send per organization,
+ * following the same pattern as
+ * `src/server/observability/anomalyWorker.ts`. Sends nothing when
+ * DISABLE_USAGE_STATS or IS_SAAS is set. The receiver is
+ * `/api/track_usage` on app.langwatch.ai.
  */
 
 import { createLogger } from "@langwatch/observability";

@@ -84,9 +84,8 @@ export function topicClusteringPM(
       .onWake(topicClusteringWake)
       .toPayload(buildProcessEventView)
       .outbox({
-        // Parity with the BullMQ worker this replaces: 3 attempts, then
-        // the failure is recorded durably (the executor owns the
-        // final-attempt record; the cap here is the backstop for
+        // 3 attempts, then the failure is recorded durably (the executor
+        // owns the final-attempt record; the cap here is the backstop for
         // executor-crash paths).
         maxAttempts: TOPIC_CLUSTERING_MAX_ATTEMPTS,
         leaseDurationMs: TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
