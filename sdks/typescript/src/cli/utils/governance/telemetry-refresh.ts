@@ -63,7 +63,7 @@ import {
 	installAppEnv,
 	removeAppEnvVars,
 } from "./app-settings";
-import { installClaudeSessionContextHooks } from "./claude-hooks";
+import { installSessionContextHooks } from "./session-context-hooks";
 import {
 	extractLookupIdFromToken,
 	listIngestionKeys,
@@ -232,7 +232,7 @@ export function refreshClaudeUserTelemetryEnv({
 	if (appEnvHasAllVars(target, vars)) return null;
 	installAppEnv(target, vars);
 	try {
-		installClaudeSessionContextHooks();
+		installSessionContextHooks({ tool: "claude_code" });
 	} catch {
 		// The env is the refresh that matters; the hooks are best-effort.
 	}

@@ -194,7 +194,7 @@ export function removeAppEnvVars(
  * wholesale, so callers merging into this start from a clean object rather
  * than losing their write to a stray comma in someone's config.
  *
- * Shared with claude-hooks.ts, which merges a different region of the same
+ * Shared with session-context-hooks.ts, which merges a different region of the same
  * file and must read and write it exactly the way the env block does.
  */
 export function readAppSettingsFile(filePath: string): Record<string, unknown> {

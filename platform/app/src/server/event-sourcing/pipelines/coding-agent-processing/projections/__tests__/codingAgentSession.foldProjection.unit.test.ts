@@ -488,6 +488,30 @@ describe("CodingAgentSessionFoldProjection", () => {
       );
       expect(state.gitBranch).toBe("feat/git-context");
     });
+
+    /** @scenario A session context event from Codex folds its git identity */
+    /** @scenario A session context event from opencode folds its git identity */
+    it.each([
+      "codex",
+      "opencode",
+    ])("folds the same identity for %s, because nothing in the fold is per-agent", (agent) => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent,
+          facts: contextFacts({ "coding_agent.name": agent }),
+        }),
+        state,
+      );
+
+      expect(state.repositoryHost).toBe("github.com");
+      expect(state.repositoryOwner).toBe("acme");
+      expect(state.repositoryName).toBe("widgets");
+      expect(state.gitBranch).toBe("main");
+      expect(state.gitWorktree).toBe("widgets");
+    });
   });
 
   describe("when the generated conversation title arrives", () => {

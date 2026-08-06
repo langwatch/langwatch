@@ -3,7 +3,7 @@
  * faked: what it posts, when it stays quiet, and the two promises it makes to
  * every session it runs in: nothing on stdout, and never a non-zero exit.
  *
- * Feature: specs/ai-governance/cli-wrappers/claude-session-context-hook.feature
+ * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
 import * as fs from "node:fs";
@@ -193,6 +193,93 @@ describe("the claude-code session context hook", () => {
       const attributes = attributesOf(posted[0]!);
       expect(attributes).not.toHaveProperty("vcs.ref.head.name");
       expect(attributes).not.toHaveProperty("vcs.worktree.name");
+    });
+  });
+
+  describe("given a seam other than Claude Code's", () => {
+    /** @scenario "The record declares the agent whose seam invoked it" */
+    it.each([
+      ["codex", "codex"],
+      ["opencode", "opencode"],
+    ])("declares %s when invoked for it", async (tool, agent) => {
+      await runHook({ tool });
+
+      expect(posted).toHaveLength(1);
+      expect(attributesOf(posted[0]!)).toMatchObject({
+        "session.id": SESSION_ID,
+        "coding_agent.name": agent,
+        "vcs.repository.name": "langwatch",
+        "vcs.ref.head.name": "feat/session-context",
+      });
+    });
+
+    it("ignores Claude Code's variables when nested inside a Claude Code session", async () => {
+      // A codex session started from a claude session inherits both, and
+      // reading either would report the wrong session on the wrong checkout.
+      await runHook({
+        tool: "codex",
+        input: { session_id: SESSION_ID, cwd: "/repo/worktrees/review" },
+        env: {
+          CLAUDE_PROJECT_DIR: "/somewhere/else",
+          CLAUDE_CODE_SESSION_ID: "the-parent-claude-session",
+        },
+        git: {
+          "remote get-url origin": "git@github.com:langwatch/langwatch.git",
+          "rev-parse --git-dir": "/repo/.git",
+          "rev-parse --git-common-dir": "/repo/.git",
+        },
+      });
+
+      expect(posted).toHaveLength(1);
+      expect(attributesOf(posted[0]!)["session.id"]).toBe(SESSION_ID);
+    });
+
+    it("takes no session id from Claude Code's variable when the payload omits it", async () => {
+      await runHook({
+        tool: "codex",
+        input: { cwd: "/repo/worktrees/review" },
+        env: { CLAUDE_CODE_SESSION_ID: "the-parent-claude-session" },
+      });
+
+      expect(posted).toEqual([]);
+    });
+
+    /** @scenario "Two agents reporting the same session id keep separate fingerprints" */
+    it("keeps a fingerprint per agent, so a shared session id does not silence one", async () => {
+      await runHook({ tool: "codex" });
+      expect(posted).toHaveLength(1);
+
+      await runHook({ tool: "opencode" });
+
+      expect(posted).toHaveLength(2);
+      expect(attributesOf(posted[1]!)["coding_agent.name"]).toBe("opencode");
+    });
+
+    it("resolves its own agent's ingest key from the CLI config", async () => {
+      await hookCommand({
+        tool: "codex",
+        env: {},
+        readInput: () =>
+          Promise.resolve(
+            JSON.stringify({
+              session_id: SESSION_ID,
+              cwd: "/repo/worktrees/review",
+            }),
+          ),
+        runGit: gitRunner(WORKTREE_GIT),
+        fetchImpl: collector(),
+        now: () => 1_700_000_000_000,
+        stateDir,
+        readCliConfig: () => ({
+          control_plane_url: "http://app.example.com",
+          default_personal_ingest_keys: {
+            claude_code: { secret: "ik-lw-claude" },
+            codex: { secret: "ik-lw-codex" },
+          },
+        }),
+      });
+
+      expect(posted[0]!.headers.Authorization).toBe("Bearer ik-lw-codex");
     });
   });
 
@@ -414,7 +501,16 @@ describe("the claude-code session context hook", () => {
     });
 
     it("stays silent for a tool it has no hook for", async () => {
-      await runHook({ tool: "codex" });
+      await runHook({ tool: "gemini" });
+
+      expect(posted).toEqual([]);
+      expect(stdoutSpy).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A seam that fires with no session id sends nothing and exits zero" */
+    it("stays silent when the payload carries no session id", async () => {
+      await runHook({ input: { cwd: "/repo/worktrees/review" } });
 
       expect(posted).toEqual([]);
       expect(stdoutSpy).not.toHaveBeenCalled();

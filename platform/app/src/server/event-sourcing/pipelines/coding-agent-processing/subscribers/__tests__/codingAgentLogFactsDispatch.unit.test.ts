@@ -241,6 +241,26 @@ describe("codingAgentLogFactsDispatch", () => {
       expect(contribution!.facts["vcs.worktree.name"]).toBe("widgets-feat");
     });
 
+    it.each([
+      "codex",
+      "opencode",
+    ])("labels a %s declaration the same way, with no vendor scope of its own", async (agent) => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        canonicalLogEvent({
+          attributes: contextAttributes({ "coding_agent.name": agent }),
+          scopeName: HOOK_SCOPE,
+          resourceAttributes: { "service.name": "langwatch-hook" },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.agent).toBe(agent);
+      expect(dispatched[0]!.facts["vcs.repository.owner"]).toBe("acme");
+    });
+
     /** @scenario A declared agent outside the registry contributes nothing */
     it("drops a declaration naming an agent LangWatch does not know", async () => {
       const { subscriber, dispatched } = makeSubscriber();

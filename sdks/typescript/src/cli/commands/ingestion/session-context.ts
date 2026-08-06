@@ -8,7 +8,7 @@
  * user's `origin` can take (scp-like ssh, ssh:// with a port, https with
  * credentials, nested GitLab groups, a `.git` suffix or none).
  *
- * Spec: specs/ai-governance/cli-wrappers/claude-session-context-hook.feature
+ * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
 /** The event every session-context record carries, on the record and as an attribute. */

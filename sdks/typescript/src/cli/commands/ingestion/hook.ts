@@ -1,19 +1,27 @@
 /**
- * `langwatch ingest hook <tool>`: the hook a coding agent runs at the start
- * and end of every session.
+ * `langwatch ingest hook <tool>`: what a coding agent runs at the start and end
+ * of every session.
  *
- * Claude Code knows exactly which repository, branch and worktree a session
- * is working in and exports none of it over telemetry. The hook slot is the
- * way in: it fires in every mode including print and SDK sessions, it hands
- * the hook the session id and working directory on stdin, and on Stop the
- * process inherits the session's live trace context. So this command runs
- * git itself and posts one small OTLP log record, which is what lets a
- * session's traces be joined to the code they were working on.
+ * Coding agents know exactly which repository, branch and worktree a session is
+ * working in and export none of it over telemetry. Each of the three that can
+ * run our code inside a session reaches this same command, and each hands it
+ * the same three facts on stdin (`session_id`, `cwd`, `hook_event_name`):
+ *
+ *   - Claude Code and Codex call it directly as a command hook.
+ *   - opencode has no command hooks, so the plugin the CLI installs subscribes
+ *     to its session event bus and spawns this command with the same payload.
+ *
+ * The session id each seam reports is the one that agent puts on its own
+ * telemetry, so the record this posts joins the session the agent is already
+ * describing. So the command runs git itself and posts one small OTLP log
+ * record, which is what lets a session's traces be joined to the code they were
+ * working on.
  *
  * Where that record goes is `resolveTarget` below, and it is deliberately not
  * the environment alone: Claude Code hands its child processes an environment
- * with every `OTEL_*` variable removed, so a hook that trusted the exporter
- * variables would never send anything from a real session.
+ * with every `OTEL_*` variable removed, and Codex hands its hooks one with no
+ * exporter variables either, so a hook that trusted them would never send
+ * anything from a real session.
  *
  * Two constraints shape every branch below.
  *
@@ -28,7 +36,7 @@
  * A failed post deliberately leaves the fingerprint file alone, so the next
  * hook in the same session retries instead of assuming the context landed.
  *
- * Spec: specs/ai-governance/cli-wrappers/claude-session-context-hook.feature
+ * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
 import { spawnSync } from "node:child_process";
@@ -52,9 +60,33 @@ import {
   sessionContextFingerprint,
 } from "./session-context";
 
-/** Agent slug per accepted tool argument. Anything else is a silent no-op. */
-const AGENT_BY_TOOL: Record<string, string> = {
-  claude_code: "claude_code",
+/**
+ * What each accepted tool argument means: the agent the record declares, plus
+ * the environment variables that agent publishes about the running session.
+ * Anything else is a silent no-op.
+ *
+ * Both variables are per-agent rather than read unconditionally, because a
+ * hook process inherits whatever its ancestors exported. A Codex session
+ * started from inside a Claude Code session sees `CLAUDE_CODE_SESSION_ID` and
+ * `CLAUDE_PROJECT_DIR` in its environment, and reading either would report the
+ * wrong session, on the wrong checkout, under the wrong agent.
+ *
+ * `projectDirVar` matters because a session can `cd` away from where it
+ * started: Claude Code exports the root it was launched in, so that beats the
+ * payload's `cwd`. Codex and opencode publish no such variable, and their
+ * payload `cwd` is already the session's own directory.
+ */
+const TOOLS: Record<
+  string,
+  { agent: string; sessionIdVar?: string; projectDirVar?: string }
+> = {
+  claude_code: {
+    agent: "claude_code",
+    sessionIdVar: "CLAUDE_CODE_SESSION_ID",
+    projectDirVar: "CLAUDE_PROJECT_DIR",
+  },
+  codex: { agent: "codex" },
+  opencode: { agent: "opencode" },
 };
 
 /** How long the collector has to accept the record before we give up on it. */
@@ -70,7 +102,7 @@ const STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 export type GitRunner = (args: { args: string[]; cwd: string }) => string | null;
 
 export interface HookCommandOptions {
-  /** The agent the hook is running for (`claude-code`). */
+  /** The agent the hook is running for: `claude-code`, `codex` or `opencode`. */
   tool: string;
   env?: NodeJS.ProcessEnv;
   /** Reads the hook payload. Defaults to draining this process's stdin. */
@@ -156,14 +188,18 @@ async function runHook({
   stateDir: string;
   readCliConfig: () => CliTelemetryConfig;
 }): Promise<void> {
-  const agent = AGENT_BY_TOOL[tool.trim().toLowerCase().replace(/-/g, "_")];
-  if (!agent) {
+  const spec = TOOLS[tool.trim().toLowerCase().replace(/-/g, "_")];
+  if (!spec) {
     debug(`no hook for tool '${tool}'`, env);
     return;
   }
+  const agent = spec.agent;
 
   const input = parseHookInput(await readInput());
-  const sessionId = firstNonEmpty(input.sessionId, env.CLAUDE_CODE_SESSION_ID);
+  const sessionId = firstNonEmpty(
+    input.sessionId,
+    spec.sessionIdVar ? env[spec.sessionIdVar] : undefined,
+  );
   if (!sessionId) {
     debug("no session id in the hook input or the environment", env);
     return;
@@ -178,11 +214,8 @@ async function runHook({
     return;
   }
 
-  // CLAUDE_PROJECT_DIR is the session's project root and survives a `cd`
-  // inside the session; the payload's cwd is the fallback for hook inputs
-  // that carry no such variable.
-  const directory =
-    firstNonEmpty(env.CLAUDE_PROJECT_DIR, input.cwd) ?? process.cwd();
+  const projectDir = spec.projectDirVar ? env[spec.projectDirVar] : undefined;
+  const directory = firstNonEmpty(projectDir, input.cwd) ?? process.cwd();
   const context = readSessionContext({ directory, runGit });
   if (!context) {
     debug(`no git repository with an origin remote at ${directory}`, env);
@@ -192,7 +225,10 @@ async function runHook({
   const fingerprint = sessionContextFingerprint(context);
   pruneStaleState({ stateDir, now });
 
-  const stateFile = path.join(stateDir, `${stateFileName(sessionId)}.json`);
+  const stateFile = path.join(
+    stateDir,
+    `${stateFileName(`${agent}-${sessionId}`)}.json`,
+  );
   if (readFingerprint(stateFile) === fingerprint) {
     debug("context unchanged since the last post", env);
     return;
@@ -406,14 +442,18 @@ function runGitCommand({ args, cwd }: { args: string[]; cwd: string }): string |
   }
 }
 
-/** `~/.langwatch/state/claude-session-context`, beside the CLI's own config. */
+/** `~/.langwatch/state/session-context`, beside the CLI's own config. */
 function defaultStateDir(): string {
-  return path.join(os.homedir(), ".langwatch", "state", "claude-session-context");
+  return path.join(os.homedir(), ".langwatch", "state", "session-context");
 }
 
-/** One path segment, whatever the session id turns out to contain. */
-function stateFileName(sessionId: string): string {
-  return sessionId.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 128);
+/**
+ * One path segment, whatever the agent and session id turn out to contain.
+ * The agent is part of the key because session ids are only unique within one
+ * agent, and two agents sharing a fingerprint would leave the second silent.
+ */
+function stateFileName(key: string): string {
+  return key.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 128);
 }
 
 function readFingerprint(stateFile: string): string | null {

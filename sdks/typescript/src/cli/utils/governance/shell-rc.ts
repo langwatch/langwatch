@@ -43,7 +43,7 @@ import {
 	appSettingsTargetFor,
 	installAppEnv,
 } from "./app-settings";
-import { installClaudeSessionContextHooks } from "./claude-hooks";
+import { installSessionContextHooks } from "./session-context-hooks";
 import { type GovernanceConfig, saveConfig } from "./config";
 import { envForTool, type ToolEnv } from "./tool-env";
 
@@ -378,7 +378,7 @@ export async function maybeOfferIngestionShellRcPersist({
 			// session hooks are what report it, and they belong to the same
 			// "yes" that persisted the exports.
 			if (tool === "claude") {
-				const hooks = installClaudeSessionContextHooks();
+				const hooks = installSessionContextHooks({ tool: "claude_code" });
 				if (hooks.action !== "unchanged") {
 					console.log(
 						chalk.green(

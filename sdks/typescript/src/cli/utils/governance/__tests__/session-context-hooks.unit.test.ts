@@ -1,7 +1,9 @@
 /**
- * The session context hook entries in ~/.claude/settings.json: the merge, the
- * ownership rule that keeps a user's own hooks out of it, and the removal
- * logout drives.
+ * The session context hook entries in the hook file of each agent that takes
+ * command hooks: the merge, the ownership rule that keeps a user's own hooks
+ * out of it, and the removal logout drives.
+ *
+ * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
 import * as fs from "node:fs";
@@ -11,30 +13,44 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  hasClaudeSessionContextHooks,
-  installClaudeSessionContextHooks,
-  removeClaudeSessionContextHooks,
-  SESSION_CONTEXT_HOOK_COMMAND,
-} from "../claude-hooks";
+  type HookedTool,
+  hasSessionContextHooks,
+  installSessionContextHooks,
+  removeSessionContextHooks,
+  sessionContextHookCommand,
+  sessionContextHooksTarget,
+} from "../session-context-hooks";
 
 let tmpHome: string;
 let settingsPath: string;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
+const origCodexHome = process.env.CODEX_HOME;
 
-const ourEntry = {
+const entryFor = (tool: HookedTool) => ({
   hooks: [
-    { type: "command", command: SESSION_CONTEXT_HOOK_COMMAND, timeout: 10 },
+    { type: "command", command: sessionContextHookCommand(tool), timeout: 10 },
   ],
-};
+});
+
+const ourEntry = entryFor("claude_code");
 
 const userEntry = {
   matcher: "startup",
   hooks: [{ type: "command", command: "./scripts/greet.sh", timeout: 5 }],
 };
 
-const readSettings = (): Record<string, any> =>
-  JSON.parse(fs.readFileSync(settingsPath, "utf8")) as Record<string, any>;
+const install = (tool: HookedTool = "claude_code", filePath?: string) =>
+  installSessionContextHooks({ tool, ...(filePath ? { filePath } : {}) });
+
+const has = (tool: HookedTool = "claude_code") =>
+  hasSessionContextHooks({ tool });
+
+const remove = (tool: HookedTool = "claude_code") =>
+  removeSessionContextHooks({ tool });
+
+const readSettings = (file = settingsPath): Record<string, any> =>
+  JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, any>;
 
 const writeSettings = (settings: unknown): void => {
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
@@ -42,22 +58,25 @@ const writeSettings = (settings: unknown): void => {
 };
 
 beforeEach(() => {
-  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-claude-hooks-"));
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-session-hooks-"));
   process.env.HOME = tmpHome;
   process.env.USERPROFILE = tmpHome;
+  delete process.env.CODEX_HOME;
   settingsPath = path.join(tmpHome, ".claude", "settings.json");
 });
 
 afterEach(() => {
   process.env.HOME = origHome;
   process.env.USERPROFILE = origUserprofile;
+  if (origCodexHome === undefined) delete process.env.CODEX_HOME;
+  else process.env.CODEX_HOME = origCodexHome;
   fs.rmSync(tmpHome, { recursive: true, force: true });
 });
 
-describe("installClaudeSessionContextHooks", () => {
+describe("installSessionContextHooks", () => {
   describe("given no settings file at all", () => {
     it("creates one carrying a SessionStart and a Stop entry", () => {
-      const result = installClaudeSessionContextHooks();
+      const result = install();
 
       expect(result.action).toBe("created");
       expect(result.path).toBe(settingsPath);
@@ -68,7 +87,7 @@ describe("installClaudeSessionContextHooks", () => {
     });
 
     it("writes json indented by two spaces, ending in a newline", () => {
-      installClaudeSessionContextHooks();
+      install();
 
       const raw = fs.readFileSync(settingsPath, "utf8");
       expect(raw.endsWith("}\n")).toBe(true);
@@ -78,10 +97,10 @@ describe("installClaudeSessionContextHooks", () => {
 
   describe("given the hooks are already installed", () => {
     it("reports unchanged and leaves the file byte for byte", () => {
-      installClaudeSessionContextHooks();
+      install();
       const before = fs.readFileSync(settingsPath, "utf8");
 
-      expect(installClaudeSessionContextHooks().action).toBe("unchanged");
+      expect(install().action).toBe("unchanged");
       expect(fs.readFileSync(settingsPath, "utf8")).toBe(before);
     });
   });
@@ -101,7 +120,7 @@ describe("installClaudeSessionContextHooks", () => {
     });
 
     it("reports updated and keeps every unrelated key verbatim", () => {
-      expect(installClaudeSessionContextHooks().action).toBe("updated");
+      expect(install().action).toBe("updated");
 
       const settings = readSettings();
       expect(settings.model).toBe("claude-sonnet-5");
@@ -112,7 +131,7 @@ describe("installClaudeSessionContextHooks", () => {
     });
 
     it("leaves the user's own entry first and adds ours beside it", () => {
-      installClaudeSessionContextHooks();
+      install();
 
       expect(readSettings().hooks.SessionStart).toEqual([userEntry, ourEntry]);
       expect(readSettings().hooks.Stop).toEqual([ourEntry]);
@@ -134,7 +153,7 @@ describe("installClaudeSessionContextHooks", () => {
         },
       });
 
-      expect(installClaudeSessionContextHooks().action).toBe("updated");
+      expect(install().action).toBe("updated");
       expect(readSettings().hooks.SessionStart).toEqual([userEntry, ourEntry]);
     });
   });
@@ -143,49 +162,104 @@ describe("installClaudeSessionContextHooks", () => {
     it("merges into that file instead of the home directory one", () => {
       const custom = path.join(tmpHome, "elsewhere", "settings.json");
 
-      const result = installClaudeSessionContextHooks({ filePath: custom });
+      const result = install("claude_code", custom);
 
       expect(result.action).toBe("created");
       expect(result.path).toBe(custom);
       expect(fs.existsSync(settingsPath)).toBe(false);
     });
   });
+
+  describe("when the tool is codex", () => {
+    it("writes the codex hook command into the codex hooks file", () => {
+      const result = install("codex");
+
+      expect(result.path).toBe(path.join(tmpHome, ".codex", "hooks.json"));
+      expect(result.displayPath).toBe("~/.codex/hooks.json");
+      expect(readSettings(result.path)).toEqual({
+        hooks: {
+          SessionStart: [entryFor("codex")],
+          Stop: [entryFor("codex")],
+        },
+      });
+    });
+
+    it("follows CODEX_HOME when the user relocated the config directory", () => {
+      process.env.CODEX_HOME = path.join(tmpHome, "elsewhere");
+
+      expect(sessionContextHooksTarget("codex").path).toBe(
+        path.join(tmpHome, "elsewhere", "hooks.json"),
+      );
+      expect(install("codex").path).toBe(
+        path.join(tmpHome, "elsewhere", "hooks.json"),
+      );
+    });
+
+    it("keeps hooks the user already declared in the same file", () => {
+      const codexHooks = path.join(tmpHome, ".codex", "hooks.json");
+      fs.mkdirSync(path.dirname(codexHooks), { recursive: true });
+      fs.writeFileSync(
+        codexHooks,
+        JSON.stringify({
+          description: "mine",
+          hooks: { SessionStart: [userEntry] },
+        }),
+      );
+
+      expect(install("codex").action).toBe("updated");
+
+      const document = readSettings(codexHooks);
+      expect(document.description).toBe("mine");
+      expect(document.hooks.SessionStart).toEqual([
+        userEntry,
+        entryFor("codex"),
+      ]);
+    });
+
+    it("leaves the claude settings file alone", () => {
+      install("codex");
+
+      expect(fs.existsSync(settingsPath)).toBe(false);
+    });
+  });
 });
 
-describe("hasClaudeSessionContextHooks", () => {
+describe("hasSessionContextHooks", () => {
   describe("given a settings file with only the user's own hooks", () => {
     it("reports nothing of ours to remove", () => {
       writeSettings({ hooks: { SessionStart: [userEntry] } });
 
-      expect(hasClaudeSessionContextHooks()).toBe(false);
+      expect(has()).toBe(false);
     });
   });
 
   describe("given no settings file", () => {
     it("reports nothing of ours to remove", () => {
-      expect(hasClaudeSessionContextHooks()).toBe(false);
+      expect(has()).toBe(false);
+      expect(has("codex")).toBe(false);
     });
   });
 
   describe("given the hooks are installed", () => {
-    it("reports them present", () => {
-      installClaudeSessionContextHooks();
+    it("reports them present for the tool that has them, and only that one", () => {
+      install();
 
-      expect(hasClaudeSessionContextHooks()).toBe(true);
+      expect(has()).toBe(true);
+      expect(has("codex")).toBe(false);
     });
   });
 });
 
-describe("removeClaudeSessionContextHooks", () => {
+describe("removeSessionContextHooks", () => {
   describe("given our entries beside the user's own", () => {
     it("takes ours, keeps theirs, and leaves no empty containers", () => {
       writeSettings({
         model: "claude-sonnet-5",
         hooks: { SessionStart: [userEntry] },
       });
-      installClaudeSessionContextHooks();
+      install();
 
-      expect(removeClaudeSessionContextHooks()).toBe(true);
+      expect(remove()).toBe(true);
 
       const settings = readSettings();
       expect(settings.hooks).toEqual({ SessionStart: [userEntry] });
@@ -194,20 +268,31 @@ describe("removeClaudeSessionContextHooks", () => {
 
     it("drops the hooks key entirely when nothing else was in it", () => {
       writeSettings({ model: "claude-sonnet-5" });
-      installClaudeSessionContextHooks();
+      install();
 
-      expect(removeClaudeSessionContextHooks()).toBe(true);
+      expect(remove()).toBe(true);
       expect(readSettings()).toEqual({ model: "claude-sonnet-5" });
+    });
+  });
+
+  describe("when the tool is codex", () => {
+    it("takes our entries out of the codex hooks file", () => {
+      install("codex");
+
+      expect(remove("codex")).toBe(true);
+      expect(readSettings(path.join(tmpHome, ".codex", "hooks.json"))).toEqual(
+        {},
+      );
     });
   });
 
   describe("given nothing of ours to remove", () => {
     it("reports no change for a missing file, and leaves other files alone", () => {
-      expect(removeClaudeSessionContextHooks()).toBe(false);
+      expect(remove()).toBe(false);
 
       writeSettings({ hooks: { SessionStart: [userEntry] } });
       const before = fs.readFileSync(settingsPath, "utf8");
-      expect(removeClaudeSessionContextHooks()).toBe(false);
+      expect(remove()).toBe(false);
       expect(fs.readFileSync(settingsPath, "utf8")).toBe(before);
     });
   });
@@ -217,7 +302,7 @@ describe("removeClaudeSessionContextHooks", () => {
       fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
       fs.writeFileSync(settingsPath, '{ "hooks": { "Stop": [ , ] }');
 
-      expect(removeClaudeSessionContextHooks()).toBe(false);
+      expect(remove()).toBe(false);
       expect(fs.readFileSync(settingsPath, "utf8")).toBe(
         '{ "hooks": { "Stop": [ , ] }',
       );

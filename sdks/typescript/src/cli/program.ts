@@ -558,7 +558,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description(
       "Hidden: low-level Path B install primitive. Normal users run `langwatch <tool>` which auto-installs when needed.",
     )
-    .option("--env-only", "skip the codex config.toml write; print exports only")
+    .option(
+      "--env-only",
+      "skip the tool's own config writes; print exports only",
+    )
     .option("--json", "emit machine-readable JSON")
     .action(
       async (

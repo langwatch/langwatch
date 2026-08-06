@@ -10,7 +10,7 @@
 # Related specs:
 #   specs/coding-agent/session-aggregate.feature                     , the session fold this enriches
 #   specs/coding-agent/pull-request-linkage.feature                  , what the branch identity is for
-#   specs/ai-governance/cli-wrappers/claude-session-context-hook.feature , the hook that emits the event
+#   specs/ai-governance/cli-wrappers/session-context-hook.feature , the hook that emits the event
 #
 # Motivation: coding agents export no repository, branch or working-directory
 # identity over telemetry (verified at the raw OTLP wire). A LangWatch-installed
@@ -22,11 +22,28 @@
 # response-body log event today and is folded onto the session as its Title,
 # treated as conversation-derived content for visibility purposes.
 #
-# Degradation, stated: agents without a companion emitter (Codex, Gemini CLI
-# today) simply have no git context and no title; the vocabulary and the
-# declared-agent seam are tool-agnostic so they can join without schema changes.
+# Nothing here is per-agent: the admission gate is one event-name equality, the
+# label is whatever the event declares (validated against the agent registry),
+# and the fold reads the same attributes whoever sent them. Claude Code, Codex
+# and opencode all emit the companion event today. An agent with no seam of its
+# own (Gemini CLI, Copilot) simply has no git context and no title, and can join
+# later without a schema change.
 
 Feature: Session git context
+
+Rule: Every agent that can emit the event joins on the same terms
+
+  @unit
+  Scenario: A session context event from Codex folds its git identity
+    Given an admitted session context event declaring the codex agent
+    When the session fold runs
+    Then the session carries the repository, branch and worktree from the event
+
+  @unit
+  Scenario: A session context event from opencode folds its git identity
+    Given an admitted session context event declaring the opencode agent
+    When the session fold runs
+    Then the session carries the repository, branch and worktree from the event
 
 Rule: The session context event joins the fold honestly
 
