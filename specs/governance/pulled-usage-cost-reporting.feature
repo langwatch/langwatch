@@ -11,26 +11,28 @@ Feature: Pulled provider usage becomes visible, attributed cost
 
   Background:
     Given a connected provider source that pulls usage on a schedule
-    And the source belongs to an organization and a team
+    And the source belongs to an organization
 
   Scenario: Pulled cost shows in the usage view
     When the source pulls a usage record with a known cost
     Then that cost appears in the customer's usage view
 
   Scenario: Pulled cost never blocks spending
-    Given a team that is already over its spending limit
-    When the source pulls a usage record for that team
+    Given the source belongs to a team whose spending is at its limit
+    When the source pulls a usage record whose cost would exceed that limit
     Then the pulled cost is recorded
-    And no spending limit is tripped by it
+    And the team's spending limit is not tripped by the pulled cost
+    And gateway requests for that team are still allowed
 
   Scenario: Pulled cost is attributed to the source's team
+    Given the source belongs to a team
     When the source pulls a usage record
-    Then the recorded cost is attributed to the source's organization and team
+    Then the recorded cost is attributed to that team and its organization
 
-  Scenario: A source with no resolvable team is reported as unattributed
-    Given a connected source with no team configured
+  Scenario: A source with no team is attributed to its organization
+    Given the source has no team configured
     When the source pulls a usage record
-    Then the cost is recorded as unattributed
+    Then the cost is attributed to the organization, with no team
     And it is never attributed to an internal governance project
 
   Scenario: Re-pulling an unchanged period records nothing new
