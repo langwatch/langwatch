@@ -12,13 +12,17 @@ Feature: The gate prices an action before it silently invalidates a prompt cache
   # a cache write costs 2x on the one-hour TTL and 1.25x on the five-minute one.
   # So invalidating a prefix you were about to read costs the difference.
   #
-  # WHICH LIFETIME IS NOT A GUESS ANY MORE. A probe of a headless session
-  # reports its writes as ephemeral_1h_input_tokens with ephemeral_5m at zero:
-  # Claude Code takes the ONE-HOUR TTL. So the figure that matters here is a
-  # 1.9x premium — about $2.85 on a 300k-token prefix at Opus 5's input rate,
-  # not the $1.73 the five-minute rate gives. Sessions in usage overage fall
-  # back to the five-minute TTL and its 1.15x premium, which is why the warning
-  # below reads the lifetime rather than assuming one.
+  # WHICH LIFETIME IS NOT A GUESS ANY MORE, AND IT DEPENDS ON THE CALLER. A
+  # scan of 40 real transcripts — 14,121 cache-writing requests, ~53M
+  # cache-write tokens — is perfectly bimodal: sub-agent transcripts write
+  # ephemeral_5m 100% of the time, main-session transcripts write ephemeral_1h
+  # 100% of the time, and no request writes both.
+  #
+  # So a main session busts at a 1.9x premium — about $2.85 on a 300k-token
+  # prefix at Opus 5's input rate — and a sub-agent at 1.15x, about $1.73. The
+  # gate reads which from the payload's agent_id rather than assuming, and a
+  # warning that quotes one figure at the other kind of caller is off by nearly
+  # a factor of two.
   #
   # THE WARNINGS ARE FOR THE DEVELOPER, NOT THE MODEL. There is no primitive
   # that shows the model a price and still lets the action proceed: a system
@@ -92,10 +96,10 @@ Feature: The gate prices an action before it silently invalidates a prompt cache
     Given the session's cached prefix is above the threshold
     When a cache-invalidating action is priced
     Then the report names the approximate size of the prefix and what re-caching it costs
-    And the figure is priced against the cache lifetime that session is actually using
-    # The two lifetimes differ by nearly a factor of two, and the session's own
-    # recent cache writes say which one is in force, so the gate reads it rather
-    # than quoting a range.
+    And the figure is priced against the cache lifetime that caller actually holds
+    # The two lifetimes differ by nearly a factor of two, and the payload's
+    # agent_id says which one applies — present means a sub-agent on the
+    # five-minute cache, absent means a main session on the one-hour cache.
 
   @unit @unimplemented
   Scenario: The prefix size is a cheap approximation, and says so

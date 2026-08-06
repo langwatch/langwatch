@@ -24,7 +24,11 @@ Most of this ADR's contract claims were settled by probing a headless session ag
 
 **A rewritten command is visible to the model, and the model reacts to it.** In the probe the nested session ran the substituted command, noticed the output did not match what it had asked for, and flagged the environment as untrustworthy in its answer. A rewrap is not transparent.
 
-The second duty has nothing to do with RAM. Prompt caching is a prefix match, and invalidating a prefix you were about to read costs the difference between a write and a read. **Claude Code takes the one-hour TTL** — the probe's usage reports `ephemeral_1h_input_tokens` with `ephemeral_5m_input_tokens` at zero — so the relevant figures are a 2× write against a 0.1× read, a **1.9× premium**, or roughly **$2.85 on a 300k-token prefix** at Opus 5's input rate. Sessions in usage overage fall back to the five-minute TTL and its 1.15× premium.
+The second duty has nothing to do with RAM. Prompt caching is a prefix match, and invalidating a prefix you were about to read costs the difference between a write and a read. **Which lifetime applies is decided by what kind of caller you are**, and a scan of 40 real transcripts on this machine — 14,121 cache-writing requests, ~53M cache-write tokens — comes back perfectly bimodal: sub-agent transcripts write `ephemeral_5m` 100% of the time, main-session transcripts write `ephemeral_1h` 100% of the time, and not one request writes both.
+
+So a sub-agent pays a 1.25× write against a 0.1× read — a **1.15× premium**, about **$1.73** on a 300k-token prefix at Opus 5's input rate — and expires after five minutes idle. A main session pays a 2× write, a **1.9× premium**, about **$2.85**, and survives an hour. Sub-agents park cheaply per token but expire fast; main sessions park expensively but almost never expire.
+
+That is directly readable from the payload the gate already receives: `agent_id` is present inside a sub-agent and absent in a main session. No inference required.
 
 There is a related cost the spawn cap prices better than RAM does: a cache entry is readable only once the first response using it begins streaming, so N sub-agents launched in one turn share a prefix and all pay the write.
 
@@ -46,7 +50,7 @@ There is a related cost the spawn cap prices better than RAM does: a cache entry
 
 **Never exit 2, and never let the runtime choose the exit code.** The gate recovers panics in main, runs no goroutines on the decision path, and translates any abnormal termination into a deferring exit. Stated as a decision because the language default is the failure mode.
 
-**Refusal is a machine-health lever, not a cache lever.** At the one-hour TTL a queued agent keeps its cache through any wait the existing 30-minute failsafe permits, so the earlier draft's claim that denying is cheaper than parking does not hold in the common case. Red still refuses, because at red the machine cannot take the work — not because the wait would cost tokens. In the five-minute regime the cache argument returns, and the gate tightens accordingly. A deny is also not free: it costs a turn, so the same command is not denied indefinitely.
+**Refusal is a machine-health lever first, and a cache lever only for sub-agents.** A main session keeps its cache through any wait the existing 30-minute failsafe permits, so against that caller the earlier draft's "denying is cheaper than parking" does not hold at all. Against a sub-agent it does, because five minutes is a wait the queue can genuinely exceed. Red refuses either way, because at red the machine cannot take the work regardless of who is asking. A deny is not free — it costs a turn — so the same command is not denied indefinitely.
 
 **On the cost side the gate warns, and each check names its channel.** No primitive shows the model a price and still lets the action proceed — `systemMessage` reaches the developer and not the model, `ask` interrupts the developer, `deny` reaches the model but blocks. Warnings are therefore for the developer. High-certainty, high-value invalidations on a large prefix use `ask`; everything else uses `systemMessage`. Two things get `deny`: a tool call repeating identically with no intervening change, and a sub-agent spawn past the machine-wide cap.
 
@@ -80,5 +84,6 @@ Two contract questions remain open and are marked in the specs rather than assum
 
 - [specs/setup/heavy-run-admission.feature](../../../specs/setup/heavy-run-admission.feature) — what the gate admits into, and the once-only handoff
 - [specs/claude/telemetry-turn-bounding.feature](../../../specs/claude/telemetry-turn-bounding.feature) — the existing Claude-side telemetry contract
-- Measured against a headless session with a scratch settings file: the matcher shape above fires; `updatedInput` applies with `allow` and not with `defer`; the payload carries no `agent_id` in a main session; Claude Code writes `ephemeral_1h` cache entries; a compiled Go panic exits 2
+- Measured against a headless session with a scratch settings file: the matcher shape above fires; `updatedInput` applies with `allow` and not with `defer`; the payload carries no `agent_id` in a main session; a compiled Go panic exits 2
+- Measured across 40 real transcripts (14,121 cache-writing requests, ~53M cache-write tokens): sub-agents write `ephemeral_5m` 100% of the time, main sessions write `ephemeral_1h` 100% of the time, no request writes both
 - Published rates: cache read 0.1× base input, write 1.25× (5m TTL) / 2× (1h); minimum cacheable prefix 512 tokens on Opus 5; breakpoints walk back at most 20 content blocks; an entry is readable only once the first response using it begins streaming
