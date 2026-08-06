@@ -6,7 +6,7 @@ replace github.com/langwatch/langwatch/sdks/go => ../
 
 require (
 	github.com/langwatch/langwatch/sdks/go v0.0.0-00010101000000-000000000000
-	github.com/oapi-codegen/runtime v1.4.1
+	github.com/oapi-codegen/runtime v1.6.0
 	github.com/stretchr/testify v1.11.1
 )
 
