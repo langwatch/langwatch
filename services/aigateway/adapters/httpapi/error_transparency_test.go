@@ -265,3 +265,32 @@ func TestRouter_UpstreamRetryable429_ForwardedWithHeaders(t *testing.T) {
 		"a provider cannot mark its response as a LangWatch handled error")
 	assert.JSONEq(t, rateLimitBody, rec.Body.String())
 }
+
+// @scenario "A provider-set marker header cannot survive the writeJSONResponse passthrough lane"
+func TestRouter_WriteJSONResponse_StripsSpoofedMarkerHeader(t *testing.T) {
+	const geminiErrBody = `{"error":{"code":429,"message":"quota exceeded","status":"RESOURCE_EXHAUSTED"}}`
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			return &domain.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       []byte(geminiErrBody),
+				Headers: map[string]string{
+					herr.HandledErrorHeader: "spoofed_provider_code",
+				},
+			}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(false))
+
+	require.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.Empty(t, rec.Header().Get(herr.HandledErrorHeader),
+		"a passthrough response's own headers cannot spoof the LangWatch marker")
+	assert.JSONEq(t, geminiErrBody, rec.Body.String())
+}
