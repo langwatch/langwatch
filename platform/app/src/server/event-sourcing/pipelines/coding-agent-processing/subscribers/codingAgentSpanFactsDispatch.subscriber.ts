@@ -40,11 +40,12 @@ import { CODING_AGENT_SPAN_NAMES } from "../services/coding-agent-session.deriva
  *     payload, and the handler reads the canonical span back from the span
  *     store. That read races the sibling spanStorage write, which is the
  *     failure the derivation shape exists to remove: on 2026-08-05 it parked 22
- *     per-trace groups in `:blocked`. No longer produced; still handled, so
- *     references already staged in Redis drain.
+ *     per-trace groups in `:blocked`. This build still STAGES it — the producer
+ *     flip is R2 — and the handler keeps resolving it after that flip, so
+ *     references already in Redis drain.
  *   - A full `span_received` job still processes exactly as before references
  *     existed: jobs staged by a previous release, and matched events the seam
- *     could not lift, carry the whole event, and the handler normalizes
+ *     could not reference, carry the whole event, and the handler normalizes
  *     inline in its own lane.
  *
  * **Deploy order (ADR-069).** This build is the CONSUMER half: it reads
@@ -125,8 +126,8 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
         return;
       }
 
-      // Claim-check staged by an earlier release: resolve through the span
-      // store. No longer produced — kept so references already in Redis drain.
+      // Claim-check: still the shape this build stages, and the shape earlier
+      // releases staged. Resolve it through the span store.
       const ref = parseSpanReferencedEvent(event);
       if (ref) {
         await deps.contributeSpanFacts(await resolveClaimCheck(ref, deps));
@@ -146,7 +147,7 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
       }
 
       // Full-event job: a pre-reference release staged it, or the seam could
-      // not build a derivation. Gate, normalize and lift inline — identical to
+      // not reference the span. Gate, normalize and lift inline — identical to
       // the pre-reference handler. A span_received this subscriber declines is
       // a legitimate quiet completion, not an unreadable shape.
       if (!isCodingAgentSpan(event)) return;
@@ -169,8 +170,8 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
 
 /**
  * Resolves a `span_referenced` claim-check through the span store and lifts its
- * facts — the legacy path, kept only so references already staged in Redis
- * drain. Nothing produces new ones.
+ * facts. R2 stops producing references; the path stays after it so the ones
+ * already staged in Redis drain.
  */
 async function resolveClaimCheck(
   ref: SpanReferencedEvent,

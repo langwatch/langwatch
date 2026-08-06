@@ -321,9 +321,9 @@ but from R1 onward the failure mode is a retry rather than a loss.
 
 The claim-check mechanism itself stays — `span_referenced` remains the right
 shape for a subscriber whose result is *not* a bounded derivation, and the
-handler keeps resolving it so references already staged in Redis drain. What
-changes is that a claim-check is no longer the default answer for a subscriber
-that only ever wanted a handful of scalars.
+handler keeps resolving it after R2 so the references staged before the flip
+drain. What changes is that a claim-check is no longer the default answer for a
+subscriber that only ever wanted a handful of scalars.
 
 ## References
 

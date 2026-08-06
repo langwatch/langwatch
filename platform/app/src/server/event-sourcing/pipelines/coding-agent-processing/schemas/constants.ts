@@ -13,9 +13,10 @@ export const SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST = "2026-07-21";
 /**
  * The staged twin of a matched `span_received` for `codingAgentSpanFactsDispatch`
  * — the span's facts, already lifted, carried ON the job (ADR-069's bounded
- * derivation amendment). It replaces the `span_referenced` claim-check, whose
- * read-back raced the sibling spanStorage write and parked 22 groups in
- * `:blocked` on 2026-08-05.
+ * derivation amendment). It replaces the `span_referenced` claim-check once R2
+ * flips the producer — this build reads it and stages nothing new — because that
+ * claim-check's read-back raced the sibling spanStorage write and parked 22
+ * groups in `:blocked` on 2026-08-05.
  *
  * This is a bounded derivation, not a payload: `data` is
  * `spanFactsContributionSchema`, whose facts come from the closed
