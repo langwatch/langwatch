@@ -37,12 +37,6 @@ import type {
 import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";
 
-export interface TraceListEvent {
-  spanId: string;
-  timestamp: number;
-  name: string;
-}
-
 export interface TraceListItem {
   traceId: string;
   timestamp: number;
@@ -104,7 +98,6 @@ export interface TraceListItem {
   ttft: number | null;
   traceName: string;
   rootSpanType: string | null;
-  events: TraceListEvent[];
 }
 
 export interface TraceListPage {
@@ -1314,10 +1307,6 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
   const totalTokens =
     (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
 
-  // The list never surfaced trace-level events (the list query selects no
-  // event columns); events are derived per-trace only on the detail read.
-  const events: TraceListEvent[] = [];
-
   return {
     traceId: row.traceId,
     timestamp: row.occurredAt,
@@ -1366,6 +1355,5 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     ttft: row.timeToFirstTokenMs,
     traceName: row.traceName,
     rootSpanType: row.rootSpanType,
-    events,
   };
 }

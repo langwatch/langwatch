@@ -298,6 +298,17 @@ export interface EvalChipInput {
   label?: string | null;
   /** Explicit pass flag from a numeric/categorical evaluator. */
   passed?: boolean | null;
+  /**
+   * What kind of verdict the evaluator produced, where the caller knows.
+   * `"categorical"` means it answered with a label and neither a number
+   * nor a pass/fail — see {@link EvalChipDisplay.categoryLabel}.
+   *
+   * Worth passing wherever it is known, because `score` alone cannot carry
+   * the distinction: some callers substitute `0` for a score the evaluator
+   * never produced, and a chip reading that as a real zero reports a
+   * failing-looking verdict nobody returned.
+   */
+  scoreType?: "numeric" | "boolean" | "categorical" | null;
 }
 
 /** Normalized chip-display contract — single source of truth for both
@@ -319,9 +330,16 @@ export interface EvalChipDisplay {
   /**
    * Color-coded pass/fail label when the evaluator returned an explicit
    * boolean verdict (not a numeric score). `null` for numeric / skipped /
-   * error.
+   * error, and for a categorising evaluator, which passed no judgement to
+   * label.
    */
   passLabel: { text: string; color: string } | null;
+  /**
+   * The category a categorising evaluator answered with — the whole of its
+   * verdict, and what a chip shows where a score or a Pass would otherwise
+   * go. `null` for every evaluator that scored or judged.
+   */
+  categoryLabel: string | null;
 }
 
 /** Map any source's status string onto the canonical v3 status enum. */
@@ -382,14 +400,32 @@ export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
   const statusLabel = getStatusLabel(status);
   const displayName =
     input.name || input.evaluatorName || input.evaluatorId || "Unknown";
-  const scoreText =
-    typeof input.score === "number" ? formatEvalScoreText(input.score) : null;
   const noVerdict = status === "skipped" || status === "error";
+  // A categorising evaluator's verdict IS its label. Show that, and nothing
+  // where the score and the pass/fail would go: both are stand-ins invented
+  // for fields it never filled, and printing them claims a run that scored
+  // zero and passed.
+  //
+  // A caller that knows its `scoreType` is believed over `score`, because its
+  // `score` may be one of those stand-ins. A caller that doesn't know is read
+  // off the raw fields, where an absent score and an absent verdict beside a
+  // label say the same thing.
+  const isCategorical =
+    input.scoreType === "categorical" ||
+    (input.scoreType == null && typeof input.score !== "number");
+  const categoryLabel =
+    !noVerdict && isCategorical && input.label && input.passed == null
+      ? input.label
+      : null;
+  const scoreText =
+    categoryLabel == null && typeof input.score === "number"
+      ? formatEvalScoreText(input.score)
+      : null;
 
   // Surface a colored Pass/Fail label only when the evaluator produced a
   // pure boolean verdict (no numeric score to show in its place).
   let passLabel: EvalChipDisplay["passLabel"] = null;
-  if (scoreText == null && !noVerdict) {
+  if (scoreText == null && categoryLabel == null && !noVerdict) {
     if (status === "passed") passLabel = { text: "Pass", color: "green.fg" };
     else if (status === "failed") passLabel = { text: "Fail", color: "red.fg" };
   }
@@ -398,6 +434,7 @@ export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
     status,
     color,
     statusLabel,
+    categoryLabel,
     displayName,
     scoreText,
     noVerdict,

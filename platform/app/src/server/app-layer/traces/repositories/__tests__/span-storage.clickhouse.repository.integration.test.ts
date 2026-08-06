@@ -21,6 +21,7 @@ import {
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import type { SpanInsertData } from "../../types";
 import { SpanStorageClickHouseRepository } from "../span-storage.clickhouse.repository";
+import { MAX_EVENT_NAMES_PER_TRACE } from "../span-storage.repository";
 
 const tenantId = `test-span-fetch-${nanoid()}`;
 const traceId = `trace-${nanoid()}`;
@@ -299,6 +300,230 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       ]);
       expect(events.find((e) => e.event_type === "exception")).toBeUndefined();
       expect(events.find((e) => e.event_type === "stale.skip")).toBeUndefined();
+    });
+  });
+
+  // The trace list's Events column. Unlike the two readers above this is
+  // batched over a page of traces and collapses each trace's events by name,
+  // so what it must get right is the grouping, the batching and the trim.
+  describe("when rolling up events for a page of traces", () => {
+    const rollupTenantId = `test-event-rollups-${nanoid()}`;
+    const feedbackTraceId = `trace-feedback-${nanoid()}`;
+    const chattyTraceId = `trace-chatty-${nanoid()}`;
+    const quietTraceId = `trace-quiet-${nanoid()}`;
+    const noisyTraceId = `trace-noisy-${nanoid()}`;
+    const otherTenantTraceId = `trace-other-${nanoid()}`;
+    const rollupBase = new Date(base + 1000);
+    const at = (offsetMs: number) => new Date(rollupBase.getTime() + offsetMs);
+    // The whole fixture sits inside this, so the read's own padding is not
+    // what makes these pass.
+    const timeRange = {
+      from: rollupBase.getTime() - 60_000,
+      to: rollupBase.getTime() + 60_000,
+    };
+
+    function rollupRow(
+      traceId: string,
+      spanId: string,
+      events: { ts: Date; name: string }[],
+      overrides: Record<string, unknown> = {},
+    ) {
+      return makeEventRow(
+        spanId,
+        events.map((e) => ({ ts: e.ts, name: e.name, attrs: {} })),
+        { TenantId: rollupTenantId, TraceId: traceId, ...overrides },
+      );
+    }
+
+    beforeAll(async () => {
+      await insertRows([
+        // One tracked-event trace, the shape a thumbs-up lands as.
+        rollupRow(feedbackTraceId, "fb-span", [
+          { ts: at(10), name: "thumbs_up_down" },
+        ]),
+        // An agent turn: the same two names over and over, across spans.
+        rollupRow(chattyTraceId, "chatty-span-1", [
+          { ts: at(30), name: "gen_ai.request.attempt" },
+          { ts: at(40), name: "tool.output" },
+          { ts: at(50), name: "gen_ai.request.attempt" },
+        ]),
+        rollupRow(chattyTraceId, "chatty-span-2", [
+          { ts: at(60), name: "tool.output" },
+          { ts: at(70), name: "exception" },
+        ]),
+        // Stale version of chatty-span-2 — its events must not be counted.
+        rollupRow(
+          chattyTraceId,
+          "chatty-span-2",
+          [{ ts: at(-500), name: "stale.rollup" }],
+          {
+            StartTime: new Date(base - 90_000),
+            EndTime: new Date(base - 90_000 + 50),
+            UpdatedAt: new Date(base - 90_000),
+            CreatedAt: new Date(base - 90_000),
+          },
+        ),
+        // A trace whose spans carry no events at all.
+        rollupRow(quietTraceId, "quiet-span", []),
+        // More distinct names than one row can show.
+        rollupRow(
+          noisyTraceId,
+          "noisy-span",
+          Array.from({ length: MAX_EVENT_NAMES_PER_TRACE + 5 }, (_, i) => ({
+            ts: at(100 + i),
+            name: `event.kind.${String(i).padStart(2, "0")}`,
+          })),
+        ),
+        // Same trace id shape, different tenant.
+        rollupRow(otherTenantTraceId, "other-span", [
+          { ts: at(10), name: "thumbs_up_down" },
+        ]),
+      ]);
+      await insertRows([
+        makeEventRow(
+          "other-tenant-span",
+          [{ ts: at(10), name: "leaked", attrs: {} }],
+          {
+            TenantId: `${rollupTenantId}-neighbour`,
+            TraceId: otherTenantTraceId,
+          },
+        ),
+      ]);
+    });
+
+    afterAll(async () => {
+      for (const tenant of [rollupTenantId, `${rollupTenantId}-neighbour`]) {
+        await ch.exec({
+          query:
+            "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+          query_params: { tenantId: tenant },
+        });
+      }
+    });
+
+    /** @scenario A trace with events shows a badge per event name */
+    it("returns one entry per event name for a trace", async () => {
+      const rollups = await repo.getTraceEventRollupsByTraceIds({
+        tenantId: rollupTenantId,
+        traceIds: [feedbackTraceId],
+        timeRange,
+      });
+
+      expect(rollups[feedbackTraceId]).toEqual({
+        names: [
+          {
+            name: "thumbs_up_down",
+            count: 1,
+            firstTimestamp: at(10).getTime(),
+          },
+        ],
+        totalCount: 1,
+        distinctCount: 1,
+      });
+    });
+
+    /** @scenario Repeated events of the same name collapse into one badge with a count */
+    /** @scenario Badges are ordered by when the event first occurred */
+    it("collapses repeats by name, ordered by first occurrence, latest span version only", async () => {
+      const rollups = await repo.getTraceEventRollupsByTraceIds({
+        tenantId: rollupTenantId,
+        traceIds: [chattyTraceId],
+        timeRange,
+      });
+
+      expect(rollups[chattyTraceId]).toEqual({
+        names: [
+          {
+            name: "gen_ai.request.attempt",
+            count: 2,
+            firstTimestamp: at(30).getTime(),
+          },
+          { name: "tool.output", count: 2, firstTimestamp: at(40).getTime() },
+          { name: "exception", count: 1, firstTimestamp: at(70).getTime() },
+        ],
+        totalCount: 5,
+        distinctCount: 3,
+      });
+    });
+
+    /** @scenario Events are fetched for the traces currently on screen */
+    it("answers a whole page in one call, keyed by trace id", async () => {
+      const rollups = await repo.getTraceEventRollupsByTraceIds({
+        tenantId: rollupTenantId,
+        traceIds: [feedbackTraceId, chattyTraceId, quietTraceId],
+        timeRange,
+      });
+
+      expect(Object.keys(rollups).sort()).toEqual(
+        [feedbackTraceId, chattyTraceId].sort(),
+      );
+    });
+
+    /** @scenario A trace with no events shows the empty marker */
+    it("omits a trace that recorded no events", async () => {
+      const rollups = await repo.getTraceEventRollupsByTraceIds({
+        tenantId: rollupTenantId,
+        traceIds: [quietTraceId],
+        timeRange,
+      });
+
+      expect(rollups[quietTraceId]).toBeUndefined();
+    });
+
+    /** @scenario A trace with a very large number of events stays bounded */
+    it("trims to the badge cap while still reporting the true totals", async () => {
+      const rollups = await repo.getTraceEventRollupsByTraceIds({
+        tenantId: rollupTenantId,
+        traceIds: [noisyTraceId],
+        timeRange,
+      });
+
+      const rollup = rollups[noisyTraceId]!;
+      expect(rollup.names).toHaveLength(MAX_EVENT_NAMES_PER_TRACE);
+      expect(rollup.distinctCount).toBe(MAX_EVENT_NAMES_PER_TRACE + 5);
+      expect(rollup.totalCount).toBe(MAX_EVENT_NAMES_PER_TRACE + 5);
+      // The trim keeps the earliest names, so the row shows what happened first.
+      expect(rollup.names[0]?.name).toBe("event.kind.00");
+    });
+
+    /** @scenario Only the caller's project is read */
+    it("returns nothing for a trace id belonging to another tenant", async () => {
+      const rollups = await repo.getTraceEventRollupsByTraceIds({
+        tenantId: rollupTenantId,
+        traceIds: [otherTenantTraceId],
+        timeRange,
+      });
+
+      expect(
+        rollups[otherTenantTraceId]?.names.map((n) => n.name),
+      ).not.toContain("leaked");
+    });
+
+    /** @scenario The read is pruned to the page's time range */
+    it("returns nothing when the page's time range excludes the spans", async () => {
+      const longAgo = rollupBase.getTime() - 400 * 24 * 60 * 60 * 1000;
+      const rollups = await repo.getTraceEventRollupsByTraceIds({
+        tenantId: rollupTenantId,
+        traceIds: [feedbackTraceId],
+        timeRange: { from: longAgo, to: longAgo + 60_000 },
+      });
+
+      expect(rollups).toEqual({});
+    });
+
+    /** @scenario An empty page of trace ids skips the query entirely */
+    it("issues no query for an empty page", async () => {
+      const failingRepo = new SpanStorageClickHouseRepository(async () => {
+        throw new Error("resolveClient must not be called");
+      });
+
+      await expect(
+        failingRepo.getTraceEventRollupsByTraceIds({
+          tenantId: rollupTenantId,
+          traceIds: [],
+          timeRange,
+        }),
+      ).resolves.toEqual({});
     });
   });
 

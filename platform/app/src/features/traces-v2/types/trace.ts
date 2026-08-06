@@ -34,14 +34,38 @@ export interface TraceEvalResult {
 }
 
 /**
- * Lightweight event reference attached to a trace list item.
- * Hoisted from spans during the fold projection.
+ * One event name a trace recorded, with how often it fired. Rows show one
+ * badge per name, not per event: an agent turn that retries a tool 237 times
+ * has 237 `tool.output` events and one thing worth saying about them.
  */
-export interface TraceListEvent {
-  spanId: string;
-  timestamp: number;
+export interface TraceListEventGroup {
   name: string;
+  count: number;
+  /** Epoch ms of the earliest event under this name — the badge order. */
+  firstTimestamp: number;
 }
+
+/**
+ * A trace's events as the list renders them. Read from `stored_spans` by
+ * `tracesV2.listEvents` once per visible page, not carried on the trace
+ * summary — the fold stopped hoisting events so that folding stays O(1) per
+ * span (migration 00025).
+ */
+export interface TraceListEvents {
+  /** Ordered by first occurrence; shorter than `distinctCount` when trimmed. */
+  groups: TraceListEventGroup[];
+  /** Every event the trace recorded, including names beyond the trim. */
+  totalCount: number;
+  /** Distinct names the trace recorded, including those beyond the trim. */
+  distinctCount: number;
+}
+
+/** A trace with no events, and the shape a row carries before they load. */
+export const NO_TRACE_EVENTS: TraceListEvents = {
+  groups: [],
+  totalCount: 0,
+  distinctCount: 0,
+};
 
 /**
  * Shape of a trace as rendered in the trace table.
@@ -122,5 +146,11 @@ export interface TraceListItem {
   traceName?: string;
   rootSpanType?: string | null;
   evaluations: TraceEvalResult[];
-  events: TraceListEvent[];
+  events: TraceListEvents;
+  /**
+   * True while the page's events read is still in flight. The Events column
+   * shows a placeholder rather than its empty marker, which would otherwise
+   * claim the trace recorded nothing.
+   */
+  eventsLoading?: boolean;
 }

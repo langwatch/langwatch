@@ -81,6 +81,32 @@ Rule: Eval card layout
     When the user clicks "Show details"
     Then a details panel reveals the available rows (Label, Error, IDs, Stacktrace, Inputs)
 
+  # A categorising evaluator (langevals/llm_category and anything else that
+  # answers with a category) returns a label and neither a score nor a
+  # pass/fail. Reading that as a passing run scoring zero is a fabrication
+  # twice over, and it buries the one thing the evaluator actually said.
+  @integration
+  Scenario: A category verdict leads the card header
+    Given the trace has a run of "Max conversation outcome" whose only verdict is the category "resolved"
+    Then the card header shows "resolved" as its leading chip
+    And no PASS badge is shown
+    And no score is shown
+    And no score bar is drawn
+    And the category is not repeated under "Show details"
+
+  @integration
+  Scenario: A label alongside a real verdict rides next to the badge
+    Given the trace has a run of "Toxicity" that passed scoring 0.90 and is labelled "safe"
+    Then the card header shows the PASS badge
+    And the header shows "safe" as a chip next to the badge
+    And the header still shows the score "0.90"
+
+  @integration
+  Scenario: An evaluator with no label is unchanged
+    Given the trace has a run of "Topic Adherence" scoring 8.2 out of 10 with no label
+    Then the card header shows the PASS badge, the name, and the score
+    And no category chip is shown
+
   Scenario: Show details is hidden when no extra context exists
     Given an eval card has only name, score, and reasoning
     Then no "Show details" toggle is rendered

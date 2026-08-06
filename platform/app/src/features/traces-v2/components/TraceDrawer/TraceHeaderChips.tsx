@@ -456,6 +456,7 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
     evaluatorId: ev.evaluatorId,
     status: ev.status,
     score: ev.score,
+    scoreType: ev.scoreType,
     label: ev.label,
     passed: ev.passed,
   });
@@ -477,6 +478,10 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
         <NoVerdictMicroBadge icon={LuCircleSlash} label="SKIPPED" />
       ) : display.status === "error" ? (
         <NoVerdictMicroBadge icon={LuCircleAlert} label="ERROR" />
+      ) : display.categoryLabel ? (
+        <Text textStyle="2xs" fontWeight="semibold" color="blue.fg" truncate>
+          {display.categoryLabel}
+        </Text>
       ) : display.scoreText ? (
         <Text textStyle="2xs" fontWeight="semibold" color="fg.muted">
           {display.scoreText}
@@ -503,7 +508,7 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
     dot: display.color,
     tone,
     onClick,
-    ariaLabel: `Eval ${display.displayName}: ${display.statusLabel}${display.scoreText ? ` ${display.scoreText}` : ""}`,
+    ariaLabel: `Eval ${display.displayName}: ${display.categoryLabel ?? display.statusLabel}${display.scoreText ? ` ${display.scoreText}` : ""}`,
     tooltip: (
       <VStack align="stretch" gap={1.5} minWidth="240px" maxWidth="340px">
         <HStack gap={2}>

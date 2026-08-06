@@ -34,11 +34,14 @@ import type {
   SpanSummaryPage,
   SpanSummaryPageCursor,
   SpanSummaryRow,
+  TraceEventRollup,
+  TraceEventRollupParams,
 } from "./span-storage.repository";
 import {
   clampSpanReadLimit,
   LANGWATCH_SIGNAL_BUCKETS,
   MAX_DERIVATION_SPANS,
+  MAX_EVENT_NAMES_PER_TRACE,
   MAX_LIGHT_SPAN_READ_ROWS,
 } from "./span-storage.repository";
 
@@ -357,6 +360,22 @@ function dedupInTuple(extraInnerWhere: string): string {
 }
 
 /**
+ * {@link dedupInTuple} for a batch of traces — same election, same caveat
+ * about which predicates may be pushed into the subquery, `IN` over the page's
+ * ids instead of one `TraceId`.
+ */
+function dedupInTupleForTraceIds(extraInnerWhere: string): string {
+  return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
+    SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
+    FROM ${TABLE_NAME}
+    WHERE TenantId = {tenantId:String}
+      AND TraceId IN {traceIds:Array(String)}
+      ${extraInnerWhere}
+    GROUP BY TenantId, TraceId, SpanId
+  )`;
+}
+
+/**
  * Per-bucket key matchers for the LangWatch signals projection. Each entry
  * compiles to one ClickHouse boolean expression over `mapKeys(SpanAttributes)`.
  * Order must match `LANGWATCH_SIGNAL_BUCKETS` in span-storage.repository.ts —
@@ -510,6 +529,20 @@ interface TraceEventRow {
   timestamp: string | number;
   name: string;
   attributes: Record<string, string>;
+}
+
+interface TraceEventRollupRow {
+  traceId: string;
+  name: string;
+  nameCount: string | number;
+  firstTimestamp: string | number;
+  totalCount: string | number;
+  distinctCount: string | number;
+}
+
+/** JSONEachRow renders 64-bit integers as strings; narrow both back to number. */
+function asNumber(value: string | number): number {
+  return typeof value === "string" ? parseInt(value, 10) : value;
 }
 
 function mapEventRow(row: EventRow): ElasticSearchEvent {
@@ -1519,6 +1552,110 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           error: error instanceof Error ? error.message : String(error),
         },
         "Failed to get trace events by trace ID from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async getTraceEventRollupsByTraceIds({
+    tenantId,
+    traceIds,
+    timeRange,
+  }: TraceEventRollupParams): Promise<Record<string, TraceEventRollup>> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.getTraceEventRollupsByTraceIds",
+    );
+
+    if (traceIds.length === 0) return {};
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      // The page's traces all occurred inside the list's range, and a span
+      // starts no earlier than its trace does, so padding both ends by the
+      // standard partition window covers every span of every trace on the
+      // page without widening to a full-history scan.
+      const fromMs = timeRange.from - DEFAULT_PARTITION_WINDOW_MS;
+      const toMs = timeRange.to + DEFAULT_PARTITION_WINDOW_MS;
+      const partitionAnd =
+        "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+        "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})";
+
+      // Three stages, innermost out: elect each span's latest version and keep
+      // only the ones carrying events, expand those spans' `Events.*` arrays,
+      // then collapse to one row per (trace, event name).
+      //
+      // The window aggregates run over the whole per-trace partition and
+      // `LIMIT ... BY` trims afterwards, so a trimmed trace still reports the
+      // totals of everything it recorded, not of what survived the trim.
+      const result = await client.query({
+        query: `
+          SELECT
+            traceId,
+            name,
+            nameCount,
+            firstTimestamp,
+            sum(nameCount) OVER (PARTITION BY traceId) AS totalCount,
+            count() OVER (PARTITION BY traceId) AS distinctCount
+          FROM (
+            SELECT
+              TraceId AS traceId,
+              event_name AS name,
+              count() AS nameCount,
+              toUnixTimestamp64Milli(min(event_timestamp)) AS firstTimestamp
+            FROM (
+              SELECT
+                TraceId,
+                "Events.Timestamp" AS Events_Timestamp,
+                "Events.Name" AS Events_Name
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN {traceIds:Array(String)}
+                AND notEmpty("Events.Name")
+                ${partitionAnd}
+                AND ${dedupInTupleForTraceIds(partitionAnd)}
+            )
+            ARRAY JOIN
+              Events_Timestamp AS event_timestamp,
+              Events_Name AS event_name
+            GROUP BY traceId, name
+          )
+          ORDER BY traceId ASC, firstTimestamp ASC, name ASC
+          LIMIT {maxNames:UInt32} BY traceId
+        `,
+        query_params: {
+          tenantId,
+          traceIds,
+          fromMs,
+          toMs,
+          maxNames: MAX_EVENT_NAMES_PER_TRACE,
+        },
+        format: "JSONEachRow",
+      });
+
+      const rows = (await result.json()) as TraceEventRollupRow[];
+      const rollups: Record<string, TraceEventRollup> = {};
+      for (const row of rows) {
+        const rollup = (rollups[row.traceId] ??= {
+          names: [],
+          totalCount: asNumber(row.totalCount),
+          distinctCount: asNumber(row.distinctCount),
+        });
+        rollup.names.push({
+          name: row.name,
+          count: asNumber(row.nameCount),
+          firstTimestamp: asNumber(row.firstTimestamp),
+        });
+      }
+      return rollups;
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceCount: traceIds.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get trace event rollups from ClickHouse",
       );
       throw error;
     }

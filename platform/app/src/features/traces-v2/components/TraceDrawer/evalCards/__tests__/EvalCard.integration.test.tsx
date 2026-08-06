@@ -128,3 +128,94 @@ describe("EvalCard evaluator inputs", () => {
     });
   });
 });
+
+describe("EvalCard header", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getEvaluationInputsUseQueryMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    });
+  });
+
+  describe("given a categorising evaluator that returned only a category", () => {
+    // How `langevals/llm_category` arrives: a label, and stand-ins where the
+    // score and verdict would be.
+    const categoryEval: EvalEntry = {
+      name: "Max conversation outcome",
+      score: 0,
+      scoreType: "categorical",
+      status: "pass",
+      label: "resolved",
+      evaluatorType: "langevals/llm_category",
+      evaluationId: "eval-cat",
+    };
+
+    /** @scenario A category verdict leads the card header */
+    it("leads with the category", () => {
+      renderCard(categoryEval);
+      expect(screen.getByText("resolved")).toBeInTheDocument();
+    });
+
+    /** @scenario A category verdict leads the card header */
+    it("shows no PASS badge for a run that judged nothing", () => {
+      renderCard(categoryEval);
+      expect(screen.queryByText("PASS")).not.toBeInTheDocument();
+    });
+
+    /** @scenario A category verdict leads the card header */
+    it("shows no score, the zero being a stand-in for a score never produced", () => {
+      renderCard(categoryEval);
+      expect(screen.queryByText("0")).not.toBeInTheDocument();
+    });
+
+    /** @scenario A category verdict leads the card header */
+    it("does not repeat the category under Show details", () => {
+      renderCard(categoryEval);
+      // Inputs are still lazily loadable, so the toggle may exist; what must
+      // not exist is a second copy of the category.
+      const toggle = screen.queryByText("Show details");
+      if (toggle) fireEvent.click(toggle);
+      expect(screen.queryByText("Label")).not.toBeInTheDocument();
+      expect(screen.getAllByText("resolved")).toHaveLength(1);
+    });
+  });
+
+  describe("given an evaluator that returned a label alongside a real verdict", () => {
+    const labelledEval: EvalEntry = {
+      name: "Toxicity",
+      score: 0.9,
+      scoreType: "numeric",
+      status: "pass",
+      label: "safe",
+      passed: true,
+      evaluationId: "eval-labelled",
+    };
+
+    /** @scenario A label alongside a real verdict rides next to the badge */
+    it("keeps the badge and the score, and adds the label beside them", () => {
+      renderCard(labelledEval);
+      expect(screen.getByText("PASS")).toBeInTheDocument();
+      expect(screen.getByText("safe")).toBeInTheDocument();
+      expect(screen.getByText("0.90")).toBeInTheDocument();
+    });
+  });
+
+  describe("given an evaluator that returned no label", () => {
+    /** @scenario An evaluator with no label is unchanged */
+    it("shows the badge, the name and the score, and no category chip", () => {
+      renderCard({
+        name: "Topic Adherence",
+        score: 8.2,
+        scoreType: "numeric",
+        status: "pass",
+        evaluationId: "eval-plain",
+      });
+
+      expect(screen.getByText("PASS")).toBeInTheDocument();
+      expect(screen.getByText("Topic Adherence")).toBeInTheDocument();
+      expect(screen.getByText("8.2")).toBeInTheDocument();
+      expect(screen.getByText("/ 10")).toBeInTheDocument();
+    });
+  });
+});

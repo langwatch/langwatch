@@ -1,27 +1,72 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Skeleton, Text } from "@chakra-ui/react";
 import type { TraceListItem } from "../../../../../types/trace";
 import { EventBadge } from "../../sharedChips";
 import type { CellDef } from "../../types";
 
 type Density = "compact" | "comfortable";
 
+/**
+ * Badges a row shows before collapsing the rest into a remainder chip. Three
+ * fits the column's default width without wrapping; the chip carries the count
+ * of what it stands for and names them on hover.
+ */
+const VISIBLE_BADGES = 3;
+
 function renderEvents(row: TraceListItem, density: Density) {
   const textStyle = density === "compact" ? "xs" : "sm";
-  if (row.events.length === 0) {
+  const { groups, distinctCount } = row.events;
+
+  if (groups.length === 0) {
+    // While the page's events are still in flight the row has no events yet
+    // but may well have some — the empty marker would be a claim we can't
+    // make, so hold the space instead.
+    if (row.eventsLoading) {
+      return <Skeleton height="16px" width="60px" borderRadius="md" />;
+    }
     return (
       <Text textStyle={textStyle} color="fg.subtle">
         —
       </Text>
     );
   }
+
+  const shown = groups.slice(0, VISIBLE_BADGES);
+  const hiddenCount = distinctCount - shown.length;
   const gap = density === "compact" ? 1 : 1.5;
+
   return (
     <HStack gap={gap} flexWrap="wrap">
-      {row.events.map((evt, i) => (
-        <EventBadge key={`${evt.spanId}-${i}`} event={evt} />
+      {shown.map((event) => (
+        <EventBadge key={event.name} event={event} />
       ))}
+      {hiddenCount > 0 && (
+        <Text
+          textStyle="2xs"
+          fontWeight="medium"
+          color="fg.muted"
+          flexShrink={0}
+          title={remainderTitle(groups.slice(VISIBLE_BADGES), hiddenCount)}
+        >
+          +{hiddenCount}
+        </Text>
+      )}
     </HStack>
   );
+}
+
+/**
+ * Names what the remainder chip stands for. The rollup itself is trimmed
+ * server-side, so past that trim the chip can only report how many more there
+ * were rather than pretend to name them.
+ */
+function remainderTitle(
+  remaining: { name: string }[],
+  hiddenCount: number,
+): string {
+  const named = remaining.map((event) => event.name);
+  const unnamed = hiddenCount - named.length;
+  if (unnamed > 0) named.push(`and ${unnamed.toLocaleString()} more`);
+  return named.join(", ");
 }
 
 export const EventsCell = {
