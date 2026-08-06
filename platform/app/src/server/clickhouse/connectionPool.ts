@@ -13,13 +13,15 @@ const logger = createLogger("langwatch:clickhouse:connection-pool");
  * agrees on them; this function only supplies the environment and reports what
  * was decided.
  *
- * A pool is per client INSTANCE, and a process constructing both the raw client
- * (`~/server/clickhouse/client.ts`) and the app-layer factory
- * (`~/server/app-layer/clients/clickhouse.factory.ts`) opens two of them, so
- * the server's budget has to cover every pool on every pod. Set
- * `CLICKHOUSE_CLIENT_REPLICAS` from the downward API and the size is derived
- * from that budget. Without it a pod cannot know how many siblings it has, so
- * the historical fixed default stands.
+ * A pool is per client INSTANCE, so the server's budget has to cover every pool
+ * on every pod. Set `CLICKHOUSE_CLIENT_REPLICAS` from the downward API and the
+ * size is derived from that budget. Without it a pod cannot know how many
+ * siblings it has, so the historical fixed default stands.
+ *
+ * This is the socket ceiling, not the working limit. A process has one
+ * construction site against a given server (`./managedClient.ts`), and what
+ * actually bounds the statements it runs is the limiter in `./statementLimit.ts`,
+ * sized from this number so the two agree.
  */
 export function getClickHouseMaxOpenConnections(): number {
   const decision = resolvePoolSize(poolSizingFromEnv(process.env));
