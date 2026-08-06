@@ -7,8 +7,9 @@
  * Covers @unit scenarios from
  * specs/model-providers/google-agent-platform.feature.
  */
-import { describe, expect, it } from "vitest";
+
 import type { ModelProvider } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 import { buildCredentials } from "../config.materialiser";
 
 const geminiRow = (customKeys: Record<string, string>): ModelProvider =>
