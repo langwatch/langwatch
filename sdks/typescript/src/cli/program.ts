@@ -1261,6 +1261,41 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     experimentCmd
+      .command("add-comparison <slug>")
+      .description(
+        "Attach a comparison judge to an experiment, creating missing prompt/agent variant targets as needed",
+      )
+      .option(
+        "--variant <spec>",
+        "Repeatable: target:<id> | prompt:<handle>[@version] | agent:<id> (at least 2 required)",
+        (value: string, previous: string[]) => [...previous, value],
+        [] as string[],
+      )
+      .option("--golden-field <field>", "Dataset field with the reference answer")
+      .option("--input-field <field>", "Dataset field to show the judge as task context")
+      .option("--metrics <list>", "Comma-separated metrics to include: cost,duration")
+      .option("--no-randomize", "Disable per-row candidate order randomization")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      slug: string,
+      options: {
+        variant?: string[];
+        goldenField?: string;
+        inputField?: string;
+        metrics?: string;
+        randomize?: boolean;
+        format?: string;
+      },
+    ) => {
+      const { addComparisonCommand: impl } = await import(
+        "./commands/experiment/add-comparison.js"
+      );
+      return impl(slug, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
       .command("status <experiment>")
       .description("Check the status of an experiment run (defaults to the latest run)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table")

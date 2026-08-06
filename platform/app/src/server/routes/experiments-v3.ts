@@ -5,6 +5,7 @@
  * - POST /api/experiments/execute (SSE streaming experiment execution)
  * - POST /api/experiments/abort (abort a running experiment)
  * - POST /api/experiments/:slug/run (CI/CD execution by slug)
+ * - POST /api/experiments/:slug/comparison (attach a comparison judge by slug)
  * - GET  /api/experiments/runs (list runs for an experiment slug)
  * - GET  /api/experiments/runs/:runId (poll run status)
  * - GET  /api/experiments/runs/:runId/results (per-row results)
@@ -17,14 +18,22 @@ import { streamSSE } from "hono/streaming";
 import type { z } from "zod";
 import {
   createInitialUIState,
+  type DatasetReference,
   type EvaluationsV3State,
+  type TargetConfig,
 } from "~/experiments-v3/types";
-import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
+import {
+  type PersistedEvaluationsV3State,
+  persistedEvaluationsV3StateSchema,
+} from "~/experiments-v3/types/persistence";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { Permission } from "~/server/api/rbac";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import {
+  validateJsonBody,
+  validator as zValidator,
+} from "~/server/api/validation";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -39,6 +48,10 @@ import {
   RunNotFoundError,
 } from "~/server/experiments/errors";
 import { ExperimentService } from "~/server/experiments/experiment.service";
+import {
+  attachComparison,
+  attachComparisonBodySchema,
+} from "~/server/experiments-v3/comparisonTargetService";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
@@ -67,8 +80,8 @@ const sessionAuth = handlerManagedAuth({
   permissions: ["evaluations:manage"],
   credential: "session",
 });
-// The read endpoints (runs list / status / results) and the run endpoint gate
-// on different grains, so they declare separately: a single shared policy
+// The read endpoints (runs list / status / results) and the write endpoints
+// gate on different grains, so they declare separately: a single shared policy
 // would report the coarser of the two for routes that only read.
 const apiKeyAuthRead = handlerManagedAuth({
   reason:
@@ -76,7 +89,14 @@ const apiKeyAuthRead = handlerManagedAuth({
   permissions: ["evaluations:view"],
   credential: "apiKey",
 });
-const apiKeyAuthRun = handlerManagedAuth({
+// Every API-key-reachable write on this surface shares the create grain:
+// starting a run creates a run, and attaching a comparison creates an
+// evaluator and the target wiring for it. `:manage` is deliberately not
+// reachable by an API key here. It implies the delete, no least-privilege key
+// holds it (the Langy session key stops short of it on purpose), and
+// `hasPermissionWithHierarchy` already lets a `:manage` holder satisfy
+// `:create`, so asking for the narrower grain takes access away from nobody.
+const apiKeyAuthWrite = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
   permissions: ["evaluations:create"],
@@ -380,7 +400,7 @@ secured.access(sessionAuth).post("/abort", async (c) => {
 
 // ── POST /:slug/run  (CI/CD execution) ──────────────────────────────
 
-secured.access(apiKeyAuthRun).post("/:slug/run", async (c) => {
+secured.access(apiKeyAuthWrite).post("/:slug/run", async (c) => {
   const { slug } = c.req.param();
 
   // Starting a run CREATES a run row against an experiment that already
@@ -563,6 +583,107 @@ secured.access(apiKeyAuthRun).post("/:slug/run", async (c) => {
   });
 
   return c.json({ runId, status: "running", total, runUrl });
+});
+
+// ── POST /:slug/comparison (attach a comparison target via API key) ─
+
+secured.access(apiKeyAuthWrite).post("/:slug/comparison", async (c) => {
+  const { slug } = c.req.param();
+
+  // Authentication runs before the body is looked at, matching the sibling
+  // run endpoint. Validating first would describe the request shape to a
+  // caller who never proved they may see it.
+  const authResult = await authenticateRequest(c, "evaluations:create");
+  if ("error" in authResult) {
+    return c.json(authResult.body ?? { error: authResult.error }, {
+      status: authResult.status,
+    });
+  }
+  const { project, markUsed } = authResult;
+
+  const experimentService = ExperimentService.create(prisma);
+  const experiment = await experimentService.findBySlugAndType({
+    projectId: project.id,
+    slug,
+    type: ExperimentType.EVALUATIONS_V3,
+  });
+
+  if (!experiment) {
+    throw new ExperimentNotFoundError(slug);
+  }
+
+  const parseResult = persistedEvaluationsV3StateSchema.safeParse(
+    experiment.workbenchState,
+  );
+  if (!parseResult.success) {
+    logger.error(
+      { slug, errors: parseResult.error.errors },
+      "Invalid workbenchState",
+    );
+    throw new InvalidExperimentConfigurationError(slug);
+  }
+  const workbenchState = parseResult.data;
+
+  const body = await validateJsonBody({
+    c,
+    schema: attachComparisonBodySchema,
+  });
+
+  try {
+    const { targets, comparisonTargetId, createdTargetIds, reusedTargetIds } =
+      await attachComparison({
+        prisma,
+        projectId: project.id,
+        targets: workbenchState.targets as TargetConfig[],
+        datasets: workbenchState.datasets as DatasetReference[],
+        activeDatasetId: workbenchState.activeDatasetId,
+        body,
+      });
+
+    // `updatedAt` was read with the state above, so a Workbench autosave
+    // landing in between refuses this write instead of being overwritten
+    // by it.
+    await experimentService.updateWorkbenchState({
+      projectId: project.id,
+      id: experiment.id,
+      workbenchState: {
+        ...workbenchState,
+        // The DSL's `TargetConfig` and the persisted schema's inferred
+        // target differ only in how loosely each types free-form JSON
+        // (`json_schema`). The service re-parses the whole state before
+        // writing, so the schema stays the authority on what lands.
+        targets: targets as PersistedEvaluationsV3State["targets"],
+      },
+      expectedUpdatedAt: experiment.updatedAt,
+    });
+
+    logger.info(
+      { projectId: project.id, slug, comparisonTargetId, createdTargetIds },
+      "Attached comparison target via API key",
+    );
+    markUsed();
+
+    return c.json({
+      comparisonTargetId,
+      createdTargetIds,
+      reusedTargetIds,
+      targets,
+    });
+  } catch (error) {
+    // Handled errors already name their cause and carry the status the
+    // boundary serialises; only the rest are ours to report.
+    if (HandledError.isHandled(error)) {
+      throw error;
+    }
+    logger.error(
+      { error, projectId: project.id, slug },
+      "Failed to attach comparison target",
+    );
+    captureException(toError(error), {
+      extra: { projectId: project.id, slug },
+    });
+    throw error;
+  }
 });
 
 // ── GET /runs?experimentSlug=... (list runs for an experiment) ──────

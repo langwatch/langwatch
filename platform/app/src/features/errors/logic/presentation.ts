@@ -61,6 +61,23 @@ const str = (
 };
 
 /**
+ * Reads a list of names out of `meta` without trusting it. Plain strings pass
+ * through; an object contributes its `id`, which is how a list of targets
+ * reaches copy that only wants to name them. Anything else is dropped.
+ */
+const strList = (error: HandledErrorShape, key: string): string[] => {
+  const value = error.meta[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === "string") return item;
+      const id = (item as { id?: unknown } | null)?.id;
+      return typeof id === "string" ? id : null;
+    })
+    .filter((name): name is string => name !== null);
+};
+
+/**
  * Whether any code in the error's reason chain (depth-first, nested included)
  * is one of `codes`.
  *
@@ -250,6 +267,66 @@ const presentations = {
   experiment_not_found: {
     title: "Experiment not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  experiment_dataset_missing: {
+    title: "This experiment has no dataset",
+    describe: () => "Pick a dataset for it in the workbench, then try again.",
+  },
+  experiment_update_conflict: {
+    // A save landed between reading this experiment and writing it back, so
+    // the write was refused rather than allowed to discard the other one.
+    title: "This experiment changed while you were editing it",
+    describe: () =>
+      "Someone else saved it, or it is open in another tab. Reload to pick up their version, then apply your change again.",
+  },
+  comparison_variant_target_not_found: {
+    title: "That target isn't in this experiment",
+    describe: (error) => {
+      // meta.availableTargets is the experiment's own target list, so naming
+      // it turns "wrong id" into "here is what you can pick instead".
+      const ids = strList(error, "availableTargets");
+      return ids.length > 0
+        ? `Pick one of its targets: ${listLabels(ids)}.`
+        : "It has no targets yet. Add one before building a comparison.";
+    },
+  },
+  comparison_variant_agent_not_found: {
+    title: "Agent not found",
+    describe: () =>
+      "Check the agent id, or add the agent to this project first.",
+  },
+  comparison_variant_is_comparison: {
+    title: "A comparison can't be compared",
+    describe: () =>
+      "Pick targets that produce answers, such as prompts or agents, rather than another comparison.",
+  },
+  comparison_variant_unmappable: {
+    title: "This target has nowhere to read its input from",
+    describe: (error) => {
+      const names = strList(error, "fields");
+      return names.length > 0
+        ? `Add a dataset column for ${listLabels(names)}, or compare targets that are already set up.`
+        : "Add the dataset columns it needs, or compare targets that are already set up.";
+    },
+  },
+  comparison_variants_not_distinct: {
+    title: "A comparison needs two different candidates",
+    describe: () =>
+      "The candidates given all point at the same target. Pick a second, different one.",
+  },
+  comparison_field_not_in_dataset: {
+    title: "That field isn't in the dataset",
+    describe: (error) => {
+      const names = strList(error, "availableColumns");
+      return names.length > 0
+        ? `Pick one of its columns: ${listLabels(names)}.`
+        : "Add the column to the dataset first.";
+    },
+  },
+  comparison_golden_field_required: {
+    title: "Name the column with the reference answer",
+    describe: () =>
+      "Judging against a reference answer needs a dataset column that holds it.",
   },
   invalid_experiment_configuration: {
     // fault: platform. The saved workbench state stopped matching its schema,

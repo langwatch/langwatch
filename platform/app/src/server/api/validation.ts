@@ -311,3 +311,46 @@ interface ValidationResult {
  * precise one.
  */
 export const validator = build as unknown as typeof openApiValidator;
+
+/**
+ * Read and validate a JSON body from inside a handler, raising exactly the
+ * errors the middleware form raises.
+ *
+ * The middleware runs before the handler body, which is correct for a route
+ * whose authentication is also middleware and wrong for one that authenticates
+ * inside its handler: the schema would answer an anonymous caller before the
+ * 401 did, describing the request shape to someone who never proved they may
+ * see it. Those routes authenticate first and then call this.
+ *
+ * A body that is not JSON at all raises `malformed_request` (400); one that
+ * parses but fails the schema raises `validation_error` (422) naming the
+ * offending fields. Both are the shapes `validator` produces, so a caller
+ * cannot tell which ordering answered it.
+ */
+export async function validateJsonBody<S extends ZodSchema>({
+  c,
+  schema,
+}: {
+  c: { req: { text: () => Promise<string> } };
+  schema: S;
+}): Promise<S["_output"]> {
+  const raw = await c.req.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new MalformedRequestError({
+      target: "json",
+      detail: error instanceof Error ? error.message : "invalid JSON",
+    });
+  }
+
+  const result = schema.safeParse(parsed);
+  if (!result.success) {
+    throw new RequestValidationError({
+      target: "json",
+      violations: result.error.issues.map(violationOf),
+    });
+  }
+  return result.data as S["_output"];
+}

@@ -1,9 +1,16 @@
 import type { Experiment, Prisma, PrismaClient } from "@prisma/client";
 import { ExperimentType } from "@prisma/client";
 import { nanoid } from "nanoid";
+import {
+  type PersistedEvaluationsV3State,
+  persistedEvaluationsV3StateSchema,
+} from "../../experiments-v3/types/persistence";
 import { slugify } from "../../utils/slugify";
 import { isUniqueConstraintError } from "../utils/prismaErrors";
-import { ExperimentNotFoundError } from "./errors";
+import {
+  ExperimentNotFoundError,
+  ExperimentUpdateConflictError,
+} from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
 
 /**
@@ -355,6 +362,51 @@ export class ExperimentService {
       throw new ExperimentNotFoundError(id);
     }
     return { success: true };
+  }
+
+  /**
+   * Overwrites an experiment's workbenchState in place, for the API-key
+   * mutating routes (attach-comparison and friends) that patch an existing
+   * EVALUATIONS_V3 experiment's targets/evaluators rather than replacing the
+   * whole row the way the session-only saveEvaluationsV3 mutation does.
+   *
+   * `expectedUpdatedAt` is the `updatedAt` the caller read the state at, and
+   * the write only lands while the row still carries it. Without that, a
+   * read-modify-write of the whole blob silently discards whatever the
+   * Workbench autosaved in between (and vice versa) — the two writers own the
+   * same field. A mismatch raises `ExperimentUpdateConflictError`, which asks
+   * the caller to re-read and reapply rather than guessing at a merge.
+   *
+   * The payload is re-validated here rather than trusted: it reaches this
+   * method already shaped by `persistedEvaluationsV3StateSchema`, and parsing
+   * it again is what guarantees a route cannot persist a blob the read path
+   * will later refuse.
+   */
+  async updateWorkbenchState({
+    projectId,
+    id,
+    workbenchState,
+    expectedUpdatedAt,
+  }: {
+    projectId: string;
+    id: string;
+    workbenchState: PersistedEvaluationsV3State;
+    expectedUpdatedAt: Date;
+  }): Promise<void> {
+    const validated = persistedEvaluationsV3StateSchema.parse(workbenchState);
+    const workbenchStateJson = JSON.parse(
+      JSON.stringify(validated),
+    ) as Prisma.InputJsonValue;
+
+    const { updated } = await this.repository.updateWorkbenchStateIfUnchanged({
+      id,
+      projectId,
+      expectedUpdatedAt,
+      workbenchState: workbenchStateJson,
+    });
+    if (!updated) {
+      throw new ExperimentUpdateConflictError({ experimentId: id });
+    }
   }
 
   /**

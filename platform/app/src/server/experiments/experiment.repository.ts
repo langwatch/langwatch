@@ -245,6 +245,46 @@ export class ExperimentRepository {
   }
 
   /**
+   * Writes `workbenchState` only while the row still carries the `updatedAt`
+   * the caller observed, and reports whether it matched.
+   *
+   * The workbench state is a single JSON blob with more than one writer: the
+   * Workbench UI autosaves the whole field, and the API-key routes patch parts
+   * of it. A plain `update` makes the later write win outright and drop the
+   * earlier one, so this compares-and-sets on `updatedAt`, which Prisma
+   * refreshes on every write, and reports the miss rather than resolving it.
+   *
+   * An unmatched condition surfaces to the caller as a 409; nothing retries it
+   * automatically, and that is the intent. Reapplying the change on top of the
+   * state that just landed would attach a comparison to an experiment the
+   * caller has not seen, which is the situation they need to look at rather
+   * than have decided for them.
+   *
+   * `updatedAt` is a `timestamp(3)`, which sets the resolution of the guard:
+   * two writes inside the same millisecond read as one version and the second
+   * is allowed through. That is the accepted limit of using the column already
+   * on the row rather than adding a version counter, and it is far narrower
+   * than the window it closes, which is however long a caller holds the state
+   * between reading it and writing it back.
+   */
+  async updateWorkbenchStateIfUnchanged(input: {
+    id: string;
+    projectId: string;
+    expectedUpdatedAt: Date;
+    workbenchState: Prisma.InputJsonValue;
+  }): Promise<{ updated: boolean }> {
+    const result = await this.prisma.experiment.updateMany({
+      where: this.active({
+        id: input.id,
+        projectId: input.projectId,
+        updatedAt: input.expectedUpdatedAt,
+      }),
+      data: { workbenchState: input.workbenchState },
+    });
+    return { updated: result.count > 0 };
+  }
+
+  /**
    * Archives an experiment by id, atomically.
    *
    * Returns a discriminated kind:

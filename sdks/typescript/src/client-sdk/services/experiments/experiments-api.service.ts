@@ -210,6 +210,32 @@ export interface ExperimentRunResultsResponse {
   };
 }
 
+export type ComparisonVariantSpec =
+  | { kind: "existingTarget"; targetId: string }
+  | { kind: "prompt"; handle: string; version?: number }
+  | { kind: "agent"; agentId: string };
+
+/** Body for `POST /api/experiments/{slug}/comparison`. */
+export interface AttachComparisonRequest {
+  variants: ComparisonVariantSpec[];
+  goldenField?: string;
+  hasGoldenAnswer?: boolean;
+  inputField?: string;
+  includeMetrics?: Array<"cost" | "duration">;
+  randomizeOrder?: boolean;
+}
+
+/**
+ * Response from `POST /api/experiments/{slug}/comparison`. Hand-written
+ * because the route is not yet declared in the generated OpenAPI types.
+ */
+export interface AttachComparisonResponse {
+  comparisonTargetId: string;
+  createdTargetIds: string[];
+  reusedTargetIds: string[];
+  targets: Array<Record<string, unknown>>;
+}
+
 export class ExperimentsApiServiceError extends Error {
   constructor(
     message: string,
@@ -460,5 +486,28 @@ export class ExperimentsApiService {
       });
     }
     return body;
+  }
+
+  /**
+   * Attach a comparison judge to an experiment, creating missing prompt/agent
+   * variant targets inline when needed (a variant that already matches an
+   * existing target in the experiment is reused, never duplicated).
+   *
+   * Hits `POST /api/experiments/{slug}/comparison` through the configured API
+   * client transport because the route is not yet declared in the generated
+   * OpenAPI types.
+   */
+  async attachComparison({
+    slug,
+    body,
+  }: {
+    slug: string;
+    body: AttachComparisonRequest;
+  }): Promise<AttachComparisonResponse> {
+    return this.postUndeclaredEndpoint<AttachComparisonResponse>({
+      path: `/api/experiments/${encodeURIComponent(slug)}/comparison`,
+      body,
+      operation: `attach comparison for "${slug}"`,
+    });
   }
 }
