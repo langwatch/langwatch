@@ -112,15 +112,35 @@ export function foldedRowName({
 // ============================================================================
 
 export default async function execute() {
-  const rows = await prisma.modelProvider.findMany({
-    where: { provider: "google_agent_platform" },
-    select: {
-      id: true,
-      name: true,
-      organizationId: true,
-      customKeys: true,
-    },
+  // ModelProvider is a tenancy-scoped model: the multitenancy middleware
+  // rejects a where-clause carrying neither a row id, an organizationId,
+  // nor a scope predicate (utils/dbMultiTenancyProtection.ts), so a bare
+  // `{ provider }` scan throws before it reads a row. Walking
+  // organizations satisfies the guard with the ADR-021 single-org anchor
+  // every row carries — and unlike a per-project walk it also reaches
+  // rows granted at ORG and TEAM scope.
+  const organizations = await prisma.organization.findMany({
+    select: { id: true },
   });
+
+  const rows = (
+    await Promise.all(
+      organizations.map((org) =>
+        prisma.modelProvider.findMany({
+          where: {
+            organizationId: org.id,
+            provider: "google_agent_platform",
+          },
+          select: {
+            id: true,
+            name: true,
+            organizationId: true,
+            customKeys: true,
+          },
+        }),
+      ),
+    )
+  ).flat();
 
   console.log(`Found ${rows.length} google_agent_platform row(s) to fold`);
 

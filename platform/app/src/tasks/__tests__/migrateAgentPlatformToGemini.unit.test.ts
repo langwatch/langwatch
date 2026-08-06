@@ -14,7 +14,10 @@ import execute, {
 } from "../migrateAgentPlatformToGemini";
 
 vi.mock("../../server/db", () => ({
-  prisma: { modelProvider: { findMany: vi.fn(), update: vi.fn() } },
+  prisma: {
+    organization: { findMany: vi.fn() },
+    modelProvider: { findMany: vi.fn(), update: vi.fn() },
+  },
 }));
 
 // Reversible stand-in for AES so the tests can assert on what was stored
@@ -27,16 +30,32 @@ vi.mock("../../utils/encryption", () => ({
   },
 }));
 
+const orgFindMany = vi.mocked(prisma.organization.findMany);
 const findMany = vi.mocked(prisma.modelProvider.findMany);
 const update = vi.mocked(prisma.modelProvider.update);
 
-/** findMany serves the row scan first, then per-row sibling-name queries. */
+/**
+ * ModelProvider is a tenancy-scoped model: the multitenancy middleware
+ * rejects any where-clause without a row id, an organizationId or a scope
+ * predicate. The stub asserts that contract rather than just returning
+ * rows — a bare `{ provider }` scan throws in a real run, which is exactly
+ * the defect a fully-mocked Prisma hid.
+ */
 const stubRows = (rows: object[]) => {
-  findMany.mockImplementation(
-    // eslint-disable-next-line @typescript-eslint/require-await
-    (async (args: { where: { provider: string } }) =>
-      args.where.provider === "google_agent_platform" ? rows : []) as never,
-  );
+  orgFindMany.mockResolvedValue([{ id: "org-1" }] as never);
+  findMany.mockImplementation((async (args: {
+    where: { provider?: string; organizationId?: string };
+  }) => {
+    if (args.where.provider === "google_agent_platform") {
+      if (typeof args.where.organizationId !== "string") {
+        throw new Error(
+          "The findMany action on the ModelProvider model requires a row id, organizationId, or scope predicate in the where clause.",
+        );
+      }
+      return rows;
+    }
+    return [];
+  }) as never);
 };
 
 describe("foldAgentPlatformKeys", () => {
