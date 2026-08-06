@@ -1343,6 +1343,16 @@ const presentations = {
         : "This budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.";
     },
   },
+  gateway_budget_scope_unreachable: {
+    // Says what would have gone wrong rather than what was rejected: a budget
+    // that never fires looks identical to one that was never breached, so the
+    // reason this was worth refusing is the whole message.
+    title: "Nothing would count against this budget",
+    describe: (error) => {
+      const scopeType = str(error, "scope_type", "scope");
+      return `None of your keys send traffic to that ${scopeType}, so this budget would never spend and never stop anything. Put it where your keys already run, scope a key to that ${scopeType}, or save it anyway to set it up ahead of the keys that will use it.`;
+    },
+  },
   gateway_scope_org_mismatch: {
     // Names the KIND of scope, never the id — the id belongs to a record in
     // another organization, which is exactly what this guard refuses to

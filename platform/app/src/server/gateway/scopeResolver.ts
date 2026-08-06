@@ -180,51 +180,204 @@ export async function resolveTraceProject(
   prisma: PrismaClient,
   vk: TraceProjectInput,
   tx?: Prisma.TransactionClient,
-): Promise<{ id: string; teamId: string; apiKey: string } | null> {
+): Promise<TraceProject | null> {
+  const [resolved] = await resolveTraceProjects(prisma, [vk], tx);
+  return resolved ?? null;
+}
+
+export type TraceProject = { id: string; teamId: string; apiKey: string };
+
+/**
+ * `resolveTraceProject` for many keys at once, answering in a fixed number
+ * of queries instead of up to three per key.
+ *
+ * Returns one entry per input, in the order given. The stages run only when
+ * some key still needs them, so resolving a single key costs exactly what
+ * the one-key call always cost; an organization with hundreds of keys costs
+ * the same three queries as one with two.
+ *
+ * Every rule lives here and nowhere else. Reach checking, config
+ * materialisation and key validation all have to agree on where a key's
+ * traces land, and a second implementation of "explicit, then unique scope,
+ * then governance" is exactly how they would stop agreeing.
+ */
+export async function resolveTraceProjects(
+  prisma: PrismaClient,
+  vks: TraceProjectInput[],
+  tx?: Prisma.TransactionClient,
+): Promise<(TraceProject | null)[]> {
   const client = tx ?? prisma;
-  // Resolution order: (1) the explicit trace destination, (2) a unique
-  // PROJECT access scope, (3) the org's governance project. The explicit
-  // column wins because it is the one the key's creator chose; the org
-  // pin on the lookup keeps a stray id from landing traces cross-tenant.
-  if (vk.traceProjectId) {
-    const explicit = await client.project.findFirst({
-      where: {
-        id: vk.traceProjectId,
-        team: { organizationId: vk.organizationId },
-      },
-      select: { id: true, teamId: true, apiKey: true },
+  if (vks.length === 0) return [];
+
+  const organizationIds = [...new Set(vks.map((vk) => vk.organizationId))];
+  const resolved = new Array<TraceProject | null>(vks.length).fill(null);
+  let pending = vks.map((_, index) => index);
+
+  const settle = (
+    indices: number[],
+    pick: (index: number) => TraceProject | undefined,
+  ) => {
+    pending = indices.filter((index) => {
+      const hit = pick(index);
+      if (!hit) return true;
+      resolved[index] = hit;
+      return false;
     });
-    if (explicit) return explicit;
-  }
-  const projectScopes = vk.scopes.filter((s) => s.scopeType === "PROJECT");
-  if (projectScopes.length === 1) {
-    const proj = await client.project.findUnique({
-      where: { id: projectScopes[0]!.scopeId },
-      select: { id: true, teamId: true, apiKey: true },
-    });
-    if (proj) return proj;
+  };
+
+  const byOrgAndId = await explicitDestinations(client, {
+    vks,
+    indices: pending,
+    organizationIds,
+  });
+  settle(pending, (index) => {
+    const vk = vks[index]!;
+    if (!vk.traceProjectId) return undefined;
+    return byOrgAndId.get(orgScopedKey(vk.organizationId, vk.traceProjectId));
+  });
+
+  const uniqueScopeIds = uniqueProjectScopeIds(vks, pending);
+  const byId = await scopedDestinations(client, uniqueScopeIds);
+  settle(pending, (index) => {
+    const scopeId = uniqueScopeIds.get(index);
+    return scopeId ? byId.get(scopeId) : undefined;
+  });
+
+  // Whatever is left falls back to the org's governance project, so its
+  // spans land in the AI Governance inbox alongside the receiver-side ones.
+  // An organization without one (older self-hosted deploys) answers null,
+  // and the materialiser then skips span export rather than failing.
+  if (pending.length > 0) {
+    const governance = await governanceProjectByOrg(client, organizationIds);
+    for (const index of pending) {
+      resolved[index] = governance.get(vks[index]!.organizationId) ?? null;
+    }
   }
 
-  const governanceProjects: Array<{
-    id: string;
-    teamId: string;
-    apiKey: string;
-    team: Pick<Team, "organizationId">;
-  }> = await client.project.findMany({
-    where: {
-      kind: "internal_governance",
-      team: { organizationId: vk.organizationId },
-    },
-    select: {
-      id: true,
-      teamId: true,
-      apiKey: true,
-      team: { select: { organizationId: true } },
-    },
-    orderBy: { createdAt: "asc" },
-    take: 1,
+  return resolved;
+}
+
+/**
+ * The explicit trace destinations, keyed by organization and id. Org-pinned
+ * because the column is request-supplied: a stray id must fall through to
+ * the key's scope rather than land this organization's traces in another
+ * tenant's project.
+ */
+async function explicitDestinations(
+  client: ProjectClient,
+  args: {
+    vks: TraceProjectInput[];
+    indices: number[];
+    organizationIds: string[];
+  },
+): Promise<Map<string, TraceProject>> {
+  const ids = args.indices
+    .map((index) => args.vks[index]!.traceProjectId)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  if (ids.length === 0) return new Map();
+  return await projectsByOrgAndId(client, {
+    ids,
+    organizationIds: args.organizationIds,
   });
-  const gov = governanceProjects[0];
-  if (!gov) return null;
-  return { id: gov.id, teamId: gov.teamId, apiKey: gov.apiKey };
+}
+
+/** The one PROJECT access scope a key has, for the keys that have exactly one. */
+function uniqueProjectScopeIds(
+  vks: TraceProjectInput[],
+  indices: number[],
+): Map<number, string> {
+  const byIndex = new Map<number, string>();
+  for (const index of indices) {
+    const projectScopes = vks[index]!.scopes.filter(
+      (s) => s.scopeType === "PROJECT",
+    );
+    if (projectScopes.length === 1) {
+      byIndex.set(index, projectScopes[0]!.scopeId);
+    }
+  }
+  return byIndex;
+}
+
+/**
+ * Projects named by a key's single access scope. Deliberately not
+ * org-pinned, matching the one-key lookup this replaced: a scope row is
+ * validated against the organization when it is written.
+ */
+async function scopedDestinations(
+  client: ProjectClient,
+  scopeIdByIndex: Map<number, string>,
+): Promise<Map<string, TraceProject>> {
+  if (scopeIdByIndex.size === 0) return new Map();
+  const rows = await client.project.findMany({
+    where: { id: { in: [...new Set(scopeIdByIndex.values())] } },
+    select: { id: true, teamId: true, apiKey: true },
+  });
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
+type ProjectClient = PrismaClient | Prisma.TransactionClient;
+
+async function projectsByOrgAndId(
+  client: ProjectClient,
+  args: { ids: string[]; organizationIds: string[] },
+): Promise<Map<string, TraceProject>> {
+  const rows: Array<TraceProject & { team: Pick<Team, "organizationId"> }> =
+    await client.project.findMany({
+      where: {
+        id: { in: [...new Set(args.ids)] },
+        team: { organizationId: { in: args.organizationIds } },
+      },
+      select: {
+        id: true,
+        teamId: true,
+        apiKey: true,
+        team: { select: { organizationId: true } },
+      },
+    });
+  return new Map(
+    rows.map((row) => [
+      orgScopedKey(row.team.organizationId, row.id),
+      { id: row.id, teamId: row.teamId, apiKey: row.apiKey },
+    ]),
+  );
+}
+
+/** Oldest governance project per organization, matching the one-key rule. */
+async function governanceProjectByOrg(
+  client: ProjectClient,
+  organizationIds: string[],
+): Promise<Map<string, TraceProject>> {
+  const rows: Array<TraceProject & { team: Pick<Team, "organizationId"> }> =
+    await client.project.findMany({
+      where: {
+        kind: "internal_governance",
+        team: { organizationId: { in: organizationIds } },
+      },
+      select: {
+        id: true,
+        teamId: true,
+        apiKey: true,
+        team: { select: { organizationId: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  const byOrg = new Map<string, TraceProject>();
+  for (const row of rows) {
+    if (byOrg.has(row.team.organizationId)) continue;
+    byOrg.set(row.team.organizationId, {
+      id: row.id,
+      teamId: row.teamId,
+      apiKey: row.apiKey,
+    });
+  }
+  return byOrg;
+}
+
+/**
+ * Project ids are globally unique, but the explicit-destination lookup is
+ * org-pinned on purpose, so the map has to be keyed by the pair or a
+ * cross-tenant id would read as a hit for whichever org asked.
+ */
+function orgScopedKey(organizationId: string, projectId: string): string {
+  return `${organizationId}:${projectId}`;
 }

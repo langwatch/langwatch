@@ -225,6 +225,10 @@ export const gatewayBudgetsRouter = createTRPCRouter({
           ])
           .nullable()
           .optional(),
+        // Keeps a team / project / group budget no active key can reach,
+        // which is otherwise refused. Provisioning ahead of the keys that
+        // will use it is legitimate, so the guardrail is not a prohibition.
+        allowUnreachable: z.boolean().optional(),
       }),
     )
     .use(checkOrganizationPermission("gatewayBudgets:create"))
@@ -244,6 +248,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         timezone: input.timezone ?? null,
         providerKey: input.providerKey ?? null,
         cycleAnchorAt: input.cycleAnchorAt ?? null,
+        allowUnreachable: input.allowUnreachable,
         actorUserId: ctx.session.user.id,
       });
       return toDto(row);

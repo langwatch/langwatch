@@ -237,6 +237,62 @@ export class GatewayGroupBudgetUnsupportedError extends HandledError {
 }
 
 /**
+ * How many of the organization's projects the refusal names before it stops
+ * counting. An organization running a project per customer has hundreds, and
+ * an error payload is not a listing endpoint; `reachable_project_count` says
+ * how many there were in total so a client never mistakes the sample for all
+ * of them.
+ */
+const REACHABLE_PROJECT_HINT_LIMIT = 10;
+
+/**
+ * A budget was written on a scope none of the organization's active keys can
+ * produce traffic for.
+ *
+ * Whether a completed request matches a TEAM, PROJECT or GROUP budget is
+ * decided by the key that served it, not by anything chosen while writing the
+ * budget. So the two sides can each look correct and never meet: a
+ * team-scoped key whose traces land in the governance project matched no
+ * budget on its own team, and a group budget matches nothing at all through a
+ * shared key with no person behind it. The result is a spending control that
+ * silently never fires, which is the worst way for one to fail.
+ *
+ * Refused at write time rather than reported later, with `allow_unreachable`
+ * for the legitimate case of provisioning ahead of the keys that will use it.
+ * An organization with no active keys is never refused: budget first, key
+ * second is the natural setup order.
+ */
+export class GatewayBudgetScopeUnreachableError extends HandledError {
+  declare readonly code: "gateway_budget_scope_unreachable";
+
+  constructor({
+    scopeType,
+    reachableProjectIds,
+  }: {
+    scopeType: string;
+    reachableProjectIds: string[];
+  }) {
+    super(
+      "gateway_budget_scope_unreachable",
+      "No active key sends traffic to that scope, so the budget would never spend",
+      {
+        meta: {
+          scope_type: scopeType,
+          reachable_project_ids: reachableProjectIds.slice(
+            0,
+            REACHABLE_PROJECT_HINT_LIMIT,
+          ),
+          reachable_project_count: reachableProjectIds.length,
+        },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "GatewayBudgetScopeUnreachableError";
+  }
+}
+
+/**
  * A cycle anchor was sent on a window that has no cycle to phase.
  *
  * TOTAL never rolls and MANUAL rolls only when someone asks it to, so an

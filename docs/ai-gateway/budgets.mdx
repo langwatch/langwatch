@@ -52,6 +52,17 @@ The budget is in force immediately; the next request counts against it. Everythi
 
 A request is evaluated against **every** budget whose scope applies. A request by Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against that org's, team's, project's and VK's budgets, Alice's principal budgets, and the per-member budgets of every group Alice belongs to. If any budget hard-blocks, the request is rejected; if any warn threshold is crossed, a warning header is added. Hard-block wins over warn.
 
+### A budget has to reach the traffic it names
+
+Which team and project a request belongs to is decided by the key that served it: the teams the key is scoped to, plus the team of the project its traces land in. So a `team`, `project` or `group` budget can be written, look correct on both sides, and match nothing at all, for instance a `project` budget on a project none of your keys send traffic to.
+
+A budget that could never accrue is refused when you create it, with `gateway_budget_scope_unreachable`. The refusal lists the projects your active keys do reach, in `error.meta.reachable_project_ids`. Two ways forward:
+
+- Point a key at the target: give it a scope on that team or project, or set the key's trace project.
+- Keep the budget as written by sending `allow_unreachable: true`, which is the right answer when you are provisioning ahead of the keys that will use it. In the app, the refusal offers "Create it anyway".
+
+An organization with no active keys is never refused, since budget first and key second is a normal setup order. On reads, `scope_reach` on each budget says `reachable` or `unreachable`, which is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+
 ### Group budgets are per member
 
 A `group` budget targets one of your [Groups](/ai-gateway/rbac) (the same entity SCIM provisions) and gives **each member their own allowance**, not one shared pot: a $10/day budget on group `engineering` caps Alice at $10 and Bob at $10, and Bob's spend never counts against Alice. One budget row covers every member, and someone joining the group is covered on their key's next configuration resolve.

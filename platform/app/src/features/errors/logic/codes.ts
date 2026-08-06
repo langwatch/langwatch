@@ -69,6 +69,7 @@ export const APP_ERROR_CODES = [
   "filter_parse_error",
   "gateway_budget_cycle_anchor_invalid",
   "gateway_budget_not_found",
+  "gateway_budget_scope_unreachable",
   "gateway_group_budget_unsupported",
   "gateway_guardrail_project_mismatch",
   "gateway_provider_bindings_gone",

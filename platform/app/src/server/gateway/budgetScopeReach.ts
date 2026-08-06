@@ -17,7 +17,7 @@
  */
 import type { GatewayBudget, PrismaClient } from "@prisma/client";
 
-import { resolveTraceProject } from "./scopeResolver";
+import { resolveTraceProjects } from "./scopeResolver";
 
 /**
  * The scopes one active key contributes. Mirrors ApplicableScopes, which is
@@ -56,10 +56,11 @@ export type BudgetScopeReach = {
 
 /**
  * Resolve, once per organization, the scopes every active key can put on a
- * request. One `resolveTraceProject` call per key: keys are per-organization
- * and few, and the result is reused across every budget in the list. Group
- * membership is read for every principal in one query, so adding keys costs
- * no extra round-trips.
+ * request. The whole thing is a fixed handful of queries no matter how many
+ * keys the organization has: trace projects resolve in one batch, and group
+ * membership is read for every principal in one more. That matters because
+ * an organization running a project per customer has hundreds of keys, and
+ * this runs on every budget list.
  */
 async function loadKeyReach(
   prisma: PrismaClient,
@@ -70,16 +71,18 @@ async function loadKeyReach(
     include: { scopes: true },
   });
 
-  const groupIdsByPrincipal = await loadGroupIdsByPrincipal(
-    prisma,
-    organizationId,
-    keys.map((key) => key.principalUserId),
-  );
+  const [groupIdsByPrincipal, traceProjects] = await Promise.all([
+    loadGroupIdsByPrincipal(
+      prisma,
+      organizationId,
+      keys.map((key) => key.principalUserId),
+    ),
+    resolveTraceProjects(prisma, keys),
+  ]);
 
-  const reach: KeyReach[] = [];
-  for (const key of keys) {
-    const traceProject = await resolveTraceProject(prisma, key);
-    reach.push({
+  return keys.map((key, index) => {
+    const traceProject = traceProjects[index];
+    return {
       organizationId: key.organizationId,
       teamIds: Array.from(
         new Set(
@@ -97,9 +100,8 @@ async function loadKeyReach(
       groupIds: key.principalUserId
         ? (groupIdsByPrincipal.get(key.principalUserId) ?? [])
         : [],
-    });
-  }
-  return reach;
+    };
+  });
 }
 
 /**
@@ -133,8 +135,11 @@ async function loadGroupIdsByPrincipal(
   return byPrincipal;
 }
 
+/** The part of a budget that decides what it matches. */
+type ScopeRef = Pick<GatewayBudget, "scopeType" | "scopeId">;
+
 /** The same predicate applicableForRequest uses, evaluated in memory. */
-function budgetMatchesKey(budget: GatewayBudget, key: KeyReach): boolean {
+function budgetMatchesKey(budget: ScopeRef, key: KeyReach): boolean {
   switch (budget.scopeType) {
     case "ORGANIZATION":
       return budget.scopeId === key.organizationId;
@@ -176,13 +181,7 @@ export async function resolveBudgetScopeReach(
   if (budgets.length === 0) return out;
 
   const keys = await loadKeyReach(prisma, organizationId);
-  const reachableProjectIds = Array.from(
-    new Set(
-      keys
-        .map((k) => k.projectId)
-        .filter((id): id is string => typeof id === "string"),
-    ),
-  );
+  const reachableProjectIds = tracedProjectIds(keys);
 
   for (const budget of budgets) {
     out.set(budget.id, {
@@ -192,4 +191,46 @@ export async function resolveBudgetScopeReach(
     });
   }
   return out;
+}
+
+/**
+ * Reach for a scope no budget carries yet, so a budget that could never
+ * accrue can be refused at the moment it is written rather than found out
+ * from a report a week later.
+ *
+ * `activeKeyCount` is what separates "this cannot work" from "nothing has
+ * been set up yet": budget first, key second is the natural order, so an
+ * organization with no keys at all must never be told its budget is
+ * unreachable.
+ */
+export type ScopeReach = {
+  reachable: boolean;
+  /** Projects the organization's active keys actually trace into. */
+  reachableProjectIds: string[];
+  /** Active keys in the organization, whatever they reach. */
+  activeKeyCount: number;
+};
+
+export async function resolveScopeReach(
+  prisma: PrismaClient,
+  organizationId: string,
+  scope: ScopeRef,
+): Promise<ScopeReach> {
+  const keys = await loadKeyReach(prisma, organizationId);
+  return {
+    reachable: keys.some((key) => budgetMatchesKey(scope, key)),
+    reachableProjectIds: tracedProjectIds(keys),
+    activeKeyCount: keys.length,
+  };
+}
+
+/** Where the organization's traffic lands today, deduplicated. */
+function tracedProjectIds(keys: KeyReach[]): string[] {
+  return Array.from(
+    new Set(
+      keys
+        .map((k) => k.projectId)
+        .filter((id): id is string => typeof id === "string"),
+    ),
+  );
 }

@@ -232,16 +232,19 @@ Feature: Gateway budget targeting
     # The configuration a customer would reach for first, which until now
     # accrued nothing at all.
 
-  @integration @unimplemented
+  @integration
   Scenario: A budget no active key can reach is refused when it is created
     Given an organization whose keys all send traffic elsewhere
     When an admin creates a budget on a project none of them reach
     Then the budget is refused as unreachable
     And the refusal names where the organization's traffic actually goes
     # A budget that can never accrue is a silent failure with a bill
-    # attached. Say so at the moment it is written.
+    # attached. Say so at the moment it is written. Only the scopes matched
+    # through the key are checked: an organization budget covers every key
+    # by construction, and the rest already refuse a target that does not
+    # exist here.
 
-  @integration @unimplemented
+  @integration
   Scenario: An admin can still create a budget before any key exists
     Given an organization with no active keys
     When an admin creates a budget on one of its projects
@@ -249,10 +252,20 @@ Feature: Gateway budget targeting
     # Budget first, key second is the natural setup order, so an empty
     # organization must never be told its budget is unreachable.
 
-  @integration @unimplemented
+  @integration
   Scenario: An admin can insist on a budget that nothing reaches yet
     Given an organization whose keys all send traffic elsewhere
     When an admin creates an unreachable budget and asks to keep it anyway
     Then the budget is created
     # Provisioning ahead of the keys that will use it is legitimate; the
     # refusal is a guardrail, not a prohibition.
+
+  @integration
+  Scenario: A budget that nothing reaches says so when it is read back
+    Given a budget on a project no active key sends traffic to
+    When it is read through the API
+    Then it reports its scope as unreachable
+    # Every other field on a budget that never fires reads exactly like one
+    # that was simply never breached. This is the only thing that tells the
+    # two apart, so a customer reconciling by API can see it without
+    # opening the app.
