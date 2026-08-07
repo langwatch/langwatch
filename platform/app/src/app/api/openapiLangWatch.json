@@ -41311,6 +41311,18 @@
                           "key": {
                             "type": "string"
                           },
+                          "group": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "bucket_start": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "event_count": {
                             "type": "integer"
                           },
@@ -41364,6 +41376,8 @@
                         },
                         "required": [
                           "key",
+                          "group",
+                          "bucket_start",
                           "event_count",
                           "settled_count",
                           "usage",
@@ -41572,13 +41586,43 @@
             "in": "query",
             "name": "group_by",
             "schema": {
-              "type": "string",
-              "enum": [
-                "virtual_key",
-                "end_user"
-              ]
+              "type": "string"
             },
             "required": true
+          },
+          {
+            "in": "query",
+            "name": "bucket",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "hour",
+                "day"
+              ],
+              "default": "none"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "default": "UTC"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "allow_unstable",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
           },
           {
             "in": "query",
@@ -41597,16 +41641,6 @@
               "exclusiveMinimum": 0
             },
             "required": true
-          },
-          {
-            "in": "query",
-            "name": "project_id",
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
-            },
-            "required": false
           },
           {
             "in": "query",
@@ -41630,11 +41664,259 @@
           },
           {
             "in": "query",
+            "name": "project_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "external_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
             "name": "virtual_key_id",
             "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "end_user_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "principal_user_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "model",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "provider_key",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "request_type",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "metadata",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 640
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 640
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "enum": [
+                "success",
+                "error",
+                "admitted",
+                "confirmed",
+                "failed",
+                "settled"
+              ]
             },
             "required": false
           }
@@ -42059,11 +42341,89 @@
           },
           {
             "in": "query",
+            "name": "project_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "external_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
             "name": "virtual_key_id",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
             },
             "required": false
           },
@@ -42071,19 +42431,43 @@
             "in": "query",
             "name": "end_user_id",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              ]
             },
             "required": false
           },
           {
             "in": "query",
-            "name": "project_id",
+            "name": "principal_user_id",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
             },
             "required": false
           },
@@ -42091,9 +42475,109 @@
             "in": "query",
             "name": "model",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "provider_key",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "request_type",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "metadata",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 640
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 640
+                  }
+                }
+              ]
             },
             "required": false
           },

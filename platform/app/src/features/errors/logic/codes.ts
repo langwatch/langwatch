@@ -75,6 +75,7 @@ export const APP_ERROR_CODES = [
   "gateway_guardrail_project_mismatch",
   "gateway_provider_bindings_gone",
   "gateway_scope_org_mismatch",
+  "gateway_spend_group_by_unstable",
   "gateway_spend_unavailable",
   "gateway_trace_project_ambiguous",
   "gateway_trace_project_unknown",

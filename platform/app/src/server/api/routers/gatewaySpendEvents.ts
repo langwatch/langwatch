@@ -12,6 +12,7 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { spendFiltersSchema } from "~/server/gateway/spendFilters";
 
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -33,19 +34,9 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
         projectId: z.string(),
         fromMs: z.number().int(),
         toMs: z.number().int(),
-        virtualKeyId: z.string().optional(),
-        endUserId: z.string().optional(),
-        model: z.string().optional(),
-        status: z
-          .enum([
-            "success",
-            "error",
-            "admitted",
-            "confirmed",
-            "failed",
-            "settled",
-          ])
-          .optional(),
+        // The same vocabulary the REST reads accept, so the Billing events
+        // screen and a reconciliation script can ask the same question.
+        filters: spendFiltersSchema.optional(),
         cursor: z
           .object({
             occurredAtMs: z.number().int(),
@@ -70,12 +61,7 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
         tenantId: input.projectId,
         fromMs: input.fromMs,
         toMs: input.toMs,
-        filters: {
-          virtualKeyId: input.virtualKeyId,
-          endUserId: input.endUserId,
-          model: input.model,
-          status: input.status,
-        },
+        filters: input.filters ?? {},
         cursor: input.cursor,
         limit: input.limit ?? 50,
       });

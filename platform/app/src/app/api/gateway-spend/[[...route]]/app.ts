@@ -33,6 +33,17 @@ import {
   decodeSpendSummariesCursor,
   GatewaySpendEventsRepository,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
+import {
+  spendFilterQueryShape,
+  spendFiltersFromQuery,
+} from "~/server/gateway/spendFilters";
+import {
+  assertGroupingIsWalkable,
+  MAX_GROUP_BY_KEYS,
+  SPEND_BUCKETS,
+  SPEND_GROUP_BY_KEYS,
+} from "~/server/gateway/spendGrouping";
+import { resolveSpendScope } from "~/server/gateway/spendScope";
 import { USD_DISPLAY_STRING_FORMAT } from "~/server/gateway/wireMoney";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { canonicalBaseResponses } from "../../shared/base-responses";
@@ -79,13 +90,7 @@ const spendEventsQuerySchema = z
     to: z.coerce.number().int().positive().safe(),
     cursor: z.string().max(500).optional(),
     limit: z.coerce.number().int().positive().max(200).optional().default(50),
-    virtual_key_id: z.string().min(1).max(100).optional(),
-    end_user_id: z.string().min(1).max(256).optional(),
-    project_id: z.string().min(1).max(100).optional(),
-    model: z.string().min(1).max(200).optional(),
-    status: z
-      .enum(["success", "error", "admitted", "confirmed", "failed", "settled"])
-      .optional(),
+    ...spendFilterQueryShape,
   })
   .refine((q) => q.from <= q.to, {
     message: "from must be less than or equal to to",
@@ -103,24 +108,6 @@ const endUserSpendQuerySchema = z.object({
   to: z.coerce.number().int().positive().optional(),
   virtual_key_id: z.string().min(1).max(100).optional(),
 });
-
-/** The org's project ids, optionally narrowed to one the caller asked for. */
-async function orgTenantIds(
-  organizationId: string,
-  projectId?: string,
-): Promise<string[]> {
-  // Ordered so downstream client routing by the first tenant is stable.
-  const projects = await prisma.project.findMany({
-    where: { team: { organizationId } },
-    select: { id: true },
-    orderBy: { id: "asc" },
-  });
-  const ids = projects.map((p) => p.id);
-  if (projectId !== undefined) {
-    return ids.includes(projectId) ? [projectId] : [];
-  }
-  return ids;
-}
 
 // ── Response DTO schemas (used by describeRoute for OpenAPI gen) ────────
 // These mirror the shapes the handlers below return. Without them the
@@ -154,7 +141,13 @@ const costSchema = z.object({
 const nextCursorSchema = z.string().nullable();
 
 const spendSummaryRowSchema = z.object({
+  /** The first grouping dimension's value, unchanged from when a rollup could
+   *  only be grouped one way. Read `group` to tell two dimensions apart. */
   key: z.string(),
+  /** Every grouping dimension by name, e.g. `{ "model": "gpt-5-mini" }`. */
+  group: z.record(z.string()),
+  /** Start of the time bucket in the requested timezone, null when unbucketed. */
+  bucket_start: z.string().nullable(),
   event_count: z.number().int(),
   settled_count: z.number().int(),
   usage: usageSchema,
@@ -247,15 +240,39 @@ const secured = createOrgApp({
 
 secured.hono.onError(handleGatewaySpendApiError);
 
+/**
+ * One to two dimensions, comma-separated. Two is the ceiling because a third
+ * multiplies the group count past what a single cursor walk serves at a
+ * useful page size, and a caller who wants a third is really asking for the
+ * events read.
+ */
+const groupBySchema = z
+  .string()
+  .transform((raw) => raw.split(",").map((part) => part.trim()))
+  .pipe(
+    z
+      .array(z.enum(SPEND_GROUP_BY_KEYS))
+      .min(1)
+      .max(MAX_GROUP_BY_KEYS)
+      .refine((keys) => new Set(keys).size === keys.length, {
+        message: "group_by cannot repeat a dimension",
+      }),
+  );
+
 const spendSummariesQuerySchema = z
   .object({
-    group_by: z.enum(["virtual_key", "end_user"]),
+    group_by: groupBySchema,
+    bucket: z.enum(SPEND_BUCKETS).optional().default("none"),
+    // An IANA zone, because a day boundary is the caller's local midnight and
+    // re-bucketing UTC days afterwards cannot recover the requests that fell
+    // on the other side of it.
+    timezone: z.string().min(1).max(64).optional().default("UTC"),
+    allow_unstable: z.coerce.boolean().optional().default(false),
     from: z.coerce.number().int().positive(),
     to: z.coerce.number().int().positive(),
-    project_id: z.string().min(1).max(100).optional(),
     cursor: z.string().max(500).optional(),
     limit: z.coerce.number().int().positive().max(1000).optional().default(500),
-    virtual_key_id: z.string().min(1).max(100).optional(),
+    ...spendFilterQueryShape,
   })
   // An inverted window is an empty window, so a caller who swapped the two
   // reads a confident zero and reconciles against it. /spend-events has
@@ -292,19 +309,37 @@ secured.access(requires("gatewaySpend:view")).get(
     ) {
       throw new BadRequestError("Invalid cursor.");
     }
-    const tenantIds = await orgTenantIds(organization.id, query.project_id);
+    assertGroupingIsWalkable({
+      keys: query.group_by,
+      bucket: query.bucket,
+      toMs: query.to,
+      nowMs: Date.now(),
+      allowUnstable: query.allow_unstable,
+    });
+    const scope = await resolveSpendScope({
+      organizationId: organization.id,
+      projectIds: query.project_id,
+      teamIds: query.team_id,
+      externalIds: query.external_id,
+    });
     const page = await spendEvents.readSpendSummaries({
-      tenantIds,
+      tenantIds: scope.tenantIds,
       groupBy: query.group_by,
+      bucket: query.bucket,
+      timezone: query.timezone,
       fromMs: query.from,
       toMs: query.to,
       cursor: query.cursor ?? null,
       limit: query.limit,
-      virtualKeyId: query.virtual_key_id,
+      filters: spendFiltersFromQuery(query, {
+        virtualKeyIds: scope.virtualKeyIds,
+      }),
     });
     return c.json({
       data: page.rows.map((r) => ({
         key: r.key,
+        group: r.group,
+        bucket_start: r.bucketStart,
         event_count: r.eventCount,
         settled_count: r.settledCount,
         usage: {
@@ -345,17 +380,21 @@ secured.access(requires("gatewaySpend:view")).get(
     if (query.cursor !== undefined && !decodeSpendEventsCursor(query.cursor)) {
       throw new BadRequestError("Invalid cursor.");
     }
-    const tenantIds = await orgTenantIds(organization.id, query.project_id);
+    const scope = await resolveSpendScope({
+      organizationId: organization.id,
+      projectIds: query.project_id,
+      teamIds: query.team_id,
+      externalIds: query.external_id,
+    });
     const page = await spendEvents.walkSpendEvents({
-      tenantIds,
+      tenantIds: scope.tenantIds,
       fromMs: query.from,
       toMs: query.to,
       cursor: query.cursor ?? null,
       limit: query.limit,
-      virtualKeyId: query.virtual_key_id,
-      endUserId: query.end_user_id,
-      model: query.model,
-      status: query.status,
+      filters: spendFiltersFromQuery(query, {
+        virtualKeyIds: scope.virtualKeyIds,
+      }),
     });
     return c.json({
       data: page.rows.map(spendRowToEnvelope),
@@ -384,7 +423,9 @@ secured.access(requires("gatewaySpend:view")).get(
     const now = Date.now();
     const fromMs = query.from ?? now - END_USER_WINDOWS[query.window];
     const toMs = query.to ?? now;
-    const tenantIds = await orgTenantIds(organization.id);
+    const { tenantIds } = await resolveSpendScope({
+      organizationId: organization.id,
+    });
     const rollup = await spendEvents.readEndUserSpend({
       tenantIds,
       endUserId,
