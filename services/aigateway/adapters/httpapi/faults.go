@@ -56,13 +56,27 @@ func faultForUpstreamStatus(status int) Fault {
 }
 
 // faultForCode attributes the gateway's own error codes.
+//
+// Every code the gateway AUTHORS belongs in one of the two named cases. The
+// default is for codes that genuinely are our problem, so a customer-caused
+// code left out of the list here does not read as unattributed — it reads as
+// a platform incident, at error level, on the one log line operators alert
+// on. That is the trap ErrCodexSessionExpired fell into when it stopped
+// being a forwarded provider 401 and became a handled error of our own:
+// faultForUpstreamStatus had been answering "customer" for it by reading the
+// status off the response it no longer has.
 func faultForCode(code herr.Code) Fault {
 	switch code {
 	case domain.ErrInvalidAPIKey, domain.ErrBudgetExceeded, domain.ErrRateLimited,
 		domain.ErrGuardrailBlocked, domain.ErrPolicyViolation, domain.ErrModelNotAllowed,
 		domain.ErrPayloadTooLarge, domain.ErrBadRequest, domain.ErrMissingModel, domain.ErrNotFound,
 		domain.ErrKeyRevoked, domain.ErrKeyDisabled, domain.ErrNoProviderConfigured,
-		domain.ErrEndUserRequired:
+		domain.ErrEndUserRequired,
+		// The customer's own OpenAI sign-in died and only they can restore it,
+		// so it is their fault in the only sense this attribution means: whose
+		// action fixes it. Counted per key too, which is what shows an
+		// operator a key wedged in a re-authenticate loop.
+		domain.ErrCodexSessionExpired:
 		return FaultCustomer
 	case domain.ErrProviderError, domain.ErrProviderTimeout,
 		domain.ErrChainExhausted, domain.ErrCircuitOpen:

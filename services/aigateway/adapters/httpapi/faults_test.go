@@ -175,6 +175,55 @@ func TestWriteErrorCountsCustomerRejectionsPerVirtualKey(t *testing.T) {
 	assert.Equal(t, 3, clientRejectSeries(t, rec), "one series per code, not per request")
 }
 
+// @scenario "A customer-caused failure the gateway authors keeps its customer fault"
+func TestWriteErrorKeepsCustomerFaultWhenTheGatewayAuthorsTheRejection(t *testing.T) {
+	// codex_session_expired stopped being a forwarded provider 401 and became
+	// a handled error the gateway writes itself. faultForUpstreamStatus had
+	// been reading "customer" off that response's status; with no response to
+	// read, the code has to carry the attribution. Left out of faultForCode it
+	// does not merely go unattributed — it lands on the platform-fault error
+	// line operators page on, for a customer signing in again.
+	rec := gatewaymetrics.New()
+	logs := observedWriteError(t, meteredContext(rec, "vk_signed_out"),
+		herr.New(context.Background(), domain.ErrCodexSessionExpired,
+			herr.M{"message": "Your OpenAI session expired."}))
+
+	entry := requireSingleFailureLog(t, logs)
+	assert.Equal(t, "customer", entry.ContextMap()["fault"])
+	assert.Equal(t, zapcore.InfoLevel, entry.Level,
+		"a customer signing in again is not a platform incident")
+	assert.Equal(t, 1, clientRejects(t, rec, "codex_session_expired", "vk_signed_out"),
+		"a key wedged in a re-authenticate loop is exactly what this counter is for")
+}
+
+// @scenario "A customer-caused failure the gateway authors keeps its customer fault"
+func TestFaultForCodeAttributesEveryCodeTheGatewayAuthors(t *testing.T) {
+	// The default arm answers "platform", so a code the gateway authors and
+	// nobody classified is indistinguishable from our own bug. Rather than
+	// re-list the switch, this walks the codes whose fault is not ours and
+	// asserts none of them fall through — the check that would have caught
+	// codex_session_expired.
+	notOurFault := []herr.Code{
+		domain.ErrInvalidAPIKey, domain.ErrBudgetExceeded, domain.ErrRateLimited,
+		domain.ErrGuardrailBlocked, domain.ErrPolicyViolation, domain.ErrModelNotAllowed,
+		domain.ErrPayloadTooLarge, domain.ErrBadRequest, domain.ErrMissingModel,
+		domain.ErrNotFound, domain.ErrKeyRevoked, domain.ErrKeyDisabled,
+		domain.ErrNoProviderConfigured, domain.ErrEndUserRequired,
+		domain.ErrCodexSessionExpired,
+		domain.ErrProviderError, domain.ErrProviderTimeout,
+		domain.ErrChainExhausted, domain.ErrCircuitOpen,
+	}
+	for _, code := range notOurFault {
+		t.Run(string(code), func(t *testing.T) {
+			assert.NotEqual(t, FaultPlatform, faultForCode(code),
+				"a failure the caller or the provider caused must not log as our incident")
+		})
+	}
+
+	assert.Equal(t, FaultPlatform, faultForCode(domain.ErrInternal),
+		"and our own bug must still be ours")
+}
+
 // @scenario "A provider or platform failure is not counted as a client rejection"
 func TestWriteErrorDoesNotCountProviderOrPlatformFaults(t *testing.T) {
 	cases := []struct {

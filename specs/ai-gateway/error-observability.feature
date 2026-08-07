@@ -43,6 +43,18 @@ Feature: Gateway errors are logged with fault attribution
     When the generic internal error is returned
     Then an error log records the failure with platform fault
 
+  # A failure that used to be a forwarded provider response was attributed
+  # from the status on that response. Once the gateway authors it as a handled
+  # error there is no response to read, so the code must carry the attribution
+  # itself — otherwise a routine customer condition (a dead Codex sign-in)
+  # lands on the platform-fault line operators page on.
+  @unit
+  Scenario: A customer-caused failure the gateway authors keeps its customer fault
+    Given the customer's own provider session has died and only they can restore it
+    When the gateway answers with its own handled error instead of forwarding a provider response
+    Then an info log records the failure with customer fault
+    And the rejection is counted against its error code and virtual key
+
   @unit
   Scenario: Failure logs identify the calling project
     Given an authenticated request fails
