@@ -20,6 +20,22 @@ import type {
 const normalizeFullName = (repositoryFullName: string): string =>
   repositoryFullName.toLowerCase();
 
+/**
+ * The host half of the same key, folded for the same reason.
+ *
+ * Every key this table is addressed by spans (organization, host, repository,
+ * branch or number), so folding the repository alone still lets one repository
+ * split in two: a caller naming `GitHub.com` matches no row a caller naming
+ * `github.com` wrote. Hosts are case insensitive, `host` arrives straight off a
+ * public query parameter, and a session records whatever casing its git remote
+ * carries, so both spellings genuinely reach this layer.
+ *
+ * `headBranch` is deliberately never folded: `feat/X` and `feat/x` really are
+ * two branches.
+ */
+const normalizeHost = (repositoryHost: string): string =>
+  repositoryHost.toLowerCase();
+
 type PullRequestRecord = {
   organizationId: string;
   repositoryHost: string;
@@ -116,14 +132,14 @@ export class PrismaGithubPullRequestsRepository
         where: {
           organizationId_repositoryHost_repositoryFullName_prNumber: {
             organizationId: pullRequest.organizationId,
-            repositoryHost: pullRequest.repositoryHost,
+            repositoryHost: normalizeHost(pullRequest.repositoryHost),
             repositoryFullName,
             prNumber: pullRequest.prNumber,
           },
         },
         create: {
           organizationId: pullRequest.organizationId,
-          repositoryHost: pullRequest.repositoryHost,
+          repositoryHost: normalizeHost(pullRequest.repositoryHost),
           repositoryFullName,
           prNumber: pullRequest.prNumber,
           ...snapshot,
@@ -148,7 +164,7 @@ export class PrismaGithubPullRequestsRepository
     const records = await this.prisma.githubPullRequest.findMany({
       where: {
         organizationId,
-        repositoryHost,
+        repositoryHost: normalizeHost(repositoryHost),
         repositoryFullName: normalizeFullName(repositoryFullName),
         headBranch: { in: [...headBranches] },
       },
@@ -173,7 +189,7 @@ export class PrismaGithubPullRequestsRepository
       where: {
         organizationId,
         OR: keys.map((key) => ({
-          repositoryHost: key.repositoryHost,
+          repositoryHost: normalizeHost(key.repositoryHost),
           repositoryFullName: normalizeFullName(key.repositoryFullName),
           headBranch: key.headBranch,
         })),
@@ -198,7 +214,7 @@ export class PrismaGithubPullRequestsRepository
       where: {
         organizationId_repositoryHost_repositoryFullName_prNumber: {
           organizationId,
-          repositoryHost,
+          repositoryHost: normalizeHost(repositoryHost),
           repositoryFullName: normalizeFullName(repositoryFullName),
           prNumber,
         },
@@ -213,7 +229,7 @@ export class PrismaGithubPullRequestsRepository
     await this.prisma.githubPullRequest.updateMany({
       where: {
         organizationId: input.organizationId,
-        repositoryHost: input.repositoryHost,
+        repositoryHost: normalizeHost(input.repositoryHost),
         repositoryFullName: normalizeFullName(input.repositoryFullName),
         prNumber: input.prNumber,
       },
@@ -243,7 +259,7 @@ export class PrismaGithubPullRequestsRepository
       where: {
         organizationId_repositoryHost_repositoryFullName_headBranch: {
           organizationId,
-          repositoryHost,
+          repositoryHost: normalizeHost(repositoryHost),
           repositoryFullName: normalizeFullName(repositoryFullName),
           headBranch,
         },
@@ -266,14 +282,14 @@ export class PrismaGithubPullRequestsRepository
       where: {
         organizationId_repositoryHost_repositoryFullName_headBranch: {
           organizationId: input.organizationId,
-          repositoryHost: input.repositoryHost,
+          repositoryHost: normalizeHost(input.repositoryHost),
           repositoryFullName,
           headBranch: input.headBranch,
         },
       },
       create: {
         organizationId: input.organizationId,
-        repositoryHost: input.repositoryHost,
+        repositoryHost: normalizeHost(input.repositoryHost),
         repositoryFullName,
         headBranch: input.headBranch,
         ...bookkeeping,
@@ -315,6 +331,7 @@ export class PrismaGithubPullRequestsRepository
     leaseMs: number;
   }): Promise<boolean> {
     const fullName = normalizeFullName(repositoryFullName);
+    const host = normalizeHost(repositoryHost);
     // Naive-UTC `::timestamp` literals: a raw JS Date binds as `timestamptz`
     // and the comparison then runs through the session timezone, which on a
     // developer's machine makes a fifteen-minute backoff look already elapsed
@@ -331,7 +348,7 @@ export class PrismaGithubPullRequestsRepository
         "recheckAfter", "attempts", "lastRequestedAt", "createdAt", "updatedAt"
       )
       VALUES (
-        ${nanoid()}, ${organizationId}, ${repositoryHost}, ${fullName},
+        ${nanoid()}, ${organizationId}, ${host}, ${fullName},
         ${headBranch}, ${at}::timestamp, 0, NULL,
         ${leaseUntil}::timestamp, 0, ${at}::timestamp, ${at}::timestamp, ${at}::timestamp
       )
@@ -369,7 +386,7 @@ export class PrismaGithubPullRequestsRepository
     await this.prisma.githubBranchPullRequestCheck.updateMany({
       where: {
         organizationId,
-        repositoryHost,
+        repositoryHost: normalizeHost(repositoryHost),
         repositoryFullName: normalizeFullName(repositoryFullName),
         headBranch,
         lastRequestedAt: { lte: staleBefore },

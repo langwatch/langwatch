@@ -10,6 +10,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GithubPullRequestRow } from "../../github/repositories/github-pull-requests.repository";
 import { traced } from "../../tracing";
+import type { PersonalSessionLookup } from "../pull-request-usage.service";
 import { PullRequestUsageService } from "../pull-request-usage.service";
 import type { CodingAgentBranchSessionRow } from "../repositories/coding-agent-session.repository";
 
@@ -57,6 +58,56 @@ function sessionRow(
     gitBranch: "feat/linkage",
     ...over,
   };
+}
+
+/** One row of the personal page's own session read, as ClickHouse returns it. */
+function personalSessionRow(
+  over: Partial<
+    Awaited<ReturnType<PersonalSessionLookup["listRecent"]>>[number]
+  > = {},
+): Awaited<ReturnType<PersonalSessionLookup["listRecent"]>>[number] {
+  return {
+    sessionId: "session-a",
+    startedAtMs: NOW - 5 * HOUR,
+    repositoryHost: "github.com",
+    repositoryOwner: "acme",
+    repositoryName: "widgets",
+    gitBranch: "feat/linkage",
+    inputTokens: 100,
+    outputTokens: 50,
+    cacheReadTokens: 20,
+    cacheCreationTokens: 10,
+    costUsd: 1.5,
+    ...over,
+  };
+}
+
+/**
+ * The mapping lookup answering only for the spelling it was asked about, so a
+ * key the service failed to fold produces a visibly empty result rather than
+ * being quietly forgiven. Deliberately stricter than the Prisma repository,
+ * which folds host and repository itself: the service has to arrive with one
+ * key per repository regardless, because the group it built is also what the
+ * page renders as a row.
+ */
+function findAllByBranchesLike(rows: GithubPullRequestRow[]) {
+  return vi.fn(
+    async ({
+      repositoryHost,
+      repositoryFullName,
+      headBranches,
+    }: {
+      repositoryHost: string;
+      repositoryFullName: string;
+      headBranches: readonly string[];
+    }) =>
+      rows.filter(
+        (row) =>
+          row.repositoryHost === repositoryHost &&
+          row.repositoryFullName === repositoryFullName.toLowerCase() &&
+          headBranches.includes(row.headBranch),
+      ),
+  );
 }
 
 function serviceWith({
@@ -232,6 +283,53 @@ describe("PullRequestUsageService", () => {
       expect(usage.rows[0]?.totalTokens).toBe(180);
       expect(usage.rows[0]?.costUsd).toBeNull();
       expect(usage.totals.costUsd).toBeNull();
+    });
+  });
+
+  // A session stores whatever casing the git remote carries, and a host is
+  // case insensitive, so `GitHub.com` and `github.com` are one repository. Fold
+  // only the repository half of the group key and they become two: the reader
+  // sees the repository twice with its usage split between the rows, and the
+  // group whose host is not already lower case matches no mapping row, so
+  // every one of its branches is reported as having no pull request.
+  describe("given one repository whose sessions report the host with different casing", () => {
+    /** @scenario "One repository reported with two host spellings stays one repository" */
+    it("lists it once, with every session, under the mapping's own spelling", async () => {
+      const findAllByBranches = findAllByBranchesLike([pullRequestRow()]);
+      const service = new PullRequestUsageService({
+        pullRequests: { findByNumber: vi.fn(), findAllByBranches } as never,
+        sessions: { listByRepositoryBranch: vi.fn() } as never,
+        personalSessions: {
+          listRecent: vi.fn().mockResolvedValue([
+            personalSessionRow({ sessionId: "s1" }),
+            personalSessionRow({
+              sessionId: "s2",
+              repositoryHost: "GitHub.com",
+              repositoryOwner: "ACME",
+              repositoryName: "Widgets",
+            }),
+          ]),
+        },
+        installations: { coversRepository: vi.fn().mockResolvedValue(true) },
+        resolveOrganizationId: async () => "org-1",
+        now: () => NOW,
+      });
+
+      const usage = await service.getForPersonalProject({
+        projectId: "project-1",
+      });
+
+      expect(findAllByBranches).toHaveBeenCalledTimes(1);
+      expect(findAllByBranches).toHaveBeenCalledWith(
+        expect.objectContaining({
+          repositoryHost: "github.com",
+          repositoryFullName: "acme/widgets",
+        }),
+      );
+      expect(usage.rows).toHaveLength(1);
+      expect(usage.rows[0]?.sessionsCount).toBe(2);
+      expect(usage.rows[0]?.costUsd).toBeCloseTo(3.0);
+      expect(usage.unlinked).toEqual([]);
     });
   });
 

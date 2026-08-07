@@ -105,7 +105,13 @@ function statusCacheKey({
   organizationId: string;
   ref: GithubPullRequestRef;
 }): string {
-  return `gh:prstatus:${organizationId}:${ref.repositoryHost}:${ref.repositoryFullName}:${ref.prNumber}`;
+  // Host and repository are folded, matching the store this cache sits in
+  // front of: two spellings of one repository resolve to a single row there,
+  // so leaving them raw here splits one pull request's status across as many
+  // entries as there are spellings, each paying its own GitHub call.
+  const host = ref.repositoryHost.toLowerCase();
+  const fullName = ref.repositoryFullName.toLowerCase();
+  return `gh:prstatus:${organizationId}:${host}:${fullName}:${ref.prNumber}`;
 }
 
 export class GithubPullRequestStatusService {

@@ -127,14 +127,24 @@ export interface BranchMappingRequest {
   headBranch: string;
 }
 
-/** An unset host means github.com; anything else is a host we do not map. */
+/**
+ * An unset host means github.com; anything else is a host we do not map.
+ *
+ * Case-folded, because a session records whatever casing its git remote
+ * carries and a host is case insensitive. A literal comparison here refuses
+ * `GitHub.com` outright, so that session is never mapped at all, and every
+ * reader downstream folds its host and then looks for a mapping row nothing
+ * ever wrote.
+ */
 export function isMappableHost(repositoryHost: string): boolean {
-  return repositoryHost === "" || repositoryHost === GITHUB_HOST;
+  const host = repositoryHost.toLowerCase();
+  return host === "" || host === GITHUB_HOST;
 }
 
-/** The host to store: the default, spelled out, so stored rows are comparable. */
+/** The host to store: the default, spelled out and folded, so rows compare. */
 export function normalizeHost(repositoryHost: string): string {
-  return repositoryHost === "" ? GITHUB_HOST : repositoryHost;
+  const host = repositoryHost.toLowerCase();
+  return host === "" ? GITHUB_HOST : host;
 }
 
 /**

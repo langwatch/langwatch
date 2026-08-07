@@ -86,6 +86,24 @@ describe("pullRequestMapping reactor", () => {
         ),
       ).toBe(true);
     });
+
+    // A session records whatever casing its git remote carries, and every
+    // reader downstream folds the host before looking the mapping up. A gate
+    // that refuses this spelling means those readers look for a row nothing
+    // ever wrote, and the branch reads as having no pull request forever.
+    /** @scenario "A session whose remote host casing differs still finds its pull request" */
+    it("treats a differently cased github.com as github.com", () => {
+      const reactor = createPullRequestMappingReactor({
+        requestBranchMapping: vi.fn(),
+      });
+
+      expect(
+        reactor.shouldReact?.(
+          event,
+          contextFor(foldState({ repositoryHost: "GitHub.com" })),
+        ),
+      ).toBe(true);
+    });
   });
 
   describe("given a session with no git context", () => {

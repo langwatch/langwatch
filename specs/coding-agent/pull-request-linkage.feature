@@ -114,6 +114,14 @@ Rule: Sessions attach to pull requests by the pull request's lifetime
     When sessions are assigned to pull requests
     Then no session is counted under two pull requests
 
+  # A session records whatever casing the git remote carries, and a host is
+  # case insensitive, so GitHub.com and github.com name one repository.
+  @unit
+  Scenario: A session whose remote host casing differs still finds its pull request
+    Given a session whose remote host is spelled differently from the mapping's
+    When sessions are assigned to pull requests
+    Then it attaches to the same pull request as its lower case twin
+
 Rule: Pull request status is read live, never maintained by the queue
 
   @unit
@@ -156,6 +164,13 @@ Rule: The Pull Requests page prices each pull request's lifetime
     When the Pull Requests page lists it
     Then an organization manager is offered to link that repository
 
+  @unit
+  Scenario: One repository reported with two host spellings stays one repository
+    Given sessions on one repository whose remote host casing differs between them
+    When the Pull Requests page lists it
+    Then the repository appears once carrying all of its sessions
+    And its pull requests are found under the mapping's own spelling
+
 Rule: The organization-wide usage read is RBAC-scoped and numbers only
 
   @integration
@@ -184,3 +199,19 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     Given a repository and pull request number no mapping knows
     When the pull request usage is read
     Then the caller receives the pull request not mapped failure
+
+  # The rollup answers for a PERSON across the organization, so it needs one.
+  # Both refusals carry a code rather than only a sentence, because the callers
+  # are CLIs and agents that have to branch on the answer.
+  @integration
+  Scenario: A shared-workspace key cannot read pull request usage
+    Given a key from a workspace that belongs to a team rather than one person
+    When the pull request usage is read
+    Then the refusal carries a named code saying a personal-workspace API key is required
+
+  @integration
+  Scenario: A key cannot read another user's pull request usage
+    Given a key whose holder may view another user's personal workspace but does not own it
+    When the pull request usage is read for that workspace
+    Then the refusal carries a named code saying the key is for a different workspace
+    And nothing in the refusal says whose workspace it is

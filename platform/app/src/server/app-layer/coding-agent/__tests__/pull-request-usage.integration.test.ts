@@ -52,6 +52,8 @@ let visibleProjectId: string;
 let tokensOnlyProjectId: string;
 /** The caller may not read it at all. */
 let hiddenProjectId: string;
+/** Holds the session whose remote was reported with the host's own casing. */
+let mixedCaseProjectId: string;
 
 const pullRequests = new PrismaGithubPullRequestsRepository(prisma);
 let sessions: CodingAgentSessionClickHouseRepository;
@@ -139,20 +141,27 @@ async function seedSession({
   sessionId,
   startedAtMs,
   costUsd,
+  repositoryHost = "github.com",
+  repositoryOwner = OWNER,
+  repositoryName = "widgets",
 }: {
   projectId: string;
   sessionId: string;
   startedAtMs: number;
   costUsd: number;
+  /** The remote as the agent reported it, casing and all. */
+  repositoryHost?: string;
+  repositoryOwner?: string;
+  repositoryName?: string;
 }): Promise<void> {
   await sessions.upsert(
     codingAgentSessionRow({
       tenantId: projectId,
       sessionId,
       startedAtMs,
-      repositoryHost: "github.com",
-      repositoryOwner: OWNER,
-      repositoryName: "widgets",
+      repositoryHost,
+      repositoryOwner,
+      repositoryName,
       gitBranch: BRANCH,
       title: "a title the response must never carry",
       userId: "agent-user-1",
@@ -194,6 +203,7 @@ beforeAll(async () => {
   visibleProjectId = await makeProject("visible");
   tokensOnlyProjectId = await makeProject("tokens-only");
   hiddenProjectId = await makeProject("hidden");
+  mixedCaseProjectId = await makeProject("mixed-case");
 
   await grant({
     projectId: visibleProjectId,
@@ -251,6 +261,18 @@ beforeAll(async () => {
     startedAtMs: Date.now() - 4 * HOUR,
     costUsd: 100,
   });
+  // The same remote, reported the way a git remote actually writes it. The
+  // mapping stores host and repository lowercased; the session stores whatever
+  // the agent read off the remote.
+  await seedSession({
+    projectId: mixedCaseProjectId,
+    sessionId: `${tag}-mixed-case`,
+    startedAtMs: Date.now() - 6 * HOUR,
+    costUsd: 3.25,
+    repositoryHost: "GitHub.com",
+    repositoryOwner: OWNER.toUpperCase(),
+    repositoryName: "Widgets",
+  });
 
   service = new PullRequestUsageService({
     pullRequests,
@@ -269,6 +291,7 @@ afterAll(async () => {
       visibleProjectId,
       tokensOnlyProjectId,
       hiddenProjectId,
+      mixedCaseProjectId,
     ]) {
       if (!projectId) continue;
       await ch.exec({
@@ -372,6 +395,41 @@ describe("pull request usage", () => {
         (row) => row.projectId === visibleProjectId,
       );
       expect(pricedRow?.costUsd).toBeCloseTo(4.0);
+    });
+  });
+
+  describe("given a session whose remote was reported with the host's own casing", () => {
+    /** @scenario "The page rolls up sessions, tokens and cost per pull request" */
+    it("rolls it up all the same", async () => {
+      const usage = await service.getPullRequestUsage({
+        ...query(),
+        permittedProjectIds: [mixedCaseProjectId],
+        costProjectIds: [mixedCaseProjectId],
+      });
+
+      expect(usage.totals.sessionsCount).toBe(1);
+      expect(usage.totals.costUsd).toBeCloseTo(3.25);
+      expect(usage.rows[0]?.projectId).toBe(mixedCaseProjectId);
+    });
+  });
+
+  // `host` is a public query parameter on the REST read, and the mapping is
+  // addressed by (organization, host, repository, number). Folding only the
+  // repository half of that key answers "we do not know this pull request" for
+  // a spelling of the host that names the very row we hold.
+  describe("given a caller who names the host with its own casing", () => {
+    /** @scenario "One repository reported with two host spellings stays one repository" */
+    it("resolves the same mapping", async () => {
+      const usage = await service.getPullRequestUsage({
+        ...query(),
+        repositoryHost: "GitHub.com",
+        repositoryFullName: REPO_FULL_NAME.toUpperCase(),
+        permittedProjectIds: [visibleProjectId],
+        costProjectIds: [visibleProjectId],
+      });
+
+      expect(usage.pullRequest.prNumber).toBe(PR_NUMBER);
+      expect(usage.totals.sessionsCount).toBe(2);
     });
   });
 

@@ -754,7 +754,7 @@ export class CodingAgentSessionClickHouseRepository
           Prompts
         FROM ${TABLE_NAME}
         WHERE TenantId IN {tenantIds:Array(String)}
-          AND RepositoryHost = {repositoryHost:String}
+          AND lower(RepositoryHost) = {repositoryHost:String}
           AND lower(RepositoryOwner) = {repositoryOwner:String}
           AND lower(RepositoryName) = {repositoryName:String}
           AND GitBranch IN {branches:Array(String)}
@@ -769,13 +769,14 @@ export class CodingAgentSessionClickHouseRepository
       `,
       query_params: {
         tenantIds,
-        repositoryHost,
         // Case-folded on both sides. A session stores the remote's casing
-        // verbatim, while the pull-request mapping stores its repository
-        // lowercased, so an exact match here would silently drop every
-        // repository whose owner or name is not already lower case. Neither
-        // column is in the sort key, so folding costs no pruning; `TenantId`
-        // and `StartedAt` still do all of it.
+        // verbatim, while the pull-request mapping stores its host and
+        // repository lowercased, so an exact match here would silently drop
+        // every remote whose host, owner or name is not already lower case.
+        // All three come from the same remote URL, and none of them is in the
+        // sort key, so folding costs no pruning; `TenantId` and `StartedAt`
+        // still do all of it.
+        repositoryHost: repositoryHost.toLowerCase(),
         repositoryOwner: repositoryOwner.toLowerCase(),
         repositoryName: repositoryName.toLowerCase(),
         // NOT folded: git branch names are case sensitive, and `feat/X` is a

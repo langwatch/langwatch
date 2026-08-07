@@ -56,7 +56,10 @@ export function shouldMapPullRequests(
     "repositoryHost" | "repositoryOwner" | "repositoryName" | "gitBranch"
   >,
 ): boolean {
-  const host = state.repositoryHost ?? "";
+  // Case-folded: a session records whatever casing its git remote carries, and
+  // a host is case insensitive, so a literal comparison drops `GitHub.com` and
+  // that session's branch is never mapped.
+  const host = (state.repositoryHost ?? "").toLowerCase();
   if (host !== "" && host !== "github.com") return false;
   return Boolean(
     state.repositoryOwner &&

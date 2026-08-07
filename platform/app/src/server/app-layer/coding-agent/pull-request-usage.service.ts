@@ -506,8 +506,15 @@ function groupSessionsByRepository(
     ) {
       continue;
     }
-    const repositoryHost =
-      session.repositoryHost === "" ? "github.com" : session.repositoryHost;
+    // Both halves of the key are case-folded, because a session stores the
+    // remote's own casing and hosts are case insensitive: fold one and not the
+    // other and `GitHub.com` splits off into a group of its own, so the reader
+    // sees one repository listed twice with its usage divided between the
+    // rows, and the group whose host is not already lower case matches no
+    // mapping row and reports every branch as unlinked.
+    const repositoryHost = (
+      session.repositoryHost === "" ? "github.com" : session.repositoryHost
+    ).toLowerCase();
     const repositoryFullName =
       `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase();
     const key = `${repositoryHost} ${repositoryFullName}`;

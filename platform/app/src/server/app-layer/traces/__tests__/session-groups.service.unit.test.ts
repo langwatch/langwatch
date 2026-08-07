@@ -10,15 +10,16 @@ import type {
   SessionGroupsQuery,
   SessionGroupsRepository,
 } from "../repositories/session-groups.repository";
+import {
+  decodeSessionGroupsCursor,
+  encodeSessionGroupsCursor,
+} from "../session-groups.cursor";
+import type { PullRequestBranchKey } from "../session-groups.pull-request-link";
 import type {
   CodingAgentSessionLookup,
   SessionGroupCodingAgentDto,
 } from "../session-groups.service";
-import {
-  decodeSessionGroupsCursor,
-  encodeSessionGroupsCursor,
-  SessionGroupsService,
-} from "../session-groups.service";
+import { SessionGroupsService } from "../session-groups.service";
 import { teaserOf } from "../visibility-window.service";
 
 const TENANT = "project-1";
@@ -291,6 +292,75 @@ describe("SessionGroupsService", () => {
       });
       expect(result.totalHits).toBe(1);
       expect(result.nextCursor).toBeNull();
+    });
+  });
+
+  // A session stores whatever casing the git remote carries, and a host is
+  // case insensitive, so `GitHub.com` and `github.com` name one repository. The
+  // mapping is keyed on (host, repository), so a key that folds the repository
+  // half and not the host asks under a spelling no stored row carries, and the
+  // session shows no pull request at all.
+  describe("given a session whose remote spells the host differently from the mapping", () => {
+    /** @scenario "A session whose remote host casing differs still finds its pull request" */
+    it("still links it to its pull request", async () => {
+      const keysSeen: PullRequestBranchKey[] = [];
+      const service = new SessionGroupsService({
+        repository: new FakeRepository([makeRow()], 1),
+        codingAgentSessions: lookupReturning({
+          "session-a": codingAgentRow({
+            repositoryHost: "GitHub.com",
+            repositoryOwner: "ACME",
+            repositoryName: "Widgets",
+            gitBranch: "feat/linkage",
+          }),
+        }),
+        resolveOrganizationId: async () => "org-1",
+        pullRequests: {
+          // The mapping lookup as Postgres answers it: the stored repository is
+          // lowercased and every column of the key is matched exactly.
+          async findForBranches({ keys }) {
+            keysSeen.push(...keys);
+            const stored = {
+              repositoryHost: "github.com",
+              repositoryFullName: "acme/widgets",
+              headBranch: "feat/linkage",
+              prNumber: 7,
+              htmlUrl: "https://github.com/acme/widgets/pull/7",
+              title: "Link sessions to pull requests",
+              prCreatedAt: new Date(1_699_999_000_000),
+              prClosedAt: null,
+              prMergedAt: null,
+            };
+            return keys.some(
+              (key) =>
+                key.repositoryHost === stored.repositoryHost &&
+                key.repositoryFullName === stored.repositoryFullName &&
+                key.headBranch === stored.headBranch,
+            )
+              ? [stored]
+              : [];
+          },
+        },
+      });
+
+      const result = await service.getSessionGroups({
+        tenantId: TENANT,
+        timeRange: { from: 0, to: 2_000_000_000_000 },
+        pageSize: 10,
+      });
+
+      expect(keysSeen).toEqual([
+        {
+          repositoryHost: "github.com",
+          repositoryFullName: "acme/widgets",
+          headBranch: "feat/linkage",
+        },
+      ]);
+      expect(result.sessions[0]?.codingAgent?.pullRequest).toEqual({
+        number: 7,
+        htmlUrl: "https://github.com/acme/widgets/pull/7",
+        title: "Link sessions to pull requests",
+      });
     });
   });
 
