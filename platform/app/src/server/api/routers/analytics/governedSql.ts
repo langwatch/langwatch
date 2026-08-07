@@ -21,49 +21,15 @@
  */
 
 import { NotFoundError } from "@langwatch/handled-error";
-import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 
 import { getGovernedSqlService } from "~/server/analytics/governed-sql";
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
-import { featureFlagService } from "~/server/featureFlag";
+import { workbenchEnabled } from "~/server/analytics/workbenchFeatureGate";
 
 import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
-
-/**
- * The experimental gate over the whole surface.
- *
- * One flag, checked server-side, so the browser cannot flip it: `availability`
- * answers false while it is off — which is what hides the navigation entry and
- * the page — and `schema`/`query` refuse outright, so a caller who skips the
- * availability question gets the same answer.
- */
-const GOVERNED_SQL_FLAG = "release_governed_sql_workbench";
-
-const workbenchEnabled = async ({
-  prisma,
-  userId,
-  projectId,
-}: {
-  prisma: PrismaClient;
-  userId: string;
-  projectId: string;
-}): Promise<boolean> => {
-  // The flag store's organization-scoped rules fail closed when the calling
-  // context has no organization, so the gate resolves it — without this, a
-  // rule enabling the workbench for an organization could never match.
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
-  return featureFlagService.isEnabled(GOVERNED_SQL_FLAG, {
-    distinctId: userId,
-    projectId,
-    organizationId: project?.team.organizationId,
-  });
-};
 
 /**
  * Longest statement this router accepts.

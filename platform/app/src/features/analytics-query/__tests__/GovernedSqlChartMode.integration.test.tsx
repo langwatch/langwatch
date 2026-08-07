@@ -246,7 +246,7 @@ describe("chart mode", () => {
         expect(requests).toEqual([]);
       });
 
-      /** @scenario "The workbench ships no polling, persistence, export, or agent surface" */
+      /** @scenario "The workbench ships no polling, browser-side persistence, export, or agent surface" */
       it("writes the specification nowhere: it lives as long as the result is on screen", async () => {
         const { unmount } = withChakra(
           <GovernedSqlChartMode result={RESULT} view="specification" />,

@@ -27,7 +27,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { GOVERNED_QUERY_RESULT_DATASET } from "../visualization/governedDatasetNames";
 import { starterVegaLiteSpecText } from "../visualization/starterVegaLiteSpec";
@@ -61,6 +61,29 @@ export interface GovernedSqlChartModeProps {
   readonly view?: "chart" | "specification";
   /** Switches the result pane to the Specification view. */
   readonly onOpenSpecification?: () => void;
+  /**
+   * A saved chart's specification, when one has been opened. Read once, at
+   * mount, and treated as the member's own work — so a result with different
+   * columns never replaces what they saved.
+   */
+  readonly initialSpecText?: string;
+  /**
+   * Hands the owner a way to read the specification on screen, so Save can
+   * store it. The same shape the workbench already uses to reach into Monaco:
+   * a registration, not a lift of this component's state, because the
+   * starter-follows-the-result-shape rule lives here and belongs here.
+   *
+   * Answers the *parsed* specification rather than its text, and `undefined`
+   * while the text is not valid JSON. Parsing here rather than in the caller is
+   * what keeps the Vega-Lite modules behind the lazy boundary — a workbench
+   * that imported the parser would put the whole runtime in the entry chunk
+   * (`vegaLazyBoundary.unit.test.ts` is what would notice).
+   *
+   * Called with `null` on unmount so nothing keeps reading a dead view.
+   */
+  readonly registerSpecReader?: (
+    read: (() => Record<string, unknown> | undefined) | null,
+  ) => void;
 }
 
 const starterFor = (result: GovernedSqlChartResult): string =>
@@ -263,8 +286,14 @@ export function GovernedSqlChartMode({
   submittedLabel,
   view = "chart",
   onOpenSpecification,
+  initialSpecText,
+  registerSpecReader,
 }: GovernedSqlChartModeProps) {
-  const { specText, setSpecText, resetSpecText } = useFollowingSpecText(result);
+  const { specText, setSpecText, resetSpecText } = useFollowingSpecText({
+    result,
+    initialSpecText,
+  });
+  useRegisteredSpecReader({ specText, registerSpecReader });
   const { datasets, columnsByDataset, parsed, errors } = useSpecValidation({
     result,
     specText,
@@ -327,13 +356,20 @@ export function GovernedSqlChartMode({
  * The specification text, following each new result shape until the member
  * edits it. An edited specification is their work and is never replaced behind
  * their back; reset hands the current result's starter back and resumes
- * following.
+ * following. A specification restored from a saved chart starts out `edited`
+ * for the same reason: it is the member's work too.
  */
-function useFollowingSpecText(result: GovernedSqlChartResult) {
+function useFollowingSpecText({
+  result,
+  initialSpecText,
+}: {
+  result: GovernedSqlChartResult;
+  initialSpecText: string | undefined;
+}) {
   const [specState, setSpecState] = useState(() => ({
     shape: shapeOf(result),
-    text: starterFor(result),
-    edited: false,
+    text: initialSpecText ?? starterFor(result),
+    edited: initialSpecText !== undefined,
   }));
 
   const shape = shapeOf(result);
@@ -350,6 +386,36 @@ function useFollowingSpecText(result: GovernedSqlChartResult) {
     resetSpecText: () =>
       setSpecState({ shape, text: starterFor(result), edited: false }),
   };
+}
+
+/**
+ * Hands the workbench a reader over the current specification text, so Save
+ * can capture the member's spec without the editor re-registering on every
+ * keystroke. The reader answers `undefined` while the text does not parse to
+ * an object — an unparseable spec is not a saveable one.
+ */
+function useRegisteredSpecReader({
+  specText,
+  registerSpecReader,
+}: {
+  specText: string;
+  registerSpecReader:
+    | ((reader: (() => Record<string, unknown> | undefined) | null) => void)
+    | undefined;
+}) {
+  const specTextRef = useRef(specText);
+  specTextRef.current = specText;
+  useEffect(() => {
+    registerSpecReader?.(() => {
+      const candidate = parseVegaLiteSpecText(specTextRef.current);
+      if (!candidate.ok) return undefined;
+      const { spec } = candidate;
+      return spec !== null && typeof spec === "object" && !Array.isArray(spec)
+        ? (spec as Record<string, unknown>)
+        : undefined;
+    });
+    return () => registerSpecReader?.(null);
+  }, [registerSpecReader]);
 }
 
 /** The parse and the policy's verdict, recomputed only when their inputs move. */
