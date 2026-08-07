@@ -92,6 +92,19 @@ const registry = {
     tips: [
       "Read `meta.parameters` — it lists every parameter the SQL declares that the request left unset",
       "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
+      "`period_start` and `period_end` are the exception — send them as `timeWindow: { start, end }`, never under `parameters`",
+    ],
+  },
+  governed_sql_reserved_parameter_supplied: {
+    tips: [
+      "Read `meta.parameters` — it lists the reserved names the request set for itself",
+      "`period_start` and `period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
+    ],
+  },
+  governed_sql_reserved_parameter_type: {
+    tips: [
+      "Read `meta.parameters` — it lists the reserved names declared with the wrong type",
+      "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
     ],
   },
   governed_sql_not_enabled: {

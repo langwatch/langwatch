@@ -451,6 +451,173 @@ describe("given the governed SQL service", () => {
     });
   });
 
+  describe("when the statement declares the reserved time-window parameters", () => {
+    const PERIOD_SQL =
+      "SELECT count() AS value FROM analytics.traces " +
+      "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}";
+    const TIME_WINDOW = {
+      start: new Date("2026-02-20T00:00:00.000Z"),
+      end: new Date("2026-02-27T00:00:00.000Z"),
+    };
+
+    /** @scenario "A statement declaring the reserved period parameters is given the surface's window" */
+    it("binds the surface's window without the caller supplying either value", async () => {
+      const executor = recordingExecutor();
+
+      const result = await serviceWith(executor).execute({
+        project: PROJECT,
+        protections: FULLY_PERMITTED,
+        sql: PERIOD_SQL,
+        timeWindow: TIME_WINDOW,
+      });
+
+      expect(executor.calls[0]!.parameters).toEqual({
+        period_start: "2026-02-20 00:00:00",
+        period_end: "2026-02-27 00:00:00",
+      });
+      // The statement itself is never rewritten to carry them.
+      expect(executor.calls[0]!.sql).toBe(PERIOD_SQL);
+      expect(result.followsTimeWindow).toBe(true);
+    });
+
+    /** @scenario "A statement declaring the reserved period parameters is given the surface's window" */
+    it("hands a different window down when the surface is showing a different period", async () => {
+      const executor = recordingExecutor();
+      const service = serviceWith(executor);
+
+      for (const start of ["2026-02-20", "2026-03-20"]) {
+        await service.execute({
+          project: PROJECT,
+          protections: FULLY_PERMITTED,
+          sql: PERIOD_SQL,
+          timeWindow: { ...TIME_WINDOW, start: new Date(`${start}T00:00:00Z`) },
+        });
+      }
+
+      expect(
+        executor.calls.map((call) => call.parameters?.period_start),
+      ).toEqual(["2026-02-20 00:00:00", "2026-03-20 00:00:00"]);
+    });
+
+    /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
+    it("refuses a request that sets one of them itself, before execution", async () => {
+      const executor = recordingExecutor();
+      const service = serviceWith(executor);
+      const run = () =>
+        service.execute({
+          project: PROJECT,
+          protections: FULLY_PERMITTED,
+          sql: PERIOD_SQL,
+          parameters: { period_start: "2020-01-01 00:00:00" },
+          timeWindow: TIME_WINDOW,
+        });
+
+      expect(await codeOf(run)).toBe(
+        "governed_sql_reserved_parameter_supplied",
+      );
+      expect(await metaOf(run)).toEqual({ parameters: ["period_start"] });
+      expect(
+        executor.calls,
+        "a chart that pinned its own window reached the database",
+      ).toHaveLength(0);
+    });
+
+    /** @scenario "A reserved period parameter declared as anything but a date-time is refused" */
+    it("refuses a reserved name declared as a string, at run and at validation alike", async () => {
+      const executor = recordingExecutor();
+      const service = serviceWith(executor);
+      const sql =
+        "SELECT count() FROM analytics.traces WHERE TraceName = {period_start:String}";
+
+      expect(
+        await codeOf(() =>
+          service.execute({
+            project: PROJECT,
+            protections: FULLY_PERMITTED,
+            sql,
+            timeWindow: TIME_WINDOW,
+          }),
+        ),
+      ).toBe("governed_sql_reserved_parameter_type");
+      expect(executor.calls).toHaveLength(0);
+
+      // The step saving a chart goes through is this one, so a chart carrying
+      // that declaration cannot be written either.
+      expect(
+        await codeOf(async () =>
+          service.validate({
+            projectId: PROJECT.id,
+            protections: FULLY_PERMITTED,
+            sql,
+          }),
+        ),
+      ).toBe("governed_sql_reserved_parameter_type");
+    });
+
+    /** @scenario "A period-aware statement run with no window names what is unset" */
+    it("refuses to run with no window, while still validating for a save", async () => {
+      const executor = recordingExecutor();
+      const service = serviceWith(executor);
+
+      expect(
+        await codeOf(() =>
+          service.execute({
+            project: PROJECT,
+            protections: FULLY_PERMITTED,
+            sql: PERIOD_SQL,
+          }),
+        ),
+      ).toBe("governed_sql_parameter_missing");
+      expect(
+        await metaOf(() =>
+          service.execute({
+            project: PROJECT,
+            protections: FULLY_PERMITTED,
+            sql: PERIOD_SQL,
+          }),
+        ),
+      ).toEqual({ parameters: ["period_end", "period_start"] });
+      expect(executor.calls).toHaveLength(0);
+
+      // Saving is not running: the window belongs to whoever later renders the
+      // chart, so a definition that supplies no value for it is complete.
+      const validated = service.validate({
+        projectId: PROJECT.id,
+        protections: FULLY_PERMITTED,
+        sql: PERIOD_SQL,
+      });
+      expect(validated.followsTimeWindow).toBe(true);
+      expect(validated.awaitingTimeWindow).toEqual([
+        "period_end",
+        "period_start",
+      ]);
+    });
+  });
+
+  describe("when the statement declares no time-window parameters", () => {
+    /** @scenario "A statement with no period parameters runs, and says so" */
+    it("runs unchanged and reports that it does not follow the period", async () => {
+      const executor = recordingExecutor();
+
+      const result = await serviceWith(executor).execute({
+        project: PROJECT,
+        protections: FULLY_PERMITTED,
+        sql: BOUNDED_COUNT,
+        timeWindow: {
+          start: new Date("2026-02-20T00:00:00.000Z"),
+          end: new Date("2026-02-27T00:00:00.000Z"),
+        },
+      });
+
+      expect(result.followsTimeWindow).toBe(false);
+      expect(executor.calls[0]!.sql).toBe(BOUNDED_COUNT);
+      expect(
+        executor.calls[0]!.parameters,
+        "a window was injected into a statement that never asked for one",
+      ).toBeUndefined();
+    });
+  });
+
   describe("when no restricted identity is provisioned", () => {
     /**
      * Fail-closed. The alternative — running a customer's SQL as the

@@ -22,6 +22,8 @@ export {
 } from "./diagnostics";
 export {
   GovernedSqlParameterMissingError,
+  GovernedSqlReservedParameterSuppliedError,
+  GovernedSqlReservedParameterTypeError,
   GovernedSqlUnavailableError,
 } from "./errors";
 export type {
@@ -37,7 +39,10 @@ export {
   DEFAULT_GOVERNED_SQL_RESULT_LIMITS,
   governedSqlConnectionFromEnv,
 } from "./executor";
-export type { GovernedSqlQueryResult } from "./governedSql.service";
+export type {
+  GovernedSqlQueryResult,
+  ValidatedGovernedSql,
+} from "./governedSql.service";
 export {
   createGovernedSqlService,
   DEFAULT_GOVERNED_DATABASE,
@@ -45,9 +50,20 @@ export {
   getGovernedSqlService,
   setGovernedSqlService,
 } from "./governedSql.service";
+export type { GovernedSqlTimeWindowResolution } from "./resolveTimeWindow";
+export { resolveGovernedTimeWindow } from "./resolveTimeWindow";
 export type {
   GovernedSchema,
   GovernedSchemaColumn,
   GovernedSchemaDataset,
 } from "./schema";
 export { describeGovernedSchema, governedExampleSql } from "./schema";
+export type { GovernedSqlTimeWindow } from "./timeWindow";
+export {
+  formatGovernedDateTimeParameter,
+  GOVERNED_SQL_PERIOD_END_PARAMETER,
+  GOVERNED_SQL_PERIOD_START_PARAMETER,
+  GOVERNED_SQL_TIME_WINDOW_PARAMETERS,
+  isGovernedSqlDateTimeParameterType,
+  isGovernedSqlTimeWindowParameter,
+} from "./timeWindow";

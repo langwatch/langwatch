@@ -17,7 +17,18 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// `test-setup.ts` stubs the router compat layer with an empty query, which
+// would make every case here run under the default relative period instead of
+// the one the URL names — and "the window the member is looking at is the
+// window that is sent" is precisely what these cases are about.
+vi.unmock("~/utils/compat/next-router");
+vi.mock(
+  "~/utils/compat/next-router",
+  async () => await vi.importActual<object>("~/utils/compat/next-router"),
+);
 
 import { GovernedSqlWorkbench } from "../components/GovernedSqlWorkbench";
 
@@ -128,11 +139,43 @@ vi.mock("../components/LazyGovernedSqlChartMode", () => ({
 const SQL =
   "SELECT trace_id FROM analytics.traces_daily WHERE id = {since:String}";
 
-async function renderWorkbench() {
+/**
+ * The page period every case runs under unless it says otherwise.
+ *
+ * Absolute rather than a relative preset, so the window is the same instant on
+ * every run — a relative preset is anchored to "now" and would make the values
+ * the request carries untestable.
+ */
+const PAGE_PERIOD = {
+  startDate: "2026-02-20T00:00:00.000Z",
+  endDate: "2026-02-27T00:00:00.000Z",
+};
+
+/** What the workbench sends for {@link PAGE_PERIOD}. */
+const PAGE_WINDOW = {
+  start: new Date(PAGE_PERIOD.startDate),
+  end: new Date(PAGE_PERIOD.endDate),
+};
+
+/**
+ * A real router rather than a stubbed `usePeriodSelector`: the period is read
+ * off the URL, and the thing worth proving is that the URL the member is
+ * looking at is the window the request carries.
+ */
+async function renderWorkbench(
+  period: { startDate: string; endDate: string } = PAGE_PERIOD,
+) {
+  const url =
+    "/my-project/analytics/query" +
+    `?startDate=${encodeURIComponent(period.startDate)}` +
+    `&endDate=${encodeURIComponent(period.endDate)}`;
+
   render(
-    <ChakraProvider value={defaultSystem}>
-      <GovernedSqlWorkbench projectId="project-1" />
-    </ChakraProvider>,
+    <MemoryRouter initialEntries={[url]}>
+      <ChakraProvider value={defaultSystem}>
+        <GovernedSqlWorkbench projectId="project-1" />
+      </ChakraProvider>
+    </MemoryRouter>,
   );
   return await screen.findByTestId("stub-monaco");
 }
@@ -192,6 +235,9 @@ describe("the governed SQL workbench", () => {
             projectId: "project-1",
             sql: SQL,
             parameters: { since: "2026-01-01" },
+            // The page's period rides in its own field, never among the named
+            // parameters — the backend refuses a request that puts it there.
+            timeWindow: PAGE_WINDOW,
           },
           { signal: expect.any(AbortSignal) },
         );
@@ -261,6 +307,135 @@ describe("the governed SQL workbench", () => {
         );
         expect(within(parameters).getByRole("alert")).toHaveTextContent(
           "Give these parameters a value",
+        );
+      });
+    });
+
+    describe("when the workbench opens on a page whose period selector names a window", () => {
+      /** @scenario "The workbench fills the period parameters from the page's period selector" */
+      it("shows that window in the spelling the database is bound with", async () => {
+        await renderWorkbench();
+
+        expect(screen.getByLabelText("period_start")).toHaveValue(
+          "2026-02-20 00:00:00",
+        );
+        expect(screen.getByLabelText("period_end")).toHaveValue(
+          "2026-02-27 00:00:00",
+        );
+      });
+
+      /** @scenario "The workbench fills the period parameters from the page's period selector" */
+      it("shows a different window when the page carries a different period", async () => {
+        await renderWorkbench({
+          startDate: "2026-03-01T00:00:00.000Z",
+          endDate: "2026-03-08T06:30:00.000Z",
+        });
+
+        expect(screen.getByLabelText("period_start")).toHaveValue(
+          "2026-03-01 00:00:00",
+        );
+        expect(screen.getByLabelText("period_end")).toHaveValue(
+          "2026-03-08 06:30:00",
+        );
+      });
+    });
+
+    describe("when the member overrides the window for one query", () => {
+      /** @scenario "A one-off window override is what runs, and survives a re-run" */
+      it("sends the override on every run, and never as a named parameter", async () => {
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.change(screen.getByLabelText("period_start"), {
+          target: { value: "2026-02-24 09:00:00" },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+        await screen.findByTestId("governed-sql-result-summary");
+        fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+
+        await waitFor(() => expect(harness.mutation).toHaveBeenCalledTimes(2));
+        const overridden = {
+          start: new Date("2026-02-24T09:00:00.000Z"),
+          end: PAGE_WINDOW.end,
+        };
+        for (const call of harness.mutation.mock.calls) {
+          expect(call[1].timeWindow).toEqual(overridden);
+          expect(call[1].parameters ?? {}).not.toHaveProperty("period_start");
+        }
+      });
+
+      /** @scenario "A one-off window override is what runs, and survives a re-run" */
+      it("goes back to the page's period when the override is dropped", async () => {
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.change(screen.getByLabelText("period_start"), {
+          target: { value: "2026-02-24 09:00:00" },
+        });
+
+        fireEvent.click(
+          screen.getByRole("button", { name: "Use the page period" }),
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        await waitFor(() => expect(harness.mutation).toHaveBeenCalledTimes(1));
+        expect(harness.mutation.mock.calls[0]![1].timeWindow).toEqual(
+          PAGE_WINDOW,
+        );
+      });
+    });
+
+    describe("when the answer's statement declared no time-window parameters", () => {
+      /** @scenario "A statement with no period parameters runs, and says so" */
+      it("says the query does not follow the page's period", async () => {
+        harness.mutation.mockResolvedValue(
+          governedSqlResult({ followsTimeWindow: false }),
+        );
+
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        await screen.findByTestId("governed-sql-result-summary");
+        expect(
+          await screen.findByTestId("does-not-follow-period"),
+        ).toHaveTextContent("does not use the time window");
+      });
+
+      /** @scenario "A statement with no period parameters runs, and says so" */
+      it("says nothing of the kind when the statement did follow it", async () => {
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        await screen.findByTestId("governed-sql-result-summary");
+        expect(
+          screen.queryByTestId("does-not-follow-period"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the backend refuses a request that set a reserved parameter itself", () => {
+      /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
+      it("says which rows to remove, at the form that holds them", async () => {
+        harness.mutation.mockRejectedValue(
+          handledErrorEnvelope({
+            code: "governed_sql_reserved_parameter_supplied",
+            meta: { parameters: ["period_start"] },
+          }),
+        );
+
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        const parameters = await screen.findByTestId("governed-sql-parameters");
+        await waitFor(() =>
+          expect(within(parameters).getByRole("alert")).toHaveTextContent(
+            "period_start",
+          ),
+        );
+        expect(within(parameters).getByRole("alert")).toHaveTextContent(
+          "Remove these",
         );
       });
     });

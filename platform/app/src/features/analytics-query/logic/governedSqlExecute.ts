@@ -51,10 +51,29 @@ export function createGovernedSqlExecute({
       projectId: string;
       sql: string;
       parameters?: Readonly<Record<string, GovernedSqlParameterValue>>;
+      timeWindow?: { start: Date; end: Date };
     },
     options?: { signal?: AbortSignal },
   ) => Promise<GovernedSqlQueryResult>;
 
-  return (request, { signal }) =>
-    mutate(GOVERNED_SQL_QUERY_PATH, { projectId, ...request }, { signal });
+  return ({ timeWindow, ...request }, { signal }) =>
+    mutate(
+      GOVERNED_SQL_QUERY_PATH,
+      {
+        projectId,
+        ...request,
+        // Instants on the wire, milliseconds in the draft: the draft compares
+        // snapshots by value, and the endpoint reads a window. Converting here
+        // keeps each side holding the shape it needs rather than the other's.
+        ...(timeWindow
+          ? {
+              timeWindow: {
+                start: new Date(timeWindow.start),
+                end: new Date(timeWindow.end),
+              },
+            }
+          : {}),
+      },
+      { signal },
+    );
 }

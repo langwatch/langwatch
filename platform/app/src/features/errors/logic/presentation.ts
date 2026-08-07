@@ -182,6 +182,16 @@ const presentations = {
     describe: () =>
       "The query declares parameters that weren't given values. Supply one for each and try again.",
   },
+  governed_sql_reserved_parameter_supplied: {
+    title: "The time window isn't yours to set",
+    describe: () =>
+      "period_start and period_end come from the period this page is showing. Remove them from your parameters and change the period instead.",
+  },
+  governed_sql_reserved_parameter_type: {
+    title: "The time window has to be a date and time",
+    describe: () =>
+      "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+  },
   governed_sql_not_enabled: {
     title: "Custom SQL isn't switched on here",
     describe: () =>

@@ -23,6 +23,7 @@ import {
   type GovernedSqlRequestAction,
   type GovernedSqlRequestState,
   type GovernedSqlSnapshot,
+  type GovernedSqlTimeWindowValues,
   governedSqlRequestReducer,
   initialGovernedSqlRequestState,
 } from "./governedSqlRequestState";
@@ -31,6 +32,13 @@ import {
 export interface GovernedSqlExecuteRequest {
   readonly sql: string;
   readonly parameters?: Readonly<Record<string, GovernedSqlParameterValue>>;
+  /**
+   * The period this submission reports over. Travels in its own field, never
+   * among the named parameters — the backend refuses a request that puts a
+   * reserved name there, because that is a chart pinning a window the surface
+   * was supposed to own.
+   */
+  readonly timeWindow?: GovernedSqlTimeWindowValues;
 }
 
 /** How a submission reaches the server. */
@@ -47,6 +55,14 @@ export interface GovernedSqlRequestController {
   setParameters(
     parameters: Readonly<Record<string, GovernedSqlParameterValue>>,
   ): void;
+  /**
+   * Sets the period the next submission reports over, or clears it.
+   *
+   * Separate from {@link GovernedSqlRequestController.setParameters} because it
+   * is not a parameter: the surface supplies it, and the backend refuses a
+   * caller that tries to send it as one.
+   */
+  setTimeWindow(timeWindow: GovernedSqlTimeWindowValues | undefined): void;
   /** Submits the current draft. No-op while a request is in flight. */
   runQuery(): void;
   /**
@@ -80,9 +96,11 @@ export interface GovernedSqlRequestController {
  */
 function requestFor(snapshot: GovernedSqlSnapshot): GovernedSqlExecuteRequest {
   const parameters = { ...snapshot.parameters };
-  return Object.keys(parameters).length > 0
-    ? { sql: snapshot.sql, parameters }
-    : { sql: snapshot.sql };
+  return {
+    sql: snapshot.sql,
+    ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
+    ...(snapshot.timeWindow ? { timeWindow: snapshot.timeWindow } : {}),
+  };
 }
 
 export function createGovernedSqlRequestController({
@@ -144,6 +162,10 @@ export function createGovernedSqlRequestController({
 
     setParameters(parameters) {
       apply({ type: "parametersEdited", parameters: { ...parameters } });
+    },
+
+    setTimeWindow(timeWindow) {
+      apply({ type: "timeWindowChanged", timeWindow });
     },
 
     runQuery() {

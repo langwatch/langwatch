@@ -74,6 +74,18 @@ const governedSqlQuerySchema = z.object({
   // first step of the rewriting this API promises never to do.
   sql: z.string().min(1).max(MAX_SQL_LENGTH),
   parameters: z.record(z.string(), parameterValueSchema).optional(),
+  /**
+   * The period this caller is reporting over.
+   *
+   * Honoured here and not only on the dashboard, because the same saved chart
+   * is readable from both and a statement that follows the period must not have
+   * two different meanings depending on which surface asked. Its values fill the
+   * reserved `period_start` / `period_end` parameters the statement declares —
+   * which is also why sending either of those under `parameters` is refused.
+   */
+  timeWindow: z
+    .object({ start: z.coerce.date(), end: z.coerce.date() })
+    .optional(),
 });
 
 // Response schemas exist for the published OpenAPI document. The service owns
@@ -89,6 +101,10 @@ const governedSqlResultSchema = z.object({
     rowsReturned: z.number(),
   }),
   truncated: z.boolean(),
+  // Whether the statement declared the reserved time-window parameters, so a
+  // consumer placing this result beside another can say which of them follows
+  // the period it is showing.
+  followsTimeWindow: z.boolean(),
   diagnostics: z.array(
     z.object({
       // Enumerated rather than a bare string: a consumer branches on the code,
@@ -159,7 +175,7 @@ export function registerGovernedSqlRoutes(
         requestedProjectId: c.req.param("projectId"),
       });
       await requireGovernedSqlEnabled(project);
-      const { sql, parameters } = c.req.valid("json");
+      const { sql, parameters, timeWindow } = c.req.valid("json");
 
       logger.info(
         { projectId: project.id, sqlLength: sql.length },
@@ -173,6 +189,7 @@ export function registerGovernedSqlRoutes(
         }),
         sql,
         ...(parameters ? { parameters } : {}),
+        ...(timeWindow ? { timeWindow } : {}),
       });
       return c.json(result);
     },

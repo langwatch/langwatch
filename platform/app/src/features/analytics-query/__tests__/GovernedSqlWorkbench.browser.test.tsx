@@ -27,6 +27,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
@@ -55,6 +56,32 @@ vi.mock("~/utils/api", () => ({
             data: SCHEMA_RESPONSE,
             isLoading: false,
             error: null,
+          }),
+        },
+      },
+      // Save and Open are the jsdom suite's business, but the workbench calls
+      // these hooks unconditionally, so a mock missing them throws before this
+      // suite can look at anything.
+      savedWorkbenchCharts: {
+        getAll: {
+          useQuery: () => ({ data: [], isLoading: false, error: null }),
+        },
+        create: {
+          useMutation: () => ({
+            mutateAsync: async () => ({}),
+            isPending: false,
+          }),
+        },
+        update: {
+          useMutation: () => ({
+            mutateAsync: async () => ({}),
+            isPending: false,
+          }),
+        },
+        delete: {
+          useMutation: () => ({
+            mutateAsync: async () => ({}),
+            isPending: false,
           }),
         },
       },
@@ -89,6 +116,17 @@ import { GovernedSqlWorkbench } from "../components/GovernedSqlWorkbench";
 const SQL =
   "SELECT evaluator_id, score FROM analytics.evaluations_daily LIMIT 500";
 
+/**
+ * The page the workbench is mounted on, period and all.
+ *
+ * The workbench reads the page's period selector for the time window it sends,
+ * and the period selector reads the URL — so a render with no router around it
+ * has nothing to read and throws before anything here can be observed.
+ */
+const PAGE_URL =
+  "/my-project/analytics/query" +
+  "?startDate=2026-02-20T00%3A00%3A00.000Z&endDate=2026-02-27T00%3A00%3A00.000Z";
+
 /** Enough rows that a window over them is a small fraction of the whole. */
 const ROW_COUNT = 500;
 
@@ -116,6 +154,7 @@ function evaluationResult(): GovernedSqlQueryResult {
     },
     truncated: false,
     diagnostics: [],
+    followsTimeWindow: false,
   };
 }
 
@@ -169,9 +208,11 @@ describe("the governed SQL workbench in real Chromium", () => {
       /** @scenario "A governed query flows from editor to native table in a real browser" */
       it("shows the returned rows in the native result table beside the run statistics", async () => {
         render(
-          <ChakraProvider value={defaultSystem}>
-            <GovernedSqlWorkbench projectId="project-1" />
-          </ChakraProvider>,
+          <MemoryRouter initialEntries={[PAGE_URL]}>
+            <ChakraProvider value={defaultSystem}>
+              <GovernedSqlWorkbench projectId="project-1" />
+            </ChakraProvider>
+          </MemoryRouter>,
         );
 
         const editor = await screen.findByTestId("governed-sql-editor-input");
@@ -218,9 +259,11 @@ describe("the governed SQL workbench in real Chromium", () => {
       /** @scenario "A governed query flows from editor to native table in a real browser" */
       it("windows the rows against the measured viewport and moves that window when the member scrolls", async () => {
         render(
-          <ChakraProvider value={defaultSystem}>
-            <GovernedSqlWorkbench projectId="project-1" />
-          </ChakraProvider>,
+          <MemoryRouter initialEntries={[PAGE_URL]}>
+            <ChakraProvider value={defaultSystem}>
+              <GovernedSqlWorkbench projectId="project-1" />
+            </ChakraProvider>
+          </MemoryRouter>,
         );
 
         const editor = await screen.findByTestId("governed-sql-editor-input");

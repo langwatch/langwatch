@@ -107,3 +107,68 @@ export class GovernedSqlParameterMissingError extends HandledError {
     this.name = "GovernedSqlParameterMissingError";
   }
 }
+
+/**
+ * The request carried a value for a parameter the surface owns.
+ *
+ * `period_start` and `period_end` are supplied by whatever is showing the chart
+ * — the dashboard's period, the workbench's page period — and a caller that
+ * sets one is pinning a window that will then ignore the surface it sits on.
+ * Refused rather than overwritten, because silently discarding a value a caller
+ * sent is how the two-charts-different-periods bug comes back wearing our name.
+ *
+ * @see ./timeWindow.ts — the contract this enforces
+ */
+export class GovernedSqlReservedParameterSuppliedError extends HandledError {
+  declare readonly code: "governed_sql_reserved_parameter_supplied";
+
+  constructor(
+    /** The reserved names the request carried. Sorted. */
+    supplied: readonly string[],
+  ) {
+    super(
+      "governed_sql_reserved_parameter_supplied",
+      "The request supplied values for time-window parameters the surface sets itself.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        // Named consumer: the parameter editor, which lists the rows to remove,
+        // and an agent repairing a request it composed.
+        meta: { parameters: supplied },
+        ...remediation("governed_sql_reserved_parameter_supplied"),
+      },
+    );
+    this.name = "GovernedSqlReservedParameterSuppliedError";
+  }
+}
+
+/**
+ * A reserved time-window parameter was declared as something other than a
+ * ClickHouse date-time.
+ *
+ * Raised while validating rather than while running, so a chart is refused at
+ * *save* for the same reason it would be refused at render — the two go through
+ * one validator — and a member finds out while they are still looking at the
+ * statement.
+ */
+export class GovernedSqlReservedParameterTypeError extends HandledError {
+  declare readonly code: "governed_sql_reserved_parameter_type";
+
+  constructor(
+    /** The reserved names declared with the wrong type. Sorted. */
+    mistyped: readonly string[],
+  ) {
+    super(
+      "governed_sql_reserved_parameter_type",
+      "The query declares a time-window parameter with a type that is not a date-time.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        // Named consumer: the editor, which says which declaration to rewrite.
+        meta: { parameters: mistyped },
+        ...remediation("governed_sql_reserved_parameter_type"),
+      },
+    );
+    this.name = "GovernedSqlReservedParameterTypeError";
+  }
+}
