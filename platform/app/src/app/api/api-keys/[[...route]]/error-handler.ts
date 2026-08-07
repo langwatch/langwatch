@@ -12,10 +12,18 @@ export const handleApiKeyError = async (
   error: Error & { status?: ContentfulStatusCode },
   c: Context,
 ): Promise<Response> => {
-  const status =
-    error instanceof HttpError ? error.status : (error.status ?? 500);
+  const status = HandledError.isHandled(error)
+    ? error.httpStatus
+    : error instanceof HttpError
+      ? error.status
+      : (error.status ?? 500);
 
-  logger.error(
+  // A refusal the caller can act on is their fact, not our outage: logging a
+  // 404 or a 422 at error level with a "[500]" in the sentence buries the real
+  // failures under the routine ones.
+  const log = status >= 500 ? logger.error : logger.warn;
+  log.call(
+    logger,
     {
       path: c.req.path,
       method: c.req.method,

@@ -1535,7 +1535,7 @@
             "description": "Invalid or missing API key token"
           },
           "403": {
-            "description": "Requested binding exceeds the creator's own permissions, or scope does not belong to this organization"
+            "description": "Requested binding exceeds the creator's own permissions, the scope does not belong to this organization, or a service key / key for another member was requested without organization admin rights"
           },
           "422": {
             "description": "Validation error (missing name, empty bindings, etc.)"
@@ -1544,7 +1544,7 @@
         "operationId": "createApiKey",
         "parameters": [],
         "summary": "Create an API key",
-        "description": "Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is returned once — store it securely.",
+        "description": "Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights. The plaintext token is returned once — store it securely.",
         "security": [
           {
             "admin_api_key": []
@@ -1579,6 +1579,28 @@
                     "type": "string",
                     "description": "ISO 8601 timestamp after which the key stops working"
                   },
+                  "assignedToUserId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Organization admins only: the member who owns the key and whose access caps it. Defaults to the caller."
+                  },
+                  "permissionMode": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "readonly",
+                      "restricted"
+                    ],
+                    "description": "'all' and 'readonly' take their meaning from the bindings alone; 'restricted' additionally requires an explicit permissions list.",
+                    "default": "all"
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Restricted mode only: the exact resource:action permissions the key's CUSTOM bindings grant."
+                  },
                   "bindings": {
                     "type": "array",
                     "items": {
@@ -1589,8 +1611,10 @@
                           "enum": [
                             "ADMIN",
                             "MEMBER",
-                            "VIEWER"
-                          ]
+                            "VIEWER",
+                            "CUSTOM"
+                          ],
+                          "description": "CUSTOM grants exactly the listed permissions and requires permissionMode 'restricted'."
                         },
                         "scopeType": {
                           "type": "string",
@@ -1634,6 +1658,415 @@
       }
     },
     "/api/api-keys/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "keyType": {
+                      "type": "string",
+                      "enum": [
+                        "personal",
+                        "service"
+                      ]
+                    },
+                    "assignedToUserId": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The member who owns the key; null for a service key."
+                    },
+                    "createdByUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "permissionMode": {
+                      "type": "string",
+                      "enum": [
+                        "all",
+                        "readonly",
+                        "restricted"
+                      ]
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The resource:action permissions a restricted key grants. Empty for the other modes."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "lastUsedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "revokedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "roleBindings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "ADMIN",
+                              "MEMBER",
+                              "VIEWER",
+                              "CUSTOM"
+                            ]
+                          },
+                          "scopeType": {
+                            "type": "string",
+                            "enum": [
+                              "ORGANIZATION",
+                              "TEAM",
+                              "PROJECT"
+                            ]
+                          },
+                          "scopeId": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "bindings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "ADMIN",
+                              "MEMBER",
+                              "VIEWER",
+                              "CUSTOM"
+                            ]
+                          },
+                          "scopeType": {
+                            "type": "string",
+                            "enum": [
+                              "ORGANIZATION",
+                              "TEAM",
+                              "PROJECT"
+                            ]
+                          },
+                          "scopeId": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires organization:view)"
+          },
+          "404": {
+            "description": "API key not found (api_key_not_found)"
+          }
+        },
+        "operationId": "getApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "API key ID"
+          }
+        ],
+        "summary": "Get an API key",
+        "description": "Read one API key by id, including its role bindings, permission mode and explicit permissions. Returns your own keys; organization admins may read any key in the organization. The secret is never returned. An id that does not exist, belongs to another organization, or belongs to another member all answer 404 api_key_not_found, so the response cannot be used to probe for keys.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
+      },
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "The updated API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "keyType": {
+                      "type": "string",
+                      "enum": [
+                        "personal",
+                        "service"
+                      ]
+                    },
+                    "assignedToUserId": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The member who owns the key; null for a service key."
+                    },
+                    "createdByUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "permissionMode": {
+                      "type": "string",
+                      "enum": [
+                        "all",
+                        "readonly",
+                        "restricted"
+                      ]
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The resource:action permissions a restricted key grants. Empty for the other modes."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "lastUsedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "revokedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "roleBindings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "ADMIN",
+                              "MEMBER",
+                              "VIEWER",
+                              "CUSTOM"
+                            ]
+                          },
+                          "scopeType": {
+                            "type": "string",
+                            "enum": [
+                              "ORGANIZATION",
+                              "TEAM",
+                              "PROJECT"
+                            ]
+                          },
+                          "scopeId": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "bindings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "ADMIN",
+                              "MEMBER",
+                              "VIEWER",
+                              "CUSTOM"
+                            ]
+                          },
+                          "scopeType": {
+                            "type": "string",
+                            "enum": [
+                              "ORGANIZATION",
+                              "TEAM",
+                              "PROJECT"
+                            ]
+                          },
+                          "scopeId": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)"
+          },
+          "404": {
+            "description": "API key not found, or not yours to edit (api_key_not_found)"
+          },
+          "409": {
+            "description": "API key is already revoked (api_key_already_revoked)"
+          },
+          "422": {
+            "description": "Validation error, for example restricted mode without a permissions list (validation_error)"
+          }
+        },
+        "operationId": "updateApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "API key ID"
+          }
+        ],
+        "summary": "Update an API key",
+        "description": "Update an API key's name, description, permission mode, permissions or bindings. Every field is optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns. You may update your own keys; organization admins may update any key in the organization. Bindings can never exceed the access of the member the key belongs to. The token itself never changes.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500
+                  },
+                  "permissionMode": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "readonly",
+                      "restricted"
+                    ],
+                    "description": "'all' and 'readonly' take their meaning from the bindings alone; 'restricted' additionally requires an explicit permissions list."
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Restricted mode only: the exact resource:action permissions the key's CUSTOM bindings grant."
+                  },
+                  "bindings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "ADMIN",
+                            "MEMBER",
+                            "VIEWER",
+                            "CUSTOM"
+                          ],
+                          "description": "CUSTOM grants exactly the listed permissions and requires permissionMode 'restricted'."
+                        },
+                        "scopeType": {
+                          "type": "string",
+                          "enum": [
+                            "ORGANIZATION",
+                            "TEAM",
+                            "PROJECT"
+                          ]
+                        },
+                        "scopeId": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "scopeType",
+                        "scopeId"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "description": "Replaces the key's bindings outright. Whatever is accepted here is exactly what a subsequent GET returns."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "responses": {
           "200": {

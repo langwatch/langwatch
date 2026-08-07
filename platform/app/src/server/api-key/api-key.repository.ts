@@ -149,6 +149,47 @@ export class ApiKeyRepository {
   }
 
   /**
+   * One key inside an organization, bindings included.
+   *
+   * The tenancy predicate is in the query rather than a comparison on the
+   * result, so an id belonging to another organization returns nothing at
+   * all: there is no row to accidentally read a field off before the check.
+   */
+  async findByIdInOrg({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<ApiKeyWithBindings | null> {
+    return this.prisma.apiKey.findFirst({
+      where: { id, organizationId },
+      include: { roleBindings: true },
+    });
+  }
+
+  /**
+   * The permission sets of custom roles, scoped to one organization.
+   *
+   * Scoped rather than looked up by id alone: a binding pointing at another
+   * organization's role must read as nothing here, the same way the permission
+   * resolver refuses to honor one.
+   */
+  async findCustomRolePermissionsInOrg({
+    ids,
+    organizationId,
+  }: {
+    ids: string[];
+    organizationId: string;
+  }): Promise<Array<{ id: string; permissions: Prisma.JsonValue }>> {
+    if (ids.length === 0) return [];
+    return this.prisma.customRole.findMany({
+      where: { id: { in: ids }, organizationId },
+      select: { id: true, permissions: true },
+    });
+  }
+
+  /**
    * The display name of one key the caller already holds an id for, scoped to
    * an organization so an id from another org resolves to nothing.
    *

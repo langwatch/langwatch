@@ -55,6 +55,32 @@ function isSystemManaged(apiKey: { name: string }): boolean {
   return HIDDEN_SYSTEM_KEY_NAMES.includes(apiKey.name);
 }
 
+/**
+ * Whether a member's own listing already shows them this key: their own keys,
+ * plus the organization's service keys.
+ *
+ * Deliberately in step with `findAllByUser`, which answers the same question
+ * for the list. A row a caller can see in the list and not by id is a hole in
+ * the CLI's list-then-read loop, not a security boundary. The company-wide
+ * ingestion keys are excluded here for the reason they are excluded there:
+ * their source, template and activity metadata is admin territory.
+ *
+ * A service credential (no user) is not a member and gets nothing from this:
+ * its listing is the org-wide one, which takes organization:manage.
+ *
+ * Revocation is not part of the question. The listing hides revoked keys so a
+ * member's list is not a graveyard; reading one back by an id already held is
+ * how you find out the key you are holding was revoked.
+ */
+function isListedForMember(
+  apiKey: { userId: string | null; ingestSourceType: string | null },
+  callerUserId: string | null,
+): boolean {
+  if (!callerUserId) return false;
+  if (apiKey.userId === callerUserId) return true;
+  return apiKey.userId === null && apiKey.ingestSourceType === null;
+}
+
 type RoleBindingBase = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
@@ -68,6 +94,13 @@ type CreatorScope =
   | { type: "org"; id: string }
   | { type: "team"; id: string }
   | { type: "project"; id: string; teamId: string };
+
+/**
+ * A key with its bindings and the explicit permission set a `restricted` key
+ * carries on its private custom role, flattened onto the record so a reader
+ * does not have to know that indirection exists.
+ */
+export type ApiKeyDetail = ApiKeyWithBindings & { permissions: string[] };
 
 export class ApiKeyService {
   private readonly repo: ApiKeyRepository;
@@ -981,6 +1014,91 @@ export class ApiKeyService {
    */
   async getById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
     return this.repo.findById({ id });
+  }
+
+  /**
+   * One key the caller already holds an id for, with its bindings and the
+   * explicit permission set behind a `restricted` mode.
+   *
+   * Every refusal is reported as not-found: an id from another organization,
+   * a key the product manages itself, and a key belonging to someone else all
+   * answer identically to an id that never existed. A 403 on the last of those
+   * would confirm the id names a real key, which is exactly what a caller
+   * probing for other people's keys is after.
+   *
+   * `callerCanReadAnyKey` is the org-administration branch: it lifts the
+   * ownership requirement, and nothing else.
+   */
+  async getByIdForCaller({
+    id,
+    organizationId,
+    callerUserId,
+    callerCanReadAnyKey,
+  }: {
+    id: string;
+    organizationId: string;
+    callerUserId: string | null;
+    callerCanReadAnyKey: boolean;
+  }): Promise<ApiKeyDetail> {
+    const apiKey = await this.repo.findByIdInOrg({ id, organizationId });
+    if (!apiKey) throw new ApiKeyNotFoundError(id);
+    if (isSystemManaged(apiKey)) throw new ApiKeyNotFoundError(id);
+    if (!callerCanReadAnyKey && !isListedForMember(apiKey, callerUserId)) {
+      throw new ApiKeyNotFoundError(id);
+    }
+
+    return {
+      ...apiKey,
+      permissions: await this.resolveKeyPermissions({ apiKey, organizationId }),
+    };
+  }
+
+  /**
+   * The permissions a key's CUSTOM bindings confer, deduplicated and sorted.
+   *
+   * A malformed role is skipped rather than thrown: this is a read, and one
+   * corrupted row must not make the key unreadable. The ceiling paths, where
+   * the same data drives a grant, keep failing closed instead.
+   */
+  private async resolveKeyPermissions({
+    apiKey,
+    organizationId,
+  }: {
+    apiKey: ApiKeyWithBindings;
+    organizationId: string;
+  }): Promise<string[]> {
+    const customRoleIds = [
+      ...new Set(
+        apiKey.roleBindings
+          .map((rb) => rb.customRoleId)
+          .filter((cid): cid is string => cid !== null),
+      ),
+    ];
+
+    const roles = await this.repo.findCustomRolePermissionsInOrg({
+      ids: customRoleIds,
+      organizationId,
+    });
+
+    const permissions = new Set<string>();
+    for (const role of roles) {
+      try {
+        for (const permission of parseCustomRolePermissions({
+          customRoleId: role.id,
+          permissions: role.permissions,
+        })) {
+          permissions.add(permission);
+        }
+      } catch (err) {
+        if (!(err instanceof MalformedCustomRolePermissionsError)) throw err;
+        logger.warn(
+          { err, customRoleId: role.id, apiKeyId: apiKey.id },
+          "custom role has malformed permissions; omitted from the key's permission set",
+        );
+      }
+    }
+
+    return [...permissions].sort();
   }
 
   /**

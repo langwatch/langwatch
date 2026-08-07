@@ -61,6 +61,10 @@ Feature: API keys management REST API
     And it contains the name, description, permission mode and bindings
     And it never contains the key's secret
 
+  # Reading somebody else's key by id discloses what the organization-wide
+  # listing discloses, one row at a time, so it takes the same rights. A key
+  # the caller may not read answers exactly like an id that names nothing:
+  # a 403 would confirm the id is real, which is what probing is after.
   @integration
   Scenario: Fetching an unknown API key returns not found
     When I fetch a key id that does not exist
@@ -93,10 +97,13 @@ Feature: API keys management REST API
     Then the request is refused with code validation_error and status 422
     And the key's permission mode is unchanged
 
+  # The ceiling is the access of the member the key belongs to, and a caller
+  # who is not an organization admin may only edit keys that are their own,
+  # so for them the two are the same thing.
   @integration
   Scenario: Widening a key beyond the caller's own access is refused
-    Given a key exists with a viewer binding on one project
+    Given a key of mine exists with a viewer binding on one project
     And my credential is not an organization admin
-    When I replace its bindings with an organization-wide admin binding
-    Then the request is refused with code insufficient_permissions and status 403
+    When I replace its bindings with an admin binding on that project
+    Then the request is refused with code api_key_scope_violation and status 403
     And the key keeps its viewer binding
