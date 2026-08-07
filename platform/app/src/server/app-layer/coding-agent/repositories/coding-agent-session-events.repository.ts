@@ -1,5 +1,7 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { groupTenantsByClient } from "~/server/clickhouse/tenantClientGroups";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { CodingAgentSessionEventRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionEvents.mapProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
@@ -407,8 +409,40 @@ export class CodingAgentSessionEventsClickHouseRepository
         "CodingAgentSessionEventsClickHouseRepository.sumTokensByModelPerSession",
       );
     }
-    const client = await this.resolveClient(tenantIds[0]!);
 
+    // Tenants of one organization all route to the same endpoint, so this is
+    // one group and one query. A list spanning organizations fans out instead
+    // of reading the others through the first tenant's client and answering
+    // with a subset it cannot see is missing.
+    const groups = await groupTenantsByClient({
+      tenantIds,
+      resolveClient: this.resolveClient,
+    });
+    const rows: SessionModelTotalsRow[] = [];
+    for (const group of groups) {
+      rows.push(
+        ...(await this.sumTokensByModelForClient({
+          ...group,
+          sessionIds,
+          fromMs,
+        })),
+      );
+    }
+    return rows;
+  }
+
+  /** One endpoint's share of the per-model totals. */
+  private async sumTokensByModelForClient({
+    client,
+    tenantIds,
+    sessionIds,
+    fromMs,
+  }: {
+    client: ClickHouseClient;
+    tenantIds: string[];
+    sessionIds: string[];
+    fromMs: number;
+  }): Promise<SessionModelTotalsRow[]> {
     // The inner scope dedups un-merged versions of one row before anything is
     // summed, so a redelivered call cannot be counted twice. `LIMIT 1 BY` is
     // safe here for the same reason it is in `findBySessionId`: every column

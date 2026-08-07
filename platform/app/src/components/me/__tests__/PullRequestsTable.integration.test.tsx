@@ -110,16 +110,70 @@ function renderedStyleOf(element: HTMLElement) {
   };
 }
 
+/**
+ * A fresh element every call. React bails out of a re-render handed the very
+ * same element object, so a shared constant would make `rerender` a no-op and
+ * the shrinking-rows case would pass without re-reading anything.
+ */
+const tableElement = () => (
+  <ChakraProvider value={defaultSystem}>
+    <PullRequestsTable projectId="proj-personal" />
+  </ChakraProvider>
+);
+
 function renderTable() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <PullRequestsTable projectId="proj-personal" />
-    </ChakraProvider>,
-  );
+  return render(tableElement());
+}
+
+/**
+ * Tab until the element holds focus, the way a keyboard reader reaches it, or
+ * give up once the whole order has been walked. Walking the real focus order is
+ * the point: calling `focus()` would prove the element accepts focus without
+ * proving anything can get to it.
+ */
+async function tabTo({
+  user,
+  element,
+}: {
+  user: ReturnType<typeof userEvent.setup>;
+  element: HTMLElement;
+}) {
+  for (let step = 0; step < 30 && document.activeElement !== element; step++) {
+    await user.tab();
+  }
+}
+
+/** What a case may pin about a row's money, and what is derived from it. */
+type CostOverrides = {
+  costUsd?: number;
+  billedCostUsd?: number;
+  nonBilledCostUsd?: number;
+};
+
+/**
+ * The three cost numbers a row carries, resolved so they always add up: billed
+ * is what the total leaves once the bundled part is taken out, unless a case
+ * pins it. A case that pins only the total therefore cannot state a billed
+ * figure larger than what was spent.
+ */
+function costSplit({
+  over,
+  defaultCostUsd,
+}: {
+  over: CostOverrides;
+  defaultCostUsd: number;
+}) {
+  const costUsd = over.costUsd ?? defaultCostUsd;
+  const nonBilledCostUsd = over.nonBilledCostUsd ?? 0;
+  return {
+    costUsd,
+    nonBilledCostUsd,
+    billedCostUsd: over.billedCostUsd ?? costUsd - nonBilledCostUsd,
+  };
 }
 
 /** One mapped pull request row, filled in around whatever a case pins. */
-function mappedRow(over: Record<string, unknown> = {}) {
+function mappedRow(over: Record<string, unknown> & CostOverrides = {}) {
   return {
     repositoryHost: "github.com",
     repositoryFullName: "acme/widgets",
@@ -139,28 +193,24 @@ function mappedRow(over: Record<string, unknown> = {}) {
     cacheReadTokens: 3_000,
     cacheCreationTokens: 4_000,
     totalTokens: 10_000,
-    costUsd: 12.5,
-    billedCostUsd: 12.5,
-    nonBilledCostUsd: 0,
     modelBreakdown: [],
     contributorsSummary: [],
     ...over,
+    ...costSplit({ over, defaultCostUsd: 12.5 }),
   };
 }
 
 /** One unlinked branch rollup. */
-function unlinkedRow(over: Record<string, unknown> = {}) {
+function unlinkedRow(over: Record<string, unknown> & CostOverrides = {}) {
   return {
     repositoryHost: "github.com",
     repositoryFullName: "acme/widgets",
     headBranch: "feat/git-context",
     sessionsCount: 3,
     totalTokens: 1_240_000,
-    costUsd: 4.25,
-    billedCostUsd: 4.25,
-    nonBilledCostUsd: 0,
     repoCovered: false,
     ...over,
+    ...costSplit({ over, defaultCostUsd: 4.25 }),
   };
 }
 
@@ -342,6 +392,32 @@ describe("the personal Pull Requests table", () => {
     });
   });
 
+  describe("given a reader who navigates by keyboard", () => {
+    /** @scenario "A comparison is reachable without a pointer" */
+    it("reaches a numeric column's comparison and opens it on focus", async () => {
+      pinUsage({
+        rows: [
+          mappedRow(),
+          mappedRow({ prNumber: 4219, totalTokens: 5_000, costUsd: 4 }),
+          mappedRow({ prNumber: 4220, totalTokens: 2_000, costUsd: 1 }),
+        ],
+        unlinked: [],
+        connection: { connected: true, installUrl: INSTALL_URL },
+      });
+      const user = userEvent.setup();
+      renderTable();
+
+      const trigger = screen.getByText("10.0K").closest("[tabindex]");
+      expect(trigger).toHaveAttribute("tabindex", "0");
+      await tabTo({ user, element: trigger as HTMLElement });
+
+      expect(document.activeElement).toBe(trigger);
+      expect(
+        await screen.findByText(/of the p95 of the visible pull requests/i),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("given a listed pull request", () => {
     beforeEach(() => {
       pinUsage({
@@ -420,6 +496,43 @@ describe("the personal Pull Requests table", () => {
 
       expect(screen.getByText("Pull request 11")).toBeInTheDocument();
       expect(screen.queryByText("Pull request 0")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the rows shrink under the page the reader is on", () => {
+    /** @scenario "A page beyond the last one falls back rather than emptying the table" */
+    it("falls back to the last page that still has rows rather than showing none", async () => {
+      const pullRequests = Array.from({ length: 12 }, (_, index) =>
+        mappedRow({
+          prNumber: 5000 + index,
+          title: `Pull request ${index}`,
+          prCreatedAtMs: Date.parse("2026-07-01T09:00:00Z") - index * 1000,
+        }),
+      );
+      pinUsage({
+        rows: pullRequests,
+        unlinked: [],
+        connection: { connected: true, installUrl: INSTALL_URL },
+      });
+      const user = userEvent.setup();
+      const { rerender } = renderTable();
+
+      await user.click(screen.getByTestId("pagination-size-10"));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+      expect(screen.getByText("Pull request 11")).toBeInTheDocument();
+
+      // A refetch that drops rows leaves the reader on a page past the end.
+      pinUsage({
+        rows: pullRequests.slice(0, 3),
+        unlinked: [],
+        connection: { connected: true, installUrl: INSTALL_URL },
+      });
+      rerender(tableElement());
+
+      expect(screen.getByText("Pull request 0")).toBeInTheDocument();
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "Page 1 of 1",
+      );
     });
   });
 

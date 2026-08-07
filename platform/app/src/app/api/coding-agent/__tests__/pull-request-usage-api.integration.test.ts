@@ -25,6 +25,18 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { CodingAgentSessionService } from "~/server/app-layer/coding-agent/coding-agent-session.service";
+import { PullRequestUsageService } from "~/server/app-layer/coding-agent/pull-request-usage.service";
+import { NullCodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
+import { NullCodingAgentSessionEventsRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
+import { NullCodingAgentTraceSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
+import { NullSessionMetricSeriesRepository } from "~/server/app-layer/coding-agent/repositories/session-metric-series.repository";
+import { GithubInstallationsService } from "~/server/app-layer/github/github-installations.service";
+import { GithubAppTokenService } from "~/server/app-layer/github/githubAppToken";
+import { NullGithubInstallationsRepository } from "~/server/app-layer/github/repositories/github-installations.repository";
+import { PrismaGithubPullRequestsRepository } from "~/server/app-layer/github/repositories/github-pull-requests.prisma.repository";
+import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -32,8 +44,22 @@ import publishedSpec from "../../openapiLangWatch.json";
 import { app } from "../[[...route]]/app";
 
 const ns = nanoid(8);
-const USAGE_PATH =
-  "/api/coding-agent/pull-request-usage?repository=acme/widgets&pullRequest=1";
+const USAGE_SPEC_PATH = "/api/coding-agent/pull-request-usage";
+const USAGE_PATH = `${USAGE_SPEC_PATH}?repository=acme/widgets&pullRequest=1`;
+
+/** One node of the generated JSON schema, to the depth this suite reads it. */
+interface SpecSchemaNode {
+  properties?: Record<string, SpecSchemaNode>;
+  required?: string[];
+  items?: SpecSchemaNode;
+}
+
+interface SpecOperation {
+  responses?: Record<
+    string,
+    { content?: Record<string, { schema?: SpecSchemaNode }> }
+  >;
+}
 
 let organization: Organization;
 let team: Team;
@@ -42,6 +68,8 @@ let callerUserId: string;
 let sharedProject: { id: string; apiKey: string };
 /** Somebody else's personal workspace, which the caller may nonetheless view. */
 let otherUsersPersonalProjectId: string;
+/** The caller's own personal workspace, the one shape this read answers for. */
+let callerPersonalProjectId: string;
 /** A user-bound key for the caller, carrying an org-wide admin binding. */
 let callerToken: string;
 
@@ -121,6 +149,67 @@ beforeAll(async () => {
   });
   otherUsersPersonalProjectId = otherPersonal.id;
 
+  const callerPersonal = await prisma.project.create({
+    data: {
+      id: `project_${nanoid()}`,
+      name: "Caller Workspace",
+      slug: `--test-caller-${ns}`,
+      language: "typescript",
+      framework: "other",
+      apiKey: `sk-lw-${nanoid(48)}`,
+      teamId: team.id,
+      isPersonal: true,
+      ownerUserId: callerUserId,
+    },
+  });
+  callerPersonalProjectId = callerPersonal.id;
+
+  await prisma.githubPullRequest.create({
+    data: {
+      organizationId: organization.id,
+      repositoryHost: "github.com",
+      repositoryFullName: "acme/widgets",
+      headBranch: "feat/linkage",
+      prNumber: 1,
+      htmlUrl: "https://github.com/acme/widgets/pull/1",
+      title: "Link sessions to pull requests",
+      state: "open",
+      isDraft: false,
+      authorLogin: "acme-dev",
+      prCreatedAt: new Date("2026-07-01T09:00:00Z"),
+    },
+  });
+
+  // The route reads through the App, and the test preset's pull-request store
+  // is a null one, so a mapped pull request would still answer "not mapped".
+  // Only the mapping is real here: sessions stay null, which is what makes the
+  // answered rollup empty and its audit record say zero projects contributed.
+  const nullSessions = new NullCodingAgentSessionRepository();
+  const nullSessionEvents = new NullCodingAgentSessionEventsRepository();
+  const sessions = new CodingAgentSessionService({
+    sessions: nullSessions,
+    traceSessions: new NullCodingAgentTraceSessionRepository(),
+    metricSeries: new NullSessionMetricSeriesRepository(),
+    sessionEvents: nullSessionEvents,
+  });
+  globalForApp.__langwatch_app = createTestApp({
+    codingAgents: {
+      sessions,
+      pullRequestUsage: new PullRequestUsageService({
+        pullRequests: new PrismaGithubPullRequestsRepository(prisma),
+        sessions: nullSessions,
+        personalSessions: sessions,
+        sessionEvents: nullSessionEvents,
+        installations: new GithubInstallationsService(
+          new NullGithubInstallationsRepository(),
+          new GithubAppTokenService("", "", null),
+        ),
+        resolveOrganizationId: async () => organization.id,
+        isSourceNonBillable: async () => false,
+      }),
+    },
+  });
+
   // Org-wide admin, so the caller genuinely holds `traces:view` on the other
   // user's workspace. The refusal has to come from ownership, not permission.
   await prisma.roleBinding.create({
@@ -152,12 +241,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await resetApp();
   const orgUsers = await prisma.organizationUser
     .findMany({ where: { organizationId: organization.id } })
     .catch(() => []);
   // Bindings before keys: a key-scoped RoleBinding requires its ApiKey, so
   // deleting the key first is refused outright.
   await cleanupTestRows(prisma, [
+    ["auditLog", { organizationId: organization.id }],
+    ["githubPullRequest", { organizationId: organization.id }],
     ["roleBinding", { organizationId: organization.id }],
     ["apiKey", { organizationId: organization.id }],
     ["project", { teamId: team.id }],
@@ -208,20 +300,68 @@ describe("Feature: Pull request usage REST API", () => {
     });
   });
 
+  describe("given a personal-workspace key reading a mapped pull request", () => {
+    describe("when the pull request usage is read", () => {
+      /** @scenario "A pull request usage read over the API is recorded" */
+      it("records the read against the caller, the organization and the pull request", async () => {
+        const res = await app.request(USAGE_PATH, {
+          headers: authHeaders({
+            apiKey: callerToken,
+            projectId: callerPersonalProjectId,
+          }),
+        });
+
+        expect(res.status).toBe(200);
+
+        const recorded = await prisma.auditLog.findFirst({
+          where: {
+            organizationId: organization.id,
+            action: "codingAgents.pullRequestUsage",
+          },
+        });
+        expect(recorded?.userId).toBe(callerUserId);
+        expect(recorded?.targetKind).toBe("pullRequest");
+        expect(recorded?.targetId).toBe("github.com/acme/widgets#1");
+        expect(recorded?.args).toMatchObject({
+          repository: "acme/widgets",
+          pullRequest: 1,
+          contributingProjectCount: 0,
+        });
+      });
+    });
+  });
+
   describe("given the published API document", () => {
-    /** The 200 answer's own property map, as the generated document holds it. */
-    const answer = (): Record<
-      string,
-      {
-        properties?: Record<string, unknown>;
-        required?: string[];
-        items?: { required?: string[] };
+    /**
+     * The 200 answer's own property map, as the generated document holds it.
+     *
+     * Each step down to it is checked and named: a regeneration that drops the
+     * route, the verb or the response would otherwise blow up on a property of
+     * undefined several levels in, saying nothing about which of them went
+     * missing, which is the only thing this suite exists to report.
+     */
+    const answer = (): Record<string, SpecSchemaNode> => {
+      const paths = (
+        publishedSpec as unknown as {
+          paths?: Record<string, { get?: SpecOperation }>;
+        }
+      ).paths;
+      const operation = paths?.[USAGE_SPEC_PATH]?.get;
+      if (!operation) {
+        throw new Error(
+          `GET ${USAGE_SPEC_PATH} is missing from the generated OpenAPI document`,
+        );
       }
-    > => {
-      const paths = (publishedSpec as unknown as { paths: Record<string, any> })
-        .paths;
-      return paths["/api/coding-agent/pull-request-usage"].get.responses["200"]
-        .content["application/json"].schema.properties;
+
+      const properties =
+        operation.responses?.["200"]?.content?.["application/json"]?.schema
+          ?.properties;
+      if (!properties) {
+        throw new Error(
+          `GET ${USAGE_SPEC_PATH} publishes no 200 JSON schema in the generated OpenAPI document`,
+        );
+      }
+      return properties;
     };
 
     it("publishes the billed and not billed halves on every row and on the totals", () => {

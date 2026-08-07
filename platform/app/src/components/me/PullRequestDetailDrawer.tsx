@@ -4,7 +4,6 @@ import {
   Heading,
   HStack,
   Skeleton,
-  Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -21,19 +20,24 @@ import {
   formatTokens,
 } from "~/features/traces-v2/utils/formatters";
 import { useDrawer } from "~/hooks/useDrawer";
-import { api, type RouterOutputs } from "~/utils/api";
+import { api } from "~/utils/api";
 
+import { ContributorsSection } from "./pullRequestDetail/ContributorsSection";
+import {
+  type DetailPayload,
+  MISSING_VALUE,
+} from "./pullRequestDetail/detailPayload";
+import { ModelsSection } from "./pullRequestDetail/ModelsSection";
+import { SessionsSection } from "./pullRequestDetail/SessionsSection";
 import { formatShortDate } from "./shortDate";
 
 /**
  * One pull request in full: what it cost, who worked on it, what each model
  * consumed, and the sessions that ran on it.
  *
- * Facts only. The sessions section lists start times, contributors, agents,
- * tokens and cost, and deliberately never a session's title or any of its
- * content: titles are derived content and are gated on the session surfaces
- * that own them. The read behind this drawer carries none, so there is nothing
- * here to leak.
+ * Facts only. Nothing here carries a session's title or any of its content:
+ * titles are derived content and are gated on the session surfaces that own
+ * them, and the read behind this drawer carries none.
  *
  * A contributor is a person when the work ran in their own workspace, and the
  * project itself when it ran in a shared one, where it opens that project's
@@ -41,9 +45,6 @@ import { formatShortDate } from "./shortDate";
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
-
-/** The placeholder for a value a row does not have. */
-const MISSING_VALUE = "—";
 
 type PullRequestStatus = "open" | "draft" | "merged" | "closed";
 
@@ -162,8 +163,6 @@ export function PullRequestDetailDrawer({
   );
 }
 
-type DetailPayload = RouterOutputs["codingAgents"]["pullRequestDetail"];
-
 /** The stored snapshot's own reading of where the pull request stands. */
 function statusOf(
   pullRequest: DetailPayload["pullRequest"],
@@ -173,22 +172,6 @@ function statusOf(
   if (pullRequest.isDraft) return "draft";
   return "open";
 }
-
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({
-  title,
-  children,
-}) => (
-  <VStack align="stretch" gap={2}>
-    <Heading size="sm">{title}</Heading>
-    {children}
-  </VStack>
-);
-
-const EmptySection: React.FC<{ children: string }> = ({ children }) => (
-  <Text fontSize="sm" color="fg.muted">
-    {children}
-  </Text>
-);
 
 const Stat: React.FC<{ label: string; children: React.ReactNode }> = ({
   label,
@@ -243,7 +226,13 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
                 />
               }
             >
-              <Text fontSize="lg" fontWeight="medium" cursor="help">
+              {/* The split lives only in the hover, so it gets a tab stop. */}
+              <Text
+                fontSize="lg"
+                fontWeight="medium"
+                cursor="help"
+                tabIndex={0}
+              >
                 {formatCost(totals.costUsd)}
               </Text>
             </Tooltip>
@@ -264,188 +253,3 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
     </Box>
   );
 };
-
-/**
- * The width a contributor's name is allowed to take.
- *
- * A shared project can be named at any length, and left alone one long name
- * sizes the whole table past the drawer and pushes the numbers out of sight,
- * so the column is bounded and anything longer is cut with the whole name on
- * hover.
- */
-const CONTRIBUTOR_COLUMN_WIDTH = "220px";
-
-/** One contributor's name: a person, or a project that opens its traces. */
-const ContributorName: React.FC<{
-  contributor: {
-    contributorLabel: string;
-    projectSlug: string;
-    contributorIsProject: boolean;
-  };
-}> = ({ contributor }) => (
-  <Table.Cell
-    fontSize="sm"
-    maxWidth={CONTRIBUTOR_COLUMN_WIDTH}
-    truncate
-    title={contributor.contributorLabel}
-  >
-    {contributor.contributorIsProject && contributor.projectSlug ? (
-      <Link href={`/${contributor.projectSlug}/traces`} color="blue.fg">
-        {contributor.contributorLabel}
-      </Link>
-    ) : (
-      contributor.contributorLabel
-    )}
-  </Table.Cell>
-);
-
-const ContributorsSection: React.FC<{
-  contributors: DetailPayload["contributors"];
-}> = ({ contributors }) => (
-  <Section title="Contributors">
-    {contributors.length === 0 ? (
-      <EmptySection>No sessions ran on this pull request yet</EmptySection>
-    ) : (
-      <Table.ScrollArea>
-        <Table.Root size="sm" variant="line">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Contributor</Table.ColumnHeader>
-              <Table.ColumnHeader>Agent</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">Sessions</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">
-                Token cost
-              </Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {contributors.map((contributor) => (
-              <Table.Row key={`${contributor.projectId} ${contributor.agent}`}>
-                <ContributorName contributor={contributor} />
-                <Table.Cell fontSize="sm" color="fg.muted">
-                  {contributor.agent || MISSING_VALUE}
-                </Table.Cell>
-                <Table.Cell textAlign="end" fontSize="sm">
-                  {numeral(contributor.sessionsCount).format("0,0")}
-                </Table.Cell>
-                <Table.Cell textAlign="end" fontSize="sm">
-                  {formatTokens(contributor.totalTokens)}
-                </Table.Cell>
-                <Table.Cell textAlign="end" fontSize="sm">
-                  {contributor.costUsd === null
-                    ? MISSING_VALUE
-                    : formatCost(contributor.costUsd)}
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Table.ScrollArea>
-    )}
-  </Section>
-);
-
-const ModelsSection: React.FC<{
-  models: DetailPayload["modelBreakdown"];
-}> = ({ models }) => {
-  const peak = models.reduce(
-    (max, model) => Math.max(max, model.totalTokens),
-    0,
-  );
-  return (
-    <Section title="Models">
-      {models.length === 0 ? (
-        <EmptySection>
-          No per-call model data for this pull request yet
-        </EmptySection>
-      ) : (
-        <VStack align="stretch" gap={3}>
-          {models.map((model) => (
-            <VStack key={model.model} align="stretch" gap={1}>
-              <HStack justify="space-between" gap={3}>
-                <Text fontSize="sm" truncate>
-                  {model.model}
-                </Text>
-                <HStack gap={3} flexShrink={0}>
-                  <Text fontSize="sm" color="fg.muted">
-                    {formatTokens(model.totalTokens)} tokens
-                  </Text>
-                  <Text fontSize="sm" color="fg.muted">
-                    {model.costUsd === null
-                      ? MISSING_VALUE
-                      : formatCost(model.costUsd)}
-                  </Text>
-                </HStack>
-              </HStack>
-              <Box
-                height="3px"
-                bg="border.subtle"
-                borderRadius="full"
-                overflow="hidden"
-              >
-                <Box
-                  height="full"
-                  width={`${peak > 0 ? (model.totalTokens / peak) * 100 : 0}%`}
-                  bg="blue.fg"
-                  borderRadius="full"
-                />
-              </Box>
-            </VStack>
-          ))}
-        </VStack>
-      )}
-    </Section>
-  );
-};
-
-const SessionsSection: React.FC<{
-  sessions: DetailPayload["sessions"];
-}> = ({ sessions }) => (
-  <Section title="Sessions">
-    {sessions.length === 0 ? (
-      <EmptySection>No sessions ran on this pull request yet</EmptySection>
-    ) : (
-      <Table.ScrollArea>
-        <Table.Root size="sm" variant="line">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Started</Table.ColumnHeader>
-              <Table.ColumnHeader>Contributor</Table.ColumnHeader>
-              <Table.ColumnHeader>Agent</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">
-                Token cost
-              </Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {sessions.map((session) => (
-              <Table.Row key={session.sessionId}>
-                <Table.Cell fontSize="sm" whiteSpace="nowrap">
-                  {formatShortDate({ timestampMs: session.startedAtMs })}{" "}
-                  {new Date(session.startedAtMs).toLocaleTimeString(undefined, {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Table.Cell>
-                <ContributorName contributor={session} />
-                <Table.Cell fontSize="sm" color="fg.muted">
-                  {session.agent || MISSING_VALUE}
-                </Table.Cell>
-                <Table.Cell textAlign="end" fontSize="sm">
-                  {formatTokens(session.totalTokens)}
-                </Table.Cell>
-                <Table.Cell textAlign="end" fontSize="sm">
-                  {session.costUsd === null
-                    ? MISSING_VALUE
-                    : formatCost(session.costUsd)}
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Table.ScrollArea>
-    )}
-  </Section>
-);

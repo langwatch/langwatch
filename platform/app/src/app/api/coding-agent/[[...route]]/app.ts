@@ -1,3 +1,4 @@
+import { auditLog } from "@ee/audit-log/auditLog";
 import { ValidationError } from "@langwatch/handled-error";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
@@ -261,10 +262,9 @@ function decodeCursor(raw: string): SessionEventsCursor | null {
   }
 }
 
-// The three cost numbers every priced figure carries: what a bundled plan
-// already covered, what was genuinely billed per token, and the list-price
-// total of both. All three are null together for a project the caller may read
-// but not price.
+// The three cost numbers each row and the totals carry: what a bundled plan
+// already covered, what is priced per token, and the list-price total of both.
+// All three are null together for a project the caller may read but not price.
 const costSplitShape = {
   costUsd: z.number().nullable(),
   billedCostUsd: z.number().nullable(),
@@ -349,8 +349,12 @@ secured.access(requires("traces:view")).get(
       "Assistant usage for one pull request: sessions, tokens and cost, " +
       "grouped by contributor and agent, plus per-model totals, " +
       "over the pull request's whole lifetime rather than a time window. " +
-      "Cost is reported three ways: what was billed per token, what a bundled " +
-      "subscription already covered, and the list-price total of both. " +
+      "Every row and the totals split cost three ways: the part priced per " +
+      "token, the part a bundled subscription already covers, and the " +
+      "list-price total of both. Per-model totals carry the list price only. " +
+      "Cost is calculated from the tokens the agent reported and LangWatch's " +
+      "model prices, so it estimates spend rather than restating a provider " +
+      "invoice. " +
       "Requires a personal-project API key; rows appear only for projects the " +
       "calling user may view, and cost only for those they may price.",
     parameters: [
@@ -420,15 +424,37 @@ secured.access(requires("traces:view")).get(
       organizationId,
     });
 
-    return c.json(
+    const usage =
       await getApp().codingAgents.pullRequestUsage.getPullRequestUsage({
         organizationId,
         repositoryHost: query.data.host,
         repositoryFullName: query.data.repository,
         prNumber: query.data.pullRequest,
         ...scope,
-      }),
-    );
+      });
+
+    // This answer names people, so who read it stays attributable. Awaited
+    // before the answer leaves, so a read is never served unrecorded. Never
+    // the contributors themselves: how many projects fed the rollup says how
+    // wide the read reached without copying the names into a second store
+    // that outlives it.
+    await auditLog({
+      userId: callerUserId,
+      organizationId,
+      action: "codingAgents.pullRequestUsage",
+      targetKind: "pullRequest",
+      targetId: `${query.data.host}/${query.data.repository}#${query.data.pullRequest}`,
+      args: {
+        repository: query.data.repository,
+        host: query.data.host,
+        pullRequest: query.data.pullRequest,
+        contributingProjectCount: new Set(
+          usage.rows.map((row) => row.projectId),
+        ).size,
+      },
+    });
+
+    return c.json(usage);
   },
 );
 

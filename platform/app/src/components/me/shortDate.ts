@@ -14,6 +14,6 @@ export function formatShortDate({
 }): string {
   const date = new Date(timestampMs);
   if (Number.isNaN(date.getTime())) return "";
-  const sameYear = date.getFullYear() === new Date(now).getFullYear();
-  return format(date, sameYear ? "MMM d" : "MMM d, yyyy");
+  const isSameYear = date.getFullYear() === new Date(now).getFullYear();
+  return format(date, isSameYear ? "MMM d" : "MMM d, yyyy");
 }

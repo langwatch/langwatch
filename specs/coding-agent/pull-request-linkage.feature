@@ -418,6 +418,21 @@ Rule: The Pull Requests table compares a row against the page it is on
     When the page is changed
     Then the next pull requests are listed
 
+  @integration
+  Scenario: A page beyond the last one falls back rather than emptying the table
+    Given a reader on the last page of pull requests
+    When a refresh leaves fewer pull requests than that page starts at
+    Then the table shows the last page that still has rows
+
+  # The comparison is the only place a row's standing against its peers is
+  # written down, so leaving it on hover alone would put it out of reach of
+  # anyone reading without a pointer.
+  @integration
+  Scenario: A comparison is reachable without a pointer
+    Given a page of pull requests carrying comparisons
+    When the keyboard focus lands on a numeric column
+    Then that column's comparison opens
+
 Rule: The organization-wide usage read is RBAC-scoped and numbers only
 
   @integration
@@ -454,6 +469,17 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     Given a repository and pull request number no mapping knows
     When the pull request usage is read
     Then the caller receives the pull request not mapped failure
+
+  # The answer names people, so who asked for it is written down. What the
+  # record must NOT carry is the names themselves: an audit row outlives the
+  # read, and copying the contributors into it would turn accountability into a
+  # second place the same people are listed.
+  @integration
+  Scenario: A pull request usage read over the API is recorded
+    Given a personal-workspace key reading a mapped pull request
+    When the pull request usage is read
+    Then the read is recorded against the caller, the organization and the pull request
+    And the record says how many projects contributed without naming anyone
 
   # The rollup answers for a PERSON across the organization, so it needs one.
   # Both refusals carry a code rather than only a sentence, because the callers

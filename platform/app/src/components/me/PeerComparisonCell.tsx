@@ -115,7 +115,17 @@ export const PeerComparisonCell: React.FC<PeerComparisonCellProps> = ({
   const content = tooltipContent ?? sentence;
 
   const body = (
-    <VStack gap={1} align="end" width="full" cursor={content ? "help" : "auto"}>
+    <VStack
+      gap={1}
+      align="end"
+      width="full"
+      cursor={content ? "help" : "auto"}
+      // A tab stop only where there is something behind it: the comparison is
+      // the only place this row's standing against its peers is written down,
+      // so it cannot be reachable by pointer alone. The tooltip opens on focus
+      // as well as hover and points its trigger at the content it opened.
+      tabIndex={content ? 0 : undefined}
+    >
       <Text fontSize="sm">{formatValue(value)}</Text>
       <ComparisonBar value={value} p95={p95} hasStats={hasStats} />
     </VStack>

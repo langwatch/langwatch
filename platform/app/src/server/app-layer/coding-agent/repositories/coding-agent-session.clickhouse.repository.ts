@@ -1,8 +1,10 @@
 import { performance } from "node:perf_hooks";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import { asNumber, asStringArray } from "~/server/clickhouse/recordDecode";
+import { groupTenantsByClient } from "~/server/clickhouse/tenantClientGroups";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   CodingAgentSessionMetricSeriesRow,
@@ -686,10 +688,10 @@ export class CodingAgentSessionClickHouseRepository
    *
    * `TenantId IN (...)` comes first, as every read of this table does. Several
    * tenants share one query here because a pull request's cost spans the
-   * projects of the organization that owns it, and per-tenant ClickHouse
-   * routing is per-ORGANIZATION, so every id in the list resolves to the same
-   * endpoint; the first one picks it, exactly as the gateway spend reads do.
-   * The service is what guarantees the list belongs to a single organization.
+   * projects of the organization that owns it, and ClickHouse routing is
+   * per-ORGANIZATION, so those all resolve to one endpoint and one query. A
+   * list that did span organizations fans out per endpoint and the answers
+   * merge, so the read stays whole either way.
    *
    * `startedAtFromMs` is required. `StartedAt` is the partition key, and this
    * read is not anchored on a session id, so without a lower bound it opens
@@ -731,8 +733,45 @@ export class CodingAgentSessionClickHouseRepository
         "CodingAgentSessionClickHouseRepository.listByRepositoryBranch",
       );
     }
-    const client = await this.resolveClient(tenantIds[0]!);
 
+    const groups = await groupTenantsByClient({
+      tenantIds,
+      resolveClient: this.resolveClient,
+    });
+    const rows: CodingAgentBranchSessionRow[] = [];
+    for (const group of groups) {
+      rows.push(
+        ...(await this.listBranchSessionsForClient({
+          ...group,
+          repositoryHost,
+          repositoryOwner,
+          repositoryName,
+          branches,
+          startedAtFromMs,
+        })),
+      );
+    }
+    return rows;
+  }
+
+  /** One endpoint's share of a repository's branch sessions. */
+  private async listBranchSessionsForClient({
+    client,
+    tenantIds,
+    repositoryHost,
+    repositoryOwner,
+    repositoryName,
+    branches,
+    startedAtFromMs,
+  }: {
+    client: ClickHouseClient;
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]> {
     const result = await client.query({
       query: `
         SELECT

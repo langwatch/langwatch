@@ -17,7 +17,7 @@ import {
 } from "~/features/traces-v2/utils/formatters";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 
 import {
   PeerComparisonCell,
@@ -67,23 +67,24 @@ interface LiveStatus {
   mappedAt: Date | null;
 }
 
-interface ModelUsage {
-  model: string;
-  totalTokens: number;
-  costUsd: number | null;
-}
+/** The whole read, as the tRPC procedure defines it. */
+type UsagePayload = RouterOutputs["codingAgents"]["pullRequestUsage"];
+
+/** One mapped pull request, as the read hands it over. */
+type MappedPullRequestPayload = UsagePayload["rows"][number];
+
+/** One branch whose pull request has not been opened (or mapped) yet. */
+type UnlinkedBranchPayload = UsagePayload["unlinked"][number];
+
+/** What one model consumed on a pull request. */
+type ModelUsage = MappedPullRequestPayload["modelBreakdown"][number];
 
 /**
  * Who worked on a pull request. A contributor is a person when the work ran in
  * their own workspace, and the project itself when it ran in a shared one.
  */
-interface ContributorSummary {
-  contributorLabel: string;
-  projectId: string;
-  projectSlug: string;
-  contributorIsProject: boolean;
-  sessionsCount: number;
-}
+type ContributorSummary =
+  MappedPullRequestPayload["contributorsSummary"][number];
 
 /**
  * One line of the table. A pull request row carries its number, title and
@@ -256,9 +257,15 @@ const ListedPullRequests: React.FC<{
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
+  // A refetch can leave fewer rows than the page the reader is already on, and
+  // the pager clamps only what it prints. Slicing on the stored page would
+  // empty the table under a footer reading "Page 1 of 1", so the slice, the
+  // pager and the next click all work off the clamped page.
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
   const visibleRows = useMemo(
-    () => rows.slice((page - 1) * pageSize, page * pageSize),
-    [rows, page, pageSize],
+    () => rows.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [rows, currentPage, pageSize],
   );
   const statuses = useLiveStatuses({ projectId, rows: visibleRows });
   const { tokenStats, costStats } = usePageStats(visibleRows);
@@ -288,7 +295,7 @@ const ListedPullRequests: React.FC<{
         </Table.Body>
       </ListTable>
       <Pagination
-        page={page}
+        page={currentPage}
         pageSize={pageSize}
         totalCount={rows.length}
         pageSizeOptions={PAGE_SIZE_OPTIONS}
@@ -514,7 +521,9 @@ const SessionsCell: React.FC<{ row: PullRequestListRow }> = ({ row }) => {
       }
       positioning={{ placement: "left" }}
     >
-      <Text as="span" cursor="help">
+      {/* Who ran the sessions is written down nowhere else on this row, so the
+          hover has a tab stop behind it. */}
+      <Text as="span" cursor="help" tabIndex={0}>
         {count}
       </Text>
     </Tooltip>
@@ -545,7 +554,7 @@ const ModelsCell: React.FC<{ models: ModelUsage[] }> = ({ models }) => {
       }
       positioning={{ placement: "left" }}
     >
-      <Text fontSize="xs" color="fg.muted" cursor="help" truncate>
+      <Text fontSize="xs" color="fg.muted" cursor="help" truncate tabIndex={0}>
         {primary!.model}
         {rest.length > 0 ? ` +${rest.length}` : ""}
       </Text>
@@ -652,6 +661,9 @@ const StatusChip: React.FC<{
         colorPalette="gray"
         color="fg.subtle"
         data-status-source="snapshot"
+        // How stale the answer is only exists in the hover, so it gets a tab
+        // stop too.
+        tabIndex={0}
       >
         {label}
       </Badge>
@@ -668,7 +680,7 @@ const RowActionsMenu: React.FC<{
   const githubUrl =
     row.pullRequest?.htmlUrl ??
     `https://${row.repositoryHost}/${row.repositoryFullName}/tree/${row.headBranch}`;
-  const offerLinking = !row.repositoryCovered && installUrl !== null;
+  const canOfferLinking = !row.repositoryCovered && installUrl !== null;
 
   return (
     // The row itself opens the detail, so every control inside it has to stop
@@ -704,7 +716,7 @@ const RowActionsMenu: React.FC<{
               Open on GitHub
             </a>
           </Menu.Item>
-          {offerLinking &&
+          {canOfferLinking &&
             (canManageOrganization ? (
               <Menu.Item value="link" asChild>
                 <a href={installUrl}>Link this repository</a>
@@ -731,92 +743,62 @@ const RowActionsMenu: React.FC<{
   );
 };
 
-/** One mapped pull request, as the tRPC read hands it over. */
-interface MappedPullRequestPayload {
-  repositoryHost: string;
-  repositoryFullName: string;
-  prNumber: number;
-  title: string;
-  headBranch: string;
-  htmlUrl: string;
-  prCreatedAtMs: number;
-  sessionsCount: number;
-  totalTokens: number;
-  costUsd: number | null;
-  billedCostUsd: number | null;
-  nonBilledCostUsd: number | null;
-  modelBreakdown: ModelUsage[];
-  contributorsSummary: ContributorSummary[];
+function toMappedListRow(row: MappedPullRequestPayload): PullRequestListRow {
+  return {
+    key: `pull-request ${row.repositoryHost} ${row.repositoryFullName} ${row.prNumber}`,
+    repositoryHost: row.repositoryHost,
+    repositoryFullName: row.repositoryFullName,
+    headBranch: row.headBranch,
+    pullRequest: {
+      number: row.prNumber,
+      title: row.title,
+      htmlUrl: row.htmlUrl,
+      openedAtMs: row.prCreatedAtMs,
+    },
+    sessionsCount: row.sessionsCount,
+    totalTokens: row.totalTokens,
+    costUsd: row.costUsd,
+    billedCostUsd: row.billedCostUsd,
+    nonBilledCostUsd: row.nonBilledCostUsd,
+    modelBreakdown: row.modelBreakdown,
+    contributorsSummary: row.contributorsSummary,
+    // A mapped pull request came through the connection, so the repository it
+    // lives in is covered by definition.
+    repositoryCovered: true,
+  };
 }
 
-interface UnlinkedBranchPayload {
-  repositoryHost: string;
-  repositoryFullName: string;
-  headBranch: string;
-  sessionsCount: number;
-  totalTokens: number;
-  costUsd: number | null;
-  billedCostUsd: number | null;
-  nonBilledCostUsd: number | null;
-  repoCovered: boolean;
+function toBranchListRow(row: UnlinkedBranchPayload): PullRequestListRow {
+  return {
+    key: `branch ${row.repositoryHost} ${row.repositoryFullName} ${row.headBranch}`,
+    repositoryHost: row.repositoryHost,
+    repositoryFullName: row.repositoryFullName,
+    headBranch: row.headBranch,
+    pullRequest: null,
+    sessionsCount: row.sessionsCount,
+    totalTokens: row.totalTokens,
+    costUsd: row.costUsd,
+    billedCostUsd: row.billedCostUsd,
+    nonBilledCostUsd: row.nonBilledCostUsd,
+    modelBreakdown: [],
+    contributorsSummary: [],
+    repositoryCovered: row.repoCovered,
+  };
 }
 
 /**
  * Flatten the read into one ordered list: mapped pull requests newest first,
  * then the branches still waiting for one.
  */
-function toListRows(
-  data:
-    | {
-        rows: MappedPullRequestPayload[];
-        unlinked: UnlinkedBranchPayload[];
-      }
-    | undefined,
-): PullRequestListRow[] {
+function toListRows(data: UsagePayload | undefined): PullRequestListRow[] {
   if (!data) return [];
 
-  const mapped = [...data.rows]
-    .sort((a, b) => b.prCreatedAtMs - a.prCreatedAtMs)
-    .map<PullRequestListRow>((row) => ({
-      key: `pull-request ${row.repositoryHost} ${row.repositoryFullName} ${row.prNumber}`,
-      repositoryHost: row.repositoryHost,
-      repositoryFullName: row.repositoryFullName,
-      headBranch: row.headBranch,
-      pullRequest: {
-        number: row.prNumber,
-        title: row.title,
-        htmlUrl: row.htmlUrl,
-        openedAtMs: row.prCreatedAtMs,
-      },
-      sessionsCount: row.sessionsCount,
-      totalTokens: row.totalTokens,
-      costUsd: row.costUsd,
-      billedCostUsd: row.billedCostUsd,
-      nonBilledCostUsd: row.nonBilledCostUsd,
-      modelBreakdown: row.modelBreakdown ?? [],
-      contributorsSummary: row.contributorsSummary ?? [],
-      // A mapped pull request came through the connection, so the repository
-      // it lives in is covered by definition.
-      repositoryCovered: true,
-    }));
-
-  const unlinked = [...data.unlinked]
-    .sort((a, b) => b.sessionsCount - a.sessionsCount)
-    .map<PullRequestListRow>((row) => ({
-      key: `branch ${row.repositoryHost} ${row.repositoryFullName} ${row.headBranch}`,
-      repositoryHost: row.repositoryHost,
-      repositoryFullName: row.repositoryFullName,
-      headBranch: row.headBranch,
-      pullRequest: null,
-      sessionsCount: row.sessionsCount,
-      totalTokens: row.totalTokens,
-      costUsd: row.costUsd,
-      billedCostUsd: row.billedCostUsd,
-      nonBilledCostUsd: row.nonBilledCostUsd,
-      modelBreakdown: [],
-      contributorsSummary: [],
-      repositoryCovered: row.repoCovered,
-    }));
-
-  return [...mapped, ...unlinked];
+  return [
+    ...[...data.rows]
+      .sort((a, b) => b.prCreatedAtMs - a.prCreatedAtMs)
+      .map(toMappedListRow),
+    ...[...data.unlinked]
+      .sort((a, b) => b.sessionsCount - a.sessionsCount)
+      .map(toBranchListRow),
+  ];
 }

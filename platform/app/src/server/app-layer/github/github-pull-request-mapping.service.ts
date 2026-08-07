@@ -423,16 +423,17 @@ export class GithubPullRequestMappingService {
     }
 
     const existing = await this.deps.repository.findBranchCheck(scope);
-    const found = pullRequests.length > 0;
-    const attempts = found ? 0 : (existing?.attempts ?? 0) + 1;
+    const hasPullRequests = pullRequests.length > 0;
+    const attempts = hasPullRequests ? 0 : (existing?.attempts ?? 0) + 1;
     await this.deps.repository.upsertBranchCheck({
       ...scope,
       lastCheckedAt: now,
       prCount: pullRequests.length,
-      // Found clears the negative cache outright: the branch has an answer, and
-      // a stale notFoundAt would keep the sweep asking about it forever.
-      notFoundAt: found ? null : (existing?.notFoundAt ?? now),
-      recheckAfter: found
+      // A pull request clears the negative cache outright: the branch has an
+      // answer, and a stale notFoundAt would keep the sweep asking about it
+      // forever.
+      notFoundAt: hasPullRequests ? null : (existing?.notFoundAt ?? now),
+      recheckAfter: hasPullRequests
         ? null
         : new Date(now.getTime() + backoffMsFor(attempts)),
       attempts,
