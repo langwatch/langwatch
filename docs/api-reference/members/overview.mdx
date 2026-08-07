@@ -1,0 +1,81 @@
+---
+title: "Overview"
+description: "Manage the people in the organization: list them, read one with the teams they reach, change an organization role, disable or re-enable access, remove someone, and read the full breakdown of what a member can reach."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+The Members API manages the people already in your organization. The organization comes from the credential, so the paths carry only the member's user id.
+
+Adding someone new is a different thing: people join through an invite they accept, so start at [Invites](/api-reference/invites/overview).
+
+## Authentication
+
+Requires an **organization-level API key**. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+Reading the list and a single member needs `organization:view`. Changing, removing, and reading the access breakdown need `organization:manage`.
+
+## Endpoints
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| `GET` | `/api/organization/members` | `organization:view` | List members with their role and status |
+| `GET` | `/api/organization/members/{userId}` | `organization:view` | Read one member and the teams they reach |
+| `PATCH` | `/api/organization/members/{userId}` | `organization:manage` | Change the organization role, or disable and re-enable access |
+| `DELETE` | `/api/organization/members/{userId}` | `organization:manage` | Remove a member from the organization and its teams |
+| `GET` | `/api/organization/members/{userId}/access` | `organization:manage` | Read everything the member can reach and where it comes from |
+
+Disabled members are left out of the list unless you pass `includeDisabled=true`.
+
+## Disable, or remove
+
+Disabling keeps the membership and everything attached to it, and takes away the role that membership carried, so the person reaches nothing in the organization any more. Their live sessions are ended in the same call rather than running until the token happens to expire. Removing takes them out of the organization and every team in it.
+
+Both are undoable in the sense that you can bring the person back, but only disabling keeps the membership in place, so it is the safer move while an offboarding is still in progress.
+
+Re-enabling a member takes a seat back, so it is checked against your plan and can be refused with `member_seat_limit_reached`.
+
+## Guard rails
+
+- The member the credential acts as cannot remove or disable themselves: `cannot_remove_self` and `cannot_disable_self`.
+- The last active administrator cannot be disabled or demoted: `cannot_disable_last_admin` and `cannot_demote_last_admin`. An organization with nobody who can administer it cannot be recovered from inside the product.
+- A `PATCH` carries exactly one of `role` or `disabled`. Sending both, or neither, is a `validation_error`.
+- Personal workspaces are not organization access, so they are not listed on a member and cannot be managed here.
+- Changing a role can leave a team with no administrator. The response reports those teams in `teamsLeftWithoutAdmin` so the caller can fix it rather than discovering it later.
+
+## The access breakdown
+
+`GET /api/organization/members/{userId}/access` answers the question an auditor asks: not what roles someone has, but what they can reach and why. It returns the organization role and its permissions, every group the member belongs to with the bindings that group carries, and the bindings held directly, each with the permissions it grants and the scope it grants them on.
+
+```bash
+curl https://app.langwatch.ai/api/organization/members/user_abc123/access \
+  -H "Authorization: Bearer sk-lw-..."
+```
+
+## Typical flow
+
+```bash
+# Who is in the organization
+curl "https://app.langwatch.ai/api/organization/members?includeDisabled=true" \
+  -H "Authorization: Bearer sk-lw-..."
+
+# Promote someone
+curl -X PATCH https://app.langwatch.ai/api/organization/members/user_abc123 \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"role": "ADMIN"}'
+
+# Offboard: disable first, remove once the handover is done
+curl -X PATCH https://app.langwatch.ai/api/organization/members/user_abc123 \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"disabled": true}'
+```

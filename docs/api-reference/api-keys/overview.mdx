@@ -12,19 +12,45 @@ The API Keys API lets you create, list, and revoke API keys for your organizatio
 
 ## Authentication
 
-Requires an **organization-level API key** with `organization:manage` permission. Pass it as a Bearer token:
+Requires an **organization-level API key**. Pass it as a Bearer token:
 
 ```
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
+Reading your own keys needs `organization:view`. Creating, updating and revoking need `organization:manage`, and so does reading or listing keys that belong to somebody else.
+
 ## Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/api-keys` | List all API keys in the organization |
+| `GET` | `/api/api-keys` | List API keys |
 | `POST` | `/api/api-keys` | Create a new API key |
+| `GET` | `/api/api-keys/{id}` | Read one key and the access it carries |
+| `PATCH` | `/api/api-keys/{id}` | Update a key's name, description or access |
 | `DELETE` | `/api/api-keys/{id}` | Revoke an API key |
+
+## Reading a key back
+
+`GET /api/api-keys/{id}` and `PATCH /api/api-keys/{id}` return the same body, and it contains every field a write accepts. `bindings` comes back in exactly the shape `POST` and `PATCH` take, so comparing what you asked for against what the key has is a comparison rather than a translation. The secret itself is never returned: it exists only in the create response.
+
+A key you do not own is readable only with real organization adminness plus `organization:manage`. Without both, the id answers 404 rather than 403, because a 403 would confirm the key exists.
+
+## Updating
+
+`PATCH` is partial at the field level: send `name` alone and only the name changes. `bindings`, when you send them, replace the key's bindings outright, so what you send is what the key has afterwards.
+
+```bash
+curl -X PATCH https://app.langwatch.ai/api/api-keys/<api_key_id> \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CI pipeline (staging only)",
+    "bindings": [
+      { "role": "MEMBER", "scopeType": "PROJECT", "scopeId": "project_abc123" }
+    ]
+  }'
+```
 
 ## Key Types
 
@@ -42,6 +68,8 @@ Created for a specific user. The key's effective permissions are the intersectio
 }
 ```
 
+A personal key is capped by the access of the person it belongs to. It defaults to the caller; `assignedToUserId` mints one for somebody else, and that key is then capped by their access rather than yours.
+
 ### Service Keys
 
 Created without a user association (`userId: null`). Scoped to specific projects via `projectIds`. Each project gets an ADMIN binding automatically.
@@ -57,3 +85,27 @@ Created without a user association (`userId: null`). Scoped to specific projects
 <Info>
 Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific projects when possible.
 </Info>
+
+Because a service key has no person capping it, and a key minted for somebody else is capped by their access rather than yours, both are reserved for organization administrators. A caller who holds `organization:manage` without being an administrator is refused with 403. Minting a personal key for yourself is always allowed: your own access caps it.
+
+## Narrowing what a key may do
+
+Three fields decide how far a key reaches:
+
+- `bindings`, the roles the key holds and where, in the same `role` / `scopeType` / `scopeId` shape [role bindings](/api-reference/role-bindings/overview) use.
+- `permissionMode`, one of `all`, `readonly` or `restricted`. `all` and `readonly` take their meaning from the bindings alone.
+- `permissions`, a list of `resource:action` keys. Only for `restricted` mode, where it is the exact set the key's `CUSTOM` bindings grant.
+
+```json
+{
+  "keyType": "service",
+  "name": "Nightly evaluation runner",
+  "permissionMode": "restricted",
+  "permissions": ["project:view", "traces:view", "evaluations:create"],
+  "bindings": [
+    { "role": "CUSTOM", "scopeType": "PROJECT", "scopeId": "project_abc123" }
+  ]
+}
+```
+
+A key can never grant more than the person or organization behind it already has, whatever you put in these fields.

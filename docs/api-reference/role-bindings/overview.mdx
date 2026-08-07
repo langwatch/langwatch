@@ -1,0 +1,99 @@
+---
+title: "Overview"
+description: "Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+A role binding is one sentence: **this principal has this role, here**. It is how every kind of access in LangWatch is expressed, so this is the API to read when you want to know who can reach what.
+
+Each binding names exactly one principal, and there are three kinds:
+
+| Principal | Field | Used for |
+|-----------|-------|----------|
+| A person | `userId` | Access someone has directly, on top of anything their groups give them |
+| A group | `groupId` | Access every member of the group inherits, including groups synced from your identity provider |
+| An API key | `apiKeyId` | What a service credential may reach, independent of any person |
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/role-bindings` | List bindings, filtered by principal or scope |
+| `POST` | `/api/role-bindings` | Grant one role to one principal at one scope |
+| `PATCH` | `/api/role-bindings/{id}` | Change the role a binding grants |
+| `DELETE` | `/api/role-bindings/{id}` | Delete a binding |
+
+`GET` filters on `userId`, `groupId`, `apiKeyId`, `scopeType` and `scopeId`, and pages with `offset` and `limit`. `totalCount` counts the filtered set, not the organization.
+
+## Scopes
+
+| `scopeType` | `scopeId` | What it reaches |
+|-------------|-----------|-----------------|
+| `ORGANIZATION` | the organization id | Every team and project in the organization |
+| `TEAM` | a team id | That team and all its projects |
+| `PROJECT` | a project id | That project only |
+
+The roles are `ADMIN`, `MEMBER`, `VIEWER`, and `CUSTOM`. `CUSTOM` carries a `customRoleId` from the [Roles](/api-reference/roles/overview) API, and is refused without one (`custom_role_id_required`).
+
+Some permissions only mean something for the organization as a whole, membership and billing among them. Granting one through a team- or project-scoped binding is refused at write time with `org_exclusive_permission_scope`, rather than being accepted and quietly having no effect.
+
+## Creating is idempotent-friendly
+
+A binding is identified by its principal, its role, and its scope. Creating the same combination twice answers 409 `role_binding_already_exists`, which a provisioning tool can read as "already done" instead of a failure. A `PATCH` changes the role; the principal and the scope stay as they are, so moving a grant somewhere else means a new binding.
+
+```bash
+# A group of engineers gets MEMBER on one team
+curl -X POST https://app.langwatch.ai/api/role-bindings \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "groupId": "group_abc123",
+    "role": "MEMBER",
+    "scopeType": "TEAM",
+    "scopeId": "team_abc123"
+  }'
+
+# A CI key gets a narrow custom role on one project
+curl -X POST https://app.langwatch.ai/api/role-bindings \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKeyId": "<api_key_id>",
+    "role": "CUSTOM",
+    "customRoleId": "<custom_role_id>",
+    "scopeType": "PROJECT",
+    "scopeId": "project_abc123"
+  }'
+```
+
+## `legacyAccessNotice`
+
+A create response can carry `legacyAccessNotice: true`. It means this is the person's first explicit binding, and until now their access came from plain team membership, which this write switches off. Nothing failed, and nothing is blocked: it is there so a tool can tell an operator that this user's access is now described entirely by bindings.
+
+## Errors
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `role_binding_principal_invalid` | 422 | Not exactly one of `userId`, `groupId`, `apiKeyId` |
+| `user_not_in_organization` | 422 | The user is not a member here |
+| `group_not_in_organization` | 422 | The group belongs to another organization |
+| `api_key_not_found` | 404 | No such API key in this organization |
+| `scope_not_in_organization` | 422 | The team or project belongs to another organization |
+| `custom_role_id_required` | 422 | Role is `CUSTOM` with no `customRoleId` |
+| `custom_role_not_assignable` | 422 | That custom role cannot be granted here |
+| `org_exclusive_permission_scope` | 422 | The role carries organization-only permissions, and the scope is a team or project |
+| `role_binding_already_exists` | 409 | That principal already has that role at that scope |
+| `role_binding_not_found` | 404 | No such binding in this organization |

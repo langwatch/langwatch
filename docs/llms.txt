@@ -926,11 +926,86 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Remove group binding](https://langwatch.ai/docs/api-reference/groups/remove-binding.md)
 - [Remove group member](https://langwatch.ai/docs/api-reference/groups/remove-member.md)
 
+## Organization
+
+- [Overview](https://langwatch.ai/docs/api-reference/organization/overview.md): Read and update the organization the calling credential belongs to: its name, support contact, presence and trace sharing settings, and its stored-object storage.
+- [Get organization](https://langwatch.ai/docs/api-reference/organization/get-organization.md)
+- [Update organization](https://langwatch.ai/docs/api-reference/organization/update-organization.md)
+
+## Members
+
+- [Overview](https://langwatch.ai/docs/api-reference/members/overview.md): Manage the people in the organization: list them, read one with the teams they reach, change an organization role, disable or re-enable access, remove someone, and read the full breakdown of what a member can reach.
+- [List members](https://langwatch.ai/docs/api-reference/members/list-members.md)
+- [Get member](https://langwatch.ai/docs/api-reference/members/get-member.md)
+- [Get member access](https://langwatch.ai/docs/api-reference/members/get-member-access.md)
+- [Update member](https://langwatch.ai/docs/api-reference/members/update-member.md)
+- [Remove member](https://langwatch.ai/docs/api-reference/members/remove-member.md)
+
+## Invites
+
+- [Overview](https://langwatch.ai/docs/api-reference/invites/overview.md): Invite people into the organization in batches, with the teams and roles they land on, and list or revoke the invites still waiting to be accepted.
+- [List invites](https://langwatch.ai/docs/api-reference/invites/list-invites.md)
+- [Create invites](https://langwatch.ai/docs/api-reference/invites/create-invites.md)
+- [Revoke invite](https://langwatch.ai/docs/api-reference/invites/revoke-invite.md)
+
+## Roles
+
+- [Overview](https://langwatch.ai/docs/api-reference/roles/overview.md): Build custom roles out of the permission catalog and keep them up to date. A role is a named set of resource and action permissions that a role binding then grants to someone, somewhere.
+- [List permissions](https://langwatch.ai/docs/api-reference/roles/list-permissions.md)
+- [List roles](https://langwatch.ai/docs/api-reference/roles/list-roles.md)
+- [Create role](https://langwatch.ai/docs/api-reference/roles/create-role.md)
+- [Get role](https://langwatch.ai/docs/api-reference/roles/get-role.md)
+- [Update role](https://langwatch.ai/docs/api-reference/roles/update-role.md)
+- [Delete role](https://langwatch.ai/docs/api-reference/roles/delete-role.md)
+
+## Role Bindings
+
+- [Overview](https://langwatch.ai/docs/api-reference/role-bindings/overview.md): Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project.
+- [List role bindings](https://langwatch.ai/docs/api-reference/role-bindings/list-role-bindings.md)
+- [Create role binding](https://langwatch.ai/docs/api-reference/role-bindings/create-role-binding.md)
+- [Update role binding](https://langwatch.ai/docs/api-reference/role-bindings/update-role-binding.md)
+- [Delete role binding](https://langwatch.ai/docs/api-reference/role-bindings/delete-role-binding.md)
+
+## SCIM Tokens
+
+- [Overview](https://langwatch.ai/docs/api-reference/scim-tokens/overview.md): Mint, list and revoke the bearer tokens an identity provider uses to reach the SCIM endpoints. Token values are shown once, when they are created, and never again.
+- [List SCIM tokens](https://langwatch.ai/docs/api-reference/scim-tokens/list-scim-tokens.md)
+- [Create SCIM token](https://langwatch.ai/docs/api-reference/scim-tokens/create-scim-token.md)
+- [Revoke SCIM token](https://langwatch.ai/docs/api-reference/scim-tokens/revoke-scim-token.md)
+
+## SCIM
+
+- [Overview](https://langwatch.ai/docs/api-reference/scim/overview.md): The SCIM 2.0 endpoints an identity provider calls to provision and deprovision users and groups in LangWatch.
+- [Get the SCIM service provider configuration](https://langwatch.ai/docs/api-reference/scim/service-provider-config.md)
+- [List the SCIM resource types](https://langwatch.ai/docs/api-reference/scim/resource-types.md)
+- [List the SCIM resource schemas](https://langwatch.ai/docs/api-reference/scim/schemas.md)
+- [List provisioned users](https://langwatch.ai/docs/api-reference/scim/list-users.md)
+- [Provision a user](https://langwatch.ai/docs/api-reference/scim/create-user.md)
+- [Get a provisioned user](https://langwatch.ai/docs/api-reference/scim/get-user.md)
+- [Replace a provisioned user](https://langwatch.ai/docs/api-reference/scim/replace-user.md)
+- [Update a provisioned user](https://langwatch.ai/docs/api-reference/scim/update-user.md)
+- [Deprovision a user](https://langwatch.ai/docs/api-reference/scim/delete-user.md)
+- [List provisioned groups](https://langwatch.ai/docs/api-reference/scim/list-groups.md)
+- [Provision a group](https://langwatch.ai/docs/api-reference/scim/create-group.md)
+- [Get a provisioned group](https://langwatch.ai/docs/api-reference/scim/get-group.md)
+- [Replace a provisioned group](https://langwatch.ai/docs/api-reference/scim/replace-group.md)
+- [Update a provisioned group](https://langwatch.ai/docs/api-reference/scim/update-group.md)
+- [Deprovision a group](https://langwatch.ai/docs/api-reference/scim/delete-group.md)
+
+## Organizations (Self-Hosted)
+
+- [Overview](https://langwatch.ai/docs/api-reference/organizations/overview.md): Create organizations on a self-hosted instance with an instance administrator credential, and read the ones already there.
+- [List organizations](https://langwatch.ai/docs/api-reference/organizations/list-organizations.md)
+- [Create an organization](https://langwatch.ai/docs/api-reference/organizations/create-organization.md)
+- [Get an organization](https://langwatch.ai/docs/api-reference/organizations/get-organization.md)
+
 ## API Keys
 
 - [Overview](https://langwatch.ai/docs/api-reference/api-keys/overview.md): Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation).
 - [List API keys](https://langwatch.ai/docs/api-reference/api-keys/list-api-keys.md)
 - [Create API key](https://langwatch.ai/docs/api-reference/api-keys/create-api-key.md)
+- [Get an API key](https://langwatch.ai/docs/api-reference/api-keys/get-api-key.md)
+- [Update an API key](https://langwatch.ai/docs/api-reference/api-keys/update-api-key.md)
 - [Revoke API key](https://langwatch.ai/docs/api-reference/api-keys/revoke-api-key.md)
 
 ## Gateway: Virtual Keys
