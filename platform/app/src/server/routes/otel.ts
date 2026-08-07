@@ -20,8 +20,8 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import { bodyLimit } from "hono/body-limit";
 import { getLangWatchTracer } from "langwatch";
+import { bodyLimit } from "~/server/api/bodyLimit";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
   apiKeyCeilingDenialResponse,

@@ -20,7 +20,6 @@ import type { Project } from "@prisma/client";
 import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import { bodyLimit } from "hono/body-limit";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
 import type Stripe from "stripe";
@@ -34,6 +33,7 @@ import {
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
+import { bodyLimit } from "~/server/api/bodyLimit";
 import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
 import {
   createServiceApp,
