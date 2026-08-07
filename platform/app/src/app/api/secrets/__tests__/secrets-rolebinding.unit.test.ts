@@ -1,4 +1,4 @@
-import { RoleBindingScopeType } from "@prisma/client";
+import { RoleBindingScopeType } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/db", () => ({

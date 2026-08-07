@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getFreePlanLimits, PLAN_LIMITS } from "../planLimits";
 import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";

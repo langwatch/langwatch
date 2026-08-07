@@ -1,4 +1,4 @@
-import type { Experiment, Prisma, PrismaClient } from "@prisma/client";
+import type { Experiment, Prisma, PrismaClient } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 
 /**

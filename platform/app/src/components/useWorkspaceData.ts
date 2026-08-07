@@ -1,4 +1,4 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { useCallback, useMemo } from "react";
 
 import { useDrawer } from "~/hooks/useDrawer";

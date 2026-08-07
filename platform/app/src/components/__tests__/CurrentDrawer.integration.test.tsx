@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CurrentDrawer } from "../CurrentDrawer";

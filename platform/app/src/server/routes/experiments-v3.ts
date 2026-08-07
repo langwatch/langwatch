@@ -11,7 +11,7 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { ExperimentType } from "@prisma/client";
+import { ExperimentType } from "~/generated/prisma/client";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { describeRoute } from "hono-openapi";

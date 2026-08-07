@@ -23,7 +23,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import type { SimulationSuite } from "@prisma/client";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import {

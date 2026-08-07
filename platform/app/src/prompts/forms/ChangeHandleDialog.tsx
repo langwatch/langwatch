@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PromptScope } from "@prisma/client";
+import { PromptScope } from "~/generated/prisma/client";
 import { Building, Check, ChevronDown, Users } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";

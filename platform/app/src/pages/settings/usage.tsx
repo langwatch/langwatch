@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { PricingModel } from "@prisma/client";
+import { PricingModel } from "~/generated/prisma/client";
 import { ArrowRight } from "lucide-react";
 import {
   getPlanActionLabel,

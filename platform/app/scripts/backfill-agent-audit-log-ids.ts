@@ -15,7 +15,7 @@
  *   DATABASE_URL=... npx tsx scripts/backfill-agent-audit-log-ids.ts --dry-run
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../src/generated/prisma/client";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const WINDOW_MS = 60_000;

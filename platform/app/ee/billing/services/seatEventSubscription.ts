@@ -2,7 +2,7 @@ import {
   Currency,
   type OrganizationUserRole,
   type PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import type Stripe from "stripe";
 import {

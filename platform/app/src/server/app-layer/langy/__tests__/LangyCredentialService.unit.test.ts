@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/utils/encryption", () => ({

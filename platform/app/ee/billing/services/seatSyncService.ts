@@ -1,4 +1,4 @@
-import { PricingModel, type PrismaClient } from "@prisma/client";
+import { PricingModel, type PrismaClient } from "~/generated/prisma/client";
 import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
 
 export const createSeatSyncService = ({

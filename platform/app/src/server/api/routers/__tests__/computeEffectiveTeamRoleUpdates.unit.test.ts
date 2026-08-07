@@ -1,4 +1,4 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
 import { computeEffectiveTeamRoleUpdates } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 

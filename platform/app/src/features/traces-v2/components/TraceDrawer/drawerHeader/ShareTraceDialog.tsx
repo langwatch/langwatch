@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { ShareLink, ShareVisibility } from "@prisma/client";
+import type { ShareLink, ShareVisibility } from "~/generated/prisma/client";
 import { useRef, useState } from "react";
 import type { IconType } from "react-icons";
 import {

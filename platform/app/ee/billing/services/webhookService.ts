@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { Currency, type PrismaClient } from "@prisma/client";
+import { Currency, type PrismaClient } from "~/generated/prisma/client";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
 import { getApp } from "../../../src/server/app-layer/app";

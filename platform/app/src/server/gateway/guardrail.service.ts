@@ -14,7 +14,7 @@ import type {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
   PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import { GatewayAuditAdapter } from "./auditLog.repository";

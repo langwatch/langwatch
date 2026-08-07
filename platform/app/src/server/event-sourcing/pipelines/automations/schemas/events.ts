@@ -1,5 +1,5 @@
 import { NOTIFICATION_CADENCES } from "@langwatch/automations/cadences";
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction } from "~/generated/prisma/client";
 import { z } from "zod";
 
 import { EventSchema } from "../../../domain/types";

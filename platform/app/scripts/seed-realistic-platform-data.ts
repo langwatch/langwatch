@@ -6,7 +6,7 @@
  * simulation, and experiment-run lifecycles are emitted as real event-sourcing
  * commands, so the event log and every projection are exercised together.
  */
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../src/generated/prisma/client";
 import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
 import { seedDemoPlatform } from "../prisma/seed-demo-platform";
 import { resetApp } from "../src/server/app-layer/app";

@@ -1,5 +1,5 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import type { OrganizationIntent } from "@prisma/client";
+import type { OrganizationIntent } from "~/generated/prisma/client";
 import { ChartNoAxesColumn, Telescope } from "lucide-react";
 import type React from "react";
 import { useAnalytics } from "react-contextual-analytics";

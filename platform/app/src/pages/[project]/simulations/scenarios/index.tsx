@@ -3,7 +3,7 @@
 // Internal pages don't need to be server rendering
 
 import { HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
-import type { Scenario } from "@prisma/client";
+import type { Scenario } from "~/generated/prisma/client";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";

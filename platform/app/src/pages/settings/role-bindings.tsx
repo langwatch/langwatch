@@ -12,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { RoleBindingScopeType } from "@prisma/client";
+import { RoleBindingScopeType } from "~/generated/prisma/client";
 import { Users } from "lucide-react";
 import { useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";

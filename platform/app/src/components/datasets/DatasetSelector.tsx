@@ -6,7 +6,7 @@ import {
   Spinner,
   Text,
 } from "@chakra-ui/react";
-import type { Dataset } from "@prisma/client";
+import type { Dataset } from "~/generated/prisma/client";
 import { type ReactNode, useEffect, useState } from "react";
 import type {
   FieldErrors,

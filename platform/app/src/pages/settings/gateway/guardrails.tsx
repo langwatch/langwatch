@@ -18,7 +18,7 @@ import {
 import type {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { Archive, Pencil, Plus, Shield } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 

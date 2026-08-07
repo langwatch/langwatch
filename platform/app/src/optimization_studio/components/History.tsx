@@ -9,7 +9,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import { useCallback, useEffect, useMemo } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { UserAvatar } from "~/components/UserAvatar";

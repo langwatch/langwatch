@@ -3,7 +3,7 @@ import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";

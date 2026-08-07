@@ -8,7 +8,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { TeamUserRole } from "@prisma/client";
+import { TeamUserRole } from "~/generated/prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import {
   ScopeChipPicker,

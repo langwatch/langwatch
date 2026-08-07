@@ -1,4 +1,4 @@
-import type { Evaluator, Organization, Project, Team } from "@prisma/client";
+import type { Evaluator, Organization, Project, Team } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";

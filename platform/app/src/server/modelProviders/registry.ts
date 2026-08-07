@@ -1,4 +1,4 @@
-import type { ModelProvider } from "@prisma/client";
+import type { ModelProvider } from "~/generated/prisma/client";
 import { z } from "zod";
 import { codexTokenKeysSchema } from "./codexAccount.schema";
 import { CODEX_ALLOWED_FEATURE_KEYS } from "./codexRestrictions";

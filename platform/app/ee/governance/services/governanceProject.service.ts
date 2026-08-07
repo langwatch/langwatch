@@ -28,7 +28,7 @@
  *   - specs/ai-gateway/governance/ui-contract.feature
  *   - specs/ai-gateway/governance/receiver-shapes.feature
  */
-import { Prisma, type PrismaClient, type Project } from "@prisma/client";
+import { Prisma, type PrismaClient, type Project } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";

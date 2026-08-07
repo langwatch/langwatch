@@ -17,7 +17,7 @@
  * Run:
  *   node scripts/_qa-add-ariana-fixture-user.mjs
  */
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../src/generated/prisma/client";
 
 const prisma = new PrismaClient();
 

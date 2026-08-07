@@ -1,6 +1,6 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { HandledError } from "@langwatch/handled-error";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";

@@ -10,7 +10,7 @@
  * continues with the next project.
  */
 
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   decideGraphTriggerHeartbeat,

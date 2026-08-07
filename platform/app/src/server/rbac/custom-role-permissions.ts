@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
 import { z } from "zod";
 import { Actions, Resources } from "../api/rbac";
 

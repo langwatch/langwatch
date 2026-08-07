@@ -1,5 +1,5 @@
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
-import { type AlertType, AlertType as AlertTypeEnum } from "@prisma/client";
+import { type AlertType, AlertType as AlertTypeEnum } from "~/generated/prisma/client";
 import {
   IncomingWebhook,
   type IncomingWebhookSendArguments,

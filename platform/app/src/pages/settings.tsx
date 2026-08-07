@@ -11,7 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { OrganizationIntent, Project } from "@prisma/client";
+import type { OrganizationIntent, Project } from "~/generated/prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
 import { Lock } from "react-feather";

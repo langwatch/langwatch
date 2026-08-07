@@ -1,5 +1,5 @@
-import type { Experiment, Project } from "@prisma/client";
-import { ExperimentType } from "@prisma/client";
+import type { Experiment, Project } from "~/generated/prisma/client";
+import { ExperimentType } from "~/generated/prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";

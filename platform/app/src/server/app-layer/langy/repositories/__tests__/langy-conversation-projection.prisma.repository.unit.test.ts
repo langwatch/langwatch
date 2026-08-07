@@ -2,7 +2,7 @@ import type { LangyConversationStateData } from "@langwatch/langy";
 import {
   type LangyConversationProjection,
   LangyProjectionTitleSource,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { Event } from "~/server/event-sourcing/domain/types";

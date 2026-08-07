@@ -1,4 +1,4 @@
-import type { PromptScope } from "@prisma/client";
+import type { PromptScope } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "../useOrganizationTeamProject";
 

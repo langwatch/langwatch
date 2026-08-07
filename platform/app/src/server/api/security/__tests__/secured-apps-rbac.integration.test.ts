@@ -21,7 +21,7 @@ import {
   RoleBindingScopeType,
   type Team,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app as analyticsApp } from "~/app/api/analytics/[...route]/app";

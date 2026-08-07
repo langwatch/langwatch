@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { TriggerAction, TriggerKind } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   decideGraphTriggerHeartbeat,

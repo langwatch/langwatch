@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";

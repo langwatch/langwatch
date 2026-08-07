@@ -12,7 +12,7 @@
  * lock is held for the duration of the `$transaction`, so the chunk I/O AND the
  * `Dataset` counter update commit (or roll back) as one unit.
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
 /**
  * Max wall-clock a dataset-mutation transaction may run before Prisma aborts it

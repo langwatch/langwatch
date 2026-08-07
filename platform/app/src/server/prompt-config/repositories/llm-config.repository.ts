@@ -4,7 +4,7 @@ import type {
   LlmPromptConfigVersion,
   Prisma,
   PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";

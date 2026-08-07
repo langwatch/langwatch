@@ -13,7 +13,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Currency, PricingModel } from "@prisma/client";
+import { Currency, PricingModel } from "~/generated/prisma/client";
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";

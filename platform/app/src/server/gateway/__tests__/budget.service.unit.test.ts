@@ -1,4 +1,4 @@
-import { type GatewayBudget, Prisma, type PrismaClient } from "@prisma/client";
+import { type GatewayBudget, Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import type {

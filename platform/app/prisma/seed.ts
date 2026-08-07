@@ -67,7 +67,7 @@ import {
   PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "../src/generated/prisma/client";
 import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 import fs from "fs";

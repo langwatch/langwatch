@@ -1,5 +1,5 @@
 import { HStack, IconButton, Table, Text } from "@chakra-ui/react";
-import type { Scenario } from "@prisma/client";
+import type { Scenario } from "~/generated/prisma/client";
 import {
   type ColumnFiltersState,
   createColumnHelper,

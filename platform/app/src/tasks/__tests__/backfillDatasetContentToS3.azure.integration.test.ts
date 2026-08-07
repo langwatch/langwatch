@@ -36,7 +36,7 @@ vi.mock("~/server/dataplane-s3", () => ({
   getS3ConfigForProject: vi.fn(async () => null),
 }));
 
-import type { Organization, Project, Team } from "@prisma/client";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";

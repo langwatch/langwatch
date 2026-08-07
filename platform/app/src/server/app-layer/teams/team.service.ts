@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import type { Team } from "@prisma/client";
+import type { Team } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 import type {

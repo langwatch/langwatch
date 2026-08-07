@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { Key, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";

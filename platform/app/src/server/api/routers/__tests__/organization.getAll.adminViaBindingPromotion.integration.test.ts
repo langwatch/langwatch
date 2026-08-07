@@ -25,7 +25,7 @@ import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";

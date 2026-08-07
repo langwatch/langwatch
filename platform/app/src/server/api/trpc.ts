@@ -37,7 +37,7 @@ import { auditLog } from "@ee/audit-log/auditLog";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
-import type { OrganizationUserRole } from "@prisma/client";
+import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
 import superjson from "superjson";

@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { EvaluationExecutionMode, Prisma } from "@prisma/client";
+import { EvaluationExecutionMode, Prisma } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { customAlphabet } from "nanoid";
 import { ZodError, z } from "zod";

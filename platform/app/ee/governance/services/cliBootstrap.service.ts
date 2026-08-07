@@ -20,7 +20,7 @@
  * catalog, and budget collapses to {null, 0, MONTHLY} when the user has no
  * personal workspace yet (fresh login flow, no VK provisioning yet).
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { env } from "~/env.mjs";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";

@@ -7,7 +7,7 @@
  *
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
-import type { Organization, Project, Team } from "@prisma/client";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";

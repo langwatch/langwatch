@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../../src/generated/prisma/client";
 
 const email = process.argv[2] ?? "rogerio@langwatch.ai";
 const prisma = new PrismaClient();

@@ -1,4 +1,4 @@
-import { ExperimentType } from "@prisma/client";
+import { ExperimentType } from "~/generated/prisma/client";
 import { useEffect, useRef } from "react";
 
 import { LoadingScreen } from "~/components/LoadingScreen";

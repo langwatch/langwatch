@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Experiment, Project } from "@prisma/client";
+import type { Experiment, Project } from "~/generated/prisma/client";
 import numeral from "numeral";
 import Parse from "papaparse";
 import React, { useEffect, useRef, useState } from "react";

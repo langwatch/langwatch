@@ -8,7 +8,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import type { AnnotationScoreDataType } from "@prisma/client";
+import type { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { diffWordsWithSpace } from "diff";
 import { Check, MessageSquareText, RotateCcw, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";

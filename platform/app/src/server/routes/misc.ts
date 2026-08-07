@@ -16,8 +16,8 @@
 
 import { randomUUID } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import type { Project } from "@prisma/client";
-import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
+import { AlertType, ExperimentType, TriggerAction } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { bodyLimit } from "hono/body-limit";

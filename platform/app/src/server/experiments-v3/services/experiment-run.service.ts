@@ -1,6 +1,6 @@
 import { TupleParam } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";

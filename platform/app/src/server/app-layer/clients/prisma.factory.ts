@@ -1,4 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+import { PrismaClient } from "~/generated/prisma/client";
 
 export interface PrismaFactoryOptions {
   databaseUrl: string;
@@ -7,7 +9,7 @@ export interface PrismaFactoryOptions {
 
 export function createPrismaClient(opts: PrismaFactoryOptions): PrismaClient {
   return new PrismaClient({
-    datasources: { db: { url: opts.databaseUrl } },
+    adapter: new PrismaPg({ connectionString: opts.databaseUrl }),
     log: opts.nodeEnv === "development" ? ["error", "warn"] : ["error"],
   });
 }

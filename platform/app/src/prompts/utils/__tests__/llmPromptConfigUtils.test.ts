@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
-import { PromptScope } from "@prisma/client";
+import { PromptScope } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { formSchema } from "~/prompts/schemas/form-schema";
 import type { VersionedPrompt } from "~/server/prompt-config";

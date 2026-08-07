@@ -1,4 +1,4 @@
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type {
   DatasetColumn,

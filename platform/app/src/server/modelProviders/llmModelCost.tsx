@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { prisma } from "../db";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { ScopeTier } from "../scopes/scope.types";

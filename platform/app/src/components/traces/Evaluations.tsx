@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import type { ElasticSearchEvaluation } from "~/server/tracer/types";

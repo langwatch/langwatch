@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { TeamUserRole } from "@prisma/client";
+import type { TeamUserRole } from "~/generated/prisma/client";
 import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";

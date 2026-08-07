@@ -17,7 +17,7 @@ import {
 import {
   type OrganizationUserRole,
   RoleBindingScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { OverflownTextWithTooltip } from "~/components/OverflownText";

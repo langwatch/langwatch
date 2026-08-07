@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Annotation } from "@prisma/client";
+import type { Annotation } from "~/generated/prisma/client";
 import { useMemo, useState } from "react";
 import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";

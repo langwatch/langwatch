@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Dataset } from "@prisma/client";
+import type { Dataset } from "~/generated/prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";

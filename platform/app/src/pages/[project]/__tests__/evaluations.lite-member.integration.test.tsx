@@ -204,7 +204,7 @@ vi.mock(
   }),
 );
 
-vi.mock("@prisma/client", () => ({
+vi.mock("~/generated/prisma/client", () => ({
   ExperimentType: {
     BATCH_EVALUATION: "BATCH_EVALUATION",
     BATCH_EVALUATION_V2: "BATCH_EVALUATION_V2",

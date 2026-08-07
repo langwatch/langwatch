@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { DataPrivacyPolicy, Prisma, PrismaClient } from "@prisma/client";
+import type { DataPrivacyPolicy, Prisma, PrismaClient } from "~/generated/prisma/client";
 import { resolveOrganizationForScope } from "~/server/scopes/resolveOrganizationForScope";
 import {
   type DataPrivacyConfig,

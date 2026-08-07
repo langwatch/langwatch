@@ -2,7 +2,7 @@ import type {
   LlmPromptConfigVersion,
   Prisma,
   PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type { z } from "zod";
 import type { messageSchema } from "~/prompts/schemas/field-schemas";
 import type { SchemaVersion } from "./enums";

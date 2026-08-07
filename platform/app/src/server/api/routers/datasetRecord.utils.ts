@@ -1,4 +1,4 @@
-import type { Dataset, DatasetRecord, Prisma } from "@prisma/client";
+import type { Dataset, DatasetRecord, Prisma } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { captureException, toError } from "~/utils/posthogErrorCapture";

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelNotConfiguredError } from "../../../modelProviders/modelNotConfiguredError";
 import { ModelProviderDisabledError } from "../../../modelProviders/modelProviderDisabledError";

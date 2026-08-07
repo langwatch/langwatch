@@ -3,7 +3,7 @@
  * @see specs/evaluations-v3/experiment-slug-deduplication.feature
  */
 
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";

@@ -1,4 +1,4 @@
-import { PromptScope } from "@prisma/client";
+import { PromptScope } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";

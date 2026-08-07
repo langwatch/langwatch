@@ -11,7 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { EvaluationExecutionMode } from "@prisma/client";
+import { EvaluationExecutionMode } from "~/generated/prisma/client";
 import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
 import {
   useCallback,

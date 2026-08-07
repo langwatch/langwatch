@@ -1,4 +1,4 @@
-import type { Organization } from "@prisma/client";
+import type { Organization } from "~/generated/prisma/client";
 import type { MiddlewareHandler } from "hono";
 
 import { prisma } from "~/server/db";

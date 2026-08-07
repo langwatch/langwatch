@@ -1,5 +1,5 @@
 import { Alert, Box } from "@chakra-ui/react";
-import { ExperimentType } from "@prisma/client";
+import { ExperimentType } from "~/generated/prisma/client";
 
 import { HandledErrorAlert } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";

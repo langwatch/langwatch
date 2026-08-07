@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { TeamUserRole } from "@prisma/client";
+import { TeamUserRole } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
 import { resolveHighestRole } from "./scim-role-resolver";
 

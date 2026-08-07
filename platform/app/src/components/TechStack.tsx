@@ -1,5 +1,5 @@
 import { Box, Field, HStack, RadioGroup, VStack } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import type { PropsWithChildren } from "react";
 import { Code } from "react-feather";
 import { Controller, type UseFormReturn } from "react-hook-form";

@@ -3,7 +3,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";

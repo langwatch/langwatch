@@ -41,7 +41,7 @@
  *   - parseOtlpBody.test.ts
  *     (parser-equivalence contract, Andre 38106f768)
  */
-import type { Organization } from "@prisma/client";
+import type { Organization } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";

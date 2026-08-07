@@ -1,5 +1,5 @@
 import { HStack } from "@chakra-ui/react";
-import { AlertType } from "@prisma/client";
+import { AlertType } from "~/generated/prisma/client";
 import { Calendar, TrendingUp, Zap } from "lucide-react";
 import type { ConditionSource } from "../logic/draftReducer";
 import { useAutomationStore } from "../state/automationStore";

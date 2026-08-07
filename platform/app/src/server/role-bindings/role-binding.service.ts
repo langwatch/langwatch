@@ -4,7 +4,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import {
   getOrganizationRolePermissions,

@@ -13,7 +13,7 @@
  * when the page was replaced by this dialog.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { OrganizationUserRole, RoleBindingScopeType } from "@prisma/client";
+import { OrganizationUserRole, RoleBindingScopeType } from "~/generated/prisma/client";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

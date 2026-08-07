@@ -9,7 +9,7 @@
  * - LANGWATCH_NLP_SERVICE running on localhost:5561
  * - Database available for test project
  */
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";

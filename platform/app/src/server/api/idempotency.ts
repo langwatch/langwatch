@@ -88,7 +88,7 @@ import {
   type IdempotencyReceipt,
   Prisma,
   type PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 
 import {

@@ -1,4 +1,4 @@
-import type { Annotation, AnnotationScore } from "@prisma/client";
+import type { Annotation, AnnotationScore } from "~/generated/prisma/client";
 import { z } from "zod";
 import { getSpanNameOrModel } from "../../utils/trace";
 import { datasetSpanSchema } from "../datasets/types";

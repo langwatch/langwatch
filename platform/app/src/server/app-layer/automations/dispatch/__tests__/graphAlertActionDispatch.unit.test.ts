@@ -1,5 +1,5 @@
-import type { Project, Trigger } from "@prisma/client";
-import { TriggerAction } from "@prisma/client";
+import type { Project, Trigger } from "~/generated/prisma/client";
+import { TriggerAction } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 // Fake cipher so the webhook-headers tests exercise the decrypt-at-dispatch

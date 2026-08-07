@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type AuditLogFn,

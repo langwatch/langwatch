@@ -1,4 +1,4 @@
-import type { ShareLink } from "@prisma/client";
+import type { ShareLink } from "~/generated/prisma/client";
 import { useCallback } from "react";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";

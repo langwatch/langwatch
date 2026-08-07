@@ -14,7 +14,7 @@
 
 import crypto from "node:crypto";
 import { HandledError } from "@langwatch/handled-error";
-import type { IdempotencyReceipt, PrismaClient } from "@prisma/client";
+import type { IdempotencyReceipt, PrismaClient } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { encrypt } from "~/utils/encryption";

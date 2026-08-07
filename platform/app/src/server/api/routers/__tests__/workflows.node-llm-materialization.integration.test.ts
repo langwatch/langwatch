@@ -11,7 +11,7 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 

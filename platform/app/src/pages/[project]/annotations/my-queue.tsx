@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { AnnotationQueueItem } from "@prisma/client";
+import type { AnnotationQueueItem } from "~/generated/prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";

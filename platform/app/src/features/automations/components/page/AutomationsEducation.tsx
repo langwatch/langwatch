@@ -1,5 +1,5 @@
 import { SimpleGrid, Text, VStack } from "@chakra-ui/react";
-import type { TriggerAction } from "@prisma/client";
+import type { TriggerAction } from "~/generated/prisma/client";
 import {
   AlertTriangle,
   Database,

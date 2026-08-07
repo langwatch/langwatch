@@ -1,5 +1,5 @@
 import { Center, Spinner } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import qs from "qs";
 import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ErrorBoundary } from "react-error-boundary";

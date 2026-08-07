@@ -6,8 +6,8 @@ import {
   type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
-} from "@prisma/client";
-import type { JsonArray } from "@prisma/client/runtime/library";
+} from "~/generated/prisma/client";
+import type { JsonArray } from "@prisma/client/runtime/client";
 import { nanoid } from "nanoid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { LimitExceededError } from "../license-enforcement/errors";
@@ -34,7 +34,7 @@ export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
 } as const;
 
 import { createLogger } from "@langwatch/observability";
-import { TeamUserRole } from "@prisma/client";
+import { TeamUserRole } from "~/generated/prisma/client";
 import { env } from "~/env.mjs";
 import type { Session } from "~/server/auth";
 import { getApp } from "../app-layer/app";

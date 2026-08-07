@@ -14,7 +14,7 @@ import type {
   ModelProvider,
   PrismaClient,
   VirtualKey,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 
 import { decrypt } from "../../utils/encryption";
 import {

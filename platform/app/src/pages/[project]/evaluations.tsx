@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { ExperimentType } from "@prisma/client";
+import type { ExperimentType } from "~/generated/prisma/client";
 import { useEffect, useState } from "react";
 import { Copy, MoreVertical } from "react-feather";
 import {

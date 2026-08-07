@@ -47,7 +47,7 @@
  * full-matrix dogfood lane.
  */
 import { randomBytes } from "node:crypto";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "../src/generated/prisma/client";
 
 import { nextResetAt } from "../src/server/gateway/budgetWindow";
 import {

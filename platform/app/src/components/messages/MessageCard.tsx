@@ -10,7 +10,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import numeral from "numeral";
 import {
   CheckCircle,

@@ -1,4 +1,4 @@
-import type { Dashboard, Prisma, PrismaClient } from "@prisma/client";
+import type { Dashboard, Prisma, PrismaClient } from "~/generated/prisma/client";
 
 /**
  * Input types for dashboard operations

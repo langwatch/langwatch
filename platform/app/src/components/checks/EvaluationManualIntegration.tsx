@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { EvaluationExecutionMode } from "@prisma/client";
+import { EvaluationExecutionMode } from "~/generated/prisma/client";
 import { Info } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

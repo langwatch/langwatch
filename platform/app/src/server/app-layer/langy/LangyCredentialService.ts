@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer";
 import type { Session } from "~/server/auth";

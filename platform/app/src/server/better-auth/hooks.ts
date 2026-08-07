@@ -7,7 +7,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { APIError } from "better-auth/api";
 import { getApp } from "~/server/app-layer/app";
 import { InviteService } from "~/server/invites/invite.service";

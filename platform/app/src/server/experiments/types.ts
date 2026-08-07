@@ -1,4 +1,4 @@
-import type { WorkflowVersion } from "@prisma/client";
+import type { WorkflowVersion } from "~/generated/prisma/client";
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------

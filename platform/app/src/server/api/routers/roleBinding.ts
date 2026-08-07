@@ -1,4 +1,4 @@
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { z } from "zod";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { RoleService } from "~/server/role/role.service";

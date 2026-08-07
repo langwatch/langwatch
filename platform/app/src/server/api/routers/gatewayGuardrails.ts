@@ -10,7 +10,7 @@
 import {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { z } from "zod";
 
 import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";

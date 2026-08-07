@@ -11,7 +11,7 @@
  * (demo, traces) set the policy without blocking, since a brief stale stamp
  * still outlives their near-now data.
  */
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../src/generated/prisma/client";
 import { applySeedRetention, seededRetentionDays } from "./seed-lib/retention";
 
 const ORG_ID = "local-dev-organization";

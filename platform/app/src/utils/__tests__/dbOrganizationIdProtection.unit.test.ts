@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";

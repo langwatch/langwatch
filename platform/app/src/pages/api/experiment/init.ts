@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { Experiment, ExperimentType, Project } from "@prisma/client";
+import type { Experiment, ExperimentType, Project } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";

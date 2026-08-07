@@ -14,8 +14,8 @@ import type {
   GatewayBudgetScopeType,
   GatewayBudgetWindow,
   PrismaClient,
-} from "@prisma/client";
-import { Prisma } from "@prisma/client";
+} from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import type {

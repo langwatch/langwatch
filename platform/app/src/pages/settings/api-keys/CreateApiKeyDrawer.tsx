@@ -9,7 +9,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import type { TeamUserRole } from "@prisma/client";
+import type { TeamUserRole } from "~/generated/prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "~/utils/auth-client";
 import {

@@ -14,7 +14,7 @@
 import { spawn } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../../src/generated/prisma/client";
 import { approveDeviceCode } from "~/server/routes/auth-cli";
 
 interface Args {

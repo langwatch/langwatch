@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { SavedViewNotFoundError, SavedViewReorderError } from "./errors";
 import { SavedViewRepository } from "./saved-view.repository";

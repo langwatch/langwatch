@@ -5,7 +5,7 @@
  * Spec: specs/setup/test-teardown-safety.feature
  */
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { cleanupTestRows } from "../cleanupTestRows";
 

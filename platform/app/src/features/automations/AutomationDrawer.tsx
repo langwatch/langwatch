@@ -31,7 +31,7 @@ import {
   type ReportTemplateContext,
   type TemplateContext,
 } from "@langwatch/automations/templating/templateContext";
-import { AlertType, TriggerAction, TriggerKind } from "@prisma/client";
+import { AlertType, TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";

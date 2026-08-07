@@ -14,7 +14,7 @@ import {
   type ReportTraceRow,
 } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
-import type { Project, Trigger } from "@prisma/client";
+import type { Project, Trigger } from "~/generated/prisma/client";
 import { Cron } from "croner";
 import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";

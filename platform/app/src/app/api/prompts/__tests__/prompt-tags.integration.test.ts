@@ -4,7 +4,7 @@ import type {
   Organization,
   Project,
   Team,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {

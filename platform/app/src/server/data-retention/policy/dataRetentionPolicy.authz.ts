@@ -1,6 +1,6 @@
 import { isAdmin } from "@ee/admin/isAdmin";
 import type { PlanInfo } from "@ee/licensing/planInfo";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import { isEnterpriseTier } from "~/server/api/enterprise";

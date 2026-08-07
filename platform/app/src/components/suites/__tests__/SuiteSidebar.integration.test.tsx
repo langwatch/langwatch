@@ -11,7 +11,7 @@
  * @see specs/features/suites/suite-sidebar-status-summary.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { SimulationSuite } from "@prisma/client";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";

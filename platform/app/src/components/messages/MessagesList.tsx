@@ -11,7 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import React, { createRef, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Maximize2 } from "react-feather";
 import { LuLayers, LuRefreshCw } from "react-icons/lu";

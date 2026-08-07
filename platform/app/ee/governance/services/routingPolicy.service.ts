@@ -35,7 +35,7 @@ import {
   type RoutingPolicy,
   type RoutingPolicyScope as RoutingPolicyScopeRow,
   RoutingPolicyScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 
 export type RoutingPolicyScope = "organization" | "team" | "project";

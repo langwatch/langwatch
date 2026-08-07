@@ -14,7 +14,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Experiment } from "@prisma/client";
+import type { Experiment } from "~/generated/prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";

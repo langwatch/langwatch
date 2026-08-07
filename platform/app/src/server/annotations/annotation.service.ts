@@ -1,4 +1,4 @@
-import type { Annotation, PrismaClient } from "@prisma/client";
+import type { Annotation, PrismaClient } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import {
   AnnotationRepository,

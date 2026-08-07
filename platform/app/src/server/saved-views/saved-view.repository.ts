@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, SavedView } from "@prisma/client";
+import type { Prisma, PrismaClient, SavedView } from "~/generated/prisma/client";
 
 /**
  * Input types for saved view operations.

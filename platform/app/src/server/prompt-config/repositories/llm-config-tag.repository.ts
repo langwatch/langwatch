@@ -4,7 +4,7 @@ import type {
   PrismaClient,
   PromptTag,
   PromptTagAssignment,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 
 const logger = createLogger("langwatch:prompt-version-tags");

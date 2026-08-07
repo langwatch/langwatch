@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   type AgentComponentConfig,
   type AgentCopyRow,

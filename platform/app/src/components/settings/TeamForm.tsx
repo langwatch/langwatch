@@ -13,7 +13,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {

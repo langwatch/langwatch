@@ -9,7 +9,7 @@
  * same membership rule as the keys table, so the page and the table agree
  * on which keys exist and what they spent.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { z } from "zod";
 
 import { getApp } from "~/server/app-layer/app";

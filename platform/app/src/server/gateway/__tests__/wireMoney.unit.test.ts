@@ -3,7 +3,7 @@
  *
  * @see specs/ai-gateway/public-rest-api.feature
  */
-import { Prisma } from "@prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   decimalUsdToNanoUsd,

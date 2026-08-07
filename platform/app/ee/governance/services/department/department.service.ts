@@ -11,8 +11,8 @@
  *
  * Spec: specs/ai-gateway/governance/departments.feature
  */
-import type { PrismaClient } from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 
 import { DepartmentRepository } from "../../repositories/department.repository";
 

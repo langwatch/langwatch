@@ -1,4 +1,4 @@
-import { PricingModel } from "@prisma/client";
+import { PricingModel } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";

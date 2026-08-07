@@ -10,7 +10,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Dataset, DatasetRecord, Project } from "@prisma/client";
+import type { Dataset, DatasetRecord, Project } from "~/generated/prisma/client";
 import type { Edge } from "@xyflow/react";
 import { useCallback, useState } from "react";
 import {

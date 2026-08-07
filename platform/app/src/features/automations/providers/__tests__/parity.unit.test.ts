@@ -7,7 +7,7 @@ import {
   buildTemplateContext,
   type GraphAlertTemplateContext,
 } from "@langwatch/automations/templating/templateContext";
-import { AlertType, TriggerAction } from "@prisma/client";
+import { AlertType, TriggerAction } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
 import { SERVER_PROVIDERS } from "~/server/app-layer/automations/providers/registry";
 import {

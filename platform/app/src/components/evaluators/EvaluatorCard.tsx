@@ -1,5 +1,5 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import type { Evaluator } from "@prisma/client";
+import type { Evaluator } from "~/generated/prisma/client";
 import {
   ArrowUp,
   CheckSquare,

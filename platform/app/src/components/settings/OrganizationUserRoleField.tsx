@@ -1,5 +1,5 @@
 import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { useMemo } from "react";
 import { FieldInfoTooltip } from "../ui/FieldInfoTooltip";
 import { Select } from "../ui/select";

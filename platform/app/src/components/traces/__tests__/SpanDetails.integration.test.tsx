@@ -8,7 +8,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router";

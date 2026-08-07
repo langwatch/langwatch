@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { JSONPath } from "jsonpath-plus";
 import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";

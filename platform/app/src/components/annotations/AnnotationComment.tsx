@@ -13,7 +13,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { AnnotationScoreDataType } from "@prisma/client";
+import type { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { useEffect, useState } from "react";
 import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
 import {

@@ -12,7 +12,7 @@
  * Spec: specs/datasets/add-to-dataset-picker.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { Dataset } from "@prisma/client";
+import type { Dataset } from "~/generated/prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";

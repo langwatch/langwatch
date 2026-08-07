@@ -10,7 +10,7 @@
  */
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { SimulationSuite } from "@prisma/client";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";

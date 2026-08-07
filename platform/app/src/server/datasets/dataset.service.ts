@@ -6,7 +6,7 @@ import type {
   DatasetRecord,
   Prisma,
   PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { KSUID_RESOURCES } from "~/utils/constants";

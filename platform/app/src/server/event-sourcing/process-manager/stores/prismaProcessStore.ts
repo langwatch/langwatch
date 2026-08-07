@@ -4,7 +4,7 @@ import {
   type PrismaClient,
   type ProcessManagerInstance,
   type ProcessManagerOutbox,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type { JsonValue } from "../json";
 import type { ProcessRef } from "../processManager.types";

@@ -17,7 +17,7 @@
  * set would be non-discriminating; this asserts the behaviour they buy.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";

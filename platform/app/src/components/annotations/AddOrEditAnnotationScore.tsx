@@ -11,7 +11,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { AnnotationScoreDataType } from "@prisma/client";
+import { AnnotationScoreDataType } from "~/generated/prisma/client";
 
 import { useEffect, useState } from "react";
 import { Plus, X } from "react-feather";

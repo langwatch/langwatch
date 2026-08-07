@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { TeamUserRole } from "@prisma/client";
+import type { TeamUserRole } from "~/generated/prisma/client";
 import { TRPCClientError } from "@trpc/client";
 import isEqual from "lodash-es/isEqual";
 import { useCallback, useEffect, useState } from "react";

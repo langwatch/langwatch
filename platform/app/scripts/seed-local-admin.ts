@@ -18,7 +18,7 @@
  *   SEED_TEAM_NAME     — team name (default: Local Dev Team)
  *   SEED_PROJECT_NAME  — project name (default: Local Dev Project)
  */
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "../src/generated/prisma/client";
 import { hash } from "bcrypt";
 import { nanoid } from "nanoid";
 import { prisma } from "../src/server/db";

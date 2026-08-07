@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getApp } from "~/server/app-layer/app";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";

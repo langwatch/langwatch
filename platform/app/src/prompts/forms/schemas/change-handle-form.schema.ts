@@ -1,4 +1,4 @@
-import { PromptScope } from "@prisma/client";
+import { PromptScope } from "~/generated/prisma/client";
 import { z } from "zod";
 
 import { isValidHandle } from "../../../server/prompt-config/repositories/llm-config-version-schema";

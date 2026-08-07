@@ -5,7 +5,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 export const CUSTOM_ROLE_KIND = {

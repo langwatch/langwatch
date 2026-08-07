@@ -4,8 +4,8 @@
  * Verifies auth, query-param validation, 404 for unknown slugs, and the
  * shape of the runs array (which may be empty for fresh experiments).
  */
-import type { Experiment, Project } from "@prisma/client";
-import { ExperimentType } from "@prisma/client";
+import type { Experiment, Project } from "~/generated/prisma/client";
+import { ExperimentType } from "~/generated/prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { getTestProject } from "~/utils/testUtils";

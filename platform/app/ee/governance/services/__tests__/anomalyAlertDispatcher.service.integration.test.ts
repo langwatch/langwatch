@@ -24,8 +24,8 @@
  */
 import { createHmac } from "node:crypto";
 
-import type { AnomalyAlert, AnomalyRule } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+import type { AnomalyAlert, AnomalyRule } from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

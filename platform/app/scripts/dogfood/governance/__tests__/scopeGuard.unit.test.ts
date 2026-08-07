@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../../../../src/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import {
   assertDemoOrgAllowed,

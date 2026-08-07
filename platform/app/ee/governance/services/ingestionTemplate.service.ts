@@ -19,7 +19,7 @@ import { createLogger } from "@langwatch/observability";
  * Spec: specs/ai-gateway/governance/ingestion-templates-catalog.feature
  *       specs/ai-governance/admin-ottl-authoring.feature
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { customAlphabet } from "nanoid";
 import { GovernanceAuditRepository } from "../repositories/governanceAudit.repository";
 import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";

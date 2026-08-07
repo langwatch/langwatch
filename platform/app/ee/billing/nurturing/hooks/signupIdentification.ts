@@ -1,4 +1,4 @@
-import type { OrganizationIntent } from "@prisma/client";
+import type { OrganizationIntent } from "~/generated/prisma/client";
 import type { z } from "zod";
 
 import { getApp } from "../../../../src/server/app-layer/app";

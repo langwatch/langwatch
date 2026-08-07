@@ -1,5 +1,5 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction } from "~/generated/prisma/client";
 import { Settings2 } from "lucide-react";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import type { ClientEntry } from "~/features/automations/providers/types";

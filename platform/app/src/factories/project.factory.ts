@@ -1,4 +1,4 @@
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 

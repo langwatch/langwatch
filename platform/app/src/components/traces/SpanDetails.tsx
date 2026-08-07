@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import numeral from "numeral";
 import { useMemo } from "react";
 import { ChevronDown, Clock, Play, Settings } from "react-feather";

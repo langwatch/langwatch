@@ -10,7 +10,7 @@ vi.mock("../../../src/server/app-layer/app", () => ({
   }),
 }));
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import Stripe from "stripe";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";

@@ -4,7 +4,7 @@ import type {
   Prisma,
   PrismaClient,
   PromptScope,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type { z } from "zod";
 import {
   deriveResponseFormatFromOutputs,

@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { EvaluationExecutionMode } from "@prisma/client";
+import { EvaluationExecutionMode } from "~/generated/prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {

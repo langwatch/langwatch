@@ -13,7 +13,7 @@
  * unclassified, unauthorized endpoint to the surface by accident. There is no
  * legacy allowlist: the migration is complete and every family is on the builder.
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
 
 import {

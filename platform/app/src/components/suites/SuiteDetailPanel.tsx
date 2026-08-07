@@ -12,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { SimulationSuite } from "@prisma/client";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import {
   BarChart3,
   CheckCircle,

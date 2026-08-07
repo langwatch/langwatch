@@ -8,7 +8,7 @@
  * @see specs/suites/suite-archiving.feature
  */
 
-import type { PrismaClient, SimulationSuite } from "@prisma/client";
+import type { PrismaClient, SimulationSuite } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SuiteRepository } from "../suite.repository";
 

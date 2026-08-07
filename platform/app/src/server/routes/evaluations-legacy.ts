@@ -13,9 +13,9 @@
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { Project } from "@prisma/client";
-import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
-import type { JsonArray } from "@prisma/client/runtime/library";
+import type { Project } from "~/generated/prisma/client";
+import { CostReferenceType, CostType, ExperimentType } from "~/generated/prisma/client";
+import type { JsonArray } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import type { Context } from "hono";

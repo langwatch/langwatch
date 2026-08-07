@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";

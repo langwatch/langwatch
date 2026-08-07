@@ -21,7 +21,7 @@
 
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { GatewayCacheRule, Project } from "@prisma/client";
+import type { GatewayCacheRule, Project } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";

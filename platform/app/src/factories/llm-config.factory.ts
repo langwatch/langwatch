@@ -3,7 +3,7 @@ import {
   type LlmPromptConfigVersion,
   type Prisma,
   PromptScope,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 import type { z } from "zod";

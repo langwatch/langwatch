@@ -11,7 +11,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { TeamUserRole } from "@prisma/client";
+import { TeamUserRole } from "~/generated/prisma/client";
 import { ShieldUser } from "lucide-react";
 
 import { useState } from "react";

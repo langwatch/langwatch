@@ -1,7 +1,7 @@
 import { Text, VStack } from "@chakra-ui/react";
 import type { DatasetActionParams } from "@langwatch/automations/providers/dataset";
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
-import type { Dataset } from "@prisma/client";
+import type { Dataset } from "~/generated/prisma/client";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";

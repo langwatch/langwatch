@@ -1,4 +1,4 @@
-import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
+import { OrganizationUserRole, type PrismaClient } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { Session } from "~/server/auth";

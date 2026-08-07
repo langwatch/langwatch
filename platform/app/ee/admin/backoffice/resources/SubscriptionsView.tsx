@@ -13,7 +13,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { PlanTypes, SubscriptionStatus } from "@prisma/client";
+import { PlanTypes, SubscriptionStatus } from "~/generated/prisma/client";
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";

@@ -1,6 +1,6 @@
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import { createLogger } from "@langwatch/observability";
-import type { AlertType } from "@prisma/client";
+import type { AlertType } from "~/generated/prisma/client";
 import {
   Column,
   Container,

@@ -1,4 +1,4 @@
-import { TriggerAction, TriggerKind } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   NullTriggerRepository,

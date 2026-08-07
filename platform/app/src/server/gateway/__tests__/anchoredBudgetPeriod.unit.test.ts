@@ -6,7 +6,7 @@
  * in anchoredBudgetCycles.unit.test.ts; this file is about what the stored
  * columns of a row mean once the anchor is applied to them.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { explainHandledError } from "~/features/errors/logic/presentation";
 import { GatewayBudgetService } from "../budget.service";

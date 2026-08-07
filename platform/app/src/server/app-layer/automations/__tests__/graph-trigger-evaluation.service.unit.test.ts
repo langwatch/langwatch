@@ -1,5 +1,5 @@
-import type { CustomGraph, Project, Trigger } from "@prisma/client";
-import { TriggerAction } from "@prisma/client";
+import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
+import { TriggerAction } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import type { GraphAlertDispatchResult } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";

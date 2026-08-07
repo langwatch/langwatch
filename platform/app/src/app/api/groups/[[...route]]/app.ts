@@ -2,7 +2,7 @@ import {
   type Organization,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";

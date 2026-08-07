@@ -1,4 +1,4 @@
-import type { Organization, Project, Team } from "@prisma/client";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   mapUserToBackofficeRow,

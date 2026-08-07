@@ -5,7 +5,7 @@ import {
 import {
   AlertType as PrismaAlertType,
   TriggerAction as PrismaTriggerAction,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
 
 /**

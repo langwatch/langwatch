@@ -1,5 +1,5 @@
-import type { Prisma, TriggerAction } from "@prisma/client";
-import { TriggerKind } from "@prisma/client";
+import type { Prisma, TriggerAction } from "~/generated/prisma/client";
+import { TriggerKind } from "~/generated/prisma/client";
 import { Cron } from "croner";
 import { z } from "zod";
 

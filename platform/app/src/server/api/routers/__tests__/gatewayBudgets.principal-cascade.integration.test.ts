@@ -16,7 +16,7 @@
  *
  * Spec: specs/ai-gateway/budgets-principal-cascade.feature
  */
-import { Prisma } from "@prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

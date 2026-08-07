@@ -33,7 +33,7 @@
  *
  * Spec: specs/ai-governance/personal-portal/tool-catalog-*.feature
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 

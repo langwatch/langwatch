@@ -1,5 +1,5 @@
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
-import type { PrismaClient, User } from "@prisma/client";
+import type { PrismaClient, User } from "~/generated/prisma/client";
 import { revokeAllSessionsForUser } from "../better-auth/revokeSessions";
 
 export class UserService {

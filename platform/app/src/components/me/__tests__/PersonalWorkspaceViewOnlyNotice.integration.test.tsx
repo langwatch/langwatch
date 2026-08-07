@@ -11,7 +11,7 @@
  * Spec: specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

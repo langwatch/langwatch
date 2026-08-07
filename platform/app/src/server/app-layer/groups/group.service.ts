@@ -5,7 +5,7 @@ import type {
   RoleBinding,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";

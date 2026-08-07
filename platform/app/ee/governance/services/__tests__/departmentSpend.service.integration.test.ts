@@ -10,7 +10,7 @@
  * Binds the @birds-eye scenarios of departments.feature.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { Organization } from "@prisma/client";
+import type { Organization } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";

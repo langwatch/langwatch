@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
 import { z } from "zod";
 import { savedViewErrorHandler } from "../../saved-views/middleware";
 import { SavedViewService } from "../../saved-views/saved-view.service";

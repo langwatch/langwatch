@@ -1,8 +1,8 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
-import type { JsonValue } from "@prisma/client/runtime/library";
+import type { Prisma, PrismaClient, WorkflowVersion } from "~/generated/prisma/client";
+import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
 import { createPatch } from "diff";

@@ -1,4 +1,4 @@
-import type { BugReport } from "@prisma/client";
+import type { BugReport } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";

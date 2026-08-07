@@ -15,7 +15,7 @@ import {
   type Prisma,
   TriggerAction,
   TriggerKind,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";

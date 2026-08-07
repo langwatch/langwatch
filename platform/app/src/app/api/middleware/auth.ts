@@ -1,4 +1,4 @@
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import type { MiddlewareHandler } from "hono";
 import type { ApiErrorEnvelope } from "~/app/api/shared/canonical-error";
 import type { Permission } from "~/server/api/rbac";

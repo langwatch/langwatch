@@ -18,7 +18,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { vi } from "vitest";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";

@@ -1,4 +1,4 @@
-import { PromptScope } from "@prisma/client";
+import { PromptScope } from "~/generated/prisma/client";
 import { merge } from "lodash-es";
 
 import { DEFAULT_MODEL, FALLBACK_MAX_TOKENS } from "~/utils/constants";

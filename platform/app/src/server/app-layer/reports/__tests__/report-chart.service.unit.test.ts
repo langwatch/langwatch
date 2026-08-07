@@ -1,4 +1,4 @@
-import type { CustomGraph } from "@prisma/client";
+import type { CustomGraph } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";

@@ -1,4 +1,4 @@
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import type { SubmitHandler } from "react-hook-form";
 import { showErrorToast } from "~/features/errors";
 import type { MembersForm } from "../components/AddMembersForm";

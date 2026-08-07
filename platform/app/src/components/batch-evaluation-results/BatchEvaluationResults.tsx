@@ -17,7 +17,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type Experiment, ExperimentType, type Project } from "@prisma/client";
+import { type Experiment, ExperimentType, type Project } from "~/generated/prisma/client";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";

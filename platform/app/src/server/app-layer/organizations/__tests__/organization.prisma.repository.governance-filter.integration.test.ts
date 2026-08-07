@@ -1,4 +1,4 @@
-import type { Organization, Project, Team, User } from "@prisma/client";
+import type { Organization, Project, Team, User } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";

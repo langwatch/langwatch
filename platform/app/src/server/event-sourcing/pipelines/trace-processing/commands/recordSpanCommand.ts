@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";

@@ -6,7 +6,7 @@
  * prose — `message` is for whoever reads the trace.
  */
 import { HandledError } from "@langwatch/handled-error";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 
 import type { ExternalIdResource } from "./resourceMetadata";
 

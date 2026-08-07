@@ -1,4 +1,4 @@
-import type { PromptTag } from "@prisma/client";
+import type { PromptTag } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import {
   PromptTagConflictError,

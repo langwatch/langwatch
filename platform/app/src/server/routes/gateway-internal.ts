@@ -17,7 +17,7 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
 import { createLogger } from "@langwatch/observability";
-import type { GatewayBudget } from "@prisma/client";
+import type { GatewayBudget } from "~/generated/prisma/client";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";

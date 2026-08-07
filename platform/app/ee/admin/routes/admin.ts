@@ -12,7 +12,7 @@
 
 import { auditLog } from "@ee/audit-log/auditLog";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
-import { PlanTypes, type Prisma, SubscriptionStatus } from "@prisma/client";
+import { PlanTypes, type Prisma, SubscriptionStatus } from "~/generated/prisma/client";
 import {
   defaultHandler,
   type GetListRequest,

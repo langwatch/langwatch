@@ -12,7 +12,7 @@ import {
   type OrganizationUserRole,
   RoleBindingScopeType,
   type TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";

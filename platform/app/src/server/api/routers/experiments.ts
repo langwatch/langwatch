@@ -4,8 +4,8 @@ import {
   EvaluationExecutionMode,
   ExperimentType,
   type Prisma,
-} from "@prisma/client";
-import type { JsonValue } from "@prisma/client/runtime/library";
+} from "~/generated/prisma/client";
+import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";

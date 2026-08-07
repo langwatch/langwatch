@@ -18,7 +18,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { WorkflowVersion } from "@prisma/client";
+import type { WorkflowVersion } from "~/generated/prisma/client";
 import { GitCompare, X } from "lucide-react";
 
 import { useMemo } from "react";

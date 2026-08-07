@@ -1,4 +1,4 @@
-import { type Organization, PricingModel } from "@prisma/client";
+import { type Organization, PricingModel } from "~/generated/prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 

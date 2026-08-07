@@ -1,4 +1,4 @@
-import { TeamUserRole } from "@prisma/client";
+import { TeamUserRole } from "~/generated/prisma/client";
 import type React from "react";
 import { useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";

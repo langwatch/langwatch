@@ -1,4 +1,4 @@
-import { AlertType } from "@prisma/client";
+import { AlertType } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerData } from "~/server/app-layer/automations/trigger.types";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";

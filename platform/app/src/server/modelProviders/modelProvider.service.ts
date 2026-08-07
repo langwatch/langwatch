@@ -1,4 +1,4 @@
-import type { PrismaClient, Project } from "@prisma/client";
+import type { PrismaClient, Project } from "~/generated/prisma/client";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { Session } from "~/server/auth";

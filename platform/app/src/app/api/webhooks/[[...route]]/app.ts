@@ -11,7 +11,7 @@ import {
 } from "@ee/webhooks/webhookEvents.service";
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
 import { createLogger } from "@langwatch/observability";
-import type { Organization } from "@prisma/client";
+import type { Organization } from "~/generated/prisma/client";
 import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";

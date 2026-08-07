@@ -1,4 +1,4 @@
-import type { OrganizationIntent } from "@prisma/client";
+import type { OrganizationIntent } from "~/generated/prisma/client";
 import type React from "react";
 import { createContext, useContext } from "react";
 import type {

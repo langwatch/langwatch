@@ -7,7 +7,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
-import type { Scenario } from "@prisma/client";
+import type { Scenario } from "~/generated/prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type UseFormReturn, useWatch } from "react-hook-form";
 import {

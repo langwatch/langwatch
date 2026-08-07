@@ -7,7 +7,7 @@
  */
 
 import { generate } from "@langwatch/ksuid";
-import type { SimulationSuite } from "@prisma/client";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

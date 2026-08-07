@@ -1,5 +1,5 @@
 import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
-import { type OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { type OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { useMemo } from "react";
 import { api } from "../../utils/api";
 import {

@@ -1,4 +1,4 @@
-import { OrganizationUserRole, type Project } from "@prisma/client";
+import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { useRouter } from "~/utils/compat/next-router";

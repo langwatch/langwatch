@@ -12,7 +12,7 @@
  */
 
 import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
-import type { SimulationSuite } from "@prisma/client";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

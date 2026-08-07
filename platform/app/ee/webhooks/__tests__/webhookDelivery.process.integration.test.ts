@@ -9,7 +9,7 @@
  * the pipeline's own applier.
  */
 
-import type { Organization, Project, Team } from "@prisma/client";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,

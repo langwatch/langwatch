@@ -14,7 +14,7 @@
  *     missing-key cascade up)
  */
 
-import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
 
 import { resolveModelForFeature } from "../resolveModelForFeature";

@@ -1,4 +1,4 @@
-import { PromptScope } from "@prisma/client";
+import { PromptScope } from "~/generated/prisma/client";
 import { z } from "zod";
 
 import { runtimeParametersSchema } from "~/prompts/schemas/field-schemas";

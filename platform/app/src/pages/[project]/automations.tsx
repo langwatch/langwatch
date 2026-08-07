@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Monitor, TriggerAction } from "@prisma/client";
+import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import { useMemo } from "react";
 import {
   Calendar,

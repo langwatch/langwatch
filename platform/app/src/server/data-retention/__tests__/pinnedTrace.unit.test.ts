@@ -1,4 +1,4 @@
-import type { PinnedTrace } from "@prisma/client";
+import type { PinnedTrace } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { PinnedTraceRepository } from "../pinning/pinnedTrace.repository";
 import {

@@ -14,7 +14,7 @@ import {
   type WebhookEndpointView,
 } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
-import type { Organization } from "@prisma/client";
+import type { Organization } from "~/generated/prisma/client";
 import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";

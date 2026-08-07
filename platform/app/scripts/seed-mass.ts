@@ -23,7 +23,7 @@
  * HAVEN_SEED_MONTHS tunes the window (default 3). Deterministic and
  * idempotent: same window → same ids → re-running upserts the same story.
  */
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../src/generated/prisma/client";
 import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
 import { seedDemoPlatform } from "../prisma/seed-demo-platform";
 import { resetApp } from "../src/server/app-layer/app";

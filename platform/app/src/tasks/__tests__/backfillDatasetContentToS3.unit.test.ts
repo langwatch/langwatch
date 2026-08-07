@@ -1,4 +1,4 @@
-import { type Dataset, type DatasetRecord, Prisma } from "@prisma/client";
+import { type Dataset, type DatasetRecord, Prisma } from "~/generated/prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // `execute()` touches the real prisma client + storage accessors only AFTER the

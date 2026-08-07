@@ -1,4 +1,4 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 
 export type TeamRoleValue = TeamUserRole | `custom:${string}`;
 

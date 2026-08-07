@@ -43,7 +43,7 @@ import { SuiteDetailPanel, SuiteEmptyState } from "../SuiteDetailPanel";
 const mockUseQuery = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
-vi.mock("@prisma/client", () => ({}));
+vi.mock("~/generated/prisma/client", () => ({}));
 
 vi.mock("~/utils/api", () => ({
   api: {

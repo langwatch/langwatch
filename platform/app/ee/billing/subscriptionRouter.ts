@@ -1,4 +1,4 @@
-import { Currency } from "@prisma/client";
+import { Currency } from "~/generated/prisma/client";
 import { z } from "zod";
 import { checkOrganizationPermission } from "../../src/server/api/rbac";
 import {

@@ -1,4 +1,4 @@
-import { PricingModel } from "@prisma/client";
+import { PricingModel } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
 import { normalizeUsageUnit, resolveUsageMeter } from "../usage-meter-policy";
 

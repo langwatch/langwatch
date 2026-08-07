@@ -7,7 +7,7 @@ import {
   langyTurnToolCallSchema,
   parseConversationTurnKey,
 } from "@langwatch/langy";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { z } from "zod";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {

@@ -1,4 +1,4 @@
-import { PromptScope } from "@prisma/client";
+import { PromptScope } from "~/generated/prisma/client";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 

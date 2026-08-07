@@ -1,4 +1,4 @@
-import type { AlertType, Prisma, TriggerAction } from "@prisma/client";
+import type { AlertType, Prisma, TriggerAction } from "~/generated/prisma/client";
 import { z } from "zod";
 
 /**

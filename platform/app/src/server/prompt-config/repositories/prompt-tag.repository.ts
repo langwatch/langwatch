@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient, PromptTag } from "@prisma/client";
+import type { PrismaClient, PromptTag } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { SEEDED_TAGS } from "~/prompts/constants/tags";
 

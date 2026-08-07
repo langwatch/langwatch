@@ -17,7 +17,7 @@ import {
   type Team,
   TeamUserRole,
   type User,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";

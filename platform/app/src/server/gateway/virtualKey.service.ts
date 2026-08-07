@@ -18,7 +18,7 @@ import type {
   PrismaClient,
   VirtualKey,
   VirtualKeyRoutingMode,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
 import { z } from "zod";

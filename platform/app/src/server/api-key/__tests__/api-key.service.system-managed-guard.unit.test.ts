@@ -9,7 +9,7 @@
  * not-found, matching the tenancy-mismatch branch rather than confirming the
  * id exists.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiKeyService } from "../api-key.service";

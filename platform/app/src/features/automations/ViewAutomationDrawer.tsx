@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { TriggerKind } from "@prisma/client";
+import { TriggerKind } from "~/generated/prisma/client";
 import { differenceInMinutes, differenceInSeconds } from "date-fns";
 import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";

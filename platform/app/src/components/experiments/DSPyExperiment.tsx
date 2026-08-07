@@ -16,7 +16,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Experiment, Project, WorkflowVersion } from "@prisma/client";
+import type { Experiment, Project, WorkflowVersion } from "~/generated/prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";

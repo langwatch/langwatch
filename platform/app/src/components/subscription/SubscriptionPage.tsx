@@ -23,7 +23,7 @@ import {
   PricingModel,
   Currency as PrismaCurrency,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { ArrowRight, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";

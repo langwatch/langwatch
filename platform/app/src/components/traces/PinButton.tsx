@@ -1,5 +1,5 @@
 import { Button } from "@chakra-ui/react";
-import { PinSource } from "@prisma/client";
+import { PinSource } from "~/generated/prisma/client";
 import { Pin, PinOff } from "lucide-react";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";

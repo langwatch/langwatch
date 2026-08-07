@@ -16,7 +16,7 @@ import {
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";

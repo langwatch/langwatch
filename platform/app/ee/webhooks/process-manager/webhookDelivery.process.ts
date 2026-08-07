@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { z } from "zod";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";

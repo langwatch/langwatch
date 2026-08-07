@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { SsoLicenseRepository } from "../sso-license.repository";
 

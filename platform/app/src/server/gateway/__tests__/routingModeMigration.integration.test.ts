@@ -23,7 +23,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

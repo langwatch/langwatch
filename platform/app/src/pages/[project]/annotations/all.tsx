@@ -1,5 +1,5 @@
 import { Button, Container, Heading, HStack, Spacer } from "@chakra-ui/react";
-import type { Annotation } from "@prisma/client";
+import type { Annotation } from "~/generated/prisma/client";
 import Parse from "papaparse";
 import { Download } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
