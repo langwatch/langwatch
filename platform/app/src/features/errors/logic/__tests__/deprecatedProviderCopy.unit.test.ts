@@ -16,14 +16,26 @@ import {
   providerDeprecation,
 } from "../../../../server/modelProviders/registry";
 import { explainHandledError } from "../presentation";
+import type { HandledErrorShape } from "../readHandledError";
 
-const describeRefusal = (provider: string, replacement: string) =>
-  explainHandledError({
+/**
+ * The payload as the client reads it off the wire — every field the shape
+ * requires, none faked with a cast, so this keeps compiling honestly if
+ * the shape grows a member.
+ */
+const describeRefusal = (provider: string, replacement: string): string => {
+  const wire: HandledErrorShape = {
     code: "model_provider_deprecated",
-    message: "This model provider is no longer available to add.",
     meta: { provider, replacement },
+    httpStatus: 400,
     fault: "customer",
-  } as Parameters<typeof explainHandledError>[0]).description;
+    tips: [],
+    docsUrl: undefined,
+    traceId: undefined,
+    reasons: [],
+  };
+  return explainHandledError(wire).description;
+};
 
 const UNNAMED = describeRefusal("whatever", "a-slug-with-no-entry");
 
