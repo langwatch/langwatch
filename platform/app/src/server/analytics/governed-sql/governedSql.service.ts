@@ -146,6 +146,18 @@ export class GovernedSqlService {
   }
 
   /**
+   * Whether this deployment has a governed identity to run a query as.
+   *
+   * The capability read the workbench navigation gates on, so an unprovisioned
+   * deployment never offers a surface it would then refuse. Fail-closed by
+   * construction: it reports the presence of the executor, which is the same
+   * fact {@link execute} refuses on, so the two can never disagree.
+   */
+  get available(): boolean {
+    return this.deps.executor != null;
+  }
+
+  /**
    * The governed schema this caller's permissions unlock.
    *
    * Needs no executor: the schema is the catalog, and a deployment with no

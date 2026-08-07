@@ -74,6 +74,7 @@ export const APP_ERROR_CODES = [
   "gateway_provider_bindings_gone",
   "gateway_scope_org_mismatch",
   "gateway_spend_unavailable",
+  "governed_sql_not_enabled",
   "governed_sql_not_permitted",
   "governed_sql_parameter_missing",
   "governed_sql_unavailable",

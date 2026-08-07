@@ -545,6 +545,10 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/analytics/users")),
       },
       {
+        path: "/:project/analytics/query",
+        ...page(() => import("./pages/[project]/analytics/query")),
+      },
+      {
         path: "/:project/analytics/custom",
         ...page(() => import("./pages/[project]/analytics/custom/index")),
       },

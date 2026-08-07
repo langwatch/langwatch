@@ -7,6 +7,11 @@ export const projectRoutes = {
     path: "/[project]/analytics",
     title: "Analytics",
   },
+  analytics_custom_query: {
+    path: "/[project]/analytics/query",
+    title: "Custom query",
+    parent: "analytics",
+  },
   workflows: {
     path: "/[project]/workflows",
     title: "Workflows",

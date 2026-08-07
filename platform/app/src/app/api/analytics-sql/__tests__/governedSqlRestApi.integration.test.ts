@@ -68,6 +68,7 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "~/server/db";
+import { getFeatureFlagStore } from "~/server/featureFlag";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -385,6 +386,12 @@ describe("given the governed analytics SQL REST endpoints", () => {
   };
 
   beforeAll(async () => {
+    // The surface ships behind the experimental feature switch, off by
+    // default. The suite runs with it on via the flag's own env override —
+    // the same lever a deployment uses — and the flag-off cases below unset
+    // it for exactly one request.
+    process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+
     // The catalog spans both residences; the governed views over the
     // PostgreSQL-resident half read engine tables that must exist first.
     postgres = await startGovernedPostgres();
@@ -502,6 +509,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
   }, 600_000);
 
   afterAll(async () => {
+    delete process.env.RELEASE_GOVERNED_SQL_WORKBENCH;
     setGovernedSqlService(null);
     // Guarded on the identifier each statement actually uses: `team` gates
     // everything keyed by teamId (and the policy created after it), while
@@ -520,6 +528,99 @@ describe("given the governed analytics SQL REST endpoints", () => {
     }
     await harness?.stop();
     await postgres?.stop();
+  });
+
+  describe("when the governed SQL feature switch is off for the project", () => {
+    /** Runs one request with the switch off, whatever else the suite set. */
+    const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
+      process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "0";
+      try {
+        return await request();
+      } finally {
+        process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+      }
+    };
+
+    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
+    it("refuses the query endpoint with the named refusal and touches no data", async () => {
+      const response = await withFlagOff(async () =>
+        post(openProject, { sql: "SELECT 1" }),
+      );
+      const body = (await response.json()) as Record<string, any>;
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("governed_sql_not_enabled");
+    });
+
+    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
+    it("refuses the schema endpoint the same way", async () => {
+      const response = await withFlagOff(async () =>
+        app.request(schemaPath(openProject), {
+          headers: { "X-Auth-Token": openProject.apiKey },
+        }),
+      );
+      const body = (await response.json()) as Record<string, any>;
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("governed_sql_not_enabled");
+    });
+  });
+
+  describe("when a stored organization rule is the only thing enabling the switch", () => {
+    /**
+     * No environment override, a row whose default is off, and one rule keyed
+     * to an organization: the surface is on exactly for that organization's
+     * projects. Runs against the real store, so this is the whole chain —
+     * gate resolves the project's organization, rule matches it.
+     */
+    const withOrganizationRule = async <T>(
+      organizationId: string,
+      request: () => Promise<T>,
+    ): Promise<T> => {
+      const store = getFeatureFlagStore();
+      await store.setRules(
+        "release_governed_sql_workbench",
+        [{ match: { organizationId }, enabled: true }],
+        null,
+      );
+      // Both env doors must be shut or the rule is never consulted: the
+      // dev .env force-enables this flag, and force-enable wins before the
+      // store — leaving it in place turns both of these tests vacuous.
+      const forceEnable = process.env.FEATURE_FLAG_FORCE_ENABLE;
+      delete process.env.RELEASE_GOVERNED_SQL_WORKBENCH;
+      delete process.env.FEATURE_FLAG_FORCE_ENABLE;
+      try {
+        return await request();
+      } finally {
+        process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+        if (forceEnable !== undefined) {
+          process.env.FEATURE_FLAG_FORCE_ENABLE = forceEnable;
+        }
+        await store.clear("release_governed_sql_workbench", null);
+      }
+    };
+
+    /** @scenario "An organization-scoped rule can switch the workbench on" */
+    it("turns the surface on for that organization's projects", async () => {
+      const response = await withOrganizationRule(organization.id, async () =>
+        app.request(schemaPath(openProject), {
+          headers: { "X-Auth-Token": openProject.apiKey },
+        }),
+      );
+      expect(response.status).toBe(200);
+    });
+
+    /** @scenario "An organization-scoped rule can switch the workbench on" */
+    it("leaves the surface off for a project outside the rule's organization", async () => {
+      const response = await withOrganizationRule(
+        "org_someone_else",
+        async () =>
+          app.request(schemaPath(openProject), {
+            headers: { "X-Auth-Token": openProject.apiKey },
+          }),
+      );
+      const body = (await response.json()) as Record<string, any>;
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("governed_sql_not_enabled");
+    });
   });
 
   describe("when the caller is not authenticated", () => {

@@ -94,6 +94,12 @@ const registry = {
       "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
     ],
   },
+  governed_sql_not_enabled: {
+    tips: [
+      "The governed SQL feature is not enabled for this project — retrying will not help",
+      "Ask an administrator to enable the SQL workbench for this project",
+    ],
+  },
   governed_sql_unavailable: {
     tips: [
       "The governed analytics SQL API is not provisioned on this deployment — retrying will not help",
