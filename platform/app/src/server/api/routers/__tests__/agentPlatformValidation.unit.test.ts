@@ -1,12 +1,14 @@
 /**
- * Agent Platform is the one provider here that cannot be validated by listing
- * models: `GET .../models` answers 401 "API keys are not supported by this
- * API" however good the key is, while `:generateContent` accepts one. Probing
- * the usual way would report a working credential as unusable, so what these
- * tests pin is mostly *which request goes out*.
+ * Gemini is one provider with two Google doors: an AI Studio key answers on
+ * generativelanguage.googleapis.com, an Agent Platform key on
+ * aiplatform.googleapis.com at a path naming the project and location. The
+ * credential's shape — pair present or absent — decides which door is asked,
+ * so what these tests pin is mostly *which request goes out*.
  *
- * Established against a real Agent Platform key, not from documentation —
- * the two endpoints on that host disagree and the docs do not mention it.
+ * Agent Platform also cannot be validated by listing models: `GET .../models`
+ * answers 401 "API keys are not supported by this API" however good the key
+ * is, while `:generateContent` accepts one. Established against real keys of
+ * both kinds, not from documentation.
  *
  * Covers @unit scenarios from
  * specs/model-providers/google-agent-platform.feature.
@@ -17,16 +19,26 @@ import { validateProviderApiKey } from "../providerValidation";
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-const CREDENTIALS = {
-  GOOGLE_AGENT_PLATFORM_API_KEY: "AQ.AnAgentPlatformKey",
-  GOOGLE_AGENT_PLATFORM_PROJECT: "acme-123",
-  GOOGLE_AGENT_PLATFORM_LOCATION: "global",
+const AGENT_PLATFORM_CREDENTIALS = {
+  GEMINI_API_KEY: "AQ.AnAgentPlatformKey",
+  GEMINI_PROJECT: "acme-123",
+  GEMINI_LOCATION: "global",
 };
 
-/** The request the probe actually made. */
+const AI_STUDIO_CREDENTIALS = {
+  GEMINI_API_KEY: "AIzaAnAiStudioKey",
+};
+
+/** The requests the probe walk actually made. */
+const sentRequests = () =>
+  mockFetch.mock.calls.map(([url, init]) => ({
+    url: String(url ?? ""),
+    init: (init ?? {}) as RequestInit,
+  }));
+
 const sentRequest = () => {
-  const [url, init] = mockFetch.mock.calls[0] ?? [];
-  return { url: String(url ?? ""), init: (init ?? {}) as RequestInit };
+  const [first] = sentRequests();
+  return first ?? { url: "", init: {} as RequestInit };
 };
 
 const generated = () => ({
@@ -38,18 +50,82 @@ const generated = () => ({
 const codeOf = (result: { valid: boolean; domainError?: { code: string } }) =>
   result.valid ? undefined : result.domainError?.code;
 
-describe("validateProviderApiKey for google_agent_platform", () => {
+describe("validateProviderApiKey for gemini's two Google doors", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset();
   });
 
-  describe("given a credential to check", () => {
-    /** @scenario A key the platform accepts is valid */
+  describe("given a credential with only an API key", () => {
+    /** @scenario An AI Studio key validates through the Gemini API door */
+    it("asks the Gemini API host and never the Agent Platform one", async () => {
+      mockFetch.mockResolvedValue(generated());
+
+      await validateProviderApiKey("gemini", AI_STUDIO_CREDENTIALS);
+
+      const urls = sentRequests().map((r) => r.url);
+      expect(urls.length).toBeGreaterThan(0);
+      for (const url of urls) {
+        expect(url).toContain("generativelanguage.googleapis.com");
+        expect(url).not.toContain("aiplatform.googleapis.com");
+      }
+    });
+
+    /** @scenario An Agent Platform key without project and location is told what is missing, not that it is invalid */
+    it("names the key's restriction rather than calling it invalid", async () => {
+      // Google's live answer for an Agent Platform key on the Gemini API
+      // host, verified with a real key: the key is fine, the door is wrong.
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: async () =>
+          JSON.stringify({
+            error: {
+              message: "Requests to this API are blocked.",
+              details: [
+                {
+                  "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                  reason: "API_KEY_SERVICE_BLOCKED",
+                },
+              ],
+            },
+          }),
+      });
+
+      const result = await validateProviderApiKey(
+        "gemini",
+        AI_STUDIO_CREDENTIALS,
+      );
+
+      expect(codeOf(result)).toBe("provider_key_restricted");
+      expect(codeOf(result)).not.toBe("provider_key_invalid");
+    });
+  });
+
+  describe("given a credential carrying a project and location", () => {
+    /** @scenario A credential carrying project and location is checked through the Agent Platform door */
+    it("builds the Agent Platform path from the project and location and skips the Gemini API", async () => {
+      mockFetch.mockResolvedValue(generated());
+
+      await validateProviderApiKey("gemini", {
+        ...AGENT_PLATFORM_CREDENTIALS,
+        GEMINI_LOCATION: "us-central1",
+      });
+
+      const requests = sentRequests();
+      expect(requests).toHaveLength(1);
+      expect(requests[0]!.url).toContain("aiplatform.googleapis.com");
+      expect(requests[0]!.url).toContain(
+        "/projects/acme-123/locations/us-central1/",
+      );
+      expect(requests[0]!.url).not.toContain("generativelanguage");
+    });
+
+    /** @scenario A credential carrying project and location is checked through the Agent Platform door */
     it("asks the provider to generate content rather than to list models", async () => {
       mockFetch.mockResolvedValue(generated());
 
-      await validateProviderApiKey("google_agent_platform", CREDENTIALS);
+      await validateProviderApiKey("gemini", AGENT_PLATFORM_CREDENTIALS);
 
       const { url, init } = sentRequest();
       expect(url).toContain(":generateContent");
@@ -68,109 +144,57 @@ describe("validateProviderApiKey for google_agent_platform", () => {
     it("sends the key as a header and keeps it out of the URL", async () => {
       mockFetch.mockResolvedValue(generated());
 
-      await validateProviderApiKey("google_agent_platform", CREDENTIALS);
+      await validateProviderApiKey("gemini", AGENT_PLATFORM_CREDENTIALS);
 
       const { url, init } = sentRequest();
       const headers = init.headers as Record<string, string>;
       expect(headers["x-goog-api-key"]).toBe(
-        CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+        AGENT_PLATFORM_CREDENTIALS.GEMINI_API_KEY,
       );
       // `?key=` is also accepted by Agent Platform, which is exactly why this
       // is pinned: a credential in a URL reaches access logs and history.
-      expect(url).not.toContain(CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY);
+      expect(url).not.toContain(AGENT_PLATFORM_CREDENTIALS.GEMINI_API_KEY);
       expect(url).not.toContain("key=");
     });
+  });
 
-    /** @scenario The project and location I entered are the ones actually checked */
-    it("builds the path from the project and location given", async () => {
+  describe("given a credential carrying only half the pair", () => {
+    /**
+     * A lone project (or lone location) names no door. The walk falls back
+     * to the Gemini API rather than probing a path it cannot build —
+     * where a restricted key still gets its named, actionable refusal.
+     */
+    it("asks the Gemini API rather than a path it cannot build", async () => {
       mockFetch.mockResolvedValue(generated());
 
-      await validateProviderApiKey("google_agent_platform", {
-        ...CREDENTIALS,
-        GOOGLE_AGENT_PLATFORM_PROJECT: "acme-123",
-        GOOGLE_AGENT_PLATFORM_LOCATION: "us-central1",
+      await validateProviderApiKey("gemini", {
+        GEMINI_API_KEY: AGENT_PLATFORM_CREDENTIALS.GEMINI_API_KEY,
+        GEMINI_PROJECT: AGENT_PLATFORM_CREDENTIALS.GEMINI_PROJECT,
       });
 
-      expect(sentRequest().url).toContain(
-        "/projects/acme-123/locations/us-central1/",
-      );
+      const urls = sentRequests().map((r) => r.url);
+      expect(urls.length).toBeGreaterThan(0);
+      for (const url of urls) {
+        expect(url).toContain("generativelanguage.googleapis.com");
+      }
     });
   });
 
-  describe("given a credential missing its project or location", () => {
-    /**
-     * This is the shape `validateKeyWithCustomUrl` produced before it was
-     * fixed to preserve stored credentials rather than rebuild them from
-     * just the key and endpoint: project and location silently dropped,
-     * leaving only the key. Asserting on it here pins the walk's behavior
-     * directly, without needing a Prisma-backed test for that caller.
-     */
-    // Three separate cases, not one covering both fields at once: an `||`
-    // guard degrading to `&&` would still return no candidates when BOTH
-    // are missing, and only a case with exactly one present catches that.
-    /** @scenario A credential missing its project or location is not probed at all */
-    it("rejects the check without probing when both project and location are missing", async () => {
-      mockFetch.mockResolvedValue(generated());
-
-      await expect(
-        validateProviderApiKey("google_agent_platform", {
-          GOOGLE_AGENT_PLATFORM_API_KEY:
-            CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
-        }),
-      ).rejects.toMatchObject({ code: "provider_unreachable" });
-
-      // Nothing to ask without both a project and a location, so nothing was sent.
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-
-    /** @scenario A credential missing its project or location is not probed at all */
-    it("rejects the check without probing when only the location is missing", async () => {
-      mockFetch.mockResolvedValue(generated());
-
-      await expect(
-        validateProviderApiKey("google_agent_platform", {
-          GOOGLE_AGENT_PLATFORM_API_KEY:
-            CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
-          GOOGLE_AGENT_PLATFORM_PROJECT:
-            CREDENTIALS.GOOGLE_AGENT_PLATFORM_PROJECT,
-        }),
-      ).rejects.toMatchObject({ code: "provider_unreachable" });
-
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-
-    /** @scenario A credential missing its project or location is not probed at all */
-    it("rejects the check without probing when only the project is missing", async () => {
-      mockFetch.mockResolvedValue(generated());
-
-      await expect(
-        validateProviderApiKey("google_agent_platform", {
-          GOOGLE_AGENT_PLATFORM_API_KEY:
-            CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
-          GOOGLE_AGENT_PLATFORM_LOCATION:
-            CREDENTIALS.GOOGLE_AGENT_PLATFORM_LOCATION,
-        }),
-      ).rejects.toMatchObject({ code: "provider_unreachable" });
-
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the platform accepts the credential", () => {
-    /** @scenario A key the platform accepts is valid */
+  describe("when Agent Platform accepts the credential", () => {
+    /** @scenario A key Agent Platform accepts is valid */
     it("reports the credential as valid", async () => {
       mockFetch.mockResolvedValue(generated());
 
       const result = await validateProviderApiKey(
-        "google_agent_platform",
-        CREDENTIALS,
+        "gemini",
+        AGENT_PLATFORM_CREDENTIALS,
       );
 
       expect(result).toEqual({ valid: true });
     });
   });
 
-  describe("when the platform refuses the credential", () => {
+  describe("when Agent Platform refuses the credential", () => {
     /** @scenario A key the platform refuses is explained, not just rejected */
     it("names the refusal without quoting the provider back", async () => {
       mockFetch.mockResolvedValue({
@@ -183,8 +207,8 @@ describe("validateProviderApiKey for google_agent_platform", () => {
       });
 
       const result = await validateProviderApiKey(
-        "google_agent_platform",
-        CREDENTIALS,
+        "gemini",
+        AGENT_PLATFORM_CREDENTIALS,
       );
 
       expect(codeOf(result)).toBe("provider_key_invalid");
@@ -208,8 +232,33 @@ describe("validateProviderApiKey for google_agent_platform", () => {
       });
 
       const result = await validateProviderApiKey(
-        "google_agent_platform",
-        CREDENTIALS,
+        "gemini",
+        AGENT_PLATFORM_CREDENTIALS,
+      );
+
+      expect(codeOf(result)).not.toBe("provider_key_invalid");
+      expect(codeOf(result)).toBe("provider_refused");
+    });
+
+    /**
+     * The doors disagree on 400: the Gemini API rejects a bad key with it,
+     * while on Agent Platform's generate-content probe it means a malformed
+     * request. Blaming the key here would revive the exact misdiagnosis the
+     * fold exists to remove — through the other door.
+     */
+    it("does not read an Agent Platform 400 as a key verdict", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: { message: "Please use a valid role: user, model." },
+          }),
+      });
+
+      const result = await validateProviderApiKey(
+        "gemini",
+        AGENT_PLATFORM_CREDENTIALS,
       );
 
       expect(codeOf(result)).not.toBe("provider_key_invalid");
@@ -223,8 +272,52 @@ describe("validateProviderApiKey for google_agent_platform", () => {
       mockFetch.mockRejectedValue(new Error("ECONNREFUSED"));
 
       await expect(
-        validateProviderApiKey("google_agent_platform", CREDENTIALS),
+        validateProviderApiKey("gemini", AGENT_PLATFORM_CREDENTIALS),
       ).rejects.toMatchObject({ code: "provider_unreachable" });
+    });
+  });
+
+  describe("given a legacy google_agent_platform row from the fold window", () => {
+    /**
+     * The retired provider has no onboarding tile any more, so it resolves
+     * no default base URL — and the no-endpoint skip must not read that as
+     * "nothing to probe". The Agent Platform door builds its own URL; a
+     * green check without a request would pass a revoked key.
+     */
+    /** @scenario A legacy row still validates through the Agent Platform door during the fold window */
+    it("probes the Agent Platform door instead of skipping validation", async () => {
+      mockFetch.mockResolvedValue(generated());
+
+      const result = await validateProviderApiKey("google_agent_platform", {
+        GOOGLE_AGENT_PLATFORM_API_KEY: "AQ.LegacyKey",
+        GOOGLE_AGENT_PLATFORM_PROJECT: "acme-123",
+        GOOGLE_AGENT_PLATFORM_LOCATION: "global",
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(sentRequest().url).toContain("aiplatform.googleapis.com");
+      expect(sentRequest().url).toContain(
+        "/projects/acme-123/locations/global/",
+      );
+      expect(result).toEqual({ valid: true });
+    });
+
+    /** @scenario A legacy row still validates through the Agent Platform door during the fold window */
+    it("still reports a refused legacy key as refused", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: async () => JSON.stringify({ error: { message: "nope" } }),
+      });
+
+      const result = await validateProviderApiKey("google_agent_platform", {
+        GOOGLE_AGENT_PLATFORM_API_KEY: "AQ.RevokedKey",
+        GOOGLE_AGENT_PLATFORM_PROJECT: "acme-123",
+        GOOGLE_AGENT_PLATFORM_LOCATION: "global",
+      });
+
+      expect(mockFetch).toHaveBeenCalled();
+      expect(codeOf(result)).toBe("provider_key_invalid");
     });
   });
 });

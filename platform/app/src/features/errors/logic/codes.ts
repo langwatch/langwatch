@@ -132,10 +132,12 @@ export const APP_ERROR_CODES = [
   "missing_slack_webhook",
   "model_not_configured",
   "model_provider_anchor_required",
+  "model_provider_deprecated",
   "model_provider_disabled",
   "model_provider_not_found",
   "model_provider_scope_forbidden",
   "model_provider_scopes_required",
+  "model_restricted_for_feature",
   "monitor_evaluator_required",
   "no_admin_configured",
   // Also a Go code, with copy already written under the shared/transport

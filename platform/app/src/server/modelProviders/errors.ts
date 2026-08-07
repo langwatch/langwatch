@@ -83,6 +83,46 @@ export class ModelProviderScopesRequiredError extends HandledError {
 }
 
 /**
+ * The call tried to create a row under a provider that no longer accepts
+ * them.
+ *
+ * A deprecated provider has been absorbed into another one; its stored rows
+ * stay fully usable so no deployment is stranded mid-fold, but the population
+ * has to be able to reach zero, or the compatibility entry can never be
+ * deleted. Hiding the tile handles the UI; this handles everyone else.
+ *
+ * Editing, disabling and deleting an existing row are all still allowed —
+ * only creation is closed, which is why the check keys on there being no
+ * existing row rather than on the provider alone.
+ *
+ * `replacement` rides in `meta` rather than in the sentence: which provider
+ * to use instead is a fact the client's presentation registry turns into
+ * words, and an API caller reads the slug directly.
+ */
+export class ModelProviderDeprecatedError extends HandledError {
+  declare readonly code: "model_provider_deprecated";
+
+  constructor({
+    provider,
+    replacement,
+  }: {
+    provider: string;
+    replacement?: string;
+  }) {
+    super(
+      "model_provider_deprecated",
+      "This model provider is no longer available to add.",
+      {
+        meta: { provider, ...(replacement ? { replacement } : {}) },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderDeprecatedError";
+  }
+}
+
+/**
  * The caller cannot manage one of the scopes a write would touch.
  *
  * A create / update / delete can affect several scope entries at once, and the

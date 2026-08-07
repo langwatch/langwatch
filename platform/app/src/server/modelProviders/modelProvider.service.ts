@@ -8,9 +8,11 @@ import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import {
   ModelProviderAnchorRequiredError,
+  ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
   ModelProviderScopesRequiredError,
 } from "./errors";
+import { rowCannotServeEmbeddings } from "./geminiDoor";
 import {
   assertCanManageAllScopes,
   canReadAnyScope,
@@ -24,6 +26,7 @@ import {
   getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders,
+  providerDeprecation,
 } from "./registry";
 import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 
@@ -296,6 +299,10 @@ export class ModelProviderService {
         ...provider_,
         isSystem: true,
         scopes: [],
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: providerKey,
+          customKeys: null,
+        }),
       });
     }
 
@@ -307,6 +314,13 @@ export class ModelProviderService {
         extraHeaders: this.maskExtraHeaders(
           mp.extraHeaders as { key: string; value: string }[] | null,
         ),
+        // Derived before masking: the door depends on the API key's
+        // presence, which the masked shape still shows, but deriving it
+        // here keeps the rule reading one row shape.
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: mp.provider,
+          customKeys: mp.customKeys,
+        }),
       }));
     return [...storedRows, ...systemRows];
   }
@@ -361,7 +375,15 @@ export class ModelProviderService {
     for (const [providerKey, provider_] of Object.entries(defaultProviders)) {
       if (savedProviderKeys.has(providerKey)) continue;
       if (!provider_.enabled) continue;
-      systemRows.push({ ...provider_, isSystem: true, scopes: [] });
+      systemRows.push({
+        ...provider_,
+        isSystem: true,
+        scopes: [],
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: providerKey,
+          customKeys: null,
+        }),
+      });
     }
     // Managed bedrock: env var MANAGED_BEDROCK__<label>__<orgId> sets
     // up cross-account credentials for a specific org. Surface a SYSTEM
@@ -389,6 +411,10 @@ export class ModelProviderService {
         extraHeaders: this.maskExtraHeaders(
           mp.extraHeaders as { key: string; value: string }[] | null,
         ),
+        embeddingsUnsupported: rowCannotServeEmbeddings({
+          provider: mp.provider,
+          customKeys: mp.customKeys,
+        }),
       }));
     return [...storedRows, ...systemRows];
   }
@@ -502,6 +528,21 @@ export class ModelProviderService {
     // NOT_FOUND so the client can refetch and retry.
     if (id && !existingProvider) {
       throw new ModelProviderNotFoundError();
+    }
+
+    // A deprecated provider accepts no NEW rows. The Add menu hides it,
+    // but hiding a tile is not enforcement: a direct API call, an SDK, or
+    // a stale frontend would keep minting rows under a provider whose
+    // whole purpose is to reach zero, and the compatibility entry could
+    // never be deleted. Keyed on there being no existing row, so editing,
+    // disabling, re-scoping and deleting a stored row all stay open —
+    // that is what keeps a deployment mid-fold from being stranded.
+    const deprecation = providerDeprecation(provider);
+    if (!existingProvider && deprecation) {
+      throw new ModelProviderDeprecatedError({
+        provider,
+        replacement: deprecation.replacedBy,
+      });
     }
 
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,

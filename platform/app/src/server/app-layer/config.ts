@@ -58,7 +58,7 @@ export interface AppConfig {
   hubspotFormId?: string;
 
   // Process role — controls which event-sourcing consumers run.
-  // "web": dispatch commands only (no BullMQ workers)
+  // "web": dispatch commands only (no queue consumers)
   // "worker": full consumers
   // "all": web server + full consumers in one process (dev-only, WORKERS_IN_PROCESS=1)
   // "migration": direct processCommand() calls, reactors excluded

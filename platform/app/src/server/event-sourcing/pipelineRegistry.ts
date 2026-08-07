@@ -1070,7 +1070,7 @@ export class PipelineRegistry {
     const traceCommands = mapCommands(tracePipeline.commands);
     resolveOrigin.resolve(traceCommands.resolveOrigin);
 
-    // Wire the deferred origin resolution queue (BullMQ-backed, survives process restart).
+    // Wire the deferred origin resolution queue (GroupQueue-backed, survives process restart).
     // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → reactor.
     const deferredOriginHandler = createDeferredOriginHandler(resolveOrigin.fn);
     const deferredOriginQueue =
